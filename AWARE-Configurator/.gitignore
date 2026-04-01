@@ -41,7 +41,6 @@ yarn-error.log*
 
 # Project specific
 /saved_json_files/
-*.json
 
 # Migrations
 */migrations/*.py
