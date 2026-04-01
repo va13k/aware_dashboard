@@ -1,13 +1,15 @@
 #!/bin/sh
 
-# ── GET: load existing .env ──
+# GET: load existing .env
 if [ "$REQUEST_METHOD" = "GET" ]; then
     printf "Content-Type: application/json\r\n\r\n"
 
-    if [ -f "$HOST_PROJECT_DIR/.env" ]; then
+    if [ -f /project/.env ]; then
         MYSQL_PASS=""
         DJANGO_KEY=""
         DJANGO_HOSTS=""
+        PUBLIC_HOST=""
+        PUBLIC_PORT=""
         PROTOCOL=""
         SSL_CERT=""
         SSL_KEY=""
@@ -16,53 +18,78 @@ if [ "$REQUEST_METHOD" = "GET" ]; then
                 MYSQL_ROOT_PASSWORD) MYSQL_PASS="$value" ;;
                 DJANGO_SECRET_KEY) DJANGO_KEY="$value" ;;
                 DJANGO_ALLOWED_HOSTS) DJANGO_HOSTS="$value" ;;
+                PUBLIC_HOST) PUBLIC_HOST="$value" ;;
+                PUBLIC_PORT) PUBLIC_PORT="$value" ;;
                 PROTOCOL) PROTOCOL="$value" ;;
                 SSL_CERTIFICATE_PATH) SSL_CERT="$value" ;;
                 SSL_CERTIFICATE_KEY_PATH) SSL_KEY="$value" ;;
             esac
-        done < "$HOST_PROJECT_DIR/.env"
-        printf '{"exists":true,"MYSQL_ROOT_PASSWORD":"%s","DJANGO_SECRET_KEY":"%s","DJANGO_ALLOWED_HOSTS":"%s","PROTOCOL":"%s","SSL_CERTIFICATE_PATH":"%s","SSL_CERTIFICATE_KEY_PATH":"%s"}' \
-            "$MYSQL_PASS" "$DJANGO_KEY" "$DJANGO_HOSTS" "$PROTOCOL" "$SSL_CERT" "$SSL_KEY"
+        done < /project/.env
+        printf '{"exists":true,"MYSQL_ROOT_PASSWORD":"%s","DJANGO_SECRET_KEY":"%s","DJANGO_ALLOWED_HOSTS":"%s","PUBLIC_HOST":"%s","PUBLIC_PORT":"%s","PROTOCOL":"%s","SSL_CERTIFICATE_PATH":"%s","SSL_CERTIFICATE_KEY_PATH":"%s"}' \
+            "$MYSQL_PASS" "$DJANGO_KEY" "$DJANGO_HOSTS" "$PUBLIC_HOST" "$PUBLIC_PORT" "$PROTOCOL" "$SSL_CERT" "$SSL_KEY"
     else
         printf '{"exists":false}'
     fi
     exit 0
 fi
 
-# ── POST: write .env and start build in background ──
+# POST: write .env and generate the micro-server config
 BODY=$(cat)
 
-ENV_CONTENT=$(echo "$BODY" | sed 's/.*"env":"//;s/"[^"]*$//' | sed 's/\\n/\
-/g')
+ENV_CONTENT=$(printf "%s" "$BODY" | python3 -c 'import json, sys; print(json.load(sys.stdin)["env"])')
 
-printf "%s\n" "$ENV_CONTENT" > "$HOST_PROJECT_DIR/.env"
+printf "%s\n" "$ENV_CONTENT" > /project/.env
+mkdir -p /project/studies /project/aware-micro-server/cache
 
-# Update aware-config.json external_server_host from the wizard values
-PROTOCOL=$(printf "%s" "$ENV_CONTENT" | grep "^PROTOCOL=" | cut -d= -f2)
-PRIMARY_HOST=$(printf "%s" "$ENV_CONTENT" | grep "^DJANGO_ALLOWED_HOSTS=" | cut -d= -f2 | cut -d, -f1)
-CONFIG_FILE="$HOST_PROJECT_DIR/aware-micro-server/aware-config.json"
-EXAMPLE_FILE="$HOST_PROJECT_DIR/aware-micro-server/aware-config.example.json"
-[ ! -f "$CONFIG_FILE" ] && [ -f "$EXAMPLE_FILE" ] && cp "$EXAMPLE_FILE" "$CONFIG_FILE"
-if [ -f "$CONFIG_FILE" ] && [ -n "$PROTOCOL" ] && [ -n "$PRIMARY_HOST" ]; then
-    PORT=80
-    [ "$PROTOCOL" = "https" ] && PORT=443
-    sed -i "s|\"external_server_host\":.*|\"external_server_host\": \"${PROTOCOL}://${PRIMARY_HOST}\",|" "$CONFIG_FILE"
-    sed -i "s|\"external_server_port\":.*|\"external_server_port\": ${PORT},|" "$CONFIG_FILE"
-fi
+python3 - <<'PY'
+import json
+import pathlib
+import secrets
 
-# Clean up previous run
-rm -f /tmp/deploy.done /tmp/deploy.running /tmp/compose.log
+project = pathlib.Path("/project")
+env_path = project / ".env"
+config_path = project / "aware-micro-server" / "aware-config.json"
+example_path = project / "aware-micro-server" / "aware-config.example.json"
 
-# Start build in background
-touch /tmp/deploy.running
-(
-    COMPOSE_FILE="$HOST_PROJECT_DIR/docker-compose.yml" docker compose \
-        --project-directory "$HOST_PROJECT_DIR" \
-        up --build -d mysql micro-server configurator nginx > /tmp/compose.log 2>&1
-    echo $? > /tmp/deploy.done
-    rm -f /tmp/deploy.running
-) </dev/null &
+env = {}
+for line in env_path.read_text(encoding="utf-8").splitlines():
+    if not line or line.startswith("#") or "=" not in line:
+        continue
+    key, value = line.split("=", 1)
+    env[key] = value
 
-# Return immediately
+protocol = env.get("PROTOCOL", "http")
+public_host = env.get("PUBLIC_HOST", "localhost")
+public_port = int(env.get("PUBLIC_PORT", "443" if protocol == "https" else "80"))
+
+source_path = config_path if config_path.exists() else example_path
+config = json.loads(source_path.read_text(encoding="utf-8"))
+
+server = config.setdefault("server", {})
+server["database_engine"] = "mysql"
+server["database_host"] = "mysql"
+server["database_name"] = "aware_ios"
+server["database_user"] = "aware_participant"
+server["database_pwd"] = "participantpass"
+server["database_port"] = 3306
+server["server_host"] = "0.0.0.0"
+server["server_port"] = 8080
+server["websocket_port"] = 8081
+server["external_server_host"] = f"{protocol}://{public_host}"
+server["external_server_port"] = public_port
+server["path_fullchain_pem"] = ""
+server["path_key_pem"] = ""
+
+study = config.setdefault("study", {})
+study["study_number"] = study.get("study_number", 1)
+study_key = str(study.get("study_key", "")).strip()
+if not study_key or study_key in {"your_study_key", "CHANGE_ME"}:
+    study["study_key"] = secrets.token_hex(6)
+
+config_path.write_text(json.dumps(config, indent=2) + "\n", encoding="utf-8")
+PY
+
+touch /project/.env.saved
+
 printf "Content-Type: application/json\r\n\r\n"
-printf '{"status":"started"}'
+printf '{"success":true}'
