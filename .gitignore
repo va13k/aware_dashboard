@@ -1,0 +1,27 @@
+# Environment - contains secrets, never commit
+.env
+
+# Studies - generated at runtime, not source code
+studies/
+
+# Node
+AWARE-Configurator/reactapp/node_modules/
+AWARE-Configurator/reactapp/build/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# Django
+AWARE-Configurator/db.sqlite3
+AWARE-Configurator/staticfiles/
+
+# Docker runtime cache
+aware-micro-server/cache/
+
+# Compiled JAR - built inside Docker, no need to commit
+aware-micro-server/output/*.jar
+
+# macOS
+.DS_Store

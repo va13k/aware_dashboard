@@ -1,0 +1,662 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>AWARE Dashboard setup</title>
+    <style>
+      *,
+      *::before,
+      *::after {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+      :root {
+        --bg: #fafaf8;
+        --surface: #ffffff;
+        --border: #e4e2db;
+        --border-focus: #33b5e5;
+        --text: #1c1c1a;
+        --text-muted: #6e6d68;
+        --text-hint: #9c9b95;
+        --accent: #33b5e5;
+        --accent-bg: #e6f6fc;
+        --accent-text: #0a5e7a;
+        --danger: #e24b4a;
+        --danger-bg: #fcebeb;
+        --radius: 10px;
+        --radius-lg: 14px;
+      }
+      body {
+        font-family:
+          system-ui,
+          -apple-system,
+          sans-serif;
+        background: var(--bg);
+        color: var(--text);
+        min-height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 2rem;
+      }
+      .container {
+        width: 100%;
+        max-width: 520px;
+      }
+      .logo {
+        font-size: 13px;
+        font-weight: 500;
+        letter-spacing: 0.05em;
+        color: var(--text-muted);
+        text-transform: uppercase;
+        margin-bottom: 0.5rem;
+      }
+      h1 {
+        font-size: 26px;
+        font-weight: 500;
+        margin-bottom: 0.25rem;
+      }
+      .subtitle {
+        font-size: 15px;
+        color: var(--text-muted);
+        margin-bottom: 2rem;
+      }
+      .steps {
+        display: flex;
+        gap: 6px;
+        margin-bottom: 2rem;
+      }
+      .steps span {
+        flex: 1;
+        height: 3px;
+        border-radius: 2px;
+        background: var(--border);
+        transition: background 0.3s;
+      }
+      .steps span.done,
+      .steps span.active {
+        background: var(--accent);
+      }
+      .card {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: var(--radius-lg);
+        padding: 1.75rem;
+        margin-bottom: 1rem;
+      }
+      .step-title {
+        font-size: 17px;
+        font-weight: 500;
+        margin-bottom: 0.25rem;
+      }
+      .step-desc {
+        font-size: 13px;
+        color: var(--text-muted);
+        margin-bottom: 1.5rem;
+      }
+      .field {
+        margin-bottom: 1.25rem;
+      }
+      .field:last-child {
+        margin-bottom: 0;
+      }
+      .field label {
+        display: block;
+        font-size: 13px;
+        font-weight: 500;
+        color: var(--text-muted);
+        margin-bottom: 6px;
+      }
+      .field input {
+        width: 100%;
+        height: 40px;
+        padding: 0 12px;
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        font-family: inherit;
+        font-size: 14px;
+        color: var(--text);
+        background: var(--surface);
+        outline: none;
+        transition: border-color 0.2s;
+      }
+      .field input:focus {
+        border-color: var(--border-focus);
+      }
+      .field input::placeholder {
+        color: var(--text-hint);
+      }
+      .hint {
+        font-size: 12px;
+        color: var(--text-hint);
+        margin-top: 5px;
+      }
+      .field-row {
+        display: flex;
+        gap: 8px;
+      }
+      .field-row input {
+        flex: 1;
+      }
+      .gen-btn {
+        height: 40px;
+        padding: 0 16px;
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        background: var(--surface);
+        font-family: inherit;
+        font-size: 13px;
+        color: var(--text);
+        cursor: pointer;
+        white-space: nowrap;
+      }
+      .gen-btn:hover {
+        background: var(--bg);
+      }
+      .toggle-row {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 4px 0;
+      }
+      .toggle {
+        width: 44px;
+        height: 24px;
+        border-radius: 12px;
+        background: var(--border);
+        cursor: pointer;
+        position: relative;
+        transition: background 0.2s;
+        flex-shrink: 0;
+      }
+      .toggle.on {
+        background: var(--accent);
+      }
+      .toggle-knob {
+        width: 20px;
+        height: 20px;
+        border-radius: 50%;
+        background: white;
+        position: absolute;
+        top: 2px;
+        left: 2px;
+        transition: left 0.2s;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+      }
+      .toggle.on .toggle-knob {
+        left: 22px;
+      }
+      .toggle-label {
+        font-size: 14px;
+      }
+      .toggle-hint {
+        font-size: 12px;
+        color: var(--text-hint);
+        margin-top: 2px;
+      }
+      .ssl-fields {
+        max-height: 0;
+        overflow: hidden;
+        transition: max-height 0.3s ease;
+      }
+      .ssl-fields.show {
+        max-height: 200px;
+      }
+      .nav {
+        display: flex;
+        gap: 8px;
+        justify-content: flex-end;
+      }
+      .btn {
+        height: 42px;
+        padding: 0 24px;
+        border-radius: var(--radius);
+        font-family: inherit;
+        font-size: 14px;
+        font-weight: 500;
+        cursor: pointer;
+        border: none;
+      }
+      .btn-back {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        color: var(--text);
+      }
+      .btn-back:hover {
+        background: var(--bg);
+      }
+      .btn-next {
+        background: var(--accent);
+        color: white;
+      }
+      .btn-next:hover {
+        background: #2a9ac4;
+      }
+      .output-label {
+        font-size: 13px;
+        font-weight: 500;
+        color: var(--text-muted);
+        margin-bottom: 8px;
+      }
+      .output-block {
+        background: var(--bg);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        padding: 1rem;
+        font-family: monospace;
+        font-size: 12.5px;
+        line-height: 1.7;
+        white-space: pre-wrap;
+        word-break: break-all;
+      }
+      .status {
+        text-align: center;
+        padding: 2rem 0;
+      }
+      .status-icon {
+        width: 56px;
+        height: 56px;
+        border-radius: 50%;
+        margin: 0 auto 1rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      .status-icon.loading {
+        background: var(--accent-bg);
+        animation: pulse 1.5s ease infinite;
+      }
+      .status-icon.success {
+        background: var(--accent-bg);
+      }
+      .status-icon.error {
+        background: var(--danger-bg);
+      }
+      @keyframes pulse {
+        0%,
+        100% {
+          transform: scale(1);
+        }
+        50% {
+          transform: scale(1.08);
+        }
+      }
+      .status-title {
+        font-size: 17px;
+        font-weight: 500;
+        margin-bottom: 0.25rem;
+      }
+      .status-desc {
+        font-size: 13px;
+        color: var(--text-muted);
+      }
+      .error-detail {
+        background: var(--danger-bg);
+        border-radius: var(--radius);
+        padding: 0.75rem 1rem;
+        font-size: 13px;
+        color: var(--danger);
+        margin-top: 1rem;
+        font-family: monospace;
+        text-align: left;
+      }
+      .hidden {
+        display: none;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <p class="logo">AWARE Framework</p>
+      <h1>Dashboard setup</h1>
+      <p class="subtitle">Configure your deployment in a few steps</p>
+
+      <div class="steps" id="steps">
+        <span class="active"></span><span></span><span></span><span></span>
+      </div>
+
+      <div class="card" id="s1">
+        <p class="step-title">Database</p>
+        <p class="step-desc">
+          MySQL stores all study data from Android and iOS devices
+        </p>
+        <div class="field">
+          <label>MySQL root password</label>
+          <input
+            type="password"
+            id="mysqlPass"
+            placeholder="Enter a strong password"
+          />
+          <p class="hint">All services use this to connect to MySQL</p>
+        </div>
+      </div>
+
+      <div class="card hidden" id="s2">
+        <p class="step-title">Configurator</p>
+        <p class="step-desc">
+          Django app that generates study configs for Android
+        </p>
+        <div class="field">
+          <label>Secret key</label>
+          <div class="field-row">
+            <input
+              type="text"
+              id="djangoKey"
+              placeholder="Click generate or type your own"
+            />
+            <button class="gen-btn" onclick="genKey()">Generate</button>
+          </div>
+          <p class="hint">Used internally for session security</p>
+        </div>
+        <div class="field">
+          <label>Allowed hosts</label>
+          <input
+            type="text"
+            id="djangoHosts"
+            value="localhost"
+            placeholder="yourdomain.com,localhost"
+          />
+          <p class="hint">
+            Comma-separated domains. Use localhost for local testing
+          </p>
+        </div>
+      </div>
+
+      <div class="card hidden" id="s3">
+        <p class="step-title">Network</p>
+        <p class="step-desc">
+          Nginx routes all traffic through a single entry point
+        </p>
+        <div class="toggle-row">
+          <div class="toggle" id="sslToggle" onclick="toggleSSL()">
+            <div class="toggle-knob"></div>
+          </div>
+          <div>
+            <p class="toggle-label">Enable HTTPS</p>
+            <p class="toggle-hint">
+              Requires SSL certificates (e.g. from Let's Encrypt)
+            </p>
+          </div>
+        </div>
+        <div class="ssl-fields" id="sslFields">
+          <div class="field" style="margin-top: 1rem">
+            <label>Certificate path</label>
+            <input type="text" id="certPath" value="./certs/fullchain.pem" />
+          </div>
+          <div class="field">
+            <label>Key path</label>
+            <input type="text" id="keyPath" value="./certs/privkey.pem" />
+          </div>
+        </div>
+      </div>
+
+      <div class="card hidden" id="s4">
+        <p class="step-title">Review</p>
+        <p class="step-desc">
+          This will be saved as .env and Docker will start automatically
+        </p>
+        <div style="margin-bottom: 1rem">
+          <p class="output-label">.env</p>
+          <div class="output-block" id="envPreview"></div>
+        </div>
+      </div>
+
+      <div class="card hidden" id="s5">
+        <div class="status">
+          <div class="status-icon loading" id="statusIcon">
+            <svg
+              width="24"
+              height="24"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="#33B5E5"
+              stroke-width="2"
+            >
+              <path
+                d="M12 2v4m0 12v4m-7.07-3.93l2.83-2.83m8.48-8.48l2.83-2.83M2 12h4m12 0h4M4.93 4.93l2.83 2.83m8.48 8.48l2.83 2.83"
+              />
+            </svg>
+          </div>
+          <p class="status-title" id="statusTitle">Deploying...</p>
+          <p class="status-desc" id="statusDesc">
+            Writing .env and starting Docker containers. This may take a few
+            minutes on first run.
+          </p>
+          <div class="error-detail hidden" id="errorDetail"></div>
+          <button
+            class="btn btn-back hidden"
+            id="editBtn"
+            onclick="restart()"
+            style="margin-top: 1.25rem"
+          >
+            Edit configuration
+          </button>
+        </div>
+      </div>
+
+      <div class="nav" id="nav">
+        <button class="btn btn-back hidden" id="backBtn" onclick="go(-1)">
+          Back
+        </button>
+        <button class="btn btn-next" id="nextBtn" onclick="go(1)">Next</button>
+      </div>
+    </div>
+
+    <script>
+      var step = 0,
+        ssl = false;
+
+      function go(dir) {
+        var next = step + dir;
+        if (next < 0 || next > 4) return;
+        if (next === 3) buildPreview();
+        if (next === 4) deploy();
+
+        document.getElementById("s" + (step + 1)).classList.add("hidden");
+        document.getElementById("s" + (next + 1)).classList.remove("hidden");
+
+        var bars = document.querySelectorAll(".steps span");
+        for (var i = 0; i < bars.length; i++) {
+          bars[i].className = i < next ? "done" : i === next ? "active" : "";
+        }
+        step = next;
+
+        var back = document.getElementById("backBtn");
+        var nb = document.getElementById("nextBtn");
+        var nav = document.getElementById("nav");
+
+        nav.classList.remove("hidden");
+        back.classList.toggle("hidden", step === 0);
+        nb.classList.remove("hidden");
+
+        if (step === 3) {
+          nb.textContent = "Deploy";
+        } else if (step === 4) {
+          nav.classList.add("hidden");
+        } else {
+          nb.textContent = "Next";
+        }
+      }
+
+      function restart() {
+        document.getElementById("s5").classList.add("hidden");
+        document.getElementById("s1").classList.remove("hidden");
+        document.getElementById("statusIcon").className = "status-icon loading";
+        document.getElementById("statusIcon").innerHTML =
+          '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#33B5E5" stroke-width="2"><path d="M12 2v4m0 12v4m-7.07-3.93l2.83-2.83m8.48-8.48l2.83-2.83M2 12h4m12 0h4M4.93 4.93l2.83 2.83m8.48 8.48l2.83 2.83"/></svg>';
+        document.getElementById("statusTitle").textContent = "Deploying...";
+        document.getElementById("statusDesc").textContent =
+          "Writing .env and starting Docker containers. This may take a few minutes on first run.";
+        document.getElementById("errorDetail").classList.add("hidden");
+        document.getElementById("editBtn").classList.add("hidden");
+
+        var bars = document.querySelectorAll(".steps span");
+        for (var i = 0; i < bars.length; i++) {
+          bars[i].className = i === 0 ? "active" : "";
+        }
+        step = 0;
+
+        var nav = document.getElementById("nav");
+        nav.classList.remove("hidden");
+        document.getElementById("backBtn").classList.add("hidden");
+        document.getElementById("nextBtn").classList.remove("hidden");
+        document.getElementById("nextBtn").textContent = "Next";
+      }
+
+      function toggleSSL() {
+        ssl = !ssl;
+        document.getElementById("sslToggle").classList.toggle("on", ssl);
+        document.getElementById("sslFields").classList.toggle("show", ssl);
+      }
+
+      function genKey() {
+        var c =
+          "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_";
+        var a = new Uint8Array(50),
+          k = "";
+        crypto.getRandomValues(a);
+        for (var i = 0; i < 50; i++) k += c[a[i] % c.length];
+        document.getElementById("djangoKey").value = k;
+      }
+
+      function getEnv() {
+        var mp = document.getElementById("mysqlPass").value || "CHANGE_ME";
+        var dk = document.getElementById("djangoKey").value || "CHANGE_ME";
+        var dh = document.getElementById("djangoHosts").value || "localhost";
+        var proto = ssl ? "https" : "http";
+        var e =
+          "MYSQL_ROOT_PASSWORD=" +
+          mp +
+          "\n" +
+          "DJANGO_SECRET_KEY=" +
+          dk +
+          "\n" +
+          "DJANGO_ALLOWED_HOSTS=" +
+          dh +
+          "\n" +
+          "PROTOCOL=" +
+          proto;
+        if (ssl) {
+          e +=
+            "\nSSL_CERTIFICATE_PATH=" +
+            document.getElementById("certPath").value;
+          e +=
+            "\nSSL_CERTIFICATE_KEY_PATH=" +
+            document.getElementById("keyPath").value;
+        }
+        return e;
+      }
+
+      function buildPreview() {
+        document.getElementById("envPreview").textContent = getEnv();
+      }
+
+      function deploy() {
+        var x = new XMLHttpRequest();
+        x.open("POST", "/cgi-bin/deploy", true);
+        x.setRequestHeader("Content-Type", "application/json");
+        x.onload = function () {
+          try {
+            var d = JSON.parse(x.responseText);
+            if (d.status === "started") {
+              pollStatus();
+            } else {
+              showError("Unexpected response from server");
+            }
+          } catch (e) {
+            showError("Invalid response from server");
+          }
+        };
+        x.onerror = function () {
+          showError("Could not reach the setup server. Is it still running?");
+        };
+        x.send(JSON.stringify({ env: getEnv() }));
+      }
+
+      function pollStatus() {
+        var interval = setInterval(function () {
+          var x = new XMLHttpRequest();
+          x.open("GET", "/cgi-bin/status", true);
+          x.onload = function () {
+            try {
+              var d = JSON.parse(x.responseText);
+              if (d.status === "running") {
+                var desc = document.getElementById("statusDesc");
+                if (d.log) {
+                  desc.textContent = d.log;
+                } else {
+                  desc.textContent =
+                    "Building containers... This may take several minutes on first run.";
+                }
+              } else if (d.status === "done") {
+                clearInterval(interval);
+                if (d.success) {
+                  document.getElementById("statusIcon").className =
+                    "status-icon success";
+                  document.getElementById("statusIcon").innerHTML =
+                    '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#33B5E5" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>';
+                  document.getElementById("statusTitle").textContent =
+                    "Deployed successfully";
+                  document.getElementById("statusDesc").textContent =
+                    "All containers are running.";
+                  document.getElementById("editBtn").classList.remove("hidden");
+                } else {
+                  showError(d.error || "Unknown error");
+                }
+              }
+            } catch (e) {}
+          };
+          x.send();
+        }, 3000);
+      }
+
+      function showError(msg) {
+        document.getElementById("statusIcon").className = "status-icon error";
+        document.getElementById("statusIcon").innerHTML =
+          '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#E24B4A" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>';
+        document.getElementById("statusTitle").textContent =
+          "Deployment failed";
+        document.getElementById("statusDesc").textContent =
+          "Check the error below.";
+        var el = document.getElementById("errorDetail");
+        el.textContent = msg;
+        el.classList.remove("hidden");
+        document.getElementById("nav").classList.remove("hidden");
+        document.getElementById("nextBtn").classList.add("hidden");
+      }
+
+      function loadExisting() {
+        var x = new XMLHttpRequest();
+        x.open("GET", "/cgi-bin/deploy", true);
+        x.onload = function () {
+          try {
+            var d = JSON.parse(x.responseText);
+            if (!d.exists) return;
+            document.querySelector(".subtitle").textContent =
+              "Existing configuration found. Update any fields and redeploy.";
+            if (d.MYSQL_ROOT_PASSWORD)
+              document.getElementById("mysqlPass").value =
+                d.MYSQL_ROOT_PASSWORD;
+            if (d.DJANGO_SECRET_KEY)
+              document.getElementById("djangoKey").value = d.DJANGO_SECRET_KEY;
+            if (d.DJANGO_ALLOWED_HOSTS)
+              document.getElementById("djangoHosts").value =
+                d.DJANGO_ALLOWED_HOSTS;
+            if (d.PROTOCOL === "https") toggleSSL();
+            if (d.SSL_CERTIFICATE_PATH)
+              document.getElementById("certPath").value =
+                d.SSL_CERTIFICATE_PATH;
+            if (d.SSL_CERTIFICATE_KEY_PATH)
+              document.getElementById("keyPath").value =
+                d.SSL_CERTIFICATE_KEY_PATH;
+          } catch (e) {}
+        };
+        x.send();
+      }
+
+      loadExisting();
+    </script>
+  </body>
+</html>

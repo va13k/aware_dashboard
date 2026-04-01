@@ -1,0 +1,21 @@
+# Git
+.git/
+.gitignore
+
+# Gradle
+.gradle/
+build/
+.idea/
+gradlew.bat
+
+# OS garbage
+.vscode/
+*.swp
+.DS_Store
+README.adoc
+LICENSE
+
+# Docker
+Dockerfile
+docker-compose*.yml
+.dockerignore

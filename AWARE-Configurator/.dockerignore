@@ -1,0 +1,37 @@
+# Git
+.git
+.gitignore
+
+# Python
+__pycache__
+*.pyc
+*.pyo
+django_test/
+
+# db
+db.sqlite3
+
+# node
+reactapp/node_modules
+reactapp/build
+
+# IDE / OS Junk
+.vscode
+.idea
+*.swp
+.DS_Store
+
+# Docker
+Dockerfile
+docker_compose*.yml
+.dockerignore
+
+# ESLint
+reactapp/.eslintrc*
+reactapp/.prettierrc*
+reactapp/.stylelintrc*
+reactapp/.eslintignore
+
+# nginx
+util/nginx_config_http
+util/nginx_config_https
