@@ -3,7 +3,7 @@
     "database_engine": "mysql",
     "database_host": "mysql",
     "database_name": "aware_ios",
-    "database_user": "aware_participant",
+    "database_user": "aware_ios_participant",
     "database_pwd": "participantpass",
     "database_port": 3306,
     "server_host": "0.0.0.0",
