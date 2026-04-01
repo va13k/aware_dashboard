@@ -1,29 +1,30 @@
 # AWARE Dashboard
 
-A Docker-based research framework for collecting sensor and survey data from Android and iOS devices. Combines a study configurator, a mobile data server, a shared MySQL database, and an Nginx reverse proxy — all deployable with a single command.
+A Docker-based research framework for collecting sensor and survey data from Android and iOS devices. It combines a study configurator, a mobile data server, a shared MySQL database, and an Nginx reverse proxy into a single setup flow.
 
-## Architecture
+## Endpoints
 
-```
-Internet → Nginx (:80 / :443)
-              ├── /configurator/  → AWARE Configurator (Django + React)
-              ├── /studies/       → Static JSON study config files
-              ├── /index.php/     → AWARE Micro Server (Vert.x / Kotlin)
-              └── /api/           → AWARE Micro Server (alternative path)
+The user-facing endpoints are exposed by **Nginx** on ports `80` and `443`.
 
-           All services → MySQL (internal Docker network only)
-```
+### User-facing endpoints
 
-| Component              | Role                                                                                         |
-| ---------------------- | -------------------------------------------------------------------------------------------- |
-| **AWARE Configurator** | Web UI for creating Android study configs. Saves JSON files served to the Android AWARE app. |
-| **AWARE Micro Server** | Backend for the iOS AWARE app. Handles device registration, table creation, and data upload. |
-| **MySQL**              | Stores all collected sensor and survey data from both platforms.                             |
-| **Nginx**              | Single public entry point. Routes traffic, serves static files, handles SSL termination.     |
+| Public path | Purpose | Backing service |
+| --- | --- | --- |
+| `/configurator/` | Android study builder UI | Django + React configurator |
+| `/studies/` | Static Android study JSON files | Files saved by the configurator and served by Nginx |
+| `/micro-server/` | Browser-friendly path to the micro-server root | AWARE Micro Server |
+| `/index.php/` | iOS client API and study join endpoints | AWARE Micro Server |
+| `/:studyNumber/:studyKey` | Join page for a specific iOS study | AWARE Micro Server |
+
+### Notes
+
+- `/micro-server/` is the preferred browser-facing path for the micro-server.
+- `/index.php/` is mainly for AWARE mobile clients. Plain `GET /index.php/` is not a standalone page.
+- `/studies/` is where Android study JSON files are exposed after you save a study.
 
 ## Prerequisites
 
-- [Docker](https://docs.docker.com/get-docker/) (v20.10 or later, with Compose v2)
+- [Docker](https://docs.docker.com/get-docker/) with Compose v2
 - [Git](https://git-scm.com/)
 
 ## Deployment
@@ -35,77 +36,101 @@ git clone https://github.com/va13k/aware_dashboard.git
 cd aware_dashboard
 ```
 
-### 2. Run the setup wizard
+### 2. Run the one-command setup flow
 
-**macOS / Linux:**
+macOS / Linux:
 
 ```bash
 ./setup.sh
 ```
 
-**Windows:**
+Windows:
 
 ```bat
 setup.bat
 ```
 
-This launches a setup wizard at **http://localhost:9999**. Fill in the form and click **Deploy** — it will write your `.env` file and build and start all containers automatically.
+This opens a setup wizard at `http://localhost:9999`.
 
-### 3. Configure the AWARE Micro Server
+When you click **Deploy**, the setup flow will:
 
-Edit `aware-micro-server/aware-config.json` to match your server's IP/domain, database credentials, and the sensors/plugins you want to collect. Use `aware-micro-server/aware-config.example.json` as a reference.
+1. write `.env`
+2. create or update `aware-micro-server/aware-config.json`
+3. build the Docker images
+4. start MySQL, the configurator, the micro-server, and Nginx
 
-> Changes to `aware-config.json` are picked up automatically — no restart needed. Connected iOS devices will sync the updated config within their next sync interval.
+The intended local prerequisites are only Git and Docker.
+
+### Headless Linux server deployment
+
+If you deploy on a Linux server without a graphical desktop, the setup still works, but the browser step happens from another machine.
+
+Step by step:
+
+1. SSH into the server.
+2. Run `./setup.sh`.
+3. The script starts the setup wizard on port `9999`.
+4. Because the server has no GUI, the automatic browser open may do nothing. That is expected.
+5. Open the setup wizard from your own computer using one of these methods:
+
+Option 1: SSH tunnel
+
+```bash
+ssh -L 9999:localhost:9999 your-user@your-server
+```
+
+Then open `http://localhost:9999` on your local machine.
+
+Option 2: Temporary public access
+
+Temporarily expose port `9999` on the server firewall, open `http://your-server-ip:9999` from your own computer, finish setup, and then close that port again.
+
+Once you click **Deploy** in the wizard, the server-side `./setup.sh` process continues automatically, writes the configuration files, and starts the full stack.
+
+### 3. Adjust the micro-server study config if needed
+
+The setup flow generates `aware-micro-server/aware-config.json` from `aware-micro-server/aware-config.example.json`, using the host and protocol you entered in the wizard.
+
+After deployment, you can edit `aware-micro-server/aware-config.json` to change:
+
+- study metadata
+- researcher details
+- enabled sensors and plugins
+- iOS study key and study number
+
+Changes to `aware-config.json` are reloaded by AWARE Micro automatically.
 
 ### 4. Access the services
 
-Once running, the services are available at:
-
-| Service                | URL                                |
-| ---------------------- | ---------------------------------- |
+| Service | URL |
+| --- | --- |
 | Configurator (Android) | `http://your-server/configurator/` |
-| Study JSON files       | `http://your-server/studies/`      |
-| Micro Server API (iOS) | `http://your-server/index.php/`    |
+| Android study files | `http://your-server/studies/` |
+| Micro Server UI | `http://your-server/micro-server/` |
+| Micro Server API (iOS) | `http://your-server/index.php/` |
 
-## Setting up a study
+## Setting Up A Study
 
 ### Android
 
-1. Open the Configurator at `/configurator/`
-2. Fill in study info, database connection, sensors, and questions
-3. On the Overview page, click **Save to server**
-4. The study JSON is saved to `studies/` and immediately accessible at `http://your-server/studies/<uuid>.json`
-5. Enter that URL in the AWARE Android app to join the study
+1. Open `/configurator/`.
+2. Fill in study info, database connection, sensors, and questions.
+3. On the Overview page, click **Download Study Config**.
+4. The study file is saved into `studies/` and exposed at `/studies/<study-id>.json`.
+5. Share that URL with Android participants.
 
 ### iOS
 
-1. Edit `aware-micro-server/aware-config.json` with your study sensors and server IP
-2. In the AWARE iOS app, enter `http://your-server/index.php/<study_number>/<study_key>` to join
+1. Edit `aware-micro-server/aware-config.json` if needed.
+2. In the AWARE iOS app, enter `http://your-server/index.php/<study_number>/<study_key>` to join.
 
-## Enabling HTTPS
+## HTTPS
 
-### 1. Obtain SSL certificates (e.g. with Let's Encrypt)
+1. Obtain certificates, for example with Let's Encrypt.
+2. Place them in a readable location such as `./certs/fullchain.pem` and `./certs/privkey.pem`.
+3. Re-run `./setup.sh` or `setup.bat` and enable HTTPS in the wizard.
 
-```bash
-sudo certbot certonly --standalone -d yourdomain.com
-```
-
-### 2. Make certificates readable
-
-```bash
-mkdir -p certs
-sudo cp /etc/letsencrypt/live/yourdomain.com/fullchain.pem ./certs/
-sudo cp /etc/letsencrypt/live/yourdomain.com/privkey.pem ./certs/
-sudo chmod 644 ./certs/*.pem
-```
-
-### 3. Re-run the setup wizard and select HTTPS
-
-```bash
-./setup.sh
-```
-
-Set `PROTOCOL=https` and provide the certificate paths. Nginx will redirect all HTTP traffic to HTTPS automatically.
+Nginx will terminate TLS and redirect HTTP traffic to HTTPS.
 
 ## Common Operations
 
@@ -115,7 +140,7 @@ docker compose logs -f
 docker compose logs -f configurator
 docker compose logs -f micro-server
 
-# Restart a single service
+# Restart one service
 docker compose restart configurator
 
 # Stop everything
@@ -127,48 +152,48 @@ docker compose down -v
 
 ## Project Structure
 
-```
+```text
 aware_dashboard/
-├── setup.sh / setup.bat          # One-command deployment wizard
-├── docker-compose.yml
-├── .env                          # Generated by setup wizard (not committed)
-├── env.example                   # Template showing available variables
-├── nginx/
-│   ├── http.conf
-│   └── https.conf
-├── db/
-│   └── create_dbs.sql            # Creates aware_android and aware_ios databases
-├── studies/                      # Saved Android study JSON files (runtime, not committed)
-├── AWARE-Configurator/           # Django + React study configurator
-├── aware-micro-server/           # Kotlin/Vert.x iOS data server
-│   ├── aware-config.json         # Live server config (not committed — contains credentials)
-│   └── aware-config.example.json # Reference template
-└── setup/                        # Setup wizard container
+|- setup.sh / setup.bat          # One-command setup entry points
+|- docker-compose.yml
+|- .env                          # Generated by the setup wizard
+|- env.example                   # Example environment variables
+|- nginx/
+|  |- http.conf
+|  `- https.conf
+|- db/
+|  `- create_dbs.sql            # Creates aware_android and aware_ios databases and service users
+|- studies/                     # Saved Android study JSON files, served at /studies/
+|- AWARE-Configurator/          # Django + React study configurator
+|- aware-micro-server/          # Kotlin/Vert.x iOS data server
+|  |- aware-config.json         # Generated live server config
+|  `- aware-config.example.json # Setup template
+`- setup/                       # Setup wizard container
 ```
 
 ## Troubleshooting
 
-**Services won't start / stuck waiting:**
-MySQL can take 30–60 seconds to initialize on first run.
+**Services take a while to start**
+
+MySQL can take 30-60 seconds to initialize on first run.
 
 ```bash
 docker compose logs mysql
 ```
 
-**Cannot reach the server from outside:**
-Make sure ports 80 and 443 are open in your firewall.
+**Cannot reach the server from outside**
+
+Make sure ports `80` and `443` are open in your firewall.
+
+**Configurator shows a blank page after changing domain or protocol**
+
+Rebuild the configurator so the frontend gets the updated public host and protocol:
 
 ```bash
-# Ubuntu/Debian
-sudo ufw allow 80 && sudo ufw allow 443
+docker compose build configurator
+docker compose up -d configurator
 ```
 
-**Configurator shows a blank page after changing domain:**
-The React app has the server address baked in at build time. Rebuild after changing `SERVER_IP` or `PROTOCOL`:
+**iOS data is not appearing in the database**
 
-```bash
-docker compose build configurator && docker compose up -d configurator
-```
-
-**iOS data not appearing in the database:**
-The Micro Server user needs `CREATE` and `INSERT` privileges on the `aware_ios` database — not just `INSERT`. Re-run the setup wizard or grant privileges manually.
+The `aware_participant` MySQL user must keep `CREATE` and `INSERT` privileges on `aware_ios`.
