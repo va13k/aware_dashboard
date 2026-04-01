@@ -5,11 +5,8 @@ services:
     profiles: ["setup"]
     ports:
       - "9999:9999"
-    environment:
-      HOST_PROJECT_DIR: ${PWD}
     volumes:
-      - ${PWD}:${PWD}
-      - /var/run/docker.sock:/var/run/docker.sock
+      - .:/project
 
   mysql:
     image: mysql:8.0
@@ -25,8 +22,7 @@ services:
     networks:
       - aware_network
     healthcheck:
-      test:
-        ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-proot"]
+      test: ["CMD-SHELL", "mysqladmin ping -h localhost -u root -p$${MYSQL_ROOT_PASSWORD}"]
       interval: 10s
       timeout: 5s
       retries: 10
@@ -36,8 +32,7 @@ services:
     container_name: aware_micro
     restart: unless-stopped
     volumes:
-      - ./aware-micro-server/aware-config.json:/app/aware-config.json
-      - ./aware-micro-server/cache:/app/cache
+      - ./aware-micro-server/aware-config.json:/app/aware-config.json:ro
     expose:
       - "8080"
     networks:
@@ -50,9 +45,9 @@ services:
     build:
       context: ./AWARE-Configurator
       args:
-        SERVER_PROTOCOL: http
-        SERVER_IP: localhost
-        SERVER_PORT: "80"
+        SERVER_PROTOCOL: ${PROTOCOL:-http}
+        SERVER_IP: ${PUBLIC_HOST:-localhost}
+        SERVER_PORT: "${PUBLIC_PORT:-80}"
         SERVER_BASE_PATH: /configurator
     container_name: aware_configurator
     restart: unless-stopped
