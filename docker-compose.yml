@@ -22,7 +22,11 @@ services:
     networks:
       - aware_network
     healthcheck:
-      test: ["CMD-SHELL", "mysqladmin ping -h localhost -u root -p$${MYSQL_ROOT_PASSWORD}"]
+      test:
+        [
+          "CMD-SHELL",
+          "mysqladmin ping -h localhost -u root -p$${MYSQL_ROOT_PASSWORD}",
+        ]
       interval: 10s
       timeout: 5s
       retries: 10
@@ -31,6 +35,10 @@ services:
     build: ./aware-micro-server
     container_name: aware_micro
     restart: unless-stopped
+    develop:
+      watch:
+        - path: ./aware-micro-server/aware-config.json
+          action: restart
     volumes:
       - ./aware-micro-server/aware-config.json:/app/aware-config.json:ro
     expose:
