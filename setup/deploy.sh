@@ -37,6 +37,19 @@ ENV_CONTENT=$(echo "$BODY" | sed 's/.*"env":"//;s/"[^"]*$//' | sed 's/\\n/\
 
 printf "%s\n" "$ENV_CONTENT" > "$HOST_PROJECT_DIR/.env"
 
+# Update aware-config.json external_server_host from the wizard values
+PROTOCOL=$(printf "%s" "$ENV_CONTENT" | grep "^PROTOCOL=" | cut -d= -f2)
+PRIMARY_HOST=$(printf "%s" "$ENV_CONTENT" | grep "^DJANGO_ALLOWED_HOSTS=" | cut -d= -f2 | cut -d, -f1)
+CONFIG_FILE="$HOST_PROJECT_DIR/aware-micro-server/aware-config.json"
+EXAMPLE_FILE="$HOST_PROJECT_DIR/aware-micro-server/aware-config.example.json"
+[ ! -f "$CONFIG_FILE" ] && [ -f "$EXAMPLE_FILE" ] && cp "$EXAMPLE_FILE" "$CONFIG_FILE"
+if [ -f "$CONFIG_FILE" ] && [ -n "$PROTOCOL" ] && [ -n "$PRIMARY_HOST" ]; then
+    PORT=80
+    [ "$PROTOCOL" = "https" ] && PORT=443
+    sed -i "s|\"external_server_host\":.*|\"external_server_host\": \"${PROTOCOL}://${PRIMARY_HOST}\",|" "$CONFIG_FILE"
+    sed -i "s|\"external_server_port\":.*|\"external_server_port\": ${PORT},|" "$CONFIG_FILE"
+fi
+
 # Clean up previous run
 rm -f /tmp/deploy.done /tmp/deploy.running /tmp/compose.log
 
