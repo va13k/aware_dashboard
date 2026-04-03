@@ -63,7 +63,7 @@ fi
 rm -f .env.saved
 
 # Build and start the wizard
-docker compose --profile setup up --build -d setup-wizard
+sudo docker compose --profile setup up --build -d setup-wizard
 
 echo ""
 echo "  Setup wizard is running."
@@ -92,11 +92,11 @@ echo "  Configuration saved! Starting services..."
 echo ""
 
 # Stop the wizard
-docker compose --profile setup stop setup-wizard 2>/dev/null
-docker compose --profile setup rm -f setup-wizard 2>/dev/null
+sudo docker compose --profile setup stop setup-wizard 2>/dev/null
+sudo docker compose --profile setup rm -f setup-wizard 2>/dev/null
 
 # Start the actual services
-docker compose up --build -d
+sudo docker compose up --build -d
 
 echo ""
 echo "  All services are starting."
