@@ -30,7 +30,7 @@ RUN pip install --no-cache-dir -r requirements.txt gunicorn
 COPY . .
 COPY --from=frontend /app/reactapp/build ./reactapp/build
 
-ENV DJANGO_ALLOWED_HOSTS="localhost"
+ENV PUBLIC_HOST="localhost"
 ENV DJANGO_STATIC_ROOT="/app/staticfiles"
 
 RUN python manage.py collectstatic --noinput && \

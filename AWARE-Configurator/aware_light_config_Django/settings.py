@@ -11,6 +11,7 @@ https://docs.djangoproject.com/en/4.1/ref/settings/
 """
 import os
 from pathlib import Path
+from urllib.parse import urlparse
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 
@@ -26,7 +27,39 @@ SECRET_KEY = SECRET_KEY = os.environ.get("DJANGO_SECRET_KEY", "django-insecure-f
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.environ.get("DJANGO_DEBUG", "False").lower() == "true"
 
-ALLOWED_HOSTS = os.environ.get("DJANGO_ALLOWED_HOSTS", "localhost").split(",")
+
+def _normalize_host(raw_value):
+    value = (raw_value or "").strip()
+    if not value:
+        return ""
+    if "://" in value:
+        value = urlparse(value).hostname or ""
+    elif value.startswith("[") and "]" in value:
+        value = value[1:value.index("]")]
+    elif value.count(":") == 1:
+        value = value.split(":", 1)[0]
+    return value.strip().strip("/")
+
+
+def _allowed_hosts():
+    configured = os.environ.get("DJANGO_ALLOWED_HOSTS", "").strip()
+    values = configured.split(",") if configured else [os.environ.get("PUBLIC_HOST", "localhost")]
+
+    hosts = []
+    for item in values:
+        host = _normalize_host(item)
+        if host and host not in hosts:
+            hosts.append(host)
+
+    for fallback_host in ["localhost", "127.0.0.1", "[::1]"]:
+        host = _normalize_host(fallback_host)
+        if host not in hosts:
+            hosts.append(host)
+
+    return hosts
+
+
+ALLOWED_HOSTS = _allowed_hosts()
 
 # Application definition
 

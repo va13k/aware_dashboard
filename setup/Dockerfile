@@ -3,6 +3,8 @@ RUN apk add --no-cache busybox-extras python3
 WORKDIR /wizard
 COPY setup.html /wizard/index.html
 COPY deploy.sh /wizard/cgi-bin/deploy
+COPY deploy_config.py /wizard/deploy_config.py
+COPY studies_index_template.html /wizard/studies_index_template.html
 RUN sed -i 's/\r$//' /wizard/cgi-bin/deploy && \
     chmod +x /wizard/cgi-bin/deploy
 EXPOSE 9999

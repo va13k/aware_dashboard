@@ -1,0 +1,206 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>AWARE Dashboard</title>
+    <style>
+      :root {
+        --bg: #f3efe6;
+        --surface: rgba(255, 253, 248, 0.88);
+        --surface-strong: #fffdf8;
+        --border: rgba(48, 67, 54, 0.14);
+        --text: #193229;
+        --muted: #5f746b;
+        --accent: rgb(31, 179, 223);
+        --accent-soft: rgba(31, 179, 223, 0.16);
+        --shadow: 0 20px 60px rgba(25, 50, 41, 0.12);
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        font-family: "Avenir Next", Avenir, "Segoe UI", sans-serif;
+        color: var(--text);
+        background:
+          radial-gradient(circle at top left, rgba(31, 179, 223, 0.2), transparent 28%),
+          radial-gradient(circle at bottom right, rgba(182, 140, 76, 0.18), transparent 30%),
+          linear-gradient(160deg, #f7f3ea 0%, #efe7da 100%);
+      }
+
+      main {
+        width: min(1080px, calc(100% - 32px));
+        margin: 0 auto;
+        padding: 48px 0 64px;
+      }
+
+      .hero {
+        display: grid;
+        gap: 18px;
+        margin-bottom: 30px;
+      }
+
+      .eyebrow {
+        margin: 0;
+        text-transform: uppercase;
+        letter-spacing: 0.14em;
+        font-size: 12px;
+        color: var(--muted);
+      }
+
+      h1 {
+        margin: 0;
+        max-width: 12ch;
+        font-size: clamp(2.8rem, 6vw, 5.6rem);
+        line-height: 0.95;
+        font-weight: 700;
+      }
+
+      .subtitle {
+        margin: 0;
+        max-width: 720px;
+        font-size: 1.08rem;
+        line-height: 1.6;
+        color: var(--muted);
+      }
+
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+        gap: 18px;
+      }
+
+      .card {
+        display: grid;
+        gap: 18px;
+        padding: 24px;
+        border-radius: 24px;
+        background: var(--surface);
+        border: 1px solid var(--border);
+        box-shadow: var(--shadow);
+        backdrop-filter: blur(18px);
+        text-decoration: none;
+        color: inherit;
+        transition:
+          transform 0.18s ease,
+          border-color 0.18s ease,
+          box-shadow 0.18s ease;
+      }
+
+      .card:hover {
+        transform: translateY(-3px);
+        border-color: rgba(31, 179, 223, 0.5);
+        box-shadow: 0 24px 70px rgba(31, 179, 223, 0.14);
+      }
+
+      .card h2 {
+        margin: 0;
+        font-size: 1.35rem;
+        line-height: 1.2;
+      }
+
+      .card p {
+        margin: 0;
+        color: var(--muted);
+        line-height: 1.6;
+      }
+
+      .card-link {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        font-weight: 700;
+        color: var(--accent);
+      }
+
+      .card-link::after {
+        content: "->";
+      }
+
+      .footer-note {
+        margin-top: 18px;
+        font-size: 0.95rem;
+        color: var(--muted);
+      }
+
+      code {
+        font-family: "SFMono-Regular", Consolas, monospace;
+        font-size: 0.95em;
+      }
+
+      @media (max-width: 640px) {
+        main {
+          padding-top: 28px;
+        }
+
+        .card {
+          padding: 20px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <section class="hero">
+        <p class="eyebrow">AWARE Dashboard</p>
+        <h1>Main page</h1>
+        <p class="subtitle">
+          This page gives you 3 options to access the main AWARE Dashboard
+          endpoints: configurator, studies, and the setup wizard.
+        </p>
+      </section>
+
+      <section class="grid">
+        <a class="card" href="/configurator/">
+          <div>
+            <h2>Configurator</h2>
+            <p>
+              Build and manage Android study configurations through the public
+              configurator UI.
+            </p>
+          </div>
+          <span class="card-link">Open /configurator/</span>
+        </a>
+
+        <a class="card" href="/studies/">
+          <div>
+            <h2>Studies</h2>
+            <p>
+              Browse the public JSON study files served from
+              <code>/studies/</code>.
+            </p>
+          </div>
+          <span class="card-link">Open /studies/</span>
+        </a>
+
+        <a class="card" id="setup-card" href="http://localhost:9999/">
+          <div>
+            <h2>Setup Configurator</h2>
+            <p>
+              Open the setup wizard container. This is available while the setup
+              image is running on port <code>9999</code>.
+            </p>
+          </div>
+          <span class="card-link">Open setup wizard</span>
+        </a>
+      </section>
+
+      <p class="footer-note">
+        If the setup wizard is not running, the internal setup link will not be
+        reachable until you start it again with <code>./setup.sh</code> or
+        <code>setup.bat</code>.
+      </p>
+    </main>
+
+      <script>
+      (function () {
+        var host = window.location.hostname || "localhost";
+        document.getElementById("setup-card").href = "http://" + host + ":9999/";
+      })();
+    </script>
+  </body>
+</html>

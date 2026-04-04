@@ -60,9 +60,8 @@ services:
     container_name: aware_configurator
     restart: unless-stopped
     environment:
-      DJANGO_ALLOWED_HOSTS: ${DJANGO_ALLOWED_HOSTS:-localhost}
-      DJANGO_DEBUG: "false"
       DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:-change-me-in-production}
+      PUBLIC_HOST: ${PUBLIC_HOST:-localhost}
     volumes:
       - configurator_static:/app/staticfiles
       - ./studies:/app/saved_json_files
@@ -80,6 +79,7 @@ services:
       - "80:80"
       - "443:443"
     volumes:
+      - ./nginx/index.html:/usr/share/nginx/html/index.html:ro
       - ./nginx/${PROTOCOL:-http}.conf:/etc/nginx/conf.d/default.conf:ro
       - ./studies:/usr/share/nginx/html/studies:ro
       - configurator_static:/usr/share/nginx/html/configurator_static:ro

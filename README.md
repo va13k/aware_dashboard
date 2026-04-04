@@ -89,7 +89,7 @@ Once you click **Deploy** in the wizard, the server-side `./setup.sh` process co
 
 ### 3. Adjust the micro-server study config if needed
 
-The setup flow generates `aware-micro-server/aware-config.json` from `aware-micro-server/aware-config.example.json`, using the host and protocol you entered in the wizard.
+The setup flow generates `aware-micro-server/aware-config.json` from `aware-micro-server/aware-config.example.json`, using the public host and protocol you entered in the wizard. By default, it writes `server.database_host` from `PUBLIC_HOST`, `server.database_user` as `aware_ios_participant`, and `server.external_server_host` from the public URL. It also generates a Django secret key automatically when one is missing.
 
 After deployment, you can edit `aware-micro-server/aware-config.json` to change:
 
@@ -99,6 +99,17 @@ After deployment, you can edit `aware-micro-server/aware-config.json` to change:
 - iOS study key and study number
 
 Changes to `aware-config.json` are reloaded by AWARE Micro automatically.
+
+### Micro-server `server` fields
+
+These fields in `aware-micro-server/aware-config.json` are the ones that matter in this Docker deployment:
+
+- `database_engine`, `database_host`, `database_name`, `database_user`, `database_pwd`, `database_port`: required. The micro-server uses them to connect to MySQL and write iOS study data into `aware_ios`.
+- `external_server_host`, `external_server_port`: required for participant-facing study URLs, QR codes, and websocket URLs that the mobile client sees. These should match the public address participants actually use.
+- `server_host`, `server_port`, `websocket_port`: required internally. They control which address and ports the micro-server listens on inside the container stack. In this project they should normally stay `0.0.0.0`, `8080`, and `8081`.
+- `path_fullchain_pem`, `path_key_pem`: optional here. They are only needed if the micro-server itself terminates TLS. In this setup, Nginx handles HTTPS in front of the micro-server, so these can stay empty.
+
+If your public host and database host are different, you can override the generated defaults in `.env` with `MICRO_DATABASE_HOST` and `MICRO_EXTERNAL_HOST` before redeploying.
 
 ### 4. Access the services
 
@@ -194,6 +205,8 @@ docker compose build configurator
 docker compose up -d configurator
 ```
 
+The configurator now derives Django allowed hosts from `PUBLIC_HOST`, so `.env` only needs the public host once unless you want to override `DJANGO_ALLOWED_HOSTS` manually.
+
 **iOS data is not appearing in the database**
 
-The `aware_participant` MySQL user must keep `CREATE` and `INSERT` privileges on `aware_ios`.
+The `aware_ios_participant` MySQL user must keep `CREATE` and `INSERT` privileges on `aware_ios`.
