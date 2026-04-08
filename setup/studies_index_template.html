@@ -211,9 +211,9 @@
             This is the participant join endpoint generated from the current
             micro-server study configuration.
           </p>
-          <a class="study-link" href="{{STUDY_JOIN_URL}}">
+          <a class="study-link dynamic-link" data-path="{{STUDY_JOIN_PATH}}" href="{{STUDY_JOIN_PATH}}">
             <span>ios-study</span>
-            <code>{{STUDY_JOIN_URL}}</code>
+            <code>{{STUDY_JOIN_PATH}}</code>
           </a>
         </article>
       </section>
@@ -222,5 +222,20 @@
         <a class="button button-secondary" href="/">Back to main page</a>
       </div>
     </main>
+    <script>
+      (function () {
+        var origin = window.location.origin;
+        var links = document.querySelectorAll(".dynamic-link[data-path]");
+        for (var i = 0; i < links.length; i += 1) {
+          var link = links[i];
+          var path = link.getAttribute("data-path");
+          if (!path) continue;
+          var absoluteUrl = origin + path;
+          link.setAttribute("href", path);
+          var code = link.querySelector("code");
+          if (code) code.textContent = absoluteUrl;
+        }
+      })();
+    </script>
   </body>
 </html>

@@ -4,6 +4,7 @@ WORKDIR /wizard
 COPY setup.html /wizard/index.html
 COPY deploy.sh /wizard/cgi-bin/deploy
 COPY deploy_config.py /wizard/deploy_config.py
+COPY write_request_env.py /wizard/write_request_env.py
 COPY studies_index_template.html /wizard/studies_index_template.html
 RUN sed -i 's/\r$//' /wizard/cgi-bin/deploy && \
     chmod +x /wizard/cgi-bin/deploy

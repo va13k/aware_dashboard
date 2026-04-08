@@ -1,16 +1,34 @@
 #!/bin/sh
+set -e
 
 # GET: load existing .env
 if [ "$REQUEST_METHOD" = "GET" ]; then
     printf "Content-Type: application/json\r\n\r\n"
 
+    MYSQL_PASS=""
+    SUGGESTED_PUBLIC_HOST=""
+    PUBLIC_HOST=""
+    PUBLIC_PORT=""
+    PROTOCOL=""
+    SSL_CERT=""
+    SSL_KEY=""
+    EXISTS=false
+
+    if [ -f /project/.setup-defaults.env ]; then
+        while IFS='=' read -r key value; do
+            case "$key" in
+                PUBLIC_HOST)
+                    SUGGESTED_PUBLIC_HOST="$value"
+                    PUBLIC_HOST="$value"
+                    ;;
+                PUBLIC_PORT) PUBLIC_PORT="$value" ;;
+                PROTOCOL) PROTOCOL="$value" ;;
+            esac
+        done < /project/.setup-defaults.env
+    fi
+
     if [ -f /project/.env ]; then
-        MYSQL_PASS=""
-        PUBLIC_HOST=""
-        PUBLIC_PORT=""
-        PROTOCOL=""
-        SSL_CERT=""
-        SSL_KEY=""
+        EXISTS=true
         while IFS='=' read -r key value; do
             case "$key" in
                 MYSQL_ROOT_PASSWORD) MYSQL_PASS="$value" ;;
@@ -21,23 +39,30 @@ if [ "$REQUEST_METHOD" = "GET" ]; then
                 SSL_CERTIFICATE_KEY_PATH) SSL_KEY="$value" ;;
             esac
         done < /project/.env
-        printf '{"exists":true,"MYSQL_ROOT_PASSWORD":"%s","PUBLIC_HOST":"%s","PUBLIC_PORT":"%s","PROTOCOL":"%s","SSL_CERTIFICATE_PATH":"%s","SSL_CERTIFICATE_KEY_PATH":"%s"}' \
-            "$MYSQL_PASS" "$PUBLIC_HOST" "$PUBLIC_PORT" "$PROTOCOL" "$SSL_CERT" "$SSL_KEY"
-    else
-        printf '{"exists":false}'
     fi
+
+    printf '{"exists":%s,"MYSQL_ROOT_PASSWORD":"%s","SUGGESTED_PUBLIC_HOST":"%s","PUBLIC_HOST":"%s","PUBLIC_PORT":"%s","PROTOCOL":"%s","SSL_CERTIFICATE_PATH":"%s","SSL_CERTIFICATE_KEY_PATH":"%s"}' \
+        "$EXISTS" "$MYSQL_PASS" "$SUGGESTED_PUBLIC_HOST" "$PUBLIC_HOST" "$PUBLIC_PORT" "$PROTOCOL" "$SSL_CERT" "$SSL_KEY"
     exit 0
 fi
 
 # POST: write .env and generate the micro-server config
 BODY=$(cat)
 
-ENV_CONTENT=$(printf "%s" "$BODY" | python3 -c 'import json, sys; print(json.load(sys.stdin)["env"])')
 REQUEST_ENV_PATH=/tmp/aware-dashboard-request.env
-printf "%s\n" "$ENV_CONTENT" > "$REQUEST_ENV_PATH"
+if ! ERROR_MSG=$(printf "%s" "$BODY" | python3 /wizard/write_request_env.py "$REQUEST_ENV_PATH" 2>&1); then
+    printf "Content-Type: application/json\r\n\r\n"
+    printf '{"success":false,"error":"%s"}' "$ERROR_MSG"
+    exit 0
+fi
+
 mkdir -p /project/studies /project/aware-micro-server/cache
 
-python3 /wizard/deploy_config.py
+if ! ERROR_MSG=$(python3 /wizard/deploy_config.py 2>&1); then
+    printf "Content-Type: application/json\r\n\r\n"
+    printf '{"success":false,"error":"%s"}' "$ERROR_MSG"
+    exit 0
+fi
 
 rm -f "$REQUEST_ENV_PATH"
 
