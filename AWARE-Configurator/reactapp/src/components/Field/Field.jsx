@@ -96,10 +96,10 @@ export default function Field(inputs) {
 
   return (
     <Grid container rowSpacing={1} columnSpacing={{ xs: 1, sm: 2, md: 3 }}>
-      <Grid width="20%">
+      <Grid xs={12} md={3}>
         <p className="field_name">{fieldName + (required ? " *" : "")}</p>
       </Grid>
-      <Grid width="80%">
+      <Grid xs={12} md={9}>
         <TextField
           error={isError}
           required={required === undefined ? false : required}
@@ -130,11 +130,11 @@ export default function Field(inputs) {
             }
           }}
         />
-        {description === undefined ? "" : <Grid width="20%" />}
+        {description === undefined ? "" : <Grid xs={12} md={3} />}
         {description === undefined ? (
           ""
         ) : (
-          <Grid width="80%">
+          <Grid xs={12} md={9}>
             <p className="description" style={{ width: "100%" }}>
               {description}
             </p>

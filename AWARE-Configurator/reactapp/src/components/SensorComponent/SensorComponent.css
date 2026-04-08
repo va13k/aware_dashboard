@@ -1,6 +1,6 @@
 .field_name {
     font-size: 1rem;
-    color: black;
+    color: var(--cfg-ink);
 }
 
 .sensor_vertical_layout {
@@ -11,6 +11,7 @@
 
 .explanation {
     font-size: 1rem;
+    color: var(--cfg-muted);
 }
 /*.schedule_title {*/
 /*    margin-top: 1rem;*/

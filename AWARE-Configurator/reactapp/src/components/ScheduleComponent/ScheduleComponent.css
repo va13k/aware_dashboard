@@ -2,12 +2,12 @@
     margin-top: 1rem;
     margin-bottom: 0.5rem;
     font-size: 1.5rem;
-    color: black;
+    color: var(--cfg-ink);
 }
 
 .schedule_field_name {
     font-size: 1rem;
-    color: black;
+    color: var(--cfg-ink);
 }
 
 .schedule_vertical_layout {
@@ -17,10 +17,11 @@
 }
 
 .schedule_border {
-    border: 2px outset #666464;
-    box-shadow: 3px 3px 5px gray;
-    border-radius: 5px;
-    padding: 0 1rem;
+    border: 1px solid var(--cfg-border);
+    box-shadow: var(--cfg-shadow);
+    border-radius: var(--cfg-radius-lg);
+    background: linear-gradient(180deg, var(--cfg-surface) 0%, var(--cfg-surface-soft) 100%);
+    padding: 0.25rem 1rem 0.75rem;
     margin-top: 1rem;
 }
 
@@ -28,8 +29,93 @@
     display: flex;
     flex-direction: row;
     justify-content: space-between;
+    gap: 1rem;
+    align-items: flex-start;
 }
 
 .schedule-description {
-    width: 600px;
+    width: min(600px, 100%);
+}
+
+.schedule-selection-card {
+    border: 1px solid #d7dde5;
+    border-radius: 14px;
+    background: #f8fafc;
+    padding: 1rem;
+}
+
+.schedule-selection-title {
+    margin: 0 0 0.35rem 0;
+    font-size: 1rem;
+    font-weight: 700;
+    color: #111827;
+}
+
+.schedule-selection-copy,
+.schedule-helper-copy {
+    margin: 0;
+    font-size: 0.95rem;
+    line-height: 1.5;
+    color: #475569;
+}
+
+.schedule-options-grid {
+    display: grid;
+    gap: 0.35rem 0.75rem;
+    margin-top: 1rem;
+}
+
+.schedule-options-grid--hours {
+    grid-template-columns: repeat(auto-fit, minmax(92px, 1fr));
+}
+
+.schedule-options-grid--days {
+    grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+}
+
+.schedule-option {
+    margin: 0;
+    padding: 0.15rem 0.5rem;
+    border-radius: 10px;
+    background: white;
+    border: 1px solid #e2e8f0;
+}
+
+.schedule-option .MuiFormControlLabel-label {
+    font-size: 0.95rem;
+}
+
+.schedule-question-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    margin-top: 0.75rem;
+}
+
+.schedule-type-group {
+    gap: 0.25rem 1rem;
+}
+
+@media (max-width: 640px) {
+    .schedule_horizontal_layout {
+        align-items: flex-start;
+        gap: 0.5rem;
+    }
+
+    .schedule-description {
+        font-size: 0.95rem;
+    }
+
+    .schedule-selection-card {
+        padding: 0.85rem;
+    }
+
+    .schedule-options-grid--hours,
+    .schedule-options-grid--days {
+        grid-template-columns: 1fr 1fr;
+    }
+
+    .schedule-type-group {
+        flex-direction: column;
+    }
 }

@@ -8,11 +8,11 @@ import config from "../../settings";
 export default function PageHeader() {
   const navigateTo = useNavigate();
   return (
-    <div>
+    <div className="page_header_shell">
       <div className="top_bar" />
       <div className="page_header">
         <ThemeProvider theme={headerTheme}>
-          <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+          <div className="page_header__inner">
             <Button
               color="header"
               onClick={() => {
@@ -39,15 +39,6 @@ export default function PageHeader() {
           </div>
         </ThemeProvider>
       </div>
-
-      {/* eslint-disable-next-line jsx-a11y/no-static-element-interactions,jsx-a11y/click-events-have-key-events */}
-      {/* <div */}
-      {/*  onClick={() => { */}
-      {/*    navigateTo("/"); */}
-      {/*  }} */}
-      {/* > */}
-      {/*  <p className="page_header">AWARE Configuration Page</p> */}
-      {/* </div> */}
     </div>
   );
 }

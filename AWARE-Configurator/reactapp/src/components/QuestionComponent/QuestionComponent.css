@@ -2,12 +2,12 @@
     margin-top: 1rem;
     margin-bottom: 0.5rem;
     font-size: 1.5rem;
-    color: black;
+    color: var(--cfg-ink);
 }
 
 .question_field_name {
     font-size: 1rem;
-    color: black;
+    color: var(--cfg-ink);
 }
 
 .question_vertical_layout {
@@ -17,10 +17,11 @@
 }
 
 .question_border {
-    border: 2px outset #666464;
-    box-shadow: 3px 3px 5px gray;
-    border-radius: 5px;
-    padding: 0 1rem;
+    border: 1px solid var(--cfg-border);
+    box-shadow: var(--cfg-shadow);
+    border-radius: var(--cfg-radius-lg);
+    background: linear-gradient(180deg, var(--cfg-surface) 0%, var(--cfg-surface-soft) 100%);
+    padding: 0.25rem 1rem 0.75rem;
     margin-top: 1rem;
 }
 
@@ -28,4 +29,6 @@
     display: flex;
     flex-direction: row;
     justify-content: space-between;
+    gap: 1rem;
+    align-items: flex-start;
 }

@@ -86,6 +86,7 @@ export default function ScheduleComponent(input) {
             inGroup
             groupField="hours"
             label={`${padding(i, 2)}:00`}
+            className="schedule-option schedule-option--time"
           />
         );
       }
@@ -108,31 +109,52 @@ export default function ScheduleComponent(input) {
             inGroup
             groupField="days"
             label={day}
+            className="schedule-option schedule-option--day"
           />
         );
       });
       return (
         <Grid container rowSpacing={1} columnSpacing={{ xs: 1, sm: 2, md: 3 }}>
-          <Grid width="20%">
+          <Grid xs={12} md={3}>
             <p className="schedule_field_name">Hours</p>
           </Grid>
-          <Grid width="80%">{hours}</Grid>
+          <Grid xs={12} md={9}>
+            <div className="schedule-selection-card">
+              <p className="schedule-selection-title">Time slots</p>
+              <p className="schedule-selection-copy">
+                Choose every hour when this schedule should trigger.
+              </p>
+              <div className="schedule-options-grid schedule-options-grid--hours">
+                {hours}
+              </div>
+            </div>
+          </Grid>
 
-          <Grid width="20%" />
-          <Grid width="80%">
-            <p style={{ width: "100%" }}>
+          <Grid xs={12} md={3} />
+          <Grid xs={12} md={9}>
+            <p className="schedule-helper-copy" style={{ width: "100%" }}>
               Notification sent at the determined hours.
             </p>
           </Grid>
 
-          <Grid width="20%">
+          <Grid xs={12} md={3}>
             <p className="schedule_field_name">Days</p>
           </Grid>
-          <Grid width="80%">{days}</Grid>
+          <Grid xs={12} md={9}>
+            <div className="schedule-selection-card">
+              <p className="schedule-selection-title">Weekdays</p>
+              <p className="schedule-selection-copy">
+                Select the days when participants should receive this schedule.
+              </p>
+              <div className="schedule-options-grid schedule-options-grid--days">
+                {days}
+              </div>
+            </div>
+          </Grid>
 
-          <Grid width="20%" />
-          <Grid width="80%">
-            <p style={{ width: "100%" }}>
+          <Grid xs={12} md={3} />
+          <Grid xs={12} md={9}>
+            <p className="schedule-helper-copy" style={{ width: "100%" }}>
               Notification sent at the determined days.
             </p>
           </Grid>
@@ -187,10 +209,10 @@ export default function ScheduleComponent(input) {
     return (
       <div>
         <Grid container rowSpacing={1} columnSpacing={{ xs: 1, sm: 2, md: 3 }}>
-          <Grid width="20%">
+          <Grid xs={12} md={3}>
             <p className="schedule_field_name">Start time</p>
           </Grid>
-          <Grid width="80%">
+          <Grid xs={12} md={9}>
             <Select
               required
               style={{ width: "100%" }}
@@ -201,10 +223,10 @@ export default function ScheduleComponent(input) {
             </Select>
           </Grid>
 
-          <Grid width="20%">
+          <Grid xs={12} md={3}>
             <p className="schedule_field_name">End time</p>
           </Grid>
-          <Grid width="80%">
+          <Grid xs={12} md={9}>
             <Select
               required
               style={{ width: "100%" }}
@@ -303,10 +325,10 @@ export default function ScheduleComponent(input) {
             rowSpacing={1}
             columnSpacing={{ xs: 1, sm: 2, md: 3 }}
           >
-            <Grid width="30%">
+            <Grid xs={12} md={4}>
               <p className="schedule_field_name">Carrying Quesitons</p>
             </Grid>
-            <Grid width="70%">
+            <Grid xs={12} md={8}>
               <div className="schedule_vertical_layout">
                 <CustomizedCheckbox
                   key="esm_keep"
@@ -328,11 +350,17 @@ export default function ScheduleComponent(input) {
             rowSpacing={1}
             columnSpacing={{ xs: 1, sm: 2, md: 3 }}
           >
-            <Grid width="30%">
+            <Grid xs={12} md={4}>
               <p className="schedule_field_name">Included questions *</p>
             </Grid>
-            <Grid width="50%">
-              <div className="schedule_vertical_layout">{questionList}</div>
+            <Grid xs={12} md={8}>
+              <div className="schedule-selection-card">
+                <p className="schedule-selection-title">Question set</p>
+                <p className="schedule-selection-copy">
+                  Pick the questions that should be shown when this schedule is triggered.
+                </p>
+                <div className="schedule-question-list">{questionList}</div>
+              </div>
             </Grid>
           </Grid>
           <Grid
@@ -340,16 +368,17 @@ export default function ScheduleComponent(input) {
             rowSpacing={1}
             columnSpacing={{ xs: 1, sm: 2, md: 3 }}
           >
-            <Grid width="30%">
+            <Grid xs={12} md={4}>
               <p className="schedule_field_name">Schedule type</p>
             </Grid>
-            <Grid width="50%">
+            <Grid xs={12} md={8}>
               <RadioGroup
                 aria-labelledby="type"
                 defaultValue={SET_SCHEDULES}
                 value={schedules[scheduleIndex].type}
                 name="schedule"
                 row
+                className="schedule-type-group"
               >
                 <FormControlLabel
                   value={SET_SCHEDULES}
