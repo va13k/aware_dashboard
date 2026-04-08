@@ -2,14 +2,17 @@ import html
 import json
 import pathlib
 import secrets
-
-from shared_config.serializers import serialize_android_config, serialize_ios_config
+import sys
 
 
 SCRIPT_DIR = pathlib.Path(__file__).resolve().parent
 PROJECT = pathlib.Path("/project")
 if not PROJECT.exists():
     PROJECT = SCRIPT_DIR.parent
+if str(PROJECT) not in sys.path:
+    sys.path.insert(0, str(PROJECT))
+
+from shared_config.serializers import serialize_android_config, serialize_ios_config
 SOURCE_PATH = PROJECT / "source.json"
 ENV_PATH = PROJECT / ".env"
 REQUEST_ENV_PATH = pathlib.Path("/tmp/aware-dashboard-request.env")
