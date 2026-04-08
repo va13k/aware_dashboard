@@ -8,19 +8,20 @@ The user-facing endpoints are exposed by **Nginx** on ports `80` and `443`.
 
 ### User-facing endpoints
 
-| Public path | Purpose | Backing service |
-| --- | --- | --- |
-| `/configurator/` | Android study builder UI | Django + React configurator |
-| `/studies/` | Static Android study JSON files | Files saved by the configurator and served by Nginx |
-| `/micro-server/` | Browser-friendly path to the micro-server root | AWARE Micro Server |
-| `/index.php/` | iOS client API and study join endpoints | AWARE Micro Server |
-| `/:studyNumber/:studyKey` | Join page for a specific iOS study | AWARE Micro Server |
+| Public path               | Purpose                                                | Backing service                                     |
+| ------------------------- | ------------------------------------------------------ | --------------------------------------------------- |
+| `/`                       | Main page with links to the available services         | Nginx landing page                                  |
+| `/configurator/`          | Android study builder UI                               | Django + React configurator                         |
+| `/studies/`               | Studies page with Android files and iOS QR/join access | Generated page served by Nginx                      |
+| `/studies/files/`         | Raw Android study JSON file listing                    | Files saved by the configurator and served by Nginx |
+| `/:studyNumber/:studyKey` | Join page for a specific iOS study                     | AWARE Micro Server                                  |
 
 ### Notes
 
-- `/micro-server/` is the preferred browser-facing path for the micro-server.
-- `/index.php/` is mainly for AWARE mobile clients. Plain `GET /index.php/` is not a standalone page.
-- `/studies/` is where Android study JSON files are exposed after you save a study.
+- Open `http://localhost/` locally, or `http://your-hostname/` on your server, to reach the main page.
+- `/studies/` now combines Android study access with the iOS QR/join page.
+- `/studies/files/` keeps the raw Android JSON file browser.
+- The AWARE iOS client sends `POST` requests to `/index.php/...`; this is an API path, not a standalone user-facing page.
 
 ## Prerequisites
 
@@ -56,8 +57,12 @@ When you click **Deploy**, the setup flow will:
 
 1. write `.env`
 2. create or update `aware-micro-server/aware-config.json`
-3. build the Docker images
-4. start MySQL, the configurator, the micro-server, and Nginx
+3. create or update `studies/studyConfig.json`
+4. create or update `studies/index.html`
+5. build the Docker images
+6. start MySQL, the configurator, the micro-server, and Nginx
+
+The runtime stack in `docker-compose.yml` only contains the long-running services. File generation happens inside `setup.sh` and `setup.bat` before the containers are started.
 
 The intended local prerequisites are only Git and Docker.
 
@@ -113,27 +118,29 @@ If your public host and database host are different, you can override the genera
 
 ### 4. Access the services
 
-| Service | URL |
-| --- | --- |
-| Configurator (Android) | `http://your-server/configurator/` |
-| Android study files | `http://your-server/studies/` |
-| Micro Server UI | `http://your-server/micro-server/` |
-| Micro Server API (iOS) | `http://your-server/index.php/` |
+| Service                        | URL                                             |
+| ------------------------------ | ----------------------------------------------- |
+| Main page                      | `http://localhost/` or `http://your-hostname/`  |
+| Configurator (Android)         | `http://your-server/configurator/`              |
+| Android study files            | `http://your-server/studies/`                   |
+| Raw Android study file listing | `http://your-server/studies/files/`             |
+| iOS join page                  | `http://your-server/<study_number>/<study_key>` |
 
 ## Setting Up A Study
 
 ### Android
 
-1. Open `/configurator/`.
+1. Open the main page at `/`, then choose **Configurator**, or go directly to `/configurator/`.
 2. Fill in study info, database connection, sensors, and questions.
 3. On the Overview page, click **Download Study Config**.
-4. The study file is saved into `studies/` and exposed at `/studies/<study-id>.json`.
+4. The study file is saved into `studies/` and exposed at `/studies/files/<study-id>.json`.
 5. Share that URL with Android participants.
 
 ### iOS
 
-1. Edit `aware-micro-server/aware-config.json` if needed.
-2. In the AWARE iOS app, enter `http://your-server/index.php/<study_number>/<study_key>` to join.
+1. Open the main page at `/`, then choose **Studies**, or go directly to `/studies/`.
+2. Edit `aware-micro-server/aware-config.json` if needed.
+3. In the AWARE iOS app, use the QR code shown on `/studies/`, or enter `http://your-server/index.php/<study_number>/<study_key>` manually. The iOS client then communicates with `/index.php/...` using `POST` requests.
 
 ## HTTPS
 
@@ -147,18 +154,18 @@ Nginx will terminate TLS and redirect HTTP traffic to HTTPS.
 
 ```bash
 # View logs
-docker compose logs -f
-docker compose logs -f configurator
-docker compose logs -f micro-server
+sudo docker compose logs -f
+sudo docker compose logs -f configurator
+sudo docker compose logs -f micro-server
 
 # Restart one service
-docker compose restart configurator
+sudo docker compose restart configurator
 
 # Stop everything
-docker compose down
+sudo docker compose down
 
 # Stop and wipe all data (irreversible)
-docker compose down -v
+sudo docker compose down -v
 ```
 
 ## Project Structure
@@ -189,7 +196,7 @@ aware_dashboard/
 MySQL can take 30-60 seconds to initialize on first run.
 
 ```bash
-docker compose logs mysql
+sudo docker compose logs mysql
 ```
 
 **Cannot reach the server from outside**
@@ -198,12 +205,7 @@ Make sure ports `80` and `443` are open in your firewall.
 
 **Configurator shows a blank page after changing domain or protocol**
 
-Rebuild the configurator so the frontend gets the updated public host and protocol:
-
-```bash
-docker compose build configurator
-docker compose up -d configurator
-```
+Rerun `./setup.sh` so the generated files and the configurator build pick up the updated public host and protocol.
 
 The configurator now derives Django allowed hosts from `PUBLIC_HOST`, so `.env` only needs the public host once unless you want to override `DJANGO_ALLOWED_HOSTS` manually.
 
