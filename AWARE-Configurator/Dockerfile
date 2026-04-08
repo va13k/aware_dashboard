@@ -33,13 +33,9 @@ COPY --from=frontend /app/reactapp/build ./reactapp/build
 ENV PUBLIC_HOST="localhost"
 ENV DJANGO_STATIC_ROOT="/app/staticfiles"
 
-RUN python manage.py collectstatic --noinput && \
-    find reactapp/build -maxdepth 1 -type f ! -name 'index.html' -exec cp {} staticfiles/ \;
+RUN chmod +x /app/start.sh
 
-RUN useradd -r -s /bin/false appuser && \
-    mkdir -p /app/saved_json_files && \
-    chown -R appuser:appuser /app/saved_json_files
-USER appuser
+RUN mkdir -p /app/saved_json_files /app/staticfiles
 
 EXPOSE 8000
-CMD ["gunicorn", "aware_light_config_Django.wsgi:application", "-c", "util/gunicorn.conf.py"]
+CMD ["/app/start.sh"]

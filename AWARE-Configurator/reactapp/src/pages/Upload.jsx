@@ -1,9 +1,8 @@
 import "./Upload.css";
-import { Button, Divider, ThemeProvider } from "@mui/material";
+import { Button } from "@mui/material";
 import { useNavigate } from "react-router-dom";
-import { useRecoilState, useRecoilValue, useSetRecoilState } from "recoil";
-import React, { useState } from "react";
-// import { DropzoneArea } from "mui-file-dropzone";
+import { useSetRecoilState } from "recoil";
+import React, { useEffect, useState } from "react";
 import PageHeader from "../components/PageHeader/PageHeader";
 import {
   accelerometerState,
@@ -12,7 +11,6 @@ import {
   bluetoothState,
   communicationSensorState,
   createTimeState,
-  databaseConnectionState,
   databaseInformationState,
   gravityState,
   gyroscopeState,
@@ -35,7 +33,6 @@ import {
   screenshotSensorState,
   pluginSensorState,
 } from "../functions/atom";
-import customisedTheme from "../functions/theme";
 import Axios from "../functions/axiosSettings";
 import {
   RANDOM_TRIGGERS,
@@ -44,8 +41,9 @@ import {
 } from "../components/ScheduleComponent/ScheduleComponent";
 import { padding } from "../functions/utils";
 
+const STUDY_CONFIG_URL = "/studies/files/studyConfig.json";
+
 export default function Upload() {
-  // initialize csrf token
   Axios({
     method: "get",
     url: "get_token/",
@@ -82,47 +80,27 @@ export default function Upload() {
   const setCommunicationData = useSetRecoilState(communicationSensorState);
   const setScreenshotData = useSetRecoilState(screenshotSensorState);
   const setPluginData = useSetRecoilState(pluginSensorState);
-  const getData = (file) => {
-    fetch(file, {
-      headers: {
-        "Content-Type": "application/json",
-        Accept: "application/json",
-      },
-    })
-      .then(function (response) {
-        console.log(response);
-        return response.json();
-      })
-      .then(function (myJson) {
-        console.log(myJson);
-      });
-  };
+  const [loadState, setLoadState] = useState({
+    status: "loading",
+    message: `Loading ${STUDY_CONFIG_URL}...`,
+  });
 
-  const [jsonObject, setJsonObject] = useState("");
   const readJsonObject = (strValue) => {
     const jsonValue = JSON.parse(strValue);
 
-    // read _id
-    // eslint-disable-next-line no-underscore-dangle
     setStudyId(jsonValue._id);
-
-    // study information part
     setStudyInformation(jsonValue.study_info);
-    setDatabaseInfo(jsonValue.database);
+    setDatabaseInfo(jsonValue.database || {});
     setCreateTime(jsonValue.createdAt);
 
-    // questions part
     setQuestions(
       jsonValue.questions.map((question) => {
-        // eslint-disable-next-line no-param-reassign
         const newQuestion = { ...question };
         delete newQuestion.id;
-        console.log(newQuestion);
         return question;
       })
     );
 
-    // schedules part
     setSchedules(
       jsonValue.schedules.map((schedule) => {
         const newSchedule = {};
@@ -151,7 +129,6 @@ export default function Upload() {
           newSchedule.days = {};
           for (let i = 0; i < schedule.days.length; i += 1) {
             const day = schedule.days[i];
-            console.log(day);
             newSchedule.days[
               day.slice(0, 1).toUpperCase() + day.slice(1).toLowerCase()
             ] = true;
@@ -173,7 +150,6 @@ export default function Upload() {
       })
     );
 
-    // sensor information part
     const sensorData = {};
     const applicationSensor = {};
     const screenData = {};
@@ -473,10 +449,8 @@ export default function Upload() {
           wifiData.frequency_wifi = value;
           break;
         case "status_esm":
-          // default value
           break;
         case "status_webservice":
-          // default value
           break;
         case "status_screenshot":
           sensorData.sensor_screenshot = value;
@@ -523,10 +497,10 @@ export default function Upload() {
         case "plugin_openweather_measurement_units":
           pluginData.plugin_openweather_measurement_units = value;
           break;
-
         default:
       }
     }
+
     setSensorData(sensorData);
     setApplicationSensor(applicationSensor);
     setScreenData(screenData);
@@ -550,35 +524,64 @@ export default function Upload() {
     setPluginData(pluginData);
     navigateTo("/study/study_information");
   };
-  function readInputFile(file) {
-    const fileReader = new FileReader();
-    fileReader.readAsText(file.target.files[0], "UTF-8");
-    fileReader.onload = (e) => {
-      readJsonObject(e.target.result);
+
+  useEffect(() => {
+    let isActive = true;
+
+    fetch(STUDY_CONFIG_URL, {
+      headers: {
+        "Content-Type": "application/json",
+        Accept: "application/json",
+      },
+      cache: "no-store",
+    })
+      .then((response) => {
+        if (!response.ok) {
+          throw new Error(`Failed to load ${STUDY_CONFIG_URL}`);
+        }
+        return response.text();
+      })
+      .then((text) => {
+        if (!isActive) {
+          return;
+        }
+        readJsonObject(text);
+      })
+      .catch((error) => {
+        if (!isActive) {
+          return;
+        }
+        setLoadState({
+          status: "error",
+          message: error.message,
+        });
+      });
+
+    return () => {
+      isActive = false;
     };
-  }
+  }, []);
 
   return (
     <div>
       <PageHeader />
       <div className="main_vertical_layout">
-        <p className="main_title">Upload study configuration file to EDIT</p>
+        <p className="main_title">Open study configuration</p>
         <p className="main_description">
-          Please upload your study configuration file if you already have one
-          and would like to make some changes.
+          The configurator automatically loads the shared Android study file and
+          opens it for editing.
         </p>
-        <Button variant="contained" component="label">
-          Upload File
-          <input
-            type="file"
-            hidden
-            onChange={(event) => {
-              readInputFile(event);
+        <p className="main_description">{loadState.message}</p>
+        {loadState.status === "error" && (
+          <Button
+            variant="contained"
+            onClick={() => {
+              window.location.reload();
             }}
-            accept=".json"
-          />
-        </Button>
-
+          >
+            Retry
+          </Button>
+        )}
         <Button
           onClick={() => {
             navigateTo("/main");

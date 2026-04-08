@@ -2,11 +2,12 @@
     margin-top: 1rem;
     margin-bottom: 0.5rem;
     font-size: 1.5rem;
-    color: black;
+    color: var(--cfg-ink);
 }
 
 .explanation {
     font-size: 1rem;
+    color: var(--cfg-muted);
 }
 
 
@@ -20,6 +21,16 @@
 
 .error{
     color: red;
+}
+
+.border {
+    overflow-wrap: anywhere;
+    border: 1px solid var(--cfg-border);
+    box-shadow: var(--cfg-shadow);
+    border-radius: var(--cfg-radius-lg);
+    background: linear-gradient(180deg, var(--cfg-surface) 0%, var(--cfg-surface-soft) 100%);
+    padding: 0.25rem 1rem 0.75rem;
+    margin-top: 1rem;
 }
 
 
@@ -72,5 +83,20 @@
     to {
         bottom: 0;
         opacity: 0;
+    }
+}
+
+@media (max-width: 640px) {
+    .title {
+        font-size: 1.25rem;
+    }
+
+    .explanation,
+    .field_name {
+        font-size: 0.95rem;
+    }
+
+    .border {
+        padding: 0 0.75rem;
     }
 }

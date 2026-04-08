@@ -4,3 +4,15 @@
     justify-content: start;
     margin: 0 15rem;
 }
+
+@media (max-width: 1024px) {
+    .study_question_vertical_layout {
+        margin: 0 3rem;
+    }
+}
+
+@media (max-width: 640px) {
+    .study_question_vertical_layout {
+        margin: 0 1rem 2rem;
+    }
+}

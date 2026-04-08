@@ -1,3 +1,7 @@
-#! /bin/bash
+#!/bin/sh
+set -eu
 
-nohup gunicorn aware_light_config_Django.wsgi -c util/gunicorn.conf &
+python manage.py collectstatic --noinput
+find reactapp/build -maxdepth 1 -type f ! -name 'index.html' -exec cp {} staticfiles/ \;
+
+exec gunicorn aware_light_config_Django.wsgi:application -c util/gunicorn.conf.py

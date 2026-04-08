@@ -25,7 +25,6 @@ import {
   bluetoothState,
   communicationSensorState,
   createTimeState,
-  databaseConnectionState,
   databaseInformationState,
   gravityState,
   gyroscopeState,
@@ -69,7 +68,6 @@ const TYPE_MAP = {
 export default function Main() {
   const navigateTo = useNavigate();
 
-  const isDbConnected = useRecoilValue(databaseConnectionState);
   const studyInformation = useRecoilValue(studyFormStudyInformationState);
   const databaseInfo = useRecoilValue(databaseInformationState);
   const questions = useRecoilValue(studyFormQuestionsState);
@@ -100,6 +98,10 @@ export default function Main() {
   const screenshotData = useRecoilValue(screenshotSensorState);
   const noteData = useRecoilValue(noteState);
   const pluginData = useRecoilValue(pluginSensorState);
+  const [saveState, setSaveState] = useState({
+    status: "idle",
+    message: "",
+  });
 
   const checkStudyInformationValidation = () => {
     return (
@@ -107,13 +109,7 @@ export default function Main() {
       studyInformation.study_description &&
       studyInformation.researcher_first &&
       studyInformation.researcher_last &&
-      studyInformation.researcher_contact &&
-      databaseInfo.database_host &&
-      databaseInfo.database_port &&
-      databaseInfo.database_name &&
-      databaseInfo.database_username &&
-      databaseInfo.database_password &&
-      isDbConnected
+      studyInformation.researcher_contact
     );
   };
 
@@ -953,50 +949,13 @@ export default function Main() {
   }
 
   function saveJsonFile() {
-    Axios({
+    return Axios({
       method: "post",
       url: "save_json_file/",
       data: {
-        text: JSON.stringify({
-          ...result,
-          database: null,
-          study_info: {
-            study_title: result.study_info.study_title,
-            study_description: result.study_info.study_description,
-          },
-        }),
+        text: JSON.stringify(result),
       },
     });
-  }
-
-  function generateJSON() {
-    const jsonText = JSON.stringify(result, null, 2);
-    // console.log(jsonText);
-
-    const blob = new Blob([jsonText]);
-    const href = URL.createObjectURL(blob);
-
-    // create "a" HTLM element with href to file
-    const link = document.createElement("a");
-    link.href = href;
-    link.download = `studyConfig.json`;
-    document.body.appendChild(link);
-    link.click();
-
-    // clean up "a" element & remove ObjectURL
-    document.body.removeChild(link);
-    URL.revokeObjectURL(href);
-  }
-
-  function downloadNotify() {
-    const x = document.getElementById("snackbar");
-
-    // Add the "show" class to DIV
-    x.className = "show";
-    // After 3 seconds, remove the show class from DIV
-    setTimeout(function () {
-      x.className = x.className.replace("show", "");
-    }, 3000);
   }
 
   return (
@@ -1146,21 +1105,40 @@ export default function Main() {
             >
               <Grid xs />
               <Grid>
-                <p style={{ color: "#FF0000", fontWeight: "bold" }}>Note:</p>
-                <p style={{ color: "#FF0000" }}>
-                  So that we can compile statistics on what sensors and other
-                  configuration settings people are using, we will be storing
-                  the details of your configuration file anonymously minus your
-                  database credentials once you click the button below to
-                  generate the configuration file.
+                <p style={{ color: "#0f172a", fontWeight: "bold" }}>
+                  Update shared configuration
                 </p>
+                <p style={{ color: "#475569", maxWidth: "680px" }}>
+                  Saving here updates the shared study source and regenerates
+                  the Android and iOS configuration files used by this
+                  deployment. Participants keep using the same public study
+                  links.
+                </p>
+                {saveState.status !== "idle" && (
+                  <Alert
+                    severity={saveState.status === "success" ? "success" : "error"}
+                    sx={{ mt: 2, maxWidth: "680px" }}
+                  >
+                    <AlertTitle>
+                      {saveState.status === "success"
+                        ? "Configuration updated"
+                        : "Update failed"}
+                    </AlertTitle>
+                    {saveState.message}
+                  </Alert>
+                )}
               </Grid>
-              <Grid xs="auto">
+              <Grid xs={12} md="auto">
+                <div className="overview-actions">
                 <Button
                   color="main"
                   variant="contained"
-                  onClick={() => {
-                    console.log(databaseInfo);
+                  onClick={async () => {
+                    setSaveState({
+                      status: "idle",
+                      message: "",
+                    });
+                    setBlankFields([]);
                     validationOn();
 
                     const validility =
@@ -1181,18 +1159,48 @@ export default function Main() {
                     }
 
                     if (validility) {
-                      generateJSON();
-                      downloadNotify();
-                      saveJsonFile();
+                      try {
+                        validationClose();
+                        await saveJsonFile();
+                        setSaveState({
+                          status: "success",
+                          message:
+                            "The shared study configuration was updated successfully.",
+                        });
+                      } catch (error) {
+                        setSaveState({
+                          status: "error",
+                          message:
+                            error?.response?.data?.msg ||
+                            error.message ||
+                            "The configuration could not be updated.",
+                        });
+                      }
                     }
                   }}
                 >
-                  DOWNLOAD STUDY CONFIG
+                  UPDATE CONFIGURATION
                 </Button>
-                {console.log(isDbConnected)}
-                {console.log(checkStudyInformationValidation())}
+                <Button
+                  color="main"
+                  variant="outlined"
+                  onClick={() => {
+                    window.location.assign("/studies/");
+                  }}
+                >
+                  OPEN STUDIES
+                </Button>
+                <Button
+                  color="main"
+                  variant="outlined"
+                  onClick={() => {
+                    window.location.assign("/");
+                  }}
+                >
+                  MAIN PAGE
+                </Button>
+                </div>
                 {!validation ? AlertDialog() : <div />}
-                <div id="snackbar">Downloading JSON file...</div>
               </Grid>
             </Grid>
           </Box>

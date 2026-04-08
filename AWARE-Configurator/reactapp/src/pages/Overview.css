@@ -2,29 +2,31 @@
     margin-top: 1rem;
     margin-bottom: 0.5rem;
     font-size: 1.5rem;
-    color: black;
+    color: var(--cfg-ink);
 }
 
 .field_name {
     margin-top: 1rem;
     margin-bottom: 0.5rem;
     font-size: 1rem;
-    color: black;
+    color: var(--cfg-ink);
 }
 
 .value {
     margin-top: 1rem;
     margin-bottom: 0.5rem;
     font-size: 1rem;
-    color: black;
+    color: var(--cfg-ink);
 }
 
 .border {
-    border: 2px outset #666464;
-    box-shadow: 3px 3px 5px gray;
-    border-radius: 5px;
-    padding: 0 1rem;
+    border: 1px solid var(--cfg-border);
+    box-shadow: var(--cfg-shadow);
+    border-radius: var(--cfg-radius-lg);
+    background: linear-gradient(180deg, var(--cfg-surface) 0%, var(--cfg-surface-soft) 100%);
+    padding: 0.25rem 1rem 0.75rem;
     margin-top: 1rem;
+    overflow-wrap: anywhere;
 }
 
 
@@ -72,4 +74,37 @@
 @keyframes fadeout {
   from {bottom: 30px; opacity: 1;}
   to {bottom: 0; opacity: 0;}
+}
+
+.overview-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    justify-content: flex-end;
+}
+
+@media (max-width: 640px) {
+    .title {
+        font-size: 1.25rem;
+    }
+
+    .field_name,
+    .value {
+        font-size: 0.95rem;
+    }
+
+    .border {
+        padding: 0 0.75rem;
+    }
+
+    .overview-actions {
+        width: 100%;
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .overview-actions button {
+        width: 100%;
+        margin-left: 0 !important;
+    }
 }
