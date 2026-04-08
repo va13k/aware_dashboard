@@ -1,13 +1,65 @@
+* {
+  box-sizing: border-box;
+}
+
+:root {
+  --cfg-bg: #f3f7fb;
+  --cfg-surface: #ffffff;
+  --cfg-surface-soft: #f8fbfd;
+  --cfg-border: #d7dde5;
+  --cfg-border-strong: #c3ced9;
+  --cfg-ink: #0f172a;
+  --cfg-muted: #526173;
+  --cfg-muted-soft: #6b7a8c;
+  --cfg-accent: rgb(31, 179, 223);
+  --cfg-accent-soft: rgba(31, 179, 223, 0.12);
+  --cfg-shadow: 0 20px 45px rgba(15, 23, 42, 0.08);
+  --cfg-radius-lg: 22px;
+  --cfg-radius-md: 16px;
+  --cfg-radius-sm: 12px;
+}
+
 body {
   margin: 0;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
-    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto", "Oxygen",
+    "Ubuntu", "Cantarell", "Fira Sans", "Droid Sans", "Helvetica Neue",
     sans-serif;
+  background:
+    radial-gradient(circle at top left, rgba(31, 179, 223, 0.12), transparent 28%),
+    linear-gradient(180deg, #fbfdff 0%, var(--cfg-bg) 100%);
+  color: var(--cfg-ink);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
 
+p {
+  color: var(--cfg-muted);
+  line-height: 1.6;
+}
+
+a {
+  color: var(--cfg-accent);
+}
+
 code {
-  font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
+  font-family: source-code-pro, Menlo, Monaco, Consolas, "Courier New",
     monospace;
+}
+
+.MuiButton-root {
+  border-radius: 14px !important;
+  padding-inline: 1rem !important;
+  min-height: 44px;
+  text-transform: none !important;
+  font-weight: 700 !important;
+  box-shadow: none !important;
+}
+
+.MuiOutlinedInput-root {
+  border-radius: 14px !important;
+  background: rgba(255, 255, 255, 0.92);
+}
+
+.MuiDialog-paper {
+  border-radius: 18px !important;
 }
