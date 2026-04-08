@@ -1,0 +1,42 @@
+.survey-layout__top {
+    position: sticky;
+    top: 0;
+    z-index: 30;
+    backdrop-filter: blur(10px);
+}
+
+.survey-layout__steps {
+    padding: 0 2rem 1rem;
+    background: linear-gradient(180deg, rgba(251, 253, 255, 0.96) 0%, rgba(243, 247, 251, 0.92) 100%);
+    border-bottom: 1px solid rgba(215, 221, 229, 0.9);
+    display: flex;
+    justify-content: center;
+}
+
+.survey-layout {
+    padding: 2rem 2rem 2rem;
+}
+
+.survey-layout__content {
+    min-width: 0;
+}
+
+@media (max-width: 1024px) {
+    .survey-layout__steps {
+        padding: 0 1.5rem 0.85rem;
+    }
+
+    .survey-layout {
+        padding: 2rem 1.5rem;
+    }
+}
+
+@media (max-width: 640px) {
+    .survey-layout__steps {
+        padding: 0 1rem 0.75rem;
+    }
+
+    .survey-layout {
+        padding: 1.5rem 1rem 2rem;
+    }
+}
