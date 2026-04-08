@@ -74,14 +74,15 @@ sudo docker compose --profile setup up --build -d setup-wizard
 echo ""
 echo "  Setup wizard is running."
 echo ""
-echo "  Open your browser to:  http://localhost:9999"
+WIZARD_URL="http://localhost:9999/?v=$(date +%s)"
+echo "  Open your browser to:  $WIZARD_URL"
 echo ""
 
 # Try to open browser
 if command -v xdg-open > /dev/null 2>&1; then
-    xdg-open "http://localhost:9999" 2>/dev/null &
+    xdg-open "$WIZARD_URL" 2>/dev/null &
 elif command -v open > /dev/null 2>&1; then
-    open "http://localhost:9999" &
+    open "$WIZARD_URL" &
 fi
 
 echo "  Fill in the form and click Save."

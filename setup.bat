@@ -60,12 +60,14 @@ if exist .env.saved del .env.saved
 
 docker compose --profile setup up --build -d setup-wizard
 
+set WIZARD_URL=http://localhost:9999/?v=%RANDOM%%RANDOM%
+
 echo   Setup wizard is running.
 echo.
-echo   Open your browser to:  http://localhost:9999
+echo   Open your browser to:  %WIZARD_URL%
 echo.
 
-start http://localhost:9999
+start %WIZARD_URL%
 
 echo   Fill in the form and click Save.
 echo   Waiting for configuration...
