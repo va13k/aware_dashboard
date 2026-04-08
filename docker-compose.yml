@@ -63,6 +63,7 @@ services:
       DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:-change-me-in-production}
       PUBLIC_HOST: ${PUBLIC_HOST:-localhost}
     volumes:
+      - .:/project
       - configurator_static:/app/staticfiles
       - ./studies:/app/saved_json_files
     networks:

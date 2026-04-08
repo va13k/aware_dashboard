@@ -58,6 +58,13 @@ echo.
 REM Remove marker from any previous run
 if exist .env.saved del .env.saved
 
+for /f "usebackq delims=" %%i in (`python setup\detect_public_host.py`) do set SUGGESTED_PUBLIC_HOST=%%i
+(
+    echo PUBLIC_HOST=%SUGGESTED_PUBLIC_HOST%
+    echo PUBLIC_PORT=80
+    echo PROTOCOL=http
+) > .setup-defaults.env
+
 docker compose --profile setup up --build -d setup-wizard
 
 set WIZARD_URL=http://localhost:9999/?v=%RANDOM%%RANDOM%
@@ -84,8 +91,6 @@ echo.
 docker compose --profile setup stop setup-wizard 2>nul
 docker compose --profile setup rm -f setup-wizard 2>nul
 
-python setup\deploy_config.py
-if errorlevel 1 exit /b 1
 docker compose up --build -d
 
 echo.
