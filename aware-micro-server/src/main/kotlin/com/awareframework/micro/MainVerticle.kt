@@ -64,8 +64,8 @@ class MainVerticle : AbstractVerticle() {
 
       if (config.succeeded() && config.result().containsKey("server")) {
         parameters = config.result()
-        val serverConfig = parameters.getJsonObject("server")
-        val study = parameters.getJsonObject("study")
+        val serverConfig = currentServerConfig()
+        val study = currentStudyInfo()
 
         // HttpServerOptions.host is the host to listen on. So using |server_host|, not |external_server_host| here.
         // See also: https://vertx.io/docs/4.3.3/apidocs/io/vertx/core/net/NetServerOptions.html#DEFAULT_HOST
@@ -75,8 +75,10 @@ class MainVerticle : AbstractVerticle() {
          * Generate QRCode to join the study using Google's Chart API
          */
         router.route(HttpMethod.GET, "/:studyNumber/:studyKey").handler { route ->
+          val currentServerConfig = currentServerConfig()
+          val currentStudy = currentStudyInfo()
           if (validRoute(
-              study,
+              currentStudy,
               route.request().getParam("studyNumber").toInt(),
               route.request().getParam("studyKey")
             )
@@ -99,9 +101,9 @@ class MainVerticle : AbstractVerticle() {
 
                 val client = WebClient.create(vertx, webClientOptions)
                 val serverURL =
-                  "${getExternalServerHost(serverConfig)}:${getExternalServerPort(serverConfig)}/index.php/${study.getInteger(
+                  "${getExternalServerHost(currentServerConfig)}:${getExternalServerPort(currentServerConfig)}/index.php/${currentStudy.getInteger(
                     "study_number"
-                  )}/${study.getString("study_key")}"
+                  )}/${currentStudy.getString("study_key")}"
 
                 logger.info { "URL encoded for the QRCode is: $serverURL" }
 
@@ -112,7 +114,12 @@ class MainVerticle : AbstractVerticle() {
                   .`as`(BodyCodec.pipe(asyncQrcode, true))
                   .send { request ->
                     if (request.succeeded()) {
-                      pebbleEngine.render(JsonObject().put("studyURL", serverURL), "templates/qrcode.peb") { pebble ->
+                      pebbleEngine.render(
+                        JsonObject()
+                          .put("studyURL", serverURL)
+                          .put("qrCodeVersion", serverURL.hashCode().toString()),
+                        "templates/qrcode.peb"
+                      ) { pebble ->
                         if (pebble.succeeded()) {
                           route.response().statusCode = 200
                           route.response().putHeader(HttpHeaders.CONTENT_TYPE, "text/html").end(pebble.result())
@@ -133,15 +140,16 @@ class MainVerticle : AbstractVerticle() {
          * - when checking study status with the study_check=1.
          */
         router.route(HttpMethod.POST, "/index.php/:studyNumber/:studyKey").handler { route ->
+          val currentStudy = currentStudyInfo()
           if (validRoute(
-              study,
+              currentStudy,
               route.request().getParam("studyNumber").toInt(),
               route.request().getParam("studyKey")
             )
           ) {
             if (route.request().getFormAttribute("study_check") == "1") {
               val status = JsonObject()
-              status.put("status", study.getBoolean("study_active"))
+              status.put("status", currentStudy.getBoolean("study_active"))
               status.put(
                 "config",
                 "[]"
@@ -171,8 +179,9 @@ class MainVerticle : AbstractVerticle() {
         }
          */
         router.route(HttpMethod.GET, "/index.php/webservice/client_get_study_info/:studyKey").handler { route ->
-          if (route.request().getParam("studyKey") == study.getString("study_key")) {
-            route.response().end(study.encode())
+          val currentStudy = currentStudyInfo()
+          if (route.request().getParam("studyKey") == currentStudy.getString("study_key")) {
+            route.response().end(currentStudy.encode())
           } else {
             route.response().statusCode = 401
             route.response().end()
@@ -180,8 +189,9 @@ class MainVerticle : AbstractVerticle() {
         }
 
         router.route(HttpMethod.POST, "/index.php/:studyNumber/:studyKey/:table/:operation").handler { route ->
+          val currentStudy = currentStudyInfo()
           if (validRoute(
-              study,
+              currentStudy,
               route.request().getParam("studyNumber").toInt(),
               route.request().getParam("studyKey")
             )
@@ -258,10 +268,12 @@ class MainVerticle : AbstractVerticle() {
          * Default route, landing page of the server
          */
         router.route(HttpMethod.GET, "/").handler { route ->
+          val currentServerConfig = currentServerConfig()
+          val currentStudy = currentStudyInfo()
           route.response().putHeader("content-type", "text/html").end(
-            "Hello from AWARE Micro!<br/>Join study: <a href=\"${getExternalServerHost(serverConfig)}:${getExternalServerPort(serverConfig)}/${study.getInteger(
+            "Hello from AWARE Micro!<br/>Join study: <a href=\"${getExternalServerHost(currentServerConfig)}:${getExternalServerPort(currentServerConfig)}/${currentStudy.getInteger(
               "study_number"
-            )}/${study.getString("study_key")}\">HERE</a>"
+            )}/${currentStudy.getString("study_key")}\">HERE</a>"
           )
         }
 
@@ -303,10 +315,12 @@ class MainVerticle : AbstractVerticle() {
 
         configReader.listen { change ->
           val newConfig = change.newConfiguration
+          parameters = newConfig
           httpServer.close()
 
           val newServerConfig = newConfig.getJsonObject("server")
           val newServerOptions = HttpServerOptions()
+          newServerOptions.host = newServerConfig.getString("server_host")
 
           if (newServerConfig.getString("path_fullchain_pem").isNotEmpty() && newServerConfig.getString("path_key_pem").isNotEmpty()) {
             newServerOptions.pemTrustOptions =
@@ -432,11 +446,19 @@ class MainVerticle : AbstractVerticle() {
     return studyNumber == studyInfo.getInteger("study_number") && studyKey == studyInfo.getString("study_key")
   }
 
+  private fun currentServerConfig(): JsonObject {
+    return parameters.getJsonObject("server")
+  }
+
+  private fun currentStudyInfo(): JsonObject {
+    return parameters.getJsonObject("study")
+  }
+
   fun getStudyConfig(): JsonArray {
-    val serverConfig = parameters.getJsonObject("server")
+    val serverConfig = currentServerConfig()
     //println("Server config: ${serverConfig.encodePrettily()}")
 
-    val study = parameters.getJsonObject("study")
+    val study = currentStudyInfo()
     //println("Study info: ${study.encodePrettily()}")
 
     val sensors = JsonArray()
