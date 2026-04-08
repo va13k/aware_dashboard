@@ -149,8 +149,8 @@
         <p class="eyebrow">AWARE Dashboard</p>
         <h1>Main page</h1>
         <p class="subtitle">
-          This page gives you 3 options to access the main AWARE Dashboard
-          endpoints: configurator, studies, and the setup wizard.
+          This page gives you 2 options to access the main AWARE Dashboard
+          endpoints: configurator and studies.
         </p>
       </section>
 
@@ -176,31 +176,13 @@
           </div>
           <span class="card-link">Open /studies/</span>
         </a>
-
-        <a class="card" id="setup-card" href="http://localhost:9999/">
-          <div>
-            <h2>Setup Configurator</h2>
-            <p>
-              Open the setup wizard container. This is available while the setup
-              image is running on port <code>9999</code>.
-            </p>
-          </div>
-          <span class="card-link">Open setup wizard</span>
-        </a>
       </section>
 
       <p class="footer-note">
-        If the setup wizard is not running, the internal setup link will not be
-        reachable until you start it again with <code>./setup.sh</code> or
-        <code>setup.bat</code>.
+        If you want to change the deployment configuration, run
+        <code>./setup.sh</code> on macOS/Linux or <code>setup.bat</code> on
+        Windows.
       </p>
     </main>
-
-      <script>
-      (function () {
-        var host = window.location.hostname || "localhost";
-        document.getElementById("setup-card").href = "http://" + host + ":9999/";
-      })();
-    </script>
   </body>
 </html>
