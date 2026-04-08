@@ -24,10 +24,12 @@ deploy_stack() {
     mkdir -p studies aware-micro-server/cache
     python3 setup/deploy_config.py
     sudo docker compose up --build -d
+    python3 setup/init_android_tables.py --docker-prefix sudo
 }
 
 start_stack_only() {
     sudo docker compose up --build -d
+    python3 setup/init_android_tables.py --docker-prefix sudo
 }
 
 HAS_ENV=0

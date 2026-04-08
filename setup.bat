@@ -39,6 +39,9 @@ if "%CHOICE%"=="1" (
     python setup\deploy_config.py
     if errorlevel 1 exit /b 1
     docker compose up --build -d
+    if errorlevel 1 exit /b 1
+    python setup\init_android_tables.py
+    if errorlevel 1 exit /b 1
     echo.
     echo   All services are starting.
     echo   Run 'docker compose ps' to check status.
@@ -92,6 +95,9 @@ docker compose --profile setup stop setup-wizard 2>nul
 docker compose --profile setup rm -f setup-wizard 2>nul
 
 docker compose up --build -d
+if errorlevel 1 exit /b 1
+python setup\init_android_tables.py
+if errorlevel 1 exit /b 1
 
 echo.
 echo   All services are starting.

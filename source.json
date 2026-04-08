@@ -19,7 +19,7 @@
   },
   "database": {
     "android": {
-      "host": "",
+      "host": "192.168.0.116",
       "port": 3306,
       "name": "aware_android",
       "username": "aware_android_participant",
@@ -38,7 +38,7 @@
   },
   "android": {
     "created_at": "",
-    "updated_at": "",
+    "updated_at": "2026-04-08T22:56:37.255Z",
     "questions": [],
     "schedules": [],
     "settings": {
@@ -53,10 +53,8 @@
       "debug_flag": false,
       "frequency_sync_config": 60,
       "enable_config_update": true,
-      "status_applications": false,
       "status_notifications": false,
       "status_crashes": false,
-      "frequency_applications": 30,
       "status_keyboard": false,
       "mask_notification": false,
       "mask_keyboard": false,
@@ -64,43 +62,12 @@
       "status_screentext": false,
       "package_specification": "2",
       "package_names": "",
-      "status_battery": false,
       "communication": false,
       "status_communication_events": false,
       "status_calls": false,
       "status_messages": false,
       "status_installations": false,
-      "status_screen": false,
       "status_touch": false,
-      "status_telephony": false,
-      "status_timezone": false,
-      "frequency_timezone": 20000,
-      "status_accelerometer": false,
-      "frequency_accelerometer": 20000,
-      "threshold_accelerometer": 0,
-      "frequency_accelerometer_enforce": false,
-      "status_barometer": false,
-      "frequency_barometer": 20000,
-      "threshold_barometer": 0,
-      "frequency_barometer_enforce": false,
-      "status_bluetooth": false,
-      "frequency_bluetooth": 60,
-      "status_gravity": false,
-      "frequency_gravity": 20000,
-      "threshold_gravity": 0,
-      "frequency_gravity_enforce": false,
-      "status_gyroscope": false,
-      "frequency_gyroscope": 20000,
-      "threshold_gyroscope": 0,
-      "frequency_gyroscope_enforce": false,
-      "status_light": false,
-      "frequency_light": 20000,
-      "threshold_light": 0,
-      "frequency_light_enforce": false,
-      "status_linear_accelerometer": false,
-      "frequency_linear_accelerometer": 20000,
-      "threshold_linear_accelerometer": 0,
-      "frequency_linear_accelerometer_enforce": false,
       "location": false,
       "status_location_gps": false,
       "status_location_network": false,
@@ -111,28 +78,9 @@
       "location_expiration_time": 300,
       "status_location_passive": false,
       "location_save_all": false,
-      "status_magnetometer": false,
-      "frequency_magnetometer": 20000,
-      "threshold_magnetometer": 0,
-      "frequency_magnetometer_enforce": false,
-      "network": false,
-      "status_network_events": false,
-      "status_network_traffic": false,
-      "status_processor": false,
-      "status_proximity": false,
-      "frequency_proximity": 20000,
-      "threshold_proximity": 0,
-      "frequency_proximity_enforce": false,
-      "status_rotation": false,
-      "frequency_rotation": 20000,
-      "threshold_rotation": 0,
-      "frequency_rotation_enforce": false,
-      "status_temperature": false,
-      "frequency_temperature": 20000,
-      "threshold_temperature": 0,
-      "frequency_temperature_enforce": false,
-      "status_wifi": false,
-      "frequency_wifi": 60,
+      "network": true,
+      "status_network_events": true,
+      "status_network_traffic": true,
       "status_screenshot": false,
       "capture_time_interval": 5,
       "compress_rate": 80,
@@ -148,7 +96,6 @@
       "plugin_openweather_frequency": 60,
       "plugin_openweather_api_key": "",
       "plugin_openweather_measurement_units": "metric",
-      "status_esm": false,
       "status_webservice": true
     }
   },
@@ -204,6 +151,101 @@
       "plugin_google_fused_location": false,
       "plugin_device_usage": false,
       "plugin_conversations": false
+    }
+  },
+  "shared": {
+    "sensors": {
+      "accelerometer": {
+        "enabled": false,
+        "frequency": 20000,
+        "threshold": 0,
+        "enforce": false
+      },
+      "applications": {
+        "enabled": false,
+        "frequency": 30
+      },
+      "barometer": {
+        "enabled": false,
+        "frequency": 20000,
+        "threshold": 0,
+        "enforce": false
+      },
+      "battery": {
+        "enabled": true
+      },
+      "bluetooth": {
+        "enabled": false,
+        "frequency": 60
+      },
+      "esm": {
+        "enabled": true
+      },
+      "gravity": {
+        "enabled": false,
+        "frequency": 20000,
+        "threshold": 0,
+        "enforce": false
+      },
+      "gyroscope": {
+        "enabled": false,
+        "frequency": 20000,
+        "threshold": 0,
+        "enforce": false
+      },
+      "light": {
+        "enabled": false,
+        "frequency": 20000,
+        "threshold": 0,
+        "enforce": false
+      },
+      "linear_accelerometer": {
+        "enabled": false,
+        "frequency": 20000,
+        "threshold": 0,
+        "enforce": false
+      },
+      "magnetometer": {
+        "enabled": false,
+        "frequency": 20000,
+        "threshold": 0,
+        "enforce": false
+      },
+      "processor": {
+        "enabled": false
+      },
+      "proximity": {
+        "enabled": false,
+        "frequency": 20000,
+        "threshold": 0,
+        "enforce": false
+      },
+      "rotation": {
+        "enabled": false,
+        "frequency": 20000,
+        "threshold": 0,
+        "enforce": false
+      },
+      "screen": {
+        "enabled": false
+      },
+      "telephony": {
+        "enabled": false
+      },
+      "temperature": {
+        "enabled": false,
+        "frequency": 20000,
+        "threshold": 0,
+        "enforce": false
+      },
+      "timezone": {
+        "enabled": false,
+        "frequency": 20000
+      },
+      "wifi": {
+        "enabled": false,
+        "frequency": 60
+      }
     }
   }
 }
