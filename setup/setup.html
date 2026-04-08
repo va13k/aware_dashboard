@@ -431,14 +431,6 @@
           <p class="status-desc" id="statusDesc">
             Writing configuration and starting containers.
           </p>
-          <div class="status-links hidden" id="statusLinks">
-            <a class="status-link" id="configuratorLink" href="#"
-              >Open Configurator</a
-            >
-            <a class="status-link secondary" id="microServerLink" href="#"
-              >Open Micro Server</a
-            >
-          </div>
           <div class="error-detail hidden" id="errorDetail"></div>
           <button
             class="btn btn-back hidden"
@@ -509,7 +501,6 @@
         document.getElementById("statusTitle").textContent = "Deploying...";
         document.getElementById("statusDesc").textContent =
           "Writing configuration and starting containers.";
-        document.getElementById("statusLinks").classList.add("hidden");
         document.getElementById("errorDetail").classList.add("hidden");
         document.getElementById("editBtn").classList.add("hidden");
 
@@ -576,21 +567,46 @@
 
       function finishDeployment() {
         var baseUrl = getBaseUrl();
-        var configuratorUrl = baseUrl + "/configurator/";
-        var microServerUrl = baseUrl + "/micro-server/";
+        var mainPageUrl = baseUrl + "/";
         document.getElementById("statusIcon").className = "status-icon success";
         document.getElementById("statusIcon").innerHTML =
           '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#33B5E5" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>';
         document.getElementById("statusTitle").textContent =
           "Deployment complete";
         document.getElementById("statusDesc").textContent =
-          "Redirecting to the configurator. The micro-server endpoint is available below.";
-        document.getElementById("configuratorLink").href = configuratorUrl;
-        document.getElementById("microServerLink").href = microServerUrl;
-        document.getElementById("statusLinks").classList.remove("hidden");
+          "Services are ready. Redirecting to the main page.";
         redirectTimer = setTimeout(function () {
-          window.location.href = configuratorUrl;
+          window.location.href = mainPageUrl;
         }, 2500);
+      }
+
+      function waitForServices() {
+        var baseUrl = getBaseUrl();
+        var configuratorUrl = baseUrl + "/configurator/";
+        var attempts = 0;
+
+        function poll() {
+          attempts += 1;
+          fetch(configuratorUrl, {
+            method: "GET",
+            mode: "no-cors",
+            cache: "no-store",
+          })
+            .then(function () {
+              finishDeployment();
+            })
+            .catch(function () {
+              document.getElementById("statusTitle").textContent =
+                "Starting services...";
+              document.getElementById("statusDesc").textContent =
+                attempts < 20
+                  ? "Configuration saved. Waiting for the configurator to become reachable."
+                  : "Configuration saved. Services are still starting. This can take a bit longer on the first run.";
+              window.setTimeout(poll, 1500);
+            });
+        }
+
+        poll();
       }
 
       function deploy() {
@@ -604,8 +620,8 @@
               document.getElementById("statusTitle").textContent =
                 "Starting services...";
               document.getElementById("statusDesc").textContent =
-                "Configuration saved. Preparing /configurator and /micro-server.";
-              window.setTimeout(finishDeployment, 1800);
+                "Configuration saved. Waiting for the deployed services.";
+              waitForServices();
             } else {
               showError(d.error || "Unknown error");
             }
@@ -627,7 +643,6 @@
           "Deployment failed";
         document.getElementById("statusDesc").textContent =
           "Check the error below.";
-        document.getElementById("statusLinks").classList.add("hidden");
         var el = document.getElementById("errorDetail");
         el.textContent = msg;
         el.classList.remove("hidden");
