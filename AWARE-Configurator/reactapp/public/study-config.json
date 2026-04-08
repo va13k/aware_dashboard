@@ -15,7 +15,7 @@
     "database_password": "participantpass",
     "rootUsername": "-",
     "rootPassword": "-",
-    "config_without_password": false,
+    "config_without_password": true,
     "require_ssl": false
   },
   "createdAt": "",

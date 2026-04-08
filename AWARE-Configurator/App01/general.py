@@ -13,7 +13,12 @@ if PROJECT_ROOT.exists() and str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 from shared_config.runtime import get_runtime_settings, load_env, normalize_public_env
-from shared_config.serializers import serialize_android_config, serialize_ios_config
+from shared_config.serializers import (
+    COMMON_SHARED_SENSOR_FIELDS,
+    build_sensor_setting_name,
+    serialize_android_config,
+    serialize_ios_config,
+)
 
 logger = logging.getLogger(__name__)
 storage_path = settings.STORAGE_DIR
@@ -132,12 +137,27 @@ def update_source_from_android_config(source, content):
     )
     source["android"]["questions"] = content.get("questions", [])
     source["android"]["schedules"] = content.get("schedules", [])
-    source["android"]["settings"] = {
+    android_settings = {
         item["setting"]: item.get("value")
         for item in content.get("sensors", [])
         if item.get("setting")
     }
+    sync_shared_sensors_from_android_settings(source, android_settings)
+    source["android"]["settings"] = android_settings
     return source
+
+
+def sync_shared_sensors_from_android_settings(source, android_settings):
+    shared_sensors = source.setdefault("shared", {}).setdefault("sensors", {})
+    for sensor_name, field_names in COMMON_SHARED_SENSOR_FIELDS.items():
+        sensor_shared = shared_sensors.setdefault(sensor_name, {})
+        if isinstance(sensor_shared, bool):
+            sensor_shared = {"enabled": sensor_shared}
+            shared_sensors[sensor_name] = sensor_shared
+        for field_name in field_names:
+            setting_name = build_sensor_setting_name(sensor_name, field_name)
+            if setting_name in android_settings:
+                sensor_shared[field_name] = android_settings.pop(setting_name)
 
 
 def build_ios_settings(source):
