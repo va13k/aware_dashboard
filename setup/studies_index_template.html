@@ -103,6 +103,11 @@
         gap: 12px;
       }
 
+      .page-actions {
+        margin-top: 18px;
+        justify-content: flex-start;
+      }
+
       .button {
         display: inline-flex;
         align-items: center;
@@ -131,25 +136,44 @@
 
       .join-url {
         padding: 12px 14px;
+        margin-bottom: 18px;
         border-radius: 14px;
         background: rgba(24, 48, 40, 0.05);
+        border: 1px solid var(--border);
+      }
+
+      .join-url span {
+        display: block;
+        margin-bottom: 6px;
+        font-weight: 700;
+      }
+
+      .join-url code {
         font-family: "SFMono-Regular", Consolas, monospace;
         font-size: 0.92rem;
         word-break: break-all;
       }
 
-      iframe {
-        width: 100%;
-        height: 430px;
-        border: 0;
-        border-radius: 18px;
-        background: white;
+      .study-link {
+        display: block;
+        padding: 12px 14px;
+        margin-bottom: 18px;
+        border-radius: 14px;
+        background: rgba(24, 48, 40, 0.05);
+        border: 1px solid var(--border);
+        text-decoration: none;
+        color: var(--text);
       }
 
-      .note {
-        margin-top: 16px;
-        font-size: 0.94rem;
-        color: var(--muted);
+      .study-link span {
+        display: block;
+        margin-bottom: 6px;
+        font-weight: 700;
+      }
+
+      .study-link code {
+        font-size: 0.9rem;
+        word-break: break-all;
       }
 
       @media (max-width: 900px) {
@@ -165,28 +189,20 @@
         <p class="eyebrow">AWARE Dashboard</p>
         <h1>Studies</h1>
         <p class="subtitle">
-          This page combines Android study file access with the iOS join QR
-          page. Use the file browser for public JSON files, or use the embedded
-          QR section to open the AWARE Micro join flow for the current iOS
-          study.
+          This page combines the public Android study file with the iOS join
+          entry point. Researchers can share the Android JSON from the left card
+          and open the current iOS join page from the right card.
         </p>
       </section>
 
       <section class="grid">
         <article class="card">
-          <h2>Android study files</h2>
+          <h2>Android study file</h2>
           <p>
-            Public JSON study files remain available from this host. You can
-            browse them directly or use the standard
-            <code>/studies/&lt;file&gt;.json</code>
-            URLs.
+            The canonical Android config is listed below. Researchers can copy
+            this URL directly and share it with Android participants.
           </p>
-          <div class="actions">
-            <a class="button button-primary" href="/studies/files/"
-              >Browse study files</a
-            >
-            <a class="button button-secondary" href="/">Back to main page</a>
-          </div>
+          {{ANDROID_STUDY_LINK}}
         </article>
 
         <article class="card">
@@ -195,31 +211,16 @@
             This is the participant join endpoint generated from the current
             micro-server study configuration.
           </p>
-          <div class="join-url">{{STUDY_JOIN_URL}}</div>
-          <div class="actions" style="margin-top: 16px">
-            <a class="button button-primary" href="{{STUDY_JOIN_PATH}}"
-              >Open QR page</a
-            >
-          </div>
+          <a class="study-link" href="{{STUDY_JOIN_URL}}">
+            <span>ios-study</span>
+            <code>{{STUDY_JOIN_URL}}</code>
+          </a>
         </article>
       </section>
 
-      <section style="margin-top: 18px">
-        <article class="card">
-          <h2>iOS QR code</h2>
-          <p>
-            The QR panel below is rendered by the micro-server route
-            <code>{{STUDY_JOIN_PATH}}</code>. Participants can scan it to join
-            the study.
-          </p>
-          <iframe src="{{STUDY_JOIN_PATH}}" title="iOS QR code"></iframe>
-          <p class="note">
-            If this panel does not load, confirm that the micro-server is
-            running and that the public host in the deployment matches the host
-            participants use.
-          </p>
-        </article>
-      </section>
+      <div class="actions page-actions">
+        <a class="button button-secondary" href="/">Back to main page</a>
+      </div>
     </main>
   </body>
 </html>

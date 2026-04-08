@@ -647,15 +647,6 @@
             if (d.MYSQL_ROOT_PASSWORD)
               document.getElementById("mysqlPass").value =
                 d.MYSQL_ROOT_PASSWORD;
-            if (d.PUBLIC_HOST)
-              document.getElementById("publicHost").value = d.PUBLIC_HOST;
-            if (d.PROTOCOL === "https") toggleSSL();
-            if (d.SSL_CERTIFICATE_PATH)
-              document.getElementById("certPath").value =
-                d.SSL_CERTIFICATE_PATH;
-            if (d.SSL_CERTIFICATE_KEY_PATH)
-              document.getElementById("keyPath").value =
-                d.SSL_CERTIFICATE_KEY_PATH;
           } catch (e) {}
         };
         x.send();

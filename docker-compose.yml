@@ -80,6 +80,8 @@ services:
       - "443:443"
     volumes:
       - ./nginx/index.html:/usr/share/nginx/html/index.html:ro
+      - ./nginx/configurator-loading.html:/usr/share/nginx/html/configurator-loading.html:ro
+      - ./nginx/setup-loading.html:/usr/share/nginx/html/setup-loading.html:ro
       - ./nginx/${PROTOCOL:-http}.conf:/etc/nginx/conf.d/default.conf:ro
       - ./studies:/usr/share/nginx/html/studies:ro
       - configurator_static:/usr/share/nginx/html/configurator_static:ro
@@ -88,8 +90,10 @@ services:
     networks:
       - aware_network
     depends_on:
-      - configurator
-      - micro-server
+      configurator:
+        condition: service_started
+      micro-server:
+        condition: service_started
 
 networks:
   aware_network:
