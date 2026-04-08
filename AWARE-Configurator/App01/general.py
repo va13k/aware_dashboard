@@ -1,8 +1,6 @@
 import json
 import logging
 import os
-import re
-import uuid
 from django.http import HttpResponse
 from django.views.decorators.csrf import ensure_csrf_cookie, csrf_exempt
 
@@ -10,6 +8,7 @@ from aware_light_config_Django import settings
 
 logger = logging.getLogger(__name__)
 storage_path = settings.STORAGE_DIR
+STUDY_CONFIG_FILE_NAME = "studyConfig.json"
 
 
 @ensure_csrf_cookie
@@ -33,7 +32,7 @@ def save_json_file(request):
             json.dumps({
                 "success": True,
                 "file_name": file_name,
-                "url": f"/studies/{file_name}",
+                "url": f"/studies/files/{file_name}",
             }),
             content_type="application/json",
         )
@@ -50,8 +49,7 @@ def save(content):
     if not folder:
         os.makedirs(storage_path)
 
-    file_name = build_file_name(content)
-    file_path = os.path.join(storage_path, file_name)
+    file_path = os.path.join(storage_path, STUDY_CONFIG_FILE_NAME)
 
     with open(file_path, 'w', encoding='utf-8') as file:
         if isinstance(content, (dict, list)):
@@ -60,17 +58,4 @@ def save(content):
         else:
             file.write(str(content))
 
-    return file_name
-
-
-def build_file_name(content):
-    if isinstance(content, dict):
-        study_id = content.get("_id")
-        if study_id:
-            return f"{sanitize_filename(study_id)}.json"
-
-    return str(uuid.uuid4()) + ".json"
-
-
-def sanitize_filename(value):
-    return re.sub(r'[^A-Za-z0-9._-]', '-', str(value))
+    return STUDY_CONFIG_FILE_NAME
