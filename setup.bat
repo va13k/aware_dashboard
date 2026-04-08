@@ -13,6 +13,9 @@ if errorlevel 1 (
     exit /b 1
 )
 
+if not exist studies mkdir studies
+if not exist aware-micro-server\cache mkdir aware-micro-server\cache
+
 set HAS_ENV=0
 set HAS_MICRO_CONFIG=0
 
@@ -31,8 +34,10 @@ set /p CHOICE="  Choose [1/2]: "
 
 if "%CHOICE%"=="1" (
     echo.
-    echo   Starting services...
+    echo   Regenerating config and starting services...
     echo.
+    python setup\deploy_config.py
+    if errorlevel 1 exit /b 1
     docker compose up --build -d
     echo.
     echo   All services are starting.
@@ -77,6 +82,8 @@ echo.
 docker compose --profile setup stop setup-wizard 2>nul
 docker compose --profile setup rm -f setup-wizard 2>nul
 
+python setup\deploy_config.py
+if errorlevel 1 exit /b 1
 docker compose up --build -d
 
 echo.

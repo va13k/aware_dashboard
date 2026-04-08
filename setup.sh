@@ -13,12 +13,18 @@ if ! command -v docker > /dev/null 2>&1; then
     exit 1
 fi
 
-if ! docker compose version > /dev/null 2>&1; then
+if ! sudo docker compose version > /dev/null 2>&1; then
     echo "  Docker Compose v2 is required but is not available."
     echo "  Update Docker, then rerun ./setup.sh."
     echo ""
     exit 1
 fi
+
+deploy_stack() {
+    mkdir -p studies aware-micro-server/cache
+    python3 setup/deploy_config.py
+    sudo docker compose up --build -d
+}
 
 HAS_ENV=0
 HAS_MICRO_CONFIG=0
@@ -43,13 +49,13 @@ if [ "$HAS_ENV" -eq 1 ] && [ "$HAS_MICRO_CONFIG" -eq 1 ]; then
 
     if [ "$CHOICE" = "1" ]; then
         echo ""
-        echo "  Starting services..."
+        echo "  Regenerating config and starting services..."
         echo ""
-        docker compose up --build -d
+        deploy_stack
         echo ""
         echo "  All services are starting."
-        echo "  Run 'docker compose ps' to check status."
-        echo "  Run 'docker compose logs -f' to see logs."
+        echo "  Run 'sudo docker compose ps' to check status."
+        echo "  Run 'sudo docker compose logs -f' to see logs."
         echo ""
         exit 0
     fi
@@ -96,10 +102,10 @@ sudo docker compose --profile setup stop setup-wizard 2>/dev/null
 sudo docker compose --profile setup rm -f setup-wizard 2>/dev/null
 
 # Start the actual services
-sudo docker compose up --build -d
+deploy_stack
 
 echo ""
 echo "  All services are starting."
-echo "  Run 'docker compose ps' to check status."
-echo "  Run 'docker compose logs -f' to see logs."
+echo "  Run 'sudo docker compose ps' to check status."
+echo "  Run 'sudo docker compose logs -f' to see logs."
 echo ""
