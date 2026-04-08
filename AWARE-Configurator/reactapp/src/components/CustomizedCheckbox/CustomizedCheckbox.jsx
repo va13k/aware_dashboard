@@ -16,6 +16,7 @@ export default function CustomizedCheckbox(inputs) {
     index, // optional feature, only for list information to locate current index
     inGroup, // optional feature, whether current checkbox in checkbox group
     groupField, // optional feature, should use with inGroup together
+    className, // optional feature, custom wrapper class
   } = inputs;
 
   let information;
@@ -74,6 +75,7 @@ export default function CustomizedCheckbox(inputs) {
 
   return (
     <FormControlLabel
+      className={className}
       control={
         <Checkbox
           checked={getValue()}
