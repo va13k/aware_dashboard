@@ -114,7 +114,7 @@ These fields in `aware-micro-server/aware-config.json` are the ones that matter 
 - `server_host`, `server_port`, `websocket_port`: required internally. They control which address and ports the micro-server listens on inside the container stack. In this project they should normally stay `0.0.0.0`, `8080`, and `8081`.
 - `path_fullchain_pem`, `path_key_pem`: optional here. They are only needed if the micro-server itself terminates TLS. In this setup, Nginx handles HTTPS in front of the micro-server, so these can stay empty.
 
-If your public host and database host are different, you can override the generated defaults in `.env` with `MICRO_DATABASE_HOST` and `MICRO_EXTERNAL_HOST` before redeploying.
+If your public host and database host are different, you can override only the database target in `.env` with `MICRO_DATABASE_HOST` before redeploying. Public study URLs always come from `PUBLIC_HOST`, `PUBLIC_PORT`, and `PROTOCOL`.
 
 ### 4. Access the services
 
