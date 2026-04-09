@@ -409,7 +409,8 @@
               type="text"
               id="publicHost"
               value=""
-              placeholder="192.168.0.116 or study.example.com"
+              oninput="rememberCustomHost()"
+              placeholder="study.example.com"
             />
           </div>
           <p class="hint">
@@ -495,15 +496,22 @@
       var step = 0,
         ssl = false,
         redirectTimer = null,
-        suggestedPublicHost = "";
+        suggestedPublicHost = "",
+        customPublicHost = "";
 
       function getSelectedHost() {
         return (document.getElementById("publicHost").value || "").trim();
       }
 
+      function updateHostPlaceholder() {
+        var hostInput = document.getElementById("publicHost");
+        hostInput.placeholder = suggestedPublicHost || "study.example.com";
+      }
+
       function updateHostInput() {
         var mode = document.getElementById("publicHostMode").value;
         var hostInput = document.getElementById("publicHost");
+        updateHostPlaceholder();
 
         if (mode === "localhost") {
           hostInput.value = "localhost";
@@ -518,10 +526,15 @@
         }
 
         hostInput.disabled = false;
-        if (!hostInput.value || hostInput.value === "localhost") {
-          hostInput.value = suggestedPublicHost || "";
-        }
+        hostInput.value = customPublicHost;
         hostInput.focus();
+      }
+
+      function rememberCustomHost() {
+        if (document.getElementById("publicHostMode").value !== "custom") {
+          return;
+        }
+        customPublicHost = (document.getElementById("publicHost").value || "").trim();
       }
 
       function setHostSelection(host) {
@@ -537,6 +550,7 @@
           mode.value = "localhost";
           hostInput.value = "localhost";
           hostInput.disabled = true;
+          customPublicHost = "";
           return;
         }
 
@@ -544,11 +558,13 @@
           mode.value = "detected";
           hostInput.value = suggestedPublicHost;
           hostInput.disabled = true;
+          customPublicHost = "";
           return;
         }
 
         mode.value = "custom";
-        hostInput.value = normalized;
+        customPublicHost = normalized;
+        hostInput.value = customPublicHost;
         hostInput.disabled = false;
       }
 
@@ -731,6 +747,7 @@
         var reachabilityBaseUrl = getReachabilityBaseUrl();
         var configuratorUrl = reachabilityBaseUrl + "/configurator/";
         var attempts = 0;
+        var maxAttempts = 80;
 
         function poll() {
           attempts += 1;
@@ -743,6 +760,14 @@
               finishDeployment();
             })
             .catch(function () {
+              if (attempts >= maxAttempts) {
+                showError(
+                  "Configuration was saved, but the configurator never became reachable at " +
+                    configuratorUrl +
+                    ". On Windows, make sure Docker Desktop is running and then start the stack with 'docker compose up --build -d'."
+                );
+                return;
+              }
               document.getElementById("statusTitle").textContent =
                 "Starting services...";
               document.getElementById("statusDesc").textContent =
@@ -796,6 +821,7 @@
         el.textContent = msg;
         el.classList.remove("hidden");
         document.getElementById("nav").classList.remove("hidden");
+        document.getElementById("editBtn").classList.remove("hidden");
         document.getElementById("nextBtn").classList.add("hidden");
       }
 
@@ -806,10 +832,27 @@
           try {
             var d = JSON.parse(x.responseText);
             suggestedPublicHost = (d.SUGGESTED_PUBLIC_HOST || "").trim();
+            updateHostPlaceholder();
             if (d.MYSQL_ROOT_PASSWORD)
               document.getElementById("mysqlPass").value =
                 d.MYSQL_ROOT_PASSWORD;
-            setHostSelection(d.PUBLIC_HOST || suggestedPublicHost || "localhost");
+
+            if (d.exists) {
+              setHostSelection((d.PUBLIC_HOST || "").trim() || suggestedPublicHost || "localhost");
+            } else {
+              var hostMode = document.getElementById("publicHostMode");
+              var hostInput = document.getElementById("publicHost");
+              if (suggestedPublicHost) {
+                hostMode.value = "detected";
+                hostInput.value = suggestedPublicHost;
+                hostInput.disabled = true;
+              } else {
+                hostMode.value = "localhost";
+                hostInput.value = "localhost";
+                hostInput.disabled = true;
+              }
+            }
+
             if (d.PROTOCOL === "https") {
               ssl = true;
               document.getElementById("sslToggle").classList.add("on");
@@ -824,7 +867,12 @@
               document.getElementById("sslFields").classList.remove("show");
             }
             buildPreview();
-          } catch (e) {}
+          } catch (e) {
+            updateHostInput();
+          }
+        };
+        x.onerror = function () {
+          updateHostInput();
         };
         x.send();
       }
