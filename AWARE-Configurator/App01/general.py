@@ -31,6 +31,7 @@ ANDROID_TEMPLATE_PATH = (
 IOS_EXAMPLE_PATH = PROJECT_ROOT / "aware-micro-server" / "aware-config.example.json"
 IOS_CONFIG_PATH = PROJECT_ROOT / "aware-micro-server" / "aware-config.json"
 STUDY_CONFIG_PATH = pathlib.Path(storage_path) / STUDY_CONFIG_FILE_NAME
+ABSTRACT_DATABASE_HOST = "db.internal"
 
 
 @ensure_csrf_cookie
@@ -90,6 +91,41 @@ def write_json(path, content):
         file.write("\n")
 
 
+def runtime_database_host() -> str:
+    env = normalize_public_env(load_env(ENV_PATH))
+    settings = get_runtime_settings(env)
+    return str(settings["database_host"]).strip()
+
+
+def normalize_database_host_for_source(raw_host: object) -> str:
+    host = str(raw_host or "").strip()
+    if not host:
+        return ABSTRACT_DATABASE_HOST
+
+    if host in {
+        ABSTRACT_DATABASE_HOST,
+        "mysql",
+        "localhost",
+        "127.0.0.1",
+        "0.0.0.0",
+        runtime_database_host(),
+    }:
+        return ABSTRACT_DATABASE_HOST
+
+    return host
+
+
+def sync_database_host(source: dict, raw_host: object) -> None:
+    normalized_host = normalize_database_host_for_source(raw_host)
+    database = source.setdefault("database", {})
+    database["host"] = normalized_host
+
+    for platform_name in ("android", "ios"):
+        platform_db = database.setdefault(platform_name, {})
+        if isinstance(platform_db, dict):
+            platform_db.pop("host", None)
+
+
 def update_source_from_android_config(source, content):
     study_info = content.get("study_info", {})
     database = content.get("database", {})
@@ -113,7 +149,10 @@ def update_source_from_android_config(source, content):
 
     if database:
         android_db = source["database"]["android"]
-        android_db["host"] = database.get("database_host", android_db["host"])
+        sync_database_host(
+            source,
+            database.get("database_host", source.get("database", {}).get("host", "")),
+        )
         android_db["port"] = int(database.get("database_port", android_db["port"]))
         android_db["name"] = database.get("database_name", android_db["name"])
         android_db["username"] = database.get(

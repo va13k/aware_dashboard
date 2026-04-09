@@ -687,7 +687,7 @@
         {
           "setting": "webservice_server",
           "title": "Study URL",
-          "defaultValue": "http://192.168.0.40/index.php/",
+          "defaultValue": "http://your-server/index.php/",
           "summary": "URL"
         },
         {

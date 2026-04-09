@@ -18,8 +18,8 @@
     "protocol": "http"
   },
   "database": {
+    "host": "db.internal",
     "android": {
-      "host": "192.168.0.116",
       "port": 3306,
       "name": "aware_android",
       "username": "aware_android_participant",
@@ -28,7 +28,6 @@
       "config_without_password": false
     },
     "ios": {
-      "host": "",
       "port": 3306,
       "name": "aware_ios",
       "username": "aware_ios_participant",
@@ -38,7 +37,7 @@
   },
   "android": {
     "created_at": "",
-    "updated_at": "2026-04-08T22:56:37.255Z",
+    "updated_at": "2026-04-09T23:13:57.173Z",
     "questions": [],
     "schedules": [],
     "settings": {

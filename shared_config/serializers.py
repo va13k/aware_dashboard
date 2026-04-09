@@ -76,12 +76,27 @@ def build_shared_sensor_settings(source: dict) -> dict[str, object]:
     return shared_settings
 
 
-def resolve_android_database_host(
-    android_db: dict[str, object], settings: dict[str, str | int]
+def source_database_host(
+    database: dict[str, object], platform_key: str | None = None
 ) -> str:
-    host = str(android_db.get("host", "")).strip()
+    platform_host = ""
+    if platform_key:
+        platform_db = database.get(platform_key, {})
+        if isinstance(platform_db, dict):
+            platform_host = str(platform_db.get("host", "")).strip()
+
+    shared_host = str(database.get("host", "")).strip()
+    return platform_host or shared_host or "db.internal"
+
+
+def resolve_database_host(
+    database: dict[str, object],
+    settings: dict[str, str | int],
+    platform_key: str | None = None,
+) -> str:
+    host = source_database_host(database, platform_key)
     if host in {"", "db.internal", "mysql", "localhost", "127.0.0.1", "0.0.0.0"}:
-        return str(settings["public_host"])
+        return str(settings["database_host"])
     return host
 
 
@@ -150,7 +165,7 @@ def serialize_android_config(
         "researcher_contact": researcher["contact"],
     }
     config["database"] = {
-        "database_host": resolve_android_database_host(android_db, settings),
+        "database_host": resolve_database_host(source["database"], settings, "android"),
         "database_port": str(android_db["port"]),
         "database_name": android_db["name"],
         "database_username": android_db["username"],
@@ -171,10 +186,14 @@ def serialize_android_config(
     return config
 
 
-def update_ios_server_config(config: dict, settings: dict[str, str | int]) -> None:
+def update_ios_server_config(
+    config: dict,
+    source_database: dict[str, object],
+    settings: dict[str, str | int],
+) -> None:
     server = config.setdefault("server", {})
     server["database_engine"] = "mysql"
-    server["database_host"] = settings["database_host"]
+    server["database_host"] = resolve_database_host(source_database, settings, "ios")
     server["database_name"] = settings["ios_database_name"]
     server["database_user"] = settings["ios_database_user"]
     server["database_pwd"] = settings["ios_database_password"]
@@ -239,7 +258,7 @@ def serialize_ios_config(
 ) -> tuple[dict, dict]:
     existing_config = load_existing_json(existing_config_path)
     config = load_json(example_path)
-    update_ios_server_config(config, settings)
+    update_ios_server_config(config, source["database"], settings)
     study = apply_ios_study_config(config, source, existing_config)
     update_ios_sensor_defaults(config.get("sensors", []), build_ios_sensor_settings(source))
     update_ios_plugin_defaults(config.get("plugins", []), source["ios"].get("plugins", {}))

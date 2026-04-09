@@ -1,5 +1,8 @@
 # Environment - contains secrets, never commit
 .env
+.env.saved
+.setup-defaults.env
+.setup-session.start
 
 # Studies - generated at runtime, not source code
 studies/
