@@ -33,7 +33,7 @@ COPY --from=frontend /app/reactapp/build ./reactapp/build
 ENV PUBLIC_HOST="localhost"
 ENV DJANGO_STATIC_ROOT="/app/staticfiles"
 
-RUN chmod +x /app/start.sh
+RUN sed -i 's/\r$//' /app/start.sh && chmod +x /app/start.sh
 
 RUN mkdir -p /app/saved_json_files /app/staticfiles
 
