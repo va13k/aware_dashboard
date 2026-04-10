@@ -5,6 +5,10 @@ from datetime import datetime, timezone
 
 from shared_config.runtime import build_public_base_url
 
+DEFAULT_ANDROID_TEMPLATE_PATH = (
+    pathlib.Path(__file__).resolve().parent / "android_template.json"
+)
+
 COMMON_SHARED_SENSOR_FIELDS: dict[str, tuple[str, ...]] = {
     "accelerometer": ("enabled", "frequency", "threshold", "enforce"),
     "applications": ("enabled", "frequency"),
@@ -30,6 +34,12 @@ COMMON_SHARED_SENSOR_FIELDS: dict[str, tuple[str, ...]] = {
 
 def load_json(path: pathlib.Path) -> dict:
     return json.loads(path.read_text(encoding="utf-8"))
+
+
+def load_android_template(path: pathlib.Path) -> dict:
+    if path.exists():
+        return load_json(path)
+    return load_json(DEFAULT_ANDROID_TEMPLATE_PATH)
 
 
 def load_existing_json(path: pathlib.Path) -> dict | None:
@@ -91,12 +101,12 @@ def source_database_host(
 
 def resolve_database_host(
     database: dict[str, object],
-    settings: dict[str, str | int],
+    fallback_host: str,
     platform_key: str | None = None,
 ) -> str:
     host = source_database_host(database, platform_key)
     if host in {"", "db.internal", "mysql", "localhost", "127.0.0.1", "0.0.0.0"}:
-        return str(settings["database_host"])
+        return fallback_host
     return host
 
 
@@ -148,7 +158,7 @@ def serialize_android_config(
     settings: dict[str, str | int],
     template_path: pathlib.Path,
 ) -> dict:
-    config = load_json(template_path)
+    config = load_android_template(template_path)
     study = source["study"]
     researcher = source["researcher"]
     android_db = source["database"]["android"]
@@ -165,7 +175,11 @@ def serialize_android_config(
         "researcher_contact": researcher["contact"],
     }
     config["database"] = {
-        "database_host": resolve_database_host(source["database"], settings, "android"),
+        "database_host": resolve_database_host(
+            source["database"],
+            str(settings["android_database_host"]),
+            "android",
+        ),
         "database_port": str(android_db["port"]),
         "database_name": android_db["name"],
         "database_username": android_db["username"],
@@ -193,7 +207,11 @@ def update_ios_server_config(
 ) -> None:
     server = config.setdefault("server", {})
     server["database_engine"] = "mysql"
-    server["database_host"] = resolve_database_host(source_database, settings, "ios")
+    server["database_host"] = resolve_database_host(
+        source_database,
+        str(settings["micro_database_host"]),
+        "ios",
+    )
     server["database_name"] = settings["ios_database_name"]
     server["database_user"] = settings["ios_database_user"]
     server["database_pwd"] = settings["ios_database_password"]

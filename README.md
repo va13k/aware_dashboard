@@ -94,7 +94,7 @@ Once you click **Deploy** in the wizard, the server-side `./setup.sh` process co
 
 ### 3. Adjust the micro-server study config if needed
 
-The setup flow generates `aware-micro-server/aware-config.json` from `aware-micro-server/aware-config.example.json`, using the public host and protocol you entered in the wizard. By default, it writes `server.database_host` from `PUBLIC_HOST`, `server.database_user` as `aware_ios_participant`, and `server.external_server_host` from the public URL. It also generates a Django secret key automatically when one is missing.
+The setup flow generates `aware-micro-server/aware-config.json` from `aware-micro-server/aware-config.example.json`, using the public host and protocol you entered in the wizard. By default, it writes `server.database_host` as the internal Docker MySQL service name `mysql`, `server.database_user` as `aware_ios_participant`, and `server.external_server_host` from the public URL. It also generates a Django secret key automatically when one is missing.
 
 After deployment, you can edit `aware-micro-server/aware-config.json` to change:
 
@@ -114,7 +114,7 @@ These fields in `aware-micro-server/aware-config.json` are the ones that matter 
 - `server_host`, `server_port`, `websocket_port`: required internally. They control which address and ports the micro-server listens on inside the container stack. In this project they should normally stay `0.0.0.0`, `8080`, and `8081`.
 - `path_fullchain_pem`, `path_key_pem`: optional here. They are only needed if the micro-server itself terminates TLS. In this setup, Nginx handles HTTPS in front of the micro-server, so these can stay empty.
 
-If your public host and database host are different, you can override only the database target in `.env` with `MICRO_DATABASE_HOST` before redeploying. Public study URLs always come from `PUBLIC_HOST`, `PUBLIC_PORT`, and `PROTOCOL`.
+If your public host and database host are different, you can override the micro-server database target in `.env` with `MICRO_DATABASE_HOST` before redeploying. Public study URLs always come from `PUBLIC_HOST`, `PUBLIC_PORT`, and `PROTOCOL`. If Android clients need a different DB endpoint than `PUBLIC_HOST`, you can also set `ANDROID_DATABASE_HOST`.
 
 ### 4. Access the services
 

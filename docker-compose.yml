@@ -13,7 +13,7 @@ services:
     container_name: aware_mysql
     restart: unless-stopped
     environment:
-      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-CHANGE_ME}
     volumes:
       - mysql_data:/var/lib/mysql
       - ./db:/docker-entrypoint-initdb.d
