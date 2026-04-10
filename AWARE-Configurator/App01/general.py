@@ -94,7 +94,7 @@ def write_json(path, content):
 def runtime_database_host() -> str:
     env = normalize_public_env(load_env(ENV_PATH))
     settings = get_runtime_settings(env)
-    return str(settings["database_host"]).strip()
+    return str(settings["android_database_host"]).strip()
 
 
 def normalize_database_host_for_source(raw_host: object) -> str:

@@ -126,6 +126,8 @@ def ensure_android_database(
         "-i",
         MYSQL_CONTAINER,
         "mysql",
+        "--protocol=TCP",
+        "-h127.0.0.1",
         "-uroot",
         f"-p{mysql_root_password}",
     ]
@@ -144,6 +146,8 @@ def apply_android_tables(
         "-i",
         MYSQL_CONTAINER,
         "mysql",
+        "--protocol=TCP",
+        "-h127.0.0.1",
         "-uroot",
         f"-p{mysql_root_password}",
         database_name,

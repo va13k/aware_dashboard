@@ -80,13 +80,17 @@ def get_runtime_settings(env: dict[str, str]) -> dict[str, str | int]:
     protocol = env.get("PROTOCOL", "http")
     public_host = strip_ipv6_brackets(env.get("PUBLIC_HOST", "localhost"))
     public_port = int(env.get("PUBLIC_PORT", "443" if protocol == "https" else "80"))
-    database_host = str(env.get("MICRO_DATABASE_HOST", public_host)).strip() or public_host
+    micro_database_host = str(env.get("MICRO_DATABASE_HOST", "mysql")).strip() or "mysql"
+    android_database_host = (
+        str(env.get("ANDROID_DATABASE_HOST", public_host)).strip() or public_host
+    )
     external_server_host = build_public_base_url(protocol, public_host, public_port)
 
     return {
         "protocol": protocol,
         "public_host": public_host,
         "public_port": public_port,
-        "database_host": database_host,
+        "micro_database_host": micro_database_host,
+        "android_database_host": android_database_host,
         "external_server_host": external_server_host,
     }
