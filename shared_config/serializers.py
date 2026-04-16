@@ -4,6 +4,7 @@ import secrets
 from datetime import datetime, timezone
 
 from shared_config.runtime import build_public_base_url
+from shared_config.source_store import read_source
 
 DEFAULT_ANDROID_TEMPLATE_PATH = (
     pathlib.Path(__file__).resolve().parent / "android_template.json"

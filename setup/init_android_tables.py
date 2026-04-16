@@ -6,12 +6,12 @@ import subprocess
 import sys
 import time
 
-
 SCRIPT_DIR = pathlib.Path(__file__).resolve().parent
 PROJECT = SCRIPT_DIR.parent
 if str(PROJECT) not in sys.path:
     sys.path.insert(0, str(PROJECT))
 
+from shared_config.source_store import read_source
 from shared_config.runtime import load_env
 
 
@@ -67,7 +67,7 @@ def load_android_db_settings() -> tuple[str, str, str, str]:
     if not mysql_root_password:
         raise RuntimeError("MYSQL_ROOT_PASSWORD is missing from .env")
 
-    source = json.loads(SOURCE_PATH.read_text(encoding="utf-8"))
+    source = read_source()
     android_db = source["database"]["android"]
     return (
         mysql_root_password,

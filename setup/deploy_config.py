@@ -4,7 +4,6 @@ import pathlib
 import secrets
 import sys
 
-
 SCRIPT_DIR = pathlib.Path(__file__).resolve().parent
 PROJECT = pathlib.Path("/project")
 RUNNING_IN_WIZARD = False
@@ -15,6 +14,7 @@ else:
 if str(PROJECT) not in sys.path:
     sys.path.insert(0, str(PROJECT))
 
+from shared_config.source_store import read_source
 from shared_config.runtime import (
     build_public_base_url,
     get_runtime_settings,
@@ -40,7 +40,7 @@ def load_merged_env() -> dict[str, str]:
 
 
 def load_source_config() -> dict:
-    return json.loads(SOURCE_PATH.read_text(encoding="utf-8"))
+    return read_source()
 
 
 def ensure_django_secret_key(env: dict[str, str]) -> None:

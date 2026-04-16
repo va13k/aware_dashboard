@@ -12,6 +12,7 @@ PROJECT_ROOT = pathlib.Path("/project")
 if PROJECT_ROOT.exists() and str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
+from shared_config.source_store import update_source
 from shared_config.runtime import get_runtime_settings, load_env, normalize_public_env
 from shared_config.serializers import (
     COMMON_SHARED_SENSOR_FIELDS,
@@ -72,17 +73,10 @@ def save(content):
     if not folder:
         os.makedirs(storage_path)
 
-    source = load_source()
-    source = update_source_from_android_config(source, content)
-    write_json(SOURCE_PATH, source)
+    source = update_source(lambda s: update_source_from_android_config(s, content))
     write_outputs(source)
 
     return STUDY_CONFIG_FILE_NAME
-
-
-def load_source():
-    with open(SOURCE_PATH, 'r', encoding='utf-8') as file:
-        return json.load(file)
 
 
 def write_json(path, content):
