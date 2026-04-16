@@ -193,35 +193,6 @@ class MySQLVerticle : AbstractVerticle() {
   }
 
   /**
-   * Create a database table if it doesn't exist
-   */
-  fun createTable(table: String): Future<Boolean> {
-    val promise = Promise.promise<Boolean>()
-    sqlClient.getConnection { connectionResult ->
-      if (connectionResult.succeeded()) {
-        val connect = connectionResult.result()
-        val queryCreateTable = "CREATE TABLE IF NOT EXISTS `$table` (`_id` INT UNSIGNED AUTO_INCREMENT PRIMARY KEY, `timestamp` DOUBLE NOT NULL, `device_id` VARCHAR(128) NOT NULL, `data` JSON NOT NULL, INDEX `timestamp_device` (`timestamp`, `device_id`))"
-        connect.query(queryCreateTable)
-          .execute()
-          .onFailure { e ->
-            logger.error(e) { "Failed in: $queryCreateTable" }
-            promise.fail(e.message)
-            connect.close()
-          }
-          .onSuccess { _ ->
-            logger.debug { "Created table \"$table\" successfully: $queryCreateTable" }
-            promise.complete(true)
-            connect.close()
-          }
-      } else {
-        logger.error(connectionResult.cause()) { "Failed to connect to database for creating a table." }
-        promise.fail(connectionResult.cause().message)
-      }
-    }
-    return promise.future()
-  }
-
-  /**
    * Insert batch of data into database table
    */
   fun insertData(table: String, device_id: String, data: JsonArray) {
@@ -229,38 +200,32 @@ class MySQLVerticle : AbstractVerticle() {
       return
     }
 
-    createTable(table)
-      .onSuccess { _ ->
-        sqlClient.getConnection { connectionResult ->
-          if (connectionResult.succeeded()) {
-            val connection = connectionResult.result()
-            val rows = data.size()
-            val values = ArrayList<String>()
-            for (i in 0 until data.size()) {
-              val entry = data.getJsonObject(i)
-              // https://github.com/eclipse-vertx/vert.x/commit/ea0eddb129530ab3719c0ef86b471894876ec519#diff-07f061e092a63da24a06ab4507d15125e3377034f21eee18c6d4261f6714e709L241
-              values.add("('$device_id', '${entry.getDouble("timestamp")}', '${StringEscapeUtils.escapeJavaScript(entry.encode())}')")
-            }
-            val insertBatch =
-              "INSERT INTO `$table` (`device_id`,`timestamp`,`data`) VALUES ${values.stream().map(Any::toString).collect(
-                Collectors.joining(",")
-              )}"
-            connection.query(insertBatch)
-              .execute()
-              .onFailure { e ->
-                logger.error(e) { "Failed to process batch." }
-                connection.close()
-              }
-              .onSuccess { _ ->
-                logger.info { "$device_id inserted to $table: $rows records" }
-                connection.close()
-              }
-          }
+    sqlClient.getConnection { connectionResult ->
+      if (connectionResult.succeeded()) {
+        val connection = connectionResult.result()
+        val rows = data.size()
+        val values = ArrayList<String>()
+        for (i in 0 until data.size()) {
+          val entry = data.getJsonObject(i)
+          // https://github.com/eclipse-vertx/vert.x/commit/ea0eddb129530ab3719c0ef86b471894876ec519#diff-07f061e092a63da24a06ab4507d15125e3377034f21eee18c6d4261f6714e709L241
+          values.add("('$device_id', '${entry.getDouble("timestamp")}', '${StringEscapeUtils.escapeJavaScript(entry.encode())}')")
         }
+        val insertBatch =
+          "INSERT INTO `$table` (`device_id`,`timestamp`,`data`) VALUES ${values.stream().map(Any::toString).collect(
+            Collectors.joining(",")
+          )}"
+        connection.query(insertBatch)
+          .execute()
+          .onFailure { e ->
+            logger.error(e) { "Failed to process batch." }
+            connection.close()
+          }
+          .onSuccess { _ ->
+            logger.info { "$device_id inserted to $table: $rows records" }
+            connection.close()
+          }
       }
-      .onFailure { e ->
-        logger.error(e) { "Failed to create table." }
-      }
+    }
   }
 
   override fun stop() {
