@@ -15,20 +15,22 @@ def _project_root() -> pathlib.Path:
 
 
 SOURCE_PATH = _project_root() / "source.json"
-LOCK_PATH = SOURCE_PATH.with_suffix(SOURCE_PATH.suffix + ".lock")
 
 
 @contextlib.contextmanager
 def source_lock():
     import fcntl
 
-    LOCK_PATH.parent.mkdir(parents=True, exist_ok=True)
-    with LOCK_PATH.open("a+") as lock_file:
-        fcntl.flock(lock_file.fileno(), fcntl.LOCK_EX)
+    dir_fd = os.open(SOURCE_PATH.parent, os.O_RDONLY)
+    try:
+        fcntl.flock(dir_fd, fcntl.LOCK_EX)
         try:
             yield
         finally:
-            fcntl.flock(lock_file.fileno(), fcntl.LOCK_UN)
+            fcntl.flock(dir_fd, fcntl.LOCK_UN)
+    finally:
+        os.close(dir_fd)
+
 
 def _read_unlocked() -> dict[str, Any]:
     with SOURCE_PATH.open("r", encoding="utf-8") as f:
@@ -36,8 +38,6 @@ def _read_unlocked() -> dict[str, Any]:
 
 
 def _atomic_write_unlocked(data: dict[str, Any]) -> None:
-    SOURCE_PATH.parent.mkdir(parents=True, exist_ok=True)
-
     fd, tmp_name = tempfile.mkstemp(
         prefix=SOURCE_PATH.name + ".",
         suffix=".tmp",
@@ -53,12 +53,6 @@ def _atomic_write_unlocked(data: dict[str, Any]) -> None:
             os.fsync(tmp.fileno())
 
         os.replace(tmp_path, SOURCE_PATH)
-
-        dir_fd = os.open(SOURCE_PATH.parent, os.O_RDONLY)
-        try:
-            os.fsync(dir_fd)
-        finally:
-            os.close(dir_fd)
 
     finally:
         if tmp_path.exists():

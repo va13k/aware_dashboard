@@ -113,10 +113,21 @@ def resolve_database_host(
 
 def build_ios_sensor_settings(source: dict) -> dict[str, object]:
     ios_sensors = source.get("ios", {}).get("sensors", {})
-    sensor_settings = {
-        f"status_{sensor_name}": enabled
-        for sensor_name, enabled in ios_sensors.items()
-    }
+    sensor_settings: dict[str, object] = {}
+    for sensor_name, enabled in ios_sensors.items():
+        if sensor_name == "network":
+            # aware-config.json splits network into two separate settings
+            sensor_settings["status_network_events"] = enabled
+            sensor_settings["status_network_traffic"] = enabled
+        elif sensor_name == "communication":
+            # aware-config.json splits communication into calls and messages
+            sensor_settings["status_calls"] = enabled
+            sensor_settings["status_messages"] = enabled
+        elif sensor_name == "locations":
+            # aware-config.json uses status_location_gps as the primary location toggle
+            sensor_settings["status_location_gps"] = enabled
+        else:
+            sensor_settings[f"status_{sensor_name}"] = enabled
 
     sensor_settings.update(build_shared_sensor_settings(source))
     return sensor_settings

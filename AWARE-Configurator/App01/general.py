@@ -192,6 +192,23 @@ def sync_shared_sensors_from_android_settings(source, android_settings):
             if setting_name in android_settings:
                 sensor_shared[field_name] = android_settings.pop(setting_name)
 
+    # Sync compound Android settings back to their iOS sensor equivalents.
+    # build_ios_sensor_settings expands these in the forward direction;
+    # here we do the reverse so iOS tracks whatever Android has enabled.
+    ios_sensors = source.setdefault("ios", {}).setdefault("sensors", {})
+    _sync_ios_compound_sensor(ios_sensors, android_settings, "network",
+                               ["status_network_events", "status_network_traffic"])
+    _sync_ios_compound_sensor(ios_sensors, android_settings, "communication",
+                               ["status_calls", "status_messages"])
+    _sync_ios_compound_sensor(ios_sensors, android_settings, "locations",
+                               ["status_location_gps"])
+
+
+def _sync_ios_compound_sensor(ios_sensors, android_settings, ios_name, android_keys):
+    values = [android_settings[k] for k in android_keys if k in android_settings]
+    if values:
+        ios_sensors[ios_name] = any(values)
+
 
 def build_ios_settings(source):
     env = normalize_public_env(load_env(ENV_PATH))
