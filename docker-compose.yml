@@ -95,6 +95,36 @@ services:
         condition: service_started
       micro-server:
         condition: service_started
+      dashboard:
+        condition: service_started
+      dashboard-api:
+        condition: service_started
+
+  dashboard-api:
+    build: ./analytics_api
+    container_name: aware_dashboard_api
+    restart: unless-stopped
+    environment:
+      ANDROID_DATABASE_URL: mysql+aiomysql://root:${MYSQL_ROOT_PASSWORD}@mysql:3306/aware_android
+      IOS_DATABASE_URL: mysql+aiomysql://root:${MYSQL_ROOT_PASSWORD}@mysql:3306/aware_ios
+    expose:
+      - "8000"
+    depends_on:
+      mysql:
+        condition: service_healthy
+    networks:
+      - aware_network
+
+  dashboard:
+    build: ./dashboard
+    container_name: aware_dashboard
+    restart: unless-stopped
+    expose:
+      - "80"
+    networks:
+      - aware_network
+    depends_on:
+      - dashboard-api
 
 networks:
   aware_network:
