@@ -140,6 +140,102 @@
         font-size: 0.95em;
       }
 
+      .sensor-note {
+        margin-top: 32px;
+        padding: 20px 24px;
+        border-radius: 16px;
+        background: var(--surface);
+        border: 1px solid var(--border);
+        overflow-x: auto;
+      }
+
+      .sensor-note-title {
+        margin: 0 0 14px;
+        font-weight: 700;
+        font-size: 0.95rem;
+      }
+
+      .sensor-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 1rem;
+      }
+
+      .sensor-table th {
+        text-align: left;
+        padding: 7px 24px 7px 0;
+        font-weight: 600;
+        font-size: 0.8rem;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        color: var(--accent);
+        border-bottom: 1px solid var(--border);
+        white-space: nowrap;
+      }
+
+      .sensor-table td {
+        padding: 7px 24px 7px 0;
+        color: var(--muted);
+        border-bottom: 1px solid var(--border);
+        vertical-align: middle;
+      }
+
+      .sensor-table tr:last-child td {
+        border-bottom: none;
+      }
+
+      .sensor-table td:first-child {
+        color: var(--text);
+        font-weight: 500;
+        white-space: nowrap;
+      }
+
+      .badge {
+        display: inline-block;
+        font-size: 0.9rem;
+        font-weight: 600;
+        padding: 2px 10px;
+        border-radius: 20px;
+      }
+
+      .badge-yes {
+        background: rgba(31, 179, 223, 0.14);
+        color: rgb(20, 140, 180);
+      }
+
+      .badge-no {
+        background: rgba(0, 0, 0, 0.05);
+        color: #aaa;
+      }
+
+      .has-tip {
+        position: relative;
+        cursor: default;
+        text-decoration: underline dotted var(--muted);
+        text-underline-offset: 3px;
+      }
+
+      .has-tip .info-tooltip {
+        display: none;
+        position: absolute;
+        left: 0;
+        top: calc(100% + 6px);
+        background: var(--surface-strong);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        padding: 8px 12px;
+        font-size: 0.82rem;
+        font-weight: 400;
+        color: var(--muted);
+        white-space: nowrap;
+        box-shadow: 0 4px 16px rgba(25, 50, 41, 0.1);
+        z-index: 10;
+      }
+
+      .has-tip:hover .info-tooltip {
+        display: block;
+      }
+
       @media (max-width: 640px) {
         main {
           padding-top: 28px;
@@ -157,6 +253,12 @@
         <p class="eyebrow">AWARE Dashboard</p>
         <h1>Main page</h1>
       </section>
+
+      <p class="footer-note">
+        If you want to change the deployment configuration, run
+        <code>./setup.sh</code> on macOS/Linux or <code>setup.bat</code> on
+        Windows.
+      </p>
 
       <section class="grid">
         <a class="card" href="/configurator/">
@@ -184,20 +286,181 @@
         <a class="card" href="/dashboard/">
           <div>
             <h2>Analytics Dashboard</h2>
-            <p>
-              Visualise sensor data collected from Android and iOS devices
-              across all active studies.
-            </p>
+            <p>Visualise sensor data collected from Android and iOS devices.</p>
           </div>
           <span class="card-link">Open /dashboard/</span>
         </a>
       </section>
 
-      <p class="footer-note">
-        If you want to change the deployment configuration, run
-        <code>./setup.sh</code> on macOS/Linux or <code>setup.bat</code> on
-        Windows.
-      </p>
+      <div class="sensor-note">
+        <h2 class="sensor-note-title">Platform sensor differences</h2>
+        <table class="sensor-table">
+          <thead>
+            <tr>
+              <th>Sensor</th>
+              <th>Android</th>
+              <th>iOS</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Accelerometer</td>
+              <td><span class="badge badge-yes">Yes</span></td>
+              <td><span class="badge badge-yes">Yes</span></td>
+            </tr>
+            <tr>
+              <td>Gyroscope</td>
+              <td><span class="badge badge-yes">Yes</span></td>
+              <td><span class="badge badge-yes">Yes</span></td>
+            </tr>
+            <tr>
+              <td>Light</td>
+              <td><span class="badge badge-yes">Yes</span></td>
+              <td><span class="badge badge-yes">Yes</span></td>
+            </tr>
+            <tr>
+              <td>Barometer</td>
+              <td><span class="badge badge-yes">Yes</span></td>
+              <td><span class="badge badge-yes">Yes</span></td>
+            </tr>
+            <tr>
+              <td>Magnetometer</td>
+              <td><span class="badge badge-yes">Yes</span></td>
+              <td><span class="badge badge-yes">Yes</span></td>
+            </tr>
+            <tr>
+              <td>Gravity</td>
+              <td><span class="badge badge-yes">Yes</span></td>
+              <td><span class="badge badge-yes">Yes</span></td>
+            </tr>
+            <tr>
+              <td>Linear accelerometer</td>
+              <td><span class="badge badge-yes">Yes</span></td>
+              <td><span class="badge badge-yes">Yes</span></td>
+            </tr>
+            <tr>
+              <td>Rotation</td>
+              <td><span class="badge badge-yes">Yes</span></td>
+              <td><span class="badge badge-yes">Yes</span></td>
+            </tr>
+            <tr>
+              <td>Proximity</td>
+              <td><span class="badge badge-yes">Yes</span></td>
+              <td><span class="badge badge-yes">Yes</span></td>
+            </tr>
+            <tr>
+              <td>Temperature</td>
+              <td><span class="badge badge-yes">Yes</span></td>
+              <td><span class="badge badge-yes">Yes</span></td>
+            </tr>
+            <tr>
+              <td>Battery</td>
+              <td><span class="badge badge-yes">Yes</span></td>
+              <td><span class="badge badge-yes">Yes</span></td>
+            </tr>
+            <tr>
+              <td>Screen</td>
+              <td><span class="badge badge-yes">Yes</span></td>
+              <td><span class="badge badge-yes">Yes</span></td>
+            </tr>
+            <tr>
+              <td>WiFi</td>
+              <td><span class="badge badge-yes">Yes</span></td>
+              <td><span class="badge badge-yes">Yes</span></td>
+            </tr>
+            <tr>
+              <td>Bluetooth</td>
+              <td><span class="badge badge-yes">Yes</span></td>
+              <td><span class="badge badge-yes">Yes</span></td>
+            </tr>
+            <tr>
+              <td>Applications</td>
+              <td><span class="badge badge-yes">Yes</span></td>
+              <td><span class="badge badge-yes">Yes</span></td>
+            </tr>
+            <tr>
+              <td>ESM (surveys)</td>
+              <td><span class="badge badge-yes">Yes</span></td>
+              <td><span class="badge badge-yes">Yes</span></td>
+            </tr>
+            <tr>
+              <td class="has-tip">
+                Location *<span class="info-tooltip"
+                  >Android: separate GPS, network and passive providers.<br />iOS:
+                  single unified location sensor.</span
+                >
+              </td>
+              <td><span class="badge badge-yes">Yes</span></td>
+              <td><span class="badge badge-yes">Yes</span></td>
+            </tr>
+            <tr>
+              <td class="has-tip">
+                Network *<span class="info-tooltip"
+                  >Android: connection events + traffic bytes/packets.<br />iOS:
+                  reachability events only.</span
+                >
+              </td>
+              <td><span class="badge badge-yes">Yes</span></td>
+              <td><span class="badge badge-yes">Yes</span></td>
+            </tr>
+            <tr>
+              <td class="has-tip">
+                Calls &amp; messages *<span class="info-tooltip"
+                  >Android: separate calls and messages tables.<br />iOS:
+                  bundled as a single communication sensor.</span
+                >
+              </td>
+              <td><span class="badge badge-yes">Yes</span></td>
+              <td><span class="badge badge-yes">Yes</span></td>
+            </tr>
+            <tr>
+              <td class="has-tip">
+                Significant motion *<span class="info-tooltip"
+                  >iOS motion coprocessor only. Not available on Android.</span
+                >
+              </td>
+              <td><span class="badge badge-no">No</span></td>
+              <td><span class="badge badge-yes">Yes</span></td>
+            </tr>
+            <tr>
+              <td>Keyboard</td>
+              <td><span class="badge badge-yes">Yes</span></td>
+              <td><span class="badge badge-no">No</span></td>
+            </tr>
+            <tr>
+              <td>Touch</td>
+              <td><span class="badge badge-yes">Yes</span></td>
+              <td><span class="badge badge-no">No</span></td>
+            </tr>
+            <tr>
+              <td>Notifications</td>
+              <td><span class="badge badge-yes">Yes</span></td>
+              <td><span class="badge badge-no">No</span></td>
+            </tr>
+            <tr>
+              <td>Screenshots</td>
+              <td><span class="badge badge-yes">Yes</span></td>
+              <td><span class="badge badge-no">No</span></td>
+            </tr>
+            <tr>
+              <td>App installs</td>
+              <td><span class="badge badge-yes">Yes</span></td>
+              <td><span class="badge badge-no">No</span></td>
+            </tr>
+            <tr>
+              <td>Crashes</td>
+              <td><span class="badge badge-yes">Yes</span></td>
+              <td><span class="badge badge-no">No</span></td>
+            </tr>
+            <tr>
+              <td>Network traffic</td>
+              <td><span class="badge badge-yes">Yes</span></td>
+              <td><span class="badge badge-no">No</span></td>
+              <td></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
     </main>
   </body>
 </html>

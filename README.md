@@ -142,6 +142,49 @@ If your public host and database host are different, you can override the micro-
 2. Edit `aware-micro-server/aware-config.json` if needed.
 3. In the AWARE iOS app, use the QR code shown on `/studies/`, or enter `http://your-server/index.php/<study_number>/<study_key>` manually. The iOS client then communicates with `/index.php/...` using `POST` requests.
 
+## Sensor Support
+
+Not all sensors are available on both platforms. The table below shows what each platform collects.
+
+| Sensor | Android | iOS | Notes |
+|---|:---:|:---:|---|
+| Accelerometer | ✓ | ✓ | |
+| Gyroscope | ✓ | ✓ | |
+| Light | ✓ | ✓ | |
+| Barometer | ✓ | ✓ | |
+| Magnetometer | ✓ | ✓ | |
+| Gravity | ✓ | ✓ | |
+| Linear accelerometer | ✓ | ✓ | |
+| Rotation | ✓ | ✓ | |
+| Proximity | ✓ | ✓ | |
+| Temperature | ✓ | ✓ | |
+| Battery | ✓ | ✓ | |
+| Screen | ✓ | ✓ | |
+| WiFi | ✓ | ✓ | |
+| Bluetooth | ✓ | ✓ | |
+| Processor | ✓ | ✓ | |
+| Telephony | ✓ | ✓ | |
+| Applications | ✓ | ✓ | |
+| Timezone | ✓ | ✓ | |
+| ESM | ✓ | ✓ | |
+| Location | ✓ | ✓ | Android splits into GPS / network / passive; iOS uses a single location sensor |
+| Network | ✓ | ✓ | Android splits into events and traffic tables; iOS records reachability events only |
+| Calls & messages | ✓ | ✓ | Android exposes `calls` and `messages` separately; iOS bundles them as `communication` |
+| Significant motion | — | ✓ | iOS motion coprocessor only |
+| Keyboard | ✓ | — | |
+| Touch | ✓ | — | |
+| Notifications | ✓ | — | |
+| Screenshots | ✓ | — | |
+| App installations | ✓ | — | |
+| Crashes | ✓ | — | |
+
+### Key differences
+
+- **Location** — Android has three separate providers (`status_location_gps`, `status_location_network`, `status_location_passive`). iOS uses one unified location sensor (`locations`).
+- **Network** — Android writes connection events to the `network` table and traffic bytes/packets to `network_traffic`. iOS only collects reachability state changes in a single `network` table.
+- **Calls and messages** — Android records these in separate tables (`calls`, `messages`). iOS stores both under `communication`.
+- **System sensors** — keyboard input, touch events, notifications, screenshots, and app installs are Android-only. iOS restricts access to these at the OS level.
+
 ## HTTPS
 
 1. Obtain certificates, for example with Let's Encrypt.
