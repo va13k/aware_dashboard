@@ -1,0 +1,8 @@
+fastapi              # framework for api itself
+uvicorn[standard]    # the server that runs FastAPI
+sqlalchemy           # prisma-analog for python
+alembic              # database migration manager
+pydantic             # requests/responces validator 
+aiomysql             # async MySQL driver
+cryptography         # aiomysql needs this internally
+python-dotenv        # reads .env file
