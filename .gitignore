@@ -1,8 +1,11 @@
 # Environment - contains secrets, never commit
 .env
-.env.saved
+.env.*
 .setup-defaults.env
 .setup-session.start
+.htpasswd
+nginx/auth/.htpasswd
+setup/.wizard_url
 
 # Studies - generated at runtime, not source code
 studies/

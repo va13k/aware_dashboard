@@ -22,7 +22,10 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # See https://docs.djangoproject.com/en/4.1/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = SECRET_KEY = os.environ.get("DJANGO_SECRET_KEY", "django-insecure-fallback-change-me")
+_secret_key = os.environ.get("DJANGO_SECRET_KEY", "")
+if not _secret_key:
+    raise RuntimeError("DJANGO_SECRET_KEY environment variable must be set")
+SECRET_KEY = _secret_key
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.environ.get("DJANGO_DEBUG", "False").lower() == "true"
@@ -74,9 +77,21 @@ INSTALLED_APPS = [
     'App01.apps.App01Config',
 ]
 
+_protocol = os.environ.get("PROTOCOL", "http")
+_public_host = os.environ.get("PUBLIC_HOST", "localhost")
+_public_port = os.environ.get("PUBLIC_PORT", "80")
+
 CORS_ALLOWED_ORIGINS = os.environ.get(
-    "DJANGO_CORS_ALLOWED_ORIGINS", "http://localhost"
+    "DJANGO_CORS_ALLOWED_ORIGINS",
+    f"{_protocol}://{_public_host}:{_public_port}",
 ).split(",")
+
+# Trust Nginx's forwarded headers (Django is behind a reverse proxy)
+USE_X_FORWARDED_HOST = True
+SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+
+# Required for CSRF to work when the site is served over HTTPS
+CSRF_TRUSTED_ORIGINS = [f"{_protocol}://{_public_host}"]
 
 MIDDLEWARE = [
     'corsheaders.middleware.CorsMiddleware',

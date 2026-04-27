@@ -71,8 +71,8 @@ elif [ "$HAS_ENV" -eq 1 ] && [ "$HAS_MICRO_CONFIG" -eq 0 ]; then
     echo ""
 fi
 
-# Remove marker from any previous run
-rm -f .env.saved
+# Remove markers from any previous run
+rm -f .env.saved setup/.wizard_url
 
 SUGGESTED_PUBLIC_HOST=$(python3 setup/detect_public_host.py)
 printf "PUBLIC_HOST=%s\nPUBLIC_PORT=80\nPROTOCOL=http\n" "$SUGGESTED_PUBLIC_HOST" > .setup-defaults.env
@@ -81,10 +81,33 @@ printf "PUBLIC_HOST=%s\nPUBLIC_PORT=80\nPROTOCOL=http\n" "$SUGGESTED_PUBLIC_HOST
 sudo docker compose --profile setup up --build -d setup-wizard
 
 echo ""
-echo "  Setup wizard is running."
+echo "  Waiting for setup wizard to start..."
+
+# Wait for server.py to write the token URL (up to 30 seconds)
+i=0
+while [ ! -s setup/.wizard_url ] && [ $i -lt 30 ]; do
+    sleep 1
+    i=$((i + 1))
+done
+
+if [ ! -s setup/.wizard_url ]; then
+    echo ""
+    echo "  ERROR: Could not read wizard URL."
+    echo "  Check logs with: sudo docker compose logs setup-wizard"
+    echo ""
+    exit 1
+fi
+
+TOKEN_PATH=$(cat setup/.wizard_url)
+WIZARD_URL="http://${SUGGESTED_PUBLIC_HOST}:9999${TOKEN_PATH}"
 echo ""
-WIZARD_URL="http://localhost:9999/?v=$(date +%s)"
-echo "  Open your browser to:  $WIZARD_URL"
+echo "  ┌──────────────────────────────────────────────────────────────┐"
+echo "  │  Setup wizard is ready. Open this URL in your browser:      │"
+echo "  │                                                              │"
+printf "  │  %-60s  │\n" "$WIZARD_URL"
+echo "  │                                                              │"
+echo "  │  This token is valid for this session only.                 │"
+echo "  └──────────────────────────────────────────────────────────────┘"
 echo ""
 
 # Try to open browser

@@ -364,6 +364,14 @@
       .hidden {
         display: none;
       }
+      .field-error {
+        font-size: 12px;
+        color: var(--danger);
+        margin-top: 5px;
+      }
+      .field input.invalid {
+        border-color: var(--danger);
+      }
     </style>
   </head>
   <body>
@@ -373,7 +381,7 @@
       <p class="subtitle">Configure your deployment in a few steps</p>
 
       <div class="steps" id="steps">
-        <span class="active"></span><span></span><span></span>
+        <span class="active"></span><span></span><span></span><span></span>
       </div>
 
       <div class="card" id="s1">
@@ -387,12 +395,47 @@
             type="password"
             id="mysqlPass"
             placeholder="Enter a strong password"
+            oninput="clearFieldError('mysqlPass')"
           />
+          <p class="field-error hidden" id="mysqlPassError"></p>
           <p class="hint">All services use this to connect to MySQL</p>
         </div>
       </div>
 
       <div class="card hidden" id="s2">
+        <p class="step-title">Researcher access</p>
+        <p class="step-desc">
+          Blocks participants from reaching the configurator and dashboard
+        </p>
+        <div class="field">
+          <label>Username</label>
+          <input
+            type="text"
+            id="researcherUser"
+            placeholder="researcher"
+            autocomplete="off"
+            oninput="clearFieldError('researcherUser')"
+          />
+          <p class="field-error hidden" id="researcherUserError"></p>
+        </div>
+        <div class="field">
+          <label>Password</label>
+          <div class="field-row">
+            <input
+              type="text"
+              id="researcherPass"
+              placeholder=""
+              autocomplete="off"
+              oninput="clearFieldError('researcherPass')"
+            />
+            <button class="gen-btn" type="button" onclick="suggestPassword()">Generate</button>
+          </div>
+          <p class="field-error hidden" id="researcherPassError"></p>
+          <p class="hint" id="researcherHint">Share this with your research team</p>
+        </div>
+      </div>
+
+      <div class="card hidden" id="s3">
         <p class="step-title">Network</p>
         <p class="step-desc">
           Nginx routes all traffic through a single entry point
@@ -441,7 +484,7 @@
         </div>
       </div>
 
-      <div class="card hidden" id="s3">
+      <div class="card hidden" id="s4">
         <p class="step-title">Review</p>
         <p class="step-desc">
           This will be saved as .env and Docker will start automatically
@@ -452,7 +495,7 @@
         </div>
       </div>
 
-      <div class="card hidden" id="s4">
+      <div class="card hidden" id="s5">
         <div class="status">
           <div class="status-icon loading" id="statusIcon">
             <svg
@@ -472,6 +515,11 @@
           <p class="status-desc" id="statusDesc">
             Writing configuration and starting containers.
           </p>
+          <div class="credentials-box hidden" id="credentialsBox" style="margin-top:1.25rem;text-align:left">
+            <p class="output-label">Researcher login</p>
+            <div class="output-block" id="credentialsText"></div>
+            <p class="hint" style="margin-top:6px">Save these — required to open /configurator/ and /dashboard/</p>
+          </div>
           <div class="error-detail hidden" id="errorDetail"></div>
           <button
             class="btn btn-back hidden"
@@ -497,7 +545,9 @@
         ssl = false,
         redirectTimer = null,
         suggestedPublicHost = "",
-        customPublicHost = "";
+        customPublicHost = "",
+        hasExistingResearcherAuth = false,
+        researcherCredentials = null;
 
       function getSelectedHost() {
         return (document.getElementById("publicHost").value || "").trim();
@@ -568,11 +618,65 @@
         hostInput.disabled = false;
       }
 
+      function showFieldError(id, msg) {
+        var input = document.getElementById(id);
+        var errEl = document.getElementById(id + "Error");
+        input.classList.add("invalid");
+        errEl.textContent = msg;
+        errEl.classList.remove("hidden");
+        input.focus();
+      }
+
+      function clearFieldError(id) {
+        document.getElementById(id).classList.remove("invalid");
+        document.getElementById(id + "Error").classList.add("hidden");
+      }
+
+      function suggestPassword() {
+        var chars = "abcdefghjkmnpqrstuvwxyz23456789";
+        var buf = new Uint8Array(16);
+        crypto.getRandomValues(buf);
+        var parts = [];
+        for (var i = 0; i < 4; i++) {
+          var part = "";
+          for (var j = 0; j < 4; j++) {
+            part += chars[buf[i * 4 + j] % chars.length];
+          }
+          parts.push(part);
+        }
+        document.getElementById("researcherPass").value = parts.join("-");
+      }
+
       function go(dir) {
         var next = step + dir;
-        if (next < 0 || next > 3) return;
-        if (next === 2) buildPreview();
-        if (next === 3) deploy();
+        if (next < 0 || next > 4) return;
+
+        if (dir > 0) {
+          if (step === 0) {
+            var mp = (document.getElementById("mysqlPass").value || "").trim();
+            if (!mp) {
+              showFieldError("mysqlPass", "Please enter a MySQL root password.");
+              return;
+            }
+          }
+          if (step === 1) {
+            var ru = (document.getElementById("researcherUser").value || "").trim();
+            var rp = (document.getElementById("researcherPass").value || "").trim();
+            var valid = true;
+            if (!ru) {
+              showFieldError("researcherUser", "Please enter a username.");
+              valid = false;
+            }
+            if (!rp && !hasExistingResearcherAuth) {
+              showFieldError("researcherPass", "Please enter a password.");
+              valid = false;
+            }
+            if (!valid) return;
+          }
+        }
+
+        if (next === 3) buildPreview();
+        if (next === 4) deploy();
 
         document.getElementById("s" + (step + 1)).classList.add("hidden");
         document.getElementById("s" + (next + 1)).classList.remove("hidden");
@@ -591,9 +695,9 @@
         back.classList.toggle("hidden", step === 0);
         nb.classList.remove("hidden");
 
-        if (step === 2) {
+        if (step === 3) {
           nb.textContent = "Deploy";
-        } else if (step === 3) {
+        } else if (step === 4) {
           nav.classList.add("hidden");
         } else {
           nb.textContent = "Next";
@@ -605,7 +709,7 @@
           clearTimeout(redirectTimer);
           redirectTimer = null;
         }
-        document.getElementById("s4").classList.add("hidden");
+        document.getElementById("s5").classList.add("hidden");
         document.getElementById("s1").classList.remove("hidden");
         document.getElementById("statusIcon").className = "status-icon loading";
         document.getElementById("statusIcon").innerHTML =
@@ -637,12 +741,16 @@
 
       function getPayload() {
         var mp = (document.getElementById("mysqlPass").value || "CHANGE_ME").trim();
+        var ru = (document.getElementById("researcherUser").value || "").trim();
+        var rp = (document.getElementById("researcherPass").value || "").trim();
         var host = getSelectedHost() || "localhost";
         var proto = ssl ? "https" : "http";
         var publicPort = ssl ? "443" : "80";
 
         return {
           mysql_root_password: mp,
+          researcher_username: ru,
+          researcher_password: rp,
           public_host: host || "localhost",
           public_port: publicPort,
           protocol: proto,
@@ -658,24 +766,13 @@
       function getEnv() {
         var payload = getPayload();
         var e =
-          "MYSQL_ROOT_PASSWORD=" +
-          payload.mysql_root_password +
-          "\n" +
-          "PUBLIC_HOST=" +
-          payload.public_host +
-          "\n" +
-          "PUBLIC_PORT=" +
-          payload.public_port +
-          "\n" +
-          "PROTOCOL=" +
-          payload.protocol;
+          "MYSQL_ROOT_PASSWORD=" + payload.mysql_root_password + "\n" +
+          "PUBLIC_HOST=" + payload.public_host + "\n" +
+          "PUBLIC_PORT=" + payload.public_port + "\n" +
+          "PROTOCOL=" + payload.protocol;
         if (payload.protocol === "https") {
-          e +=
-            "\nSSL_CERTIFICATE_PATH=" +
-            payload.ssl_certificate_path;
-          e +=
-            "\nSSL_CERTIFICATE_KEY_PATH=" +
-            payload.ssl_certificate_key_path;
+          e += "\nSSL_CERTIFICATE_PATH=" + payload.ssl_certificate_path;
+          e += "\nSSL_CERTIFICATE_KEY_PATH=" + payload.ssl_certificate_key_path;
         }
         return e;
       }
@@ -736,11 +833,24 @@
           '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#33B5E5" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>';
         document.getElementById("statusTitle").textContent =
           "Deployment complete";
-        document.getElementById("statusDesc").textContent =
-          "Services are ready. Redirecting to the main page.";
-        redirectTimer = setTimeout(function () {
-          window.location.href = mainPageUrl;
-        }, 2500);
+
+        if (researcherCredentials && researcherCredentials.username) {
+          document.getElementById("credentialsBox").classList.remove("hidden");
+          document.getElementById("credentialsText").textContent =
+            "Username: " + researcherCredentials.username +
+            "\nPassword: " + researcherCredentials.password;
+          document.getElementById("statusDesc").textContent =
+            "Services are ready. Save the credentials above, then visit the main page.";
+          redirectTimer = setTimeout(function () {
+            window.location.href = mainPageUrl;
+          }, 8000);
+        } else {
+          document.getElementById("statusDesc").textContent =
+            "Services are ready. Redirecting to the main page.";
+          redirectTimer = setTimeout(function () {
+            window.location.href = mainPageUrl;
+          }, 2500);
+        }
       }
 
       function waitForServices() {
@@ -783,12 +893,16 @@
 
       function deploy() {
         var x = new XMLHttpRequest();
-        x.open("POST", "/cgi-bin/deploy", true);
+        x.open("POST", "cgi-bin/deploy", true);
         x.setRequestHeader("Content-Type", "application/json");
         x.onload = function () {
           try {
             var d = JSON.parse(x.responseText);
             if (d.success) {
+              researcherCredentials = {
+                username: d.researcher_username || "",
+                password: d.researcher_password || "",
+              };
               document.getElementById("statusTitle").textContent =
                 "Starting services...";
               document.getElementById("statusDesc").textContent =
@@ -827,7 +941,7 @@
 
       function loadExisting() {
         var x = new XMLHttpRequest();
-        x.open("GET", "/cgi-bin/deploy", true);
+        x.open("GET", "cgi-bin/deploy", true);
         x.onload = function () {
           try {
             var d = JSON.parse(x.responseText);
@@ -836,6 +950,17 @@
             if (d.MYSQL_ROOT_PASSWORD)
               document.getElementById("mysqlPass").value =
                 d.MYSQL_ROOT_PASSWORD;
+
+            if (d.RESEARCHER_USERNAME) {
+              document.getElementById("researcherUser").value =
+                d.RESEARCHER_USERNAME;
+              hasExistingResearcherAuth = true;
+              document.getElementById("researcherHint").textContent =
+                "Leave blank to keep the current password";
+            } else {
+              document.getElementById("researcherUser").value = "researcher";
+              suggestPassword();
+            }
 
             if (d.exists) {
               setHostSelection((d.PUBLIC_HOST || "").trim() || suggestedPublicHost || "localhost");
