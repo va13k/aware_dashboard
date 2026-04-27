@@ -37,9 +37,32 @@
   },
   "android": {
     "created_at": "",
-    "updated_at": "2026-04-09T23:13:57.173Z",
-    "questions": [],
-    "schedules": [],
+    "updated_at": "2026-04-27T09:26:58.883Z",
+    "questions": [
+      {
+        "esm_submit": "Submit",
+        "esm_title": "Question1",
+        "instructions": "Are you okay?",
+        "esm_type": 2,
+        "esm_radios": [
+          "Yes",
+          "No"
+        ],
+        "id": 1
+      }
+    ],
+    "schedules": [
+      {
+        "title": "Schedule 1",
+        "type": "interval",
+        "esm_keep": false,
+        "questions": [
+          1
+        ],
+        "hours": [],
+        "days": []
+      }
+    ],
     "settings": {
       "webservice_wifi_only": false,
       "webservice_charging": false,
@@ -51,7 +74,7 @@
       "foreground_priority": false,
       "debug_flag": false,
       "frequency_sync_config": 60,
-      "enable_config_update": true,
+      "enable_config_update": false,
       "status_notifications": false,
       "status_crashes": false,
       "status_keyboard": false,
@@ -77,9 +100,9 @@
       "location_expiration_time": 300,
       "status_location_passive": false,
       "location_save_all": false,
-      "network": true,
-      "status_network_events": true,
-      "status_network_traffic": true,
+      "network": false,
+      "status_network_events": false,
+      "status_network_traffic": false,
       "status_screenshot": false,
       "capture_time_interval": 5,
       "compress_rate": 80,
@@ -171,7 +194,7 @@
         "enforce": false
       },
       "battery": {
-        "enabled": true
+        "enabled": false
       },
       "bluetooth": {
         "enabled": false,
