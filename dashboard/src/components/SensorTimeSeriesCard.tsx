@@ -37,45 +37,46 @@ export default function SensorTimeSeriesCard({ config, records, loading }: Props
   const tickFormatter = makeTickFormatter(spanMs)
 
   return (
-    <div className="bg-[#1a1f2e] border border-[#2d3347] rounded-[10px] p-4">
+    <div className="bg-card backdrop-blur-xl border border-wire rounded-3xl shadow-card p-5">
       <div className="flex items-center gap-2 mb-3">
         <span className="w-2 h-2 rounded-full shrink-0" style={{ background: config.color }} />
-        <h3 className="text-[13px] font-semibold flex-1">{config.label}</h3>
+        <h3 className="text-[13px] font-semibold flex-1 text-ink">{config.label}</h3>
         {config.unit && (
-          <span className="text-[11px] text-slate-500 bg-[#2d3347] px-1.5 py-0.5 rounded">
+          <span className="text-[11px] text-sage bg-[rgba(48,67,54,0.07)] px-1.5 py-0.5 rounded-md">
             {config.unit}
           </span>
         )}
         {values.length > 0 && (
-          <span className="text-[11px] text-slate-500 ml-auto">
-            mean <b className="text-slate-400">{fmt(mean(values))}</b>
+          <span className="text-[11px] text-sage ml-auto">
+            mean <b className="text-ink">{fmt(mean(values))}</b>
             {' · '}
-            median <b className="text-slate-400">{fmt(median(values))}</b>
+            median <b className="text-ink">{fmt(median(values))}</b>
           </span>
         )}
       </div>
 
       {loading ? (
-        <div className="h-40 rounded-md shimmer" />
+        <div className="h-40 rounded-xl shimmer" />
       ) : !data.length ? (
-        <div className="h-40 flex items-center justify-center text-slate-500 text-[13px]">
+        <div className="h-40 flex items-center justify-center text-sage text-[13px]">
           No data
         </div>
       ) : (
         <ResponsiveContainer width="100%" height={160}>
           <LineChart data={data} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#2d3347" />
+            <CartesianGrid strokeDasharray="3 3" stroke="rgba(48,67,54,0.12)" />
             <XAxis
               dataKey="time"
               tickFormatter={tickFormatter}
-              tick={{ fill: '#94a3b8', fontSize: 11 }}
+              tick={{ fill: '#5f746b', fontSize: 11 }}
               minTickGap={60}
             />
-            <YAxis tick={{ fill: '#94a3b8', fontSize: 11 }} width={45} />
+            <YAxis tick={{ fill: '#5f746b', fontSize: 11 }} width={45} />
             <Tooltip
               labelFormatter={v => new Date((v as number) * 1000).toLocaleString()}
-              contentStyle={{ background: '#1a1f2e', border: '1px solid #2d3347', borderRadius: 6 }}
-              labelStyle={{ color: '#94a3b8' }}
+              contentStyle={{ background: '#fffdf8', border: '1px solid rgba(48,67,54,0.14)', borderRadius: 10 }}
+              labelStyle={{ color: '#5f746b' }}
+              itemStyle={{ color: '#193229' }}
             />
             <Line
               type="monotone"

@@ -69,13 +69,13 @@ export default function DevicePage() {
   }, [selected])
 
   if (error) return (
-    <div className="mt-4 p-4 text-red-400 bg-red-950/50 border border-red-900 rounded-lg">
+    <div className="mt-4 p-4 text-red-700 bg-red-50 border border-red-200 rounded-2xl">
       {error}
     </div>
   )
 
   if (!devices) return (
-    <div className="text-slate-500 py-8 text-center text-[13px]">Loading devices…</div>
+    <div className="text-sage py-8 text-center text-[13px]">Loading devices…</div>
   )
 
   const allDevices: Device[] = [...devices.android, ...devices.ios]
@@ -83,7 +83,7 @@ export default function DevicePage() {
   return (
     <div>
       <div className="flex items-center gap-3 mb-1">
-        <label htmlFor="device-select" className="text-[13px] text-slate-500 font-medium">
+        <label htmlFor="device-select" className="text-[13px] text-sage font-medium">
           Device
         </label>
         <select
@@ -93,7 +93,7 @@ export default function DevicePage() {
             const d = allDevices.find(d => d.device_id === e.target.value)
             if (d) setSelected(d)
           }}
-          className="bg-[#1a1f2e] border border-[#2d3347] text-slate-200 py-1.75 px-3 rounded-md text-[13px] cursor-pointer min-w-65 focus:outline-2 focus:outline-indigo-500"
+          className="bg-card-strong border border-wire text-ink py-1.75 px-3 rounded-xl text-[13px] cursor-pointer min-w-65 focus:outline-2 focus:outline-teal"
         >
           {allDevices.map(d => (
             <option key={d.device_id} value={d.device_id}>

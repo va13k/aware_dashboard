@@ -8,8 +8,8 @@ export default function App() {
   const [page, setPage] = useState<Page>("overview");
 
   return (
-    <div className="min-h-screen bg-[#0f1117] text-slate-200 flex flex-col">
-      <header className="sticky top-0 z-10 flex items-center justify-between px-6 h-13 bg-[#1a1f2e] border-b border-[#2d3347]">
+    <div className="min-h-screen bg-page text-ink font-sans flex flex-col">
+      <header className="sticky top-0 z-10 flex items-center justify-between px-6 h-13 bg-card backdrop-blur-xl border-b border-wire">
         <span className="font-bold text-[15px] tracking-tight">
           AWARE Dashboard
         </span>
@@ -18,11 +18,11 @@ export default function App() {
             <button
               key={p}
               onClick={() => setPage(p)}
-              className={`px-3.5 py-1.5 rounded-md text-[13px] font-medium transition-colors cursor-pointer border-none
+              className={`px-3.5 py-1.5 rounded-lg text-[13px] font-medium transition-colors cursor-pointer border-none
                 ${
                   page === p
-                    ? "bg-[#2d3347] text-slate-200"
-                    : "bg-transparent text-slate-500 hover:bg-[#2d3347] hover:text-slate-200"
+                    ? "bg-teal-soft text-teal"
+                    : "bg-transparent text-sage hover:bg-teal-soft/50 hover:text-ink"
                 }`}
             >
               {p === "overview" ? "Overview" : "Per Device"}

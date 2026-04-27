@@ -56,14 +56,14 @@ export default function OverviewPage() {
   }, [])
 
   if (error) return (
-    <div className="mt-4 p-4 text-red-400 bg-red-950/50 border border-red-900 rounded-lg">
+    <div className="mt-4 p-4 text-red-700 bg-red-50 border border-red-200 rounded-2xl">
       {error}
     </div>
   )
 
   return (
     <div>
-      <p className="text-slate-500 text-[13px]">
+      <p className="text-sage text-[13px]">
         Aggregate mean &amp; median across all devices, per sensor.
       </p>
       <div className="grid grid-cols-[repeat(auto-fill,minmax(340px,1fr))] gap-4 mt-4">
