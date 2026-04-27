@@ -1,0 +1,259 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AWARE — Sign in</title>
+  <style>
+    *, *::before, *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    :root {
+      --bg:           #fafaf8;
+      --surface:      #ffffff;
+      --border:       #e4e2db;
+      --border-focus: #33b5e5;
+      --text:         #1c1c1a;
+      --text-muted:   #6e6d68;
+      --accent:       #33b5e5;
+      --accent-hover: #2a9ac4;
+      --danger:       #e24b4a;
+      --danger-bg:    #fcebeb;
+      --warn:         #b45309;
+      --warn-bg:      #fef3c7;
+      --radius:       10px;
+      --radius-lg:    14px;
+    }
+
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 2rem;
+    }
+
+    .container {
+      width: 100%;
+      max-width: 360px;
+    }
+
+    .logo {
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: 0.05em;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      margin-bottom: 0.4rem;
+    }
+
+    h1 {
+      font-size: 24px;
+      font-weight: 500;
+      margin-bottom: 0.25rem;
+    }
+
+    .subtitle {
+      font-size: 14px;
+      color: var(--text-muted);
+      margin-bottom: 2rem;
+    }
+
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 1.75rem;
+    }
+
+    .banner {
+      font-size: 13px;
+      border-radius: var(--radius);
+      padding: 0.65rem 0.9rem;
+      margin-bottom: 1.25rem;
+      line-height: 1.5;
+    }
+
+    .banner.error {
+      color: var(--danger);
+      background: var(--danger-bg);
+    }
+
+    .banner.warn {
+      color: var(--warn);
+      background: var(--warn-bg);
+    }
+
+    .banner code {
+      font-size: 12px;
+      font-family: monospace;
+    }
+
+    .field {
+      margin-bottom: 1.25rem;
+    }
+
+    .field:last-of-type {
+      margin-bottom: 0;
+    }
+
+    label {
+      display: block;
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--text-muted);
+      margin-bottom: 6px;
+    }
+
+    input[type="text"],
+    input[type="password"] {
+      width: 100%;
+      height: 40px;
+      padding: 0 12px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      font-family: inherit;
+      font-size: 14px;
+      color: var(--text);
+      background: var(--surface);
+      outline: none;
+      transition: border-color 0.2s;
+    }
+
+    input:focus {
+      border-color: var(--border-focus);
+    }
+
+    input.invalid {
+      border-color: var(--danger);
+    }
+
+    input:disabled {
+      background: var(--bg);
+      color: var(--text-muted);
+      cursor: not-allowed;
+    }
+
+    .field-error {
+      display: none;
+      font-size: 12px;
+      color: var(--danger);
+      margin-top: 5px;
+    }
+
+    button[type="submit"] {
+      width: 100%;
+      height: 42px;
+      margin-top: 1.5rem;
+      border: none;
+      border-radius: var(--radius);
+      background: var(--accent);
+      color: #fff;
+      font-family: inherit;
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+
+    button[type="submit"]:hover:not(:disabled) {
+      background: var(--accent-hover);
+    }
+
+    button[type="submit"]:disabled {
+      opacity: 0.55;
+      cursor: not-allowed;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <p class="logo">AWARE Framework</p>
+    <h1>Researcher sign in</h1>
+    <p class="subtitle">Access the configurator and dashboard</p>
+
+    <div class="card">
+
+      {% if not_configured %}
+      <p class="banner warn">
+        Setup has not been completed yet.
+        Run <code>./setup.sh</code> first.
+      </p>
+      {% elif error %}
+      <p class="banner error">Incorrect username or password.</p>
+      {% endif %}
+
+      <form method="post" action="/auth/login" novalidate>
+        <input type="hidden" name="next" value="{{ next_url }}" />
+
+        <div class="field">
+          <label for="username">Username</label>
+          <input
+            id="username"
+            name="username"
+            type="text"
+            autocomplete="username"
+            autofocus
+            {% if not_configured %}disabled{% endif %}
+          />
+          <p class="field-error" id="usernameError"></p>
+        </div>
+
+        <div class="field">
+          <label for="password">Password</label>
+          <input
+            id="password"
+            name="password"
+            type="password"
+            autocomplete="current-password"
+            {% if not_configured %}disabled{% endif %}
+          />
+          <p class="field-error" id="passwordError"></p>
+        </div>
+
+        <button type="submit" {% if not_configured %}disabled{% endif %}>
+          Sign in
+        </button>
+      </form>
+
+    </div>
+  </div>
+
+  <script>
+    document.querySelector("form").addEventListener("submit", function (e) {
+      var username = document.getElementById("username");
+      var password = document.getElementById("password");
+      var ok = true;
+
+      if (!username.value.trim()) {
+        showError(username, "usernameError", "Please enter your username");
+        ok = false;
+      }
+      if (!password.value) {
+        showError(password, "passwordError", "Please enter your password");
+        ok = false;
+      }
+
+      if (!ok) e.preventDefault();
+    });
+
+    function showError(input, errorId, message) {
+      var errorEl = document.getElementById(errorId);
+      input.classList.add("invalid");
+      errorEl.textContent = message;
+      errorEl.style.display = "block";
+      input.focus();
+      input.addEventListener("input", function () {
+        input.classList.remove("invalid");
+        errorEl.style.display = "none";
+      }, { once: true });
+    }
+  </script>
+</body>
+</html>
