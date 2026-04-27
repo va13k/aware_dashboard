@@ -52,6 +52,9 @@ def main() -> None:
         )
     ).strip()
 
+    researcher_username = str(payload.get("researcher_username", "")).strip()
+    researcher_password = str(payload.get("researcher_password", "")).strip()
+
     if not public_host:
         raise SystemExit("PUBLIC_HOST is required")
 
@@ -61,6 +64,11 @@ def main() -> None:
         f"PUBLIC_PORT={public_port}",
         f"PROTOCOL={protocol}",
     ]
+
+    if researcher_username:
+        lines.append(f"RESEARCHER_USERNAME={researcher_username}")
+    if researcher_password:
+        lines.append(f"RESEARCHER_PASSWORD={researcher_password}")
 
     if protocol == "https":
         if ssl_cert:

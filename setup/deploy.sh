@@ -16,6 +16,7 @@ if [ "$REQUEST_METHOD" = "GET" ]; then
     PROTOCOL=""
     SSL_CERT=""
     SSL_KEY=""
+    RESEARCHER_USERNAME=""
     EXISTS=false
 
     if [ -f /project/.setup-defaults.env ]; then
@@ -45,12 +46,13 @@ if [ "$REQUEST_METHOD" = "GET" ]; then
                 PROTOCOL) PROTOCOL="$value" ;;
                 SSL_CERTIFICATE_PATH) SSL_CERT="$value" ;;
                 SSL_CERTIFICATE_KEY_PATH) SSL_KEY="$value" ;;
+                RESEARCHER_USERNAME) RESEARCHER_USERNAME="$value" ;;
             esac
         done < /project/.env
     fi
 
-    printf '{"exists":%s,"MYSQL_ROOT_PASSWORD":"%s","SUGGESTED_PUBLIC_HOST":"%s","PUBLIC_HOST":"%s","PUBLIC_PORT":"%s","PROTOCOL":"%s","SSL_CERTIFICATE_PATH":"%s","SSL_CERTIFICATE_KEY_PATH":"%s"}' \
-        "$EXISTS" "$MYSQL_PASS" "$SUGGESTED_PUBLIC_HOST" "$PUBLIC_HOST" "$PUBLIC_PORT" "$PROTOCOL" "$SSL_CERT" "$SSL_KEY"
+    printf '{"exists":%s,"MYSQL_ROOT_PASSWORD":"%s","SUGGESTED_PUBLIC_HOST":"%s","PUBLIC_HOST":"%s","PUBLIC_PORT":"%s","PROTOCOL":"%s","SSL_CERTIFICATE_PATH":"%s","SSL_CERTIFICATE_KEY_PATH":"%s","RESEARCHER_USERNAME":"%s"}' \
+        "$EXISTS" "$MYSQL_PASS" "$SUGGESTED_PUBLIC_HOST" "$PUBLIC_HOST" "$PUBLIC_PORT" "$PROTOCOL" "$SSL_CERT" "$SSL_KEY" "$RESEARCHER_USERNAME"
     exit 0
 fi
 
@@ -76,5 +78,19 @@ rm -f "$REQUEST_ENV_PATH"
 
 touch /project/.env.saved
 
+RESEARCHER_USERNAME=""
+RESEARCHER_PASSWORD=""
+if [ -f /project/.env ]; then
+    while IFS='=' read -r key value; do
+        key=$(trim_cr "$key")
+        value=$(trim_cr "$value")
+        case "$key" in
+            RESEARCHER_USERNAME) RESEARCHER_USERNAME="$value" ;;
+            RESEARCHER_PASSWORD) RESEARCHER_PASSWORD="$value" ;;
+        esac
+    done < /project/.env
+fi
+
 printf "Content-Type: application/json\r\n\r\n"
-printf '{"success":true}'
+printf '{"success":true,"researcher_username":"%s","researcher_password":"%s"}' \
+    "$RESEARCHER_USERNAME" "$RESEARCHER_PASSWORD"
