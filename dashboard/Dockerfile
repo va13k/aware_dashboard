@@ -7,7 +7,9 @@ RUN npm ci --frozen-lockfile
 
 COPY . .
 
+ARG VITE_API_KEY
 ENV VITE_BASE_PATH=/dashboard/
+ENV VITE_API_KEY=$VITE_API_KEY
 RUN npm run build
 
 FROM nginx:alpine

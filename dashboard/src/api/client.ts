@@ -1,9 +1,11 @@
 import type { DevicesResponse, SensorRecord } from '../types'
 
 const BASE = '/api'
+const API_KEY = import.meta.env.VITE_API_KEY as string | undefined
 
 async function get<T>(path: string): Promise<T> {
-  const res = await fetch(`${BASE}${path}`)
+  const headers: HeadersInit = API_KEY ? { 'X-API-Key': API_KEY } : {}
+  const res = await fetch(`${BASE}${path}`, { headers })
   if (!res.ok) throw new Error(`${res.status} ${res.statusText}`)
   return res.json()
 }
