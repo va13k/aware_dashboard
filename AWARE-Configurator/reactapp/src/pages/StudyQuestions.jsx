@@ -51,14 +51,10 @@ export default function StudyQuestions() {
   };
 
   const checkValidation = () => {
+    if (questions.length === 0) return false;
     for (let i = 0; i < questions.length; i += 1) {
       const each = questions[i];
-      if (
-        !each.esm_type ||
-        !each.esm_title ||
-        !("esm_type" in each) ||
-        !("esm_title" in each)
-      ) {
+      if (!each.esm_type || !each.esm_title) {
         return false;
       }
     }
@@ -76,28 +72,21 @@ export default function StudyQuestions() {
           aria-describedby="alert-dialog-description"
         >
           <DialogTitle id="alert-dialog-title">
-            Required fields are left blank.
+            Required fields are missing
           </DialogTitle>
           <DialogContent>
             <DialogContentText id="alert-dialog-description">
-              Title or type of the following questions is missing:{"\n"}
-              {blankFields.map((item) => (
+              {blankFields.includes(-1)
+                ? "At least one question is required before proceeding."
+                : "Each question must have a title and a type. Please fix the following:"}
+              {blankFields.filter((i) => i !== -1).map((item) => (
                 <li key={item}>Question {item + 1}</li>
               ))}
-              Are you sure going to next page?
             </DialogContentText>
           </DialogContent>
           <DialogActions>
             <Button onClick={validationClose} autoFocus>
-              Cancel
-            </Button>
-            <Button
-              onClick={() => {
-                validationClose();
-                navigateTo("/study/schedule_configuration");
-              }}
-            >
-              Next page
+              OK
             </Button>
           </DialogActions>
         </Dialog>
@@ -160,23 +149,22 @@ export default function StudyQuestions() {
                 display="flex"
                 variant="contained"
                 onClick={() => {
-                  validationOn();
-                  validate(checkValidation());
-                  if (questions.length === 0 || checkValidation()) {
+                  const valid = checkValidation();
+                  validate(valid);
+                  if (valid) {
                     navigateTo("/study/schedule_configuration");
-                    console.log(questions);
                   } else {
-                    for (let i = 0; i < questions.length; i += 1) {
-                      const each = questions[i];
-                      if (
-                        !each.esm_type ||
-                        !each.esm_title ||
-                        !("esm_type" in each) ||
-                        !("esm_title" in each)
-                      ) {
-                        updateBlankFields(i);
+                    if (questions.length === 0) {
+                      updateBlankFields(-1);
+                    } else {
+                      for (let i = 0; i < questions.length; i += 1) {
+                        const each = questions[i];
+                        if (!each.esm_type || !each.esm_title) {
+                          updateBlankFields(i);
+                        }
                       }
                     }
+                    validationOn();
                   }
                 }}
                 // disabled={!checkValidation()}

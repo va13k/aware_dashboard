@@ -58,7 +58,7 @@ export default function SensorData() {
 
   // software sensor states
   const [applicationSensor, setapplicationSensor] = useRecoilState(
-    applicationSensorState
+    applicationSensorState,
   );
 
   const updateApplicationSensorData = (fieldName, value) => {
@@ -71,7 +71,7 @@ export default function SensorData() {
   const [screenData, setscreenData] = useRecoilState(screenSensorState);
 
   const [communicationData, setcommunicationData] = useRecoilState(
-    communicationSensorState
+    communicationSensorState,
   );
 
   const [accelerometerData, setaccelerometerData] =
@@ -88,7 +88,7 @@ export default function SensorData() {
   const [lightData, setlightData] = useRecoilState(lightState);
 
   const [linearAccelerometerData, setLinearAccelerometerData] = useRecoilState(
-    linearAccelerometerState
+    linearAccelerometerState,
   );
 
   const [locationsData, setLocationsData] = useRecoilState(locationsState);
@@ -112,7 +112,7 @@ export default function SensorData() {
   const [wifiData, setWifiData] = useRecoilState(wifiState);
 
   const [screenshotData, setScreenshotData] = useRecoilState(
-    screenshotSensorState
+    screenshotSensorState,
   );
 
   const [noteData, setNoteData] = useRecoilState(noteState);
@@ -980,7 +980,7 @@ export default function SensorData() {
                   onClick={(_, checked) => {
                     updateApplicationSensorData(
                       "screenshot_package_specification",
-                      "0"
+                      "0",
                     );
                   }}
                 />
@@ -991,7 +991,7 @@ export default function SensorData() {
                   onClick={(_, checked) => {
                     updateApplicationSensorData(
                       "screenshot_package_specification",
-                      "1"
+                      "1",
                     );
                   }}
                 />
@@ -1002,7 +1002,7 @@ export default function SensorData() {
                   onClick={(_, checked) => {
                     updateApplicationSensorData(
                       "screenshot_package_specification",
-                      "2"
+                      "2",
                     );
                   }}
                 />
@@ -1119,7 +1119,7 @@ export default function SensorData() {
               onClick={(_, checked) => {
                 updatePluginData(
                   "plugin_openweather_measurement_units",
-                  "metric"
+                  "metric",
                 );
               }}
             />
@@ -1130,7 +1130,7 @@ export default function SensorData() {
               onClick={(_, checked) => {
                 updatePluginData(
                   "plugin_openweather_measurement_units",
-                  "imperial"
+                  "imperial",
                 );
               }}
             />

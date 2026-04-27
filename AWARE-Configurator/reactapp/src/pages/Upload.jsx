@@ -67,7 +67,7 @@ export default function Upload() {
   const setGyroscopeData = useSetRecoilState(gyroscopeState);
   const setLightData = useSetRecoilState(lightState);
   const setLinearAccelerometerData = useSetRecoilState(
-    linearAccelerometerState
+    linearAccelerometerState,
   );
   const setLocationsData = useSetRecoilState(locationsState);
   const setMagnetometerData = useSetRecoilState(magnetometerState);
@@ -98,7 +98,7 @@ export default function Upload() {
         const newQuestion = { ...question };
         delete newQuestion.id;
         return question;
-      })
+      }),
     );
 
     setSchedules(
@@ -147,7 +147,7 @@ export default function Upload() {
         }
 
         return newSchedule;
-      })
+      }),
     );
 
     const sensorData = {};

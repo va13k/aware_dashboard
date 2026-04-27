@@ -14,7 +14,9 @@ import MobileWarning from "./components/MobileWarning/MobileWarning";
 
 function App() {
   return (
-    <BrowserRouter basename="/configurator">
+    <BrowserRouter
+      basename={process.env.NODE_ENV === "development" ? "/" : "/configurator"}
+    >
       <MobileWarning />
       <Routes>
         <Route path="/" element={<Navigate replace to="/main" />} />

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React from "react";
 import { TextField } from "@mui/material";
 
 import { useRecoilState } from "recoil";
@@ -19,13 +19,7 @@ export default function CustomizedCheckbox(inputs) {
     className, // optional feature, custom wrapper class
   } = inputs;
 
-  let information;
-  let setInformation;
-  if (recoilState === undefined) {
-    [information, setInformation] = useState({});
-  } else {
-    [information, setInformation] = useRecoilState(recoilState);
-  }
+  const [information, setInformation] = useRecoilState(recoilState);
 
   const updateFormByField = (curFieldName, curValue) => {
     // update non-list data structure

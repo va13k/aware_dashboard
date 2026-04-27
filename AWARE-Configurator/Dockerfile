@@ -11,12 +11,9 @@ ARG SERVER_IP=localhost
 ARG SERVER_PORT=80
 ARG SERVER_BASE_PATH=/configurator
 
-RUN sed -i "s|\[REPLACEABLE_PROTOCOL\]|${SERVER_PROTOCOL}|g"   src/settings.js && \
-    sed -i "s|\[REPLACEABLE_IP_ADDR\]|${SERVER_IP}|g"          src/settings.js && \
-    sed -i "s|\[REPLACEABLE_PORT_NUM\]|${SERVER_PORT}|g"        src/settings.js && \
-    sed -i "s|\[REPLACEABLE_BASE_PATH\]|${SERVER_BASE_PATH}|g"  src/settings.js
+RUN printf "REACT_APP_SERVER_PROTOCOL=%s\nREACT_APP_SERVER_IP=%s\nREACT_APP_SERVER_PORT=%s\nREACT_APP_SERVER_BASE_PATH=%s\n" \
+    "${SERVER_PROTOCOL}" "${SERVER_IP}" "${SERVER_PORT}" "${SERVER_BASE_PATH}" > .env.production
 
-ENV DISABLE_ESLINT_PLUGIN=true
 RUN PUBLIC_URL=/configurator npm run build
 
 

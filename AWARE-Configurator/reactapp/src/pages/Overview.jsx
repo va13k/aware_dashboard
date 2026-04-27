@@ -8,7 +8,7 @@ import {
 } from "@mui/material";
 import { useNavigate } from "react-router-dom";
 import Grid from "@mui/material/Unstable_Grid2";
-import React, { useEffect, useState } from "react";
+import React, { useState } from "react";
 import { useRecoilValue, useRecoilState } from "recoil";
 import Box from "@mui/material/Box";
 import Dialog from "@mui/material/Dialog";
@@ -93,7 +93,6 @@ export default function Main() {
   const communicationData = useRecoilValue(communicationSensorState);
   const studyId = useRecoilValue(studyIdState);
   const createTime = useRecoilValue(createTimeState);
-  const [result, setResult] = useState({});
   const date = new Date().toJSON();
   const screenshotData = useRecoilValue(screenshotSensorState);
   const noteData = useRecoilValue(noteState);
@@ -114,6 +113,7 @@ export default function Main() {
   };
 
   const checkQuestionValidation = () => {
+    if (questions.length === 0) return false;
     for (let i = 0; i < questions.length; i += 1) {
       const each = questions[i];
       if (!each.esm_type || !each.esm_title) {
@@ -124,6 +124,7 @@ export default function Main() {
   };
 
   const checkScheduleValidation = () => {
+    if (schedules.length === 0) return false;
     for (let i = 0; i < schedules.length; i += 1) {
       const each = schedules[i];
       if (!each.questions || !each.title) {
@@ -215,8 +216,8 @@ export default function Main() {
     );
   });
 
-  useEffect(() => {
-    const newResult = {
+  function buildResult() {
+    return {
       _id: studyId,
       study_info: studyInformation,
       database: {
@@ -881,8 +882,7 @@ export default function Main() {
         { setting: "status_webservice", value: true },
       ],
     };
-    setResult(newResult);
-  }, []);
+  }
 
   const [open, setOpen] = React.useState(false);
 
@@ -953,7 +953,7 @@ export default function Main() {
       method: "post",
       url: "save_json_file/",
       data: {
-        text: JSON.stringify(result),
+        text: JSON.stringify(buildResult()),
       },
     });
   }

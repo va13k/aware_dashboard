@@ -1,20 +1,24 @@
 .title {
-    margin-top: 1rem;
-    margin-bottom: 0.5rem;
-    font-size: 1.5rem;
-    color: var(--cfg-ink);
+  margin-top: 1rem;
+  margin-bottom: 0.5rem;
+  font-size: 1.5rem;
+  color: var(--cfg-ink);
 }
 
 .explanation {
-    font-size: 1rem;
-    color: var(--cfg-muted);
+  font-size: 1rem;
+  color: var(--cfg-muted);
 }
 
 .border {
-    border: 1px solid var(--cfg-border);
-    box-shadow: var(--cfg-shadow);
-    border-radius: var(--cfg-radius-lg);
-    background: linear-gradient(180deg, var(--cfg-surface) 0%, var(--cfg-surface-soft) 100%);
-    padding: 0.25rem 1rem 0.75rem;
-    margin-top: 1rem;
+  border: 1px solid var(--cfg-border);
+  box-shadow: var(--cfg-shadow);
+  border-radius: var(--cfg-radius-lg);
+  background: linear-gradient(
+    180deg,
+    var(--cfg-surface) 0%,
+    var(--cfg-surface-soft) 100%
+  );
+  padding: 0.25rem 1rem 0.75rem;
+  margin-top: 1rem;
 }

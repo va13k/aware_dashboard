@@ -11,7 +11,7 @@ import {
 
 export default function Field(inputs) {
   const [isDbConnected, setIsDbConnected] = useRecoilState(
-    databaseConnectionState
+    databaseConnectionState,
   );
 
   const {
@@ -29,13 +29,7 @@ export default function Field(inputs) {
   } = inputs;
 
   const [isError, setIsError] = useState(false);
-  let information;
-  let setInformation;
-  if (recoilState === undefined) {
-    [information, setInformation] = useState({});
-  } else {
-    [information, setInformation] = useRecoilState(recoilState);
-  }
+  const [information, setInformation] = useRecoilState(recoilState);
 
   const updateFormByField = (curFieldName, curValue) => {
     // update non-list data structure
@@ -57,7 +51,7 @@ export default function Field(inputs) {
             (subEach, subEachIdx) => {
               if (subEachIdx === subIndex) return curValue;
               return subEach;
-            }
+            },
           );
           return { ...each, [curFieldName]: newSubList };
         }
@@ -95,7 +89,12 @@ export default function Field(inputs) {
   }
 
   return (
-    <Grid container rowSpacing={1} columnSpacing={{ xs: 1, sm: 2, md: 3 }}>
+    <Grid
+      container
+      rowSpacing={1}
+      columnSpacing={{ xs: 1, sm: 2, md: 3 }}
+      sx={{ mt: 2 }}
+    >
       <Grid xs={12} md={3}>
         <p className="field_name">{fieldName + (required ? " *" : "")}</p>
       </Grid>
@@ -113,7 +112,7 @@ export default function Field(inputs) {
             if (type === "number") {
               updateFormByField(
                 field.toString(),
-                parseInt(event.target.value, 10)
+                parseInt(event.target.value, 10),
               );
             } else {
               updateFormByField(field.toString(), event.target.value);

@@ -25,7 +25,6 @@ export default function Main() {
 
   return (
     <div>
-      <PageHeader />
       <div className="main_vertical_layout">
         <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
           <p className="main_title">AWARE Configuration Page</p>
@@ -55,11 +54,13 @@ export default function Main() {
             <Button
               variant="contained"
               color="main"
+              size="large"
               onClick={() => {
                 navigateTo("/upload");
               }}
+              sx={{ fontSize: "1.1rem", px: 4, py: 1.5 }}
             >
-              <EditIcon />
+              <EditIcon sx={{ mr: 1 }} />
               Change study configuration
             </Button>
           </div>
@@ -75,11 +76,18 @@ export default function Main() {
             </Grid>
             <Grid xs={4}>
               <LockIcon color="main" sx={{ fontSize: 70 }} />
-              <p>Deployment-level server and database settings stay managed outside the form.</p>
+              <p>
+                Deployment-level server and database settings stay managed
+                outside the form.
+              </p>
             </Grid>
+          </Grid>
+          <Grid container spacing={2} className="main_grid">
             <Grid xs={4}>
               <AccessTimeIcon color="main" sx={{ fontSize: 70 }} />
-              <p>Researchers only update the study content they actually need.</p>
+              <p>
+                Researchers only update the study content they actually need.
+              </p>
             </Grid>
             <Grid xs={4}>
               <GitHubIcon color="main" sx={{ fontSize: 70 }} />
@@ -98,7 +106,7 @@ export default function Main() {
           </Grid>
         </ThemeProvider>
 
-        <Divider light />
+        <Divider light sx={{ my: 5 }} />
 
         <Grid container spacing={2}>
           <Grid xs={6}>

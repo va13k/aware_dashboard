@@ -115,41 +115,43 @@ export default function StudyInformation() {
         <div className="border">
           <p className="title">{TITLE1}</p>
           <p className="explanation">{EXPLANATION1}</p>
-          <Field
-            fieldName="Study title"
-            recoilState={studyFormStudyInformationState}
-            field="study_title"
-            inputLabel="Study title"
-            required
-          />
-          <Field
-            fieldName="description"
-            recoilState={studyFormStudyInformationState}
-            field="study_description"
-            inputLabel="Description"
-            required
-          />
-          <Field
-            fieldName="Researcher's first name"
-            recoilState={studyFormStudyInformationState}
-            field="researcher_first"
-            inputLabel="First name"
-            required
-          />
-          <Field
-            fieldName="Researcher's last name"
-            recoilState={studyFormStudyInformationState}
-            field="researcher_last"
-            inputLabel="Last name"
-            required
-          />
-          <Field
-            fieldName="Researcher's email"
-            recoilState={studyFormStudyInformationState}
-            field="researcher_contact"
-            inputLabel="Email"
-            required
-          />
+          <div className="field_section">
+            <Field
+              fieldName="Study title"
+              recoilState={studyFormStudyInformationState}
+              field="study_title"
+              inputLabel="Study title"
+              required
+            />
+            <Field
+              fieldName="Description"
+              recoilState={studyFormStudyInformationState}
+              field="study_description"
+              inputLabel="Description"
+              required
+            />
+            <Field
+              fieldName="Researcher's first name"
+              recoilState={studyFormStudyInformationState}
+              field="researcher_first"
+              inputLabel="First name"
+              required
+            />
+            <Field
+              fieldName="Researcher's last name"
+              recoilState={studyFormStudyInformationState}
+              field="researcher_last"
+              inputLabel="Last name"
+              required
+            />
+            <Field
+              fieldName="Researcher's email"
+              recoilState={studyFormStudyInformationState}
+              field="researcher_contact"
+              inputLabel="Email"
+              required
+            />
+          </div>
 
           <Grid
             container
@@ -157,7 +159,9 @@ export default function StudyInformation() {
             columnSpacing={{ xs: 1, sm: 2, md: 3 }}
           >
             <Grid xs={12} md={3} />
-            <Grid xs={12} md={9}>{emailNotification()}</Grid>
+            <Grid xs={12} md={9}>
+              {emailNotification()}
+            </Grid>
           </Grid>
         </div>
 

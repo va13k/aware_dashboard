@@ -58,30 +58,21 @@ export default function ScheduleConfiguration() {
           aria-describedby="alert-dialog-description"
         >
           <DialogTitle id="alert-dialog-title">
-            Schedule incorrect or with missing values.
+            Schedule has missing or invalid values
           </DialogTitle>
           <DialogContent>
             <DialogContentText id="alert-dialog-description">
-              The following schedules are missing values or having problems:
-              {"\n"}
-              {/* {blankFields} */}
+              Please fix the following before continuing:
               {blankFields.map((item) => (
-                <li key={item}>Schedule {item + 1}</li>
+                <li key={item}>
+                  {typeof item === "number" ? `Schedule ${item + 1} — missing title or questions` : item}
+                </li>
               ))}
-              Are you sure going to next page?
             </DialogContentText>
           </DialogContent>
           <DialogActions>
             <Button onClick={validationClose} autoFocus>
-              Cancel
-            </Button>
-            <Button
-              onClick={() => {
-                validationClose();
-                navigateTo("/study/sensor_data");
-              }}
-            >
-              Next page
+              OK
             </Button>
           </DialogActions>
         </Dialog>
@@ -111,16 +102,7 @@ export default function ScheduleConfiguration() {
   };
 
   const checkValidation = () => {
-    if (
-      (questions.length === 0 || Object.keys(questions).length === 0) &&
-      !(schedules.length === 0)
-    ) {
-      return false;
-    }
-
-    if (!(questions.length === 0) && schedules.length === 0) {
-      return false;
-    }
+    if (schedules.length === 0) return false;
 
     for (let i = 0; i < schedules.length; i += 1) {
       const each = schedules[i];
@@ -196,40 +178,24 @@ export default function ScheduleConfiguration() {
                 color="main"
                 variant="contained"
                 onClick={() => {
-                  validationOn();
-                  validate(checkValidation());
-                  console.log(questions.length);
-                  console.log(questions);
-                  if (checkValidation()) {
+                  const valid = checkValidation();
+                  validate(valid);
+                  if (valid) {
                     navigateTo("/study/sensor_data");
-                  }
-                  if (
-                    (questions.length === 0 ||
-                      Object.keys(questions).length === 0) &&
-                    !(schedules.length === 0)
-                  ) {
-                    updateBlankFields(
-                      "More than one schedule but zero questions"
-                    );
-                  } else if (
-                    !(
-                      questions.length === 0 ||
-                      Object.keys(questions).length === 0
-                    ) &&
-                    schedules.length === 0
-                  ) {
-                    updateBlankFields("No schedules");
                   } else {
-                    for (let i = 0; i < schedules.length; i += 1) {
-                      const each = schedules[i];
-                      if (
-                        !each.questions ||
-                        !each.title ||
-                        !("title" in each)
-                      ) {
-                        updateBlankFields(i);
+                    if (schedules.length === 0) {
+                      updateBlankFields(
+                        "At least one schedule is required before proceeding."
+                      );
+                    } else {
+                      for (let i = 0; i < schedules.length; i += 1) {
+                        const each = schedules[i];
+                        if (!each.questions || !each.title) {
+                          updateBlankFields(i);
+                        }
                       }
                     }
+                    validationOn();
                   }
                 }}
                 // disabled={!checkValidation()}
