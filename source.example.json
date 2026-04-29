@@ -1,0 +1,52 @@
+{
+  "study": {
+    "id": "",
+    "title": "AWARE Study",
+    "description": "",
+    "active": true,
+    "start_timestamp": 0
+  },
+  "researcher": {
+    "first_name": "",
+    "last_name": "",
+    "contact": ""
+  },
+  "database": {
+    "host": "db.internal",
+    "android": {
+      "name": "aware_android",
+      "username": "aware_android_participant",
+      "password": "participantpass",
+      "port": 3306
+    },
+    "ios": {
+      "name": "aware_ios",
+      "username": "aware_ios_participant",
+      "password": "participantpass",
+      "port": 3306
+    }
+  },
+  "ios": {
+    "study_number": 1,
+    "study_key": "",
+    "sensors": {},
+    "plugins": {},
+    "server": {
+      "server_host": "0.0.0.0",
+      "server_port": 8080,
+      "websocket_port": 8081,
+      "path_fullchain_pem": "",
+      "path_key_pem": ""
+    }
+  },
+  "shared": {
+    "sensors": {}
+  },
+  "android": {
+    "created_at": "",
+    "updated_at": "",
+    "questions": [],
+    "schedules": [],
+    "settings": {}
+  }
+}
