@@ -66,7 +66,7 @@ if ! ERROR_MSG=$(printf "%s" "$BODY" | python3 /wizard/write_request_env.py "$RE
     exit 0
 fi
 
-mkdir -p /project/studies /project/aware-micro-server/cache
+mkdir -p /project/studies /project/aware-micro-server/cache /project/aware-micro-server/esm
 
 if ! ERROR_MSG=$(python3 /wizard/deploy_config.py 2>&1); then
     printf "Content-Type: application/json\r\n\r\n"

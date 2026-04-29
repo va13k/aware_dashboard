@@ -21,7 +21,7 @@ if ! sudo docker compose version > /dev/null 2>&1; then
 fi
 
 deploy_stack() {
-    mkdir -p studies aware-micro-server/cache
+    mkdir -p studies aware-micro-server/cache aware-micro-server/esm
     python3 setup/deploy_config.py
     sudo docker compose up --build -d
     python3 setup/init_android_tables.py --docker-prefix sudo

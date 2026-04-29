@@ -1,0 +1,62 @@
+[
+  {
+    "schedule_id": "schedule_1",
+    "hours": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      9,
+      8,
+      7,
+      6,
+      5,
+      10,
+      11,
+      13,
+      12,
+      14,
+      19,
+      18,
+      17,
+      23,
+      22,
+      16,
+      21,
+      20,
+      15
+    ],
+    "notification_title": "Schedule 1",
+    "notification_body": "Tap to answer",
+    "esms": [
+      {
+        "esm": {
+          "esm_type": 2,
+          "esm_title": "Question1",
+          "esm_instructions": "Are you okay/happy?",
+          "esm_submit": "Submit",
+          "esm_trigger": "q1",
+          "esm_radios": [
+            "Yes",
+            "No",
+            "hmm"
+          ]
+        }
+      },
+      {
+        "esm": {
+          "esm_type": 6,
+          "esm_title": "are you happy 2 ?",
+          "esm_instructions": "",
+          "esm_submit": "Submit",
+          "esm_trigger": "q2",
+          "esm_scale_min": 0,
+          "esm_scale_max": 100,
+          "esm_scale_start": 50,
+          "esm_scale_step": 1
+        }
+      }
+    ]
+  }
+]

@@ -37,18 +37,29 @@
   },
   "android": {
     "created_at": "",
-    "updated_at": "2026-04-27T09:26:58.883Z",
+    "updated_at": "2026-04-29T12:21:33.459Z",
     "questions": [
       {
         "esm_submit": "Submit",
         "esm_title": "Question1",
-        "instructions": "Are you okay?",
+        "instructions": "Are you okay/happy?",
         "esm_type": 2,
         "esm_radios": [
           "Yes",
-          "No"
+          "No",
+          "hmm"
         ],
         "id": 1
+      },
+      {
+        "esm_submit": "Submit",
+        "esm_title": "are you happy 2 ?",
+        "esm_type": 6,
+        "esm_scale_min": 0,
+        "esm_scale_max": 100,
+        "esm_scale_step": 1,
+        "esm_scale_start": 50,
+        "id": 2
       }
     ],
     "schedules": [
@@ -57,10 +68,44 @@
         "type": "interval",
         "esm_keep": false,
         "questions": [
-          1
+          1,
+          2
         ],
-        "hours": [],
-        "days": []
+        "hours": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          9,
+          8,
+          7,
+          6,
+          5,
+          10,
+          11,
+          13,
+          12,
+          14,
+          19,
+          18,
+          17,
+          23,
+          22,
+          16,
+          21,
+          20,
+          15
+        ],
+        "days": [
+          "monday",
+          "tuesday",
+          "wednesday",
+          "thursday",
+          "sunday",
+          "saturday",
+          "friday"
+        ]
       }
     ],
     "settings": {
@@ -75,7 +120,7 @@
       "debug_flag": false,
       "frequency_sync_config": 60,
       "enable_config_update": false,
-      "status_notifications": false,
+      "status_notifications": true,
       "status_crashes": false,
       "status_keyboard": false,
       "mask_notification": false,
@@ -178,13 +223,13 @@
   "shared": {
     "sensors": {
       "accelerometer": {
-        "enabled": false,
+        "enabled": true,
         "frequency": 20000,
         "threshold": 0,
         "enforce": false
       },
       "applications": {
-        "enabled": false,
+        "enabled": true,
         "frequency": 30
       },
       "barometer": {
@@ -194,7 +239,7 @@
         "enforce": false
       },
       "battery": {
-        "enabled": false
+        "enabled": true
       },
       "bluetooth": {
         "enabled": false,

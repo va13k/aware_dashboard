@@ -1,5 +1,6 @@
 import json
 import pathlib
+import re
 import secrets
 from datetime import datetime, timezone
 
@@ -285,7 +286,7 @@ def serialize_ios_config(
     settings: dict[str, str | int],
     example_path: pathlib.Path,
     existing_config_path: pathlib.Path,
-) -> tuple[dict, dict]:
+) -> tuple[dict, dict, list]:
     existing_config = load_existing_json(existing_config_path)
     config = load_json(example_path)
     update_ios_server_config(config, source["database"], settings)
@@ -293,4 +294,115 @@ def serialize_ios_config(
     update_ios_sensor_defaults(config.get("sensors", []), build_ios_sensor_settings(source))
     update_ios_plugin_defaults(config.get("plugins", []), source["ios"].get("plugins", {}))
     update_ios_webservice_url(config, settings)
-    return config, study
+    esm_schedules = build_ios_esm_schedules(source)
+    esm_url = (
+        build_public_base_url(
+            str(settings["protocol"]),
+            str(settings["public_host"]),
+            int(settings["public_port"]),
+        )
+        + "/esm/ios-esm-config.json"
+    )
+    upsert_ios_esm_plugin(config, esm_url)
+    return config, study, esm_schedules
+
+
+# ---------------------------------------------------------------------------
+# iOS ESM schedule generation
+# ---------------------------------------------------------------------------
+
+def _slugify(text: str) -> str:
+    return re.sub(r"[^a-z0-9]+", "_", text.lower()).strip("_") or "schedule"
+
+
+def _question_to_ios_esm(question: dict) -> dict:
+    esm: dict = {
+        "esm_type": question.get("esm_type", 1),
+        "esm_title": question.get("esm_title", ""),
+        "esm_instructions": question.get("instructions", ""),
+        "esm_submit": question.get("esm_submit", "Submit"),
+        "esm_trigger": f"q{question.get('id', 1)}",
+    }
+    t = question.get("esm_type", 1)
+    if t == 2:
+        esm["esm_radios"] = question.get("esm_radios", [])
+    elif t == 3:
+        esm["esm_checkboxes"] = question.get("esm_checkboxes", [])
+    elif t == 4:
+        for k in ("esm_likert_max", "esm_likert_min", "esm_likert_step",
+                  "esm_likert_max_label", "esm_likert_min_label"):
+            if k in question:
+                esm[k] = question[k]
+    elif t == 5:
+        esm["esm_quick_answers"] = question.get("esm_quick_answers", [])
+    elif t == 6:
+        for k in ("esm_scale_min", "esm_scale_max", "esm_scale_start",
+                  "esm_scale_step", "esm_scale_min_label", "esm_scale_max_label"):
+            if k in question:
+                esm[k] = question[k]
+    return {"esm": esm}
+
+
+def build_ios_esm_schedules(source: dict) -> list:
+    android = source.get("android", {})
+    questions_list = android.get("questions", [])
+    schedules_list = android.get("schedules", [])
+    study = source.get("study", {})
+
+    if not schedules_list or not questions_list:
+        return []
+
+    questions_by_id = {q.get("id", i + 1): q for i, q in enumerate(questions_list)}
+    ios_schedules = []
+
+    for idx, sched in enumerate(schedules_list):
+        q_ids = sched.get("questions", [])
+        esms = [
+            _question_to_ios_esm(questions_by_id[qid])
+            for qid in q_ids
+            if qid in questions_by_id
+        ]
+        if not esms:
+            continue
+
+        schedule_id = _slugify(sched.get("title", f"schedule_{idx + 1}"))
+        ios_sched: dict = {
+            "schedule_id": schedule_id,
+            "hours": sched.get("hours", list(range(24))),
+            "notification_title": sched.get("title", study.get("title", "Study")),
+            "notification_body": "Tap to answer",
+            "esms": esms,
+        }
+        for key in ("start_date", "end_date", "expiration", "randomize", "randomize_schedule"):
+            if key in sched:
+                ios_sched[key] = sched[key]
+
+        ios_schedules.append(ios_sched)
+
+    return ios_schedules
+
+
+def upsert_ios_esm_plugin(config: dict, esm_url: str) -> None:
+    plugins = config.setdefault("plugins", [])
+    for plugin in plugins:
+        if plugin.get("plugin") == "plugin_ios_esm":
+            for setting in plugin.get("settings", []):
+                if setting.get("setting") == "plugin_ios_esm_config_url":
+                    setting["defaultValue"] = esm_url
+            return
+    plugins.append({
+        "package_name": "com.aware.plugin.ios_esm",
+        "plugin": "plugin_ios_esm",
+        "settings": [
+            {
+                "setting": "status_plugin_ios_esm",
+                "title": "Active",
+                "defaultValue": "true",
+            },
+            {
+                "setting": "plugin_ios_esm_config_url",
+                "title": "iOS ESM Config URL",
+                "defaultValue": esm_url,
+            },
+        ],
+    })

@@ -29,6 +29,7 @@ ENV_PATH = PROJECT / ".env"
 REQUEST_ENV_PATH = pathlib.Path("/tmp/aware-dashboard-request.env")
 CONFIG_PATH = PROJECT / "aware-micro-server" / "aware-config.json"
 EXAMPLE_PATH = PROJECT / "aware-micro-server" / "aware-config.example.json"
+ESM_CONFIG_PATH = PROJECT / "aware-micro-server" / "esm" / "ios-esm-config.json"
 ANDROID_TEMPLATE_PATH = PROJECT / "AWARE-Configurator" / "reactapp" / "public" / "study-config.json"
 STUDY_CONFIG_PATH = PROJECT / "studies" / "studyConfig.json"
 STUDIES_INDEX_PATH = PROJECT / "studies" / "index.html"
@@ -105,6 +106,11 @@ def persist_env(env: dict[str, str]) -> None:
 
 def write_micro_config(config: dict) -> None:
     CONFIG_PATH.write_text(json.dumps(config, indent=2) + "\n", encoding="utf-8")
+
+
+def write_ios_esm_config(schedules: list) -> None:
+    ESM_CONFIG_PATH.parent.mkdir(parents=True, exist_ok=True)
+    ESM_CONFIG_PATH.write_text(json.dumps(schedules, indent=2) + "\n", encoding="utf-8")
 
 
 def write_android_config(config: dict) -> None:
@@ -189,8 +195,9 @@ def main() -> None:
     android_config = serialize_android_config(source, settings, ANDROID_TEMPLATE_PATH)
     write_android_config(android_config)
 
-    config, study = serialize_ios_config(source, settings, EXAMPLE_PATH, CONFIG_PATH)
+    config, study, esm_schedules = serialize_ios_config(source, settings, EXAMPLE_PATH, CONFIG_PATH)
     write_micro_config(config)
+    write_ios_esm_config(esm_schedules)
 
     base_url, study_join_path, study_join_url = build_study_join_urls(
         str(settings["protocol"]),

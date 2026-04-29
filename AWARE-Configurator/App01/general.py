@@ -31,6 +31,7 @@ ANDROID_TEMPLATE_PATH = (
 )
 IOS_EXAMPLE_PATH = PROJECT_ROOT / "aware-micro-server" / "aware-config.example.json"
 IOS_CONFIG_PATH = PROJECT_ROOT / "aware-micro-server" / "aware-config.json"
+ESM_CONFIG_PATH = PROJECT_ROOT / "aware-micro-server" / "esm" / "ios-esm-config.json"
 STUDY_CONFIG_PATH = pathlib.Path(storage_path) / STUDY_CONFIG_FILE_NAME
 ABSTRACT_DATABASE_HOST = "db.internal"
 
@@ -234,7 +235,7 @@ def build_ios_settings(source):
 def write_outputs(source):
     settings = build_ios_settings(source)
     android_config = serialize_android_config(source, settings, ANDROID_TEMPLATE_PATH)
-    ios_config, _study = serialize_ios_config(
+    ios_config, _study, esm_schedules = serialize_ios_config(
         source,
         settings,
         IOS_EXAMPLE_PATH,
@@ -242,3 +243,5 @@ def write_outputs(source):
     )
     write_json(STUDY_CONFIG_PATH, android_config)
     write_json(IOS_CONFIG_PATH, ios_config)
+    ESM_CONFIG_PATH.parent.mkdir(parents=True, exist_ok=True)
+    write_json(ESM_CONFIG_PATH, esm_schedules)
