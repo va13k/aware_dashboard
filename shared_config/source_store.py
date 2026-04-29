@@ -15,6 +15,13 @@ def _project_root() -> pathlib.Path:
 
 
 SOURCE_PATH = _project_root() / "source.json"
+_EXAMPLE_PATH = _project_root() / "source.example.json"
+
+
+def _bootstrap_if_missing() -> None:
+    if not SOURCE_PATH.exists() and _EXAMPLE_PATH.exists():
+        import shutil
+        shutil.copy2(_EXAMPLE_PATH, SOURCE_PATH)
 
 
 @contextlib.contextmanager
@@ -60,6 +67,7 @@ def _atomic_write_unlocked(data: dict[str, Any]) -> None:
 
 
 def read_source() -> dict[str, Any]:
+    _bootstrap_if_missing()
     with source_lock():
         return _read_unlocked()
 
