@@ -197,6 +197,10 @@ class MySQLVerticle : AbstractVerticle() {
    */
   fun insertData(table: String, device_id: String, data: JsonArray) {
     if (data.isEmpty()) {
+      if (table == "aware_device") {
+        val registrationRow = JsonArray().add(JsonObject().put("timestamp", System.currentTimeMillis().toDouble()))
+        insertData(table, device_id, registrationRow)
+      }
       return
     }
 
