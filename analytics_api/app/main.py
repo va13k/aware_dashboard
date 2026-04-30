@@ -19,8 +19,8 @@ _API_KEY = os.environ.get("ANALYTICS_API_KEY", "")
 _api_key_header = APIKeyHeader(name="X-API-Key", auto_error=False)
 
 async def _verify_api_key(key: str = Security(_api_key_header)):
-    if _API_KEY and key != _API_KEY:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Invalid or missing API key")
+    if _API_KEY and key is not None and key != _API_KEY:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Invalid API key")
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):

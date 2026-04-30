@@ -53,7 +53,7 @@ def _verify_token(token: str) -> bool:
 
 
 def _safe_next(url: str) -> str:
-    if url and url.startswith("/") and not url.startswith("//"):
+    if url and url.startswith("/") and not url.startswith("//") and not url.startswith("/api/"):
         return url
     return "/configurator/"
 

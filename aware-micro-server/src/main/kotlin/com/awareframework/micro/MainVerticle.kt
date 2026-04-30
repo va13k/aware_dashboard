@@ -131,6 +131,9 @@ class MainVerticle : AbstractVerticle() {
                   }
               }
             }
+          } else {
+            route.response().statusCode = 404
+            route.response().end()
           }
         }
 
