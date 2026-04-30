@@ -1,11 +1,9 @@
 import type { DeviceDetail, DevicesResponse, SensorRecord } from '../types'
 
 const BASE = '/api'
-const API_KEY = import.meta.env.VITE_API_KEY as string | undefined
 
 async function get<T>(path: string): Promise<T> {
-  const headers: HeadersInit = API_KEY ? { 'X-API-Key': API_KEY } : {}
-  const res = await fetch(`${BASE}${path}`, { headers })
+  const res = await fetch(`${BASE}${path}`)
   if (res.redirected && res.url.includes('/auth/')) {
     window.location.assign(res.url)
     return new Promise<T>(() => {})

@@ -30,6 +30,10 @@ def _check_credentials(username: str, password: str) -> bool:
     )
 
 
+def verify_researcher_credentials(username: str, password: str) -> bool:
+    return _check_credentials(username, password)
+
+
 def _make_token(username: str) -> str:
     ts = str(int(time.time()))
     msg = f"{username}:{ts}"

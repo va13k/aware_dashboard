@@ -51,12 +51,6 @@ def ensure_django_secret_key(env: dict[str, str]) -> None:
         env["DJANGO_SECRET_KEY"] = secrets.token_urlsafe(50)
 
 
-def ensure_analytics_api_key(env: dict[str, str]) -> None:
-    api_key = str(env.get("ANALYTICS_API_KEY", "")).strip()
-    if not api_key or api_key == "CHANGE_ME":
-        env["ANALYTICS_API_KEY"] = secrets.token_hex(32)
-
-
 def ensure_researcher_credentials(env: dict[str, str]) -> None:
     if not env.get("RESEARCHER_USERNAME", "").strip():
         env["RESEARCHER_USERNAME"] = "researcher"
@@ -80,7 +74,6 @@ def persist_env(env: dict[str, str]) -> None:
     ordered_keys = [
         "MYSQL_ROOT_PASSWORD",
         "DJANGO_SECRET_KEY",
-        "ANALYTICS_API_KEY",
         "RESEARCHER_USERNAME",
         "RESEARCHER_PASSWORD",
         "PUBLIC_HOST",
@@ -157,7 +150,6 @@ def write_studies_index(base_url: str, study_join_path: str, study_join_url: str
 def main() -> None:
     env = load_merged_env()
     ensure_django_secret_key(env)
-    ensure_analytics_api_key(env)
     ensure_researcher_credentials(env)
     env = normalize_public_env(env)
 

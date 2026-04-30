@@ -100,6 +100,7 @@ services:
       - "443:443"
     volumes:
       - ./nginx/index.html:/usr/share/nginx/html/index.html:ro
+      - ./nginx/backup.html:/usr/share/nginx/html/backup.html:ro
       - ./nginx/configurator-loading.html:/usr/share/nginx/html/configurator-loading.html:ro
       - ./nginx/setup-loading.html:/usr/share/nginx/html/setup-loading.html:ro
       - ./nginx/${PROTOCOL:-http}.conf:/etc/nginx/conf.d/default.conf:ro
@@ -126,7 +127,7 @@ services:
     environment:
       ANDROID_DATABASE_URL: mysql+aiomysql://aware_analytics:analyticspass@mysql:3306/aware_android
       IOS_DATABASE_URL: mysql+aiomysql://aware_analytics:analyticspass@mysql:3306/aware_ios
-      ANALYTICS_API_KEY: ${ANALYTICS_API_KEY}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-CHANGE_ME}
       RESEARCHER_USERNAME: ${RESEARCHER_USERNAME:-}
       RESEARCHER_PASSWORD: ${RESEARCHER_PASSWORD:-}
     expose:
@@ -144,10 +145,7 @@ services:
       start_period: 10s
 
   dashboard:
-    build:
-      context: ./dashboard
-      args:
-        VITE_API_KEY: ${ANALYTICS_API_KEY}
+    build: ./dashboard
     container_name: aware_dashboard
     restart: unless-stopped
     expose:

@@ -1,11 +1,9 @@
-import os
 import logging
 from contextlib import asynccontextmanager
 from sqlalchemy import text
-from fastapi import FastAPI, Security, HTTPException, status
-from fastapi.security import APIKeyHeader
+from fastapi import FastAPI
 from app.database import android_engine, ios_engine
-from app.routers import health, devices, android, ios, auth
+from app.routers import health, devices, android, ios, auth, backup
 
 class _SuppressChromeProbe(logging.Filter):
     def filter(self, record):
@@ -15,17 +13,8 @@ logging.basicConfig(level=logging.INFO)
 logging.getLogger("uvicorn.access").addFilter(_SuppressChromeProbe())
 logger = logging.getLogger(__name__)
 
-_API_KEY = os.environ.get("ANALYTICS_API_KEY", "")
-_api_key_header = APIKeyHeader(name="X-API-Key", auto_error=False)
-
-async def _verify_api_key(key: str = Security(_api_key_header)):
-    if _API_KEY and key is not None and key != _API_KEY:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Invalid API key")
-
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    if not _API_KEY:
-        logger.warning("ANALYTICS_API_KEY is not set — API is unprotected")
     for name, engine in (("Android", android_engine), ("iOS", ios_engine)):
         try:
             async with engine.connect() as conn:
@@ -44,9 +33,10 @@ app = FastAPI(
 
 app.include_router(auth.router)
 app.include_router(health.router)
-app.include_router(devices.router,  dependencies=[Security(_verify_api_key)])
-app.include_router(android.router,  dependencies=[Security(_verify_api_key)])
-app.include_router(ios.router,      dependencies=[Security(_verify_api_key)])
+app.include_router(devices.router)
+app.include_router(android.router)
+app.include_router(ios.router)
+app.include_router(backup.router)
 
 @app.get("/")
 async def root():
