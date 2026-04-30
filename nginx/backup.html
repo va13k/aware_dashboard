@@ -1,0 +1,351 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>AWARE Backup</title>
+    <style>
+      :root {
+        --bg: #f3efe6;
+        --surface: rgba(255, 253, 248, 0.9);
+        --surface-strong: #fffdf8;
+        --border: rgba(48, 67, 54, 0.14);
+        --text: #193229;
+        --muted: #5f746b;
+        --accent: rgb(31, 179, 223);
+        --accent-soft: rgba(31, 179, 223, 0.16);
+        --shadow: 0 20px 60px rgba(25, 50, 41, 0.12);
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        font-family: "Avenir Next", Avenir, "Segoe UI", sans-serif;
+        color: var(--text);
+        background:
+          radial-gradient(circle at top left, rgba(31, 179, 223, 0.16), transparent 28%),
+          radial-gradient(circle at bottom right, rgba(182, 140, 76, 0.14), transparent 30%),
+          linear-gradient(160deg, #f7f3ea 0%, #efe7da 100%);
+      }
+
+      main {
+        width: min(1120px, calc(100% - 32px));
+        margin: 0 auto;
+        padding: 42px 0 64px;
+      }
+
+      header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 18px;
+        margin-bottom: 22px;
+      }
+
+      h1,
+      h2,
+      p {
+        margin: 0;
+      }
+
+      h1 {
+        font-size: clamp(2rem, 4vw, 3.6rem);
+        line-height: 1;
+      }
+
+      .back {
+        color: var(--accent);
+        font-weight: 700;
+        text-decoration: none;
+      }
+
+      .panel {
+        padding: 24px;
+        border-radius: 24px;
+        background: var(--surface);
+        border: 1px solid var(--border);
+        box-shadow: var(--shadow);
+      }
+
+      .muted {
+        color: var(--muted);
+        line-height: 1.5;
+      }
+
+      .file-picker {
+        display: grid;
+        grid-template-columns: auto minmax(0, 1fr);
+        align-items: center;
+        gap: 12px;
+        width: 100%;
+        margin-top: 16px;
+        border: 1px solid var(--border);
+        border-radius: 14px;
+        background: var(--surface-strong);
+        padding: 8px;
+      }
+
+      .file-picker input {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        margin: -1px;
+        padding: 0;
+        overflow: hidden;
+        clip: rect(0, 0, 0, 0);
+        border: 0;
+      }
+
+      .file-trigger {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        border: 1px solid var(--accent);
+        border-radius: 12px;
+        background: var(--accent-soft);
+        color: rgb(20, 140, 180);
+        font: inherit;
+        font-size: 0.9rem;
+        font-weight: 700;
+        padding: 10px 16px;
+        cursor: pointer;
+        user-select: none;
+      }
+
+      .file-picker:focus-within {
+        border-color: var(--accent);
+        box-shadow: 0 0 0 3px rgba(31, 179, 223, 0.14);
+      }
+
+      .file-name {
+        min-width: 0;
+        color: var(--muted);
+        font-size: 0.92rem;
+        font-weight: 700;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .actions {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 16px;
+      }
+
+      .action {
+        padding: 18px;
+        border-radius: 18px;
+        border: 1px solid var(--border);
+        background: rgba(255, 253, 248, 0.72);
+      }
+
+      .action p {
+        margin-top: 6px;
+        font-size: 0.88rem;
+      }
+
+      button {
+        margin-top: 18px;
+        border: 1px solid var(--accent);
+        border-radius: 12px;
+        background: var(--accent-soft);
+        color: rgb(20, 140, 180);
+        font: inherit;
+        font-size: 0.9rem;
+        font-weight: 700;
+        padding: 10px 16px;
+        cursor: pointer;
+      }
+
+      button.secondary {
+        border-color: var(--border);
+        background: var(--surface-strong);
+        color: var(--text);
+      }
+
+      button:disabled {
+        opacity: 0.45;
+        cursor: not-allowed;
+      }
+
+      .status {
+        display: none;
+        margin-top: 16px;
+        border-radius: 12px;
+        border: 1px solid var(--border);
+        background: var(--surface-strong);
+        color: var(--muted);
+        padding: 12px;
+        font-size: 0.92rem;
+      }
+
+      .status.show {
+        display: block;
+      }
+
+      .status.error {
+        border-color: #fecaca;
+        background: #fef2f2;
+        color: #b91c1c;
+      }
+
+      .status.ok {
+        border-color: #bbf7d0;
+        background: #f0fdf4;
+        color: #047857;
+      }
+
+      @media (max-width: 820px) {
+        header,
+        .actions {
+          grid-template-columns: 1fr;
+        }
+
+        header {
+          display: grid;
+        }
+
+        .file-picker {
+          grid-template-columns: 1fr;
+        }
+
+        .file-trigger {
+          width: 100%;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header>
+        <div>
+          <h1>Backup & Restore</h1>
+          <p class="muted">Export or import the AWARE MySQL databases.</p>
+        </div>
+        <a class="back" href="/">Back to main page</a>
+      </header>
+
+      <section class="panel">
+        <div class="actions">
+          <div class="action">
+            <h2>Export database</h2>
+            <p class="muted">Downloads aware_android and aware_ios as a compressed SQL file.</p>
+            <button id="exportBtn">Export</button>
+          </div>
+
+          <div class="action">
+            <h2>Import database</h2>
+            <p class="muted">Restores a previously exported .sql.gz backup.</p>
+            <div class="file-picker">
+              <input id="backupFile" type="file" accept=".gz,.sql.gz,application/gzip" />
+              <label class="file-trigger" for="backupFile">Select backup</label>
+              <span id="backupFileName" class="file-name">No file selected</span>
+            </div>
+            <button id="importBtn" class="secondary">Import</button>
+          </div>
+        </div>
+
+        <div id="status" class="status"></div>
+      </section>
+    </main>
+
+    <script>
+      const backupFile = document.getElementById("backupFile");
+      const backupFileName = document.getElementById("backupFileName");
+      const exportBtn = document.getElementById("exportBtn");
+      const importBtn = document.getElementById("importBtn");
+      const statusBox = document.getElementById("status");
+
+      function setStatus(message, type) {
+        statusBox.textContent = message;
+        statusBox.className = "status show" + (type ? " " + type : "");
+      }
+
+      async function checkedFetch(path, options) {
+        const response = await fetch(path, options);
+        if (response.redirected && response.url.includes("/auth/")) {
+          window.location.assign(response.url);
+          return new Promise(() => {});
+        }
+        if (!response.ok) {
+          let message = response.status + " " + response.statusText;
+          try {
+            const body = await response.json();
+            message = body.detail || message;
+          } catch (_error) {
+            // Keep the HTTP status when the response is not JSON.
+          }
+          throw new Error(message);
+        }
+        return response;
+      }
+
+      function setBusy(busy) {
+        exportBtn.disabled = busy;
+        importBtn.disabled = busy;
+      }
+
+      backupFile.addEventListener("change", () => {
+        const file = backupFile.files && backupFile.files[0];
+        backupFileName.textContent = file ? file.name : "No file selected";
+      });
+
+      exportBtn.addEventListener("click", async () => {
+        setBusy(true);
+        setStatus("Preparing database export...");
+        try {
+          const response = await checkedFetch("/api/backup/export", {
+            method: "POST",
+          });
+          const disposition = response.headers.get("Content-Disposition") || "";
+          const match = disposition.match(/filename="?([^"]+)"?/);
+          const blob = await response.blob();
+          const url = URL.createObjectURL(blob);
+          const link = document.createElement("a");
+          link.href = url;
+          link.download = match?.[1] || "aware-db-backup.sql.gz";
+          document.body.appendChild(link);
+          link.click();
+          link.remove();
+          URL.revokeObjectURL(url);
+          setStatus("Backup export downloaded.", "ok");
+        } catch (error) {
+          setStatus(String(error), "error");
+        } finally {
+          setBusy(false);
+        }
+      });
+
+      importBtn.addEventListener("click", async () => {
+        const file = backupFile.files && backupFile.files[0];
+        if (!file) {
+          setStatus("Choose a .sql.gz backup file first.", "error");
+          return;
+        }
+        if (!window.confirm("Importing a backup overwrites matching database content. Continue?")) {
+          return;
+        }
+        setBusy(true);
+        setStatus("Importing database backup...");
+        try {
+          const form = new FormData();
+          form.set("backup", file);
+          await checkedFetch("/api/backup/import", {
+            method: "POST",
+            body: form,
+          });
+          setStatus("Backup imported successfully.", "ok");
+        } catch (error) {
+          setStatus(String(error), "error");
+        } finally {
+          setBusy(false);
+        }
+      });
+    </script>
+  </body>
+</html>
