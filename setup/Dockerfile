@@ -2,6 +2,8 @@ FROM alpine:3.21
 RUN apk add --no-cache python3 openssl
 WORKDIR /wizard
 COPY setup.html /wizard/index.html
+COPY script.js /wizard/script.js
+COPY style.css /wizard/style.css
 COPY server.py /wizard/server.py
 COPY deploy.sh /wizard/cgi-bin/deploy
 COPY deploy_config.py /wizard/deploy_config.py
