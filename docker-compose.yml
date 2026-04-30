@@ -7,27 +7,33 @@ services:
       - "9999:9999"
     volumes:
       - .:/project
+      - /var/run/docker.sock:/var/run/docker.sock:ro
 
   mysql:
     image: mysql:8.0
     container_name: aware_mysql
     restart: unless-stopped
+    command: --init-file=/etc/mysql/init_all.sql
     environment:
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-CHANGE_ME}
+    ports:
+      - 3306:3306
     volumes:
       - mysql_data:/var/lib/mysql
       - ./db:/docker-entrypoint-initdb.d
+      - ./db/init_all.sql:/etc/mysql/init_all.sql:ro
     networks:
       - aware_network
     healthcheck:
       test:
         [
           "CMD-SHELL",
-          "mysqladmin ping -h localhost -u root -p$${MYSQL_ROOT_PASSWORD}",
+          "mysql -u aware_analytics -panalyticspass aware_android -e 'SELECT 1' 2>/dev/null",
         ]
       interval: 10s
       timeout: 5s
-      retries: 10
+      retries: 24
+      start_period: 60s
 
   micro-server:
     build: ./aware-micro-server
@@ -46,6 +52,12 @@ services:
     depends_on:
       mysql:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -s -o /dev/null http://localhost:8080/"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
 
   configurator:
     build:
@@ -72,6 +84,12 @@ services:
     depends_on:
       mysql:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "python3 -c 'import urllib.request; urllib.request.urlopen(\"http://localhost:8000/\")'"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
 
   nginx:
     image: nginx:alpine
@@ -93,13 +111,13 @@ services:
       - aware_network
     depends_on:
       configurator:
-        condition: service_started
+        condition: service_healthy
       micro-server:
-        condition: service_started
+        condition: service_healthy
       dashboard:
-        condition: service_started
+        condition: service_healthy
       dashboard-api:
-        condition: service_started
+        condition: service_healthy
 
   dashboard-api:
     build: ./analytics_api
@@ -118,6 +136,12 @@ services:
         condition: service_healthy
     networks:
       - aware_network
+    healthcheck:
+      test: ["CMD-SHELL", "python3 -c 'import urllib.request; urllib.request.urlopen(\"http://localhost:8000/health\")'"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
 
   dashboard:
     build:
@@ -132,6 +156,12 @@ services:
       - aware_network
     depends_on:
       - dashboard-api
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO/dev/null http://127.0.0.1/dashboard/"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
 
 networks:
   aware_network:
