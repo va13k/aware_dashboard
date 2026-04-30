@@ -1,12 +1,8 @@
-import { useState } from "react";
+import { BrowserRouter, Routes, Route, NavLink, Navigate } from "react-router-dom";
 import OverviewPage from "./pages/OverviewPage";
 import DevicePage from "./pages/DevicePage";
 
-type Page = "overview" | "device";
-
-export default function App() {
-  const [page, setPage] = useState<Page>("overview");
-
+function Layout() {
   return (
     <div className="min-h-screen bg-page text-ink font-sans flex flex-col">
       <header className="sticky top-0 z-10 flex items-center justify-between px-6 h-13 bg-card backdrop-blur-xl border-b border-wire">
@@ -14,25 +10,43 @@ export default function App() {
           AWARE Dashboard
         </span>
         <nav className="flex gap-1">
-          {(["overview", "device"] as Page[]).map((p) => (
-            <button
-              key={p}
-              onClick={() => setPage(p)}
-              className={`px-3.5 py-1.5 rounded-lg text-[13px] font-medium transition-colors cursor-pointer border-none
-                ${
-                  page === p
-                    ? "bg-teal-soft text-teal"
-                    : "bg-transparent text-sage hover:bg-teal-soft/50 hover:text-ink"
-                }`}
+          {[
+            { to: "/", label: "Overview", end: true },
+            { to: "/devices", label: "Per Device", end: false },
+          ].map(({ to, label, end }) => (
+            <NavLink
+              key={to}
+              to={to}
+              end={end}
+              className={({ isActive }) =>
+                `px-3.5 py-1.5 rounded-lg text-[13px] font-medium transition-colors cursor-pointer border-none no-underline ` +
+                (isActive
+                  ? "bg-teal-soft text-teal"
+                  : "bg-transparent text-sage hover:bg-teal-soft/50 hover:text-ink")
+              }
             >
-              {p === "overview" ? "Overview" : "Per Device"}
-            </button>
+              {label}
+            </NavLink>
           ))}
         </nav>
       </header>
       <main className="px-6 py-6 w-full max-w-350 mx-auto">
-        {page === "overview" ? <OverviewPage /> : <DevicePage />}
+        <Routes>
+          <Route index element={<OverviewPage />} />
+          <Route path="devices" element={<DevicePage />} />
+          <Route path="devices/:platform/:deviceId" element={<DevicePage />} />
+          <Route path="devices/:deviceId" element={<DevicePage />} />
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
       </main>
     </div>
+  );
+}
+
+export default function App() {
+  return (
+    <BrowserRouter basename="/dashboard">
+      <Layout />
+    </BrowserRouter>
   );
 }

@@ -4,7 +4,7 @@ import {
 } from 'recharts'
 import type { SensorConfig } from '../config/sensors'
 import type { SensorRecord } from '../types'
-import { mean, median, fmt } from '../utils/stats'
+import { min, max, fmt } from '../utils/stats'
 
 interface Props {
   config: SensorConfig
@@ -31,6 +31,7 @@ export default function SensorTimeSeriesCard({ config, records, loading }: Props
     .sort((a, b) => a.time - b.time)
 
   const values = data.map(d => d.value)
+  const lastVal = values.length ? values[values.length - 1] : null
   const spanMs = data.length > 1
     ? (data[data.length - 1].time - data[0].time) * 1000
     : 0
@@ -38,7 +39,7 @@ export default function SensorTimeSeriesCard({ config, records, loading }: Props
 
   return (
     <div className="bg-card backdrop-blur-xl border border-wire rounded-3xl shadow-card p-5">
-      <div className="flex items-center gap-2 mb-3">
+      <div className="flex items-center gap-2 mb-1">
         <span className="w-2 h-2 rounded-full shrink-0" style={{ background: config.color }} />
         <h3 className="text-[13px] font-semibold flex-1 text-ink">{config.label}</h3>
         {config.unit && (
@@ -46,14 +47,16 @@ export default function SensorTimeSeriesCard({ config, records, loading }: Props
             {config.unit}
           </span>
         )}
-        {values.length > 0 && (
-          <span className="text-[11px] text-sage ml-auto">
-            mean <b className="text-ink">{fmt(mean(values))}</b>
-            {' · '}
-            median <b className="text-ink">{fmt(median(values))}</b>
-          </span>
-        )}
       </div>
+
+      {values.length > 0 && (
+        <div className="flex items-center gap-3 mb-3 text-[11px] text-sage">
+          <span><b className="text-ink">{values.length}</b> pts</span>
+          <span>last <b className="text-ink">{fmt(lastVal!)}</b></span>
+          <span>↓ <b className="text-ink">{fmt(min(values))}</b></span>
+          <span>↑ <b className="text-ink">{fmt(max(values))}</b></span>
+        </div>
+      )}
 
       {loading ? (
         <div className="h-40 rounded-xl shimmer" />

@@ -19,6 +19,20 @@ export interface DevicesResponse {
   ios: IosDevice[]
 }
 
+export interface DeviceStreamSummary {
+  key: string
+  count: number
+  last_seen: number | null
+  latest: Record<string, unknown> | null
+}
+
+export interface DeviceDetail {
+  platform: 'android' | 'ios'
+  device_id: string
+  device: Record<string, unknown> | null
+  streams: DeviceStreamSummary[]
+}
+
 export type SensorRecord = Record<string, unknown> & {
   id: number
   timestamp: number

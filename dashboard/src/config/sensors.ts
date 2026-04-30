@@ -55,7 +55,14 @@ export const SENSOR_CONFIGS: SensorConfig[] = [
     unit: 'lux',
     color: '#fbbf24',
     extract: r =>
-      (r.double_light_lux as number | null) ?? (r.lux as number | null) ?? null,
+      (r.double_light_lux as number | null) ?? (r.double_values_0 as number | null) ?? (r.lux as number | null) ?? null,
+  },
+  {
+    key: 'locations',
+    label: 'Speed',
+    unit: 'm/s',
+    color: '#10b981',
+    extract: r => (r.double_speed as number | null) ?? null,
   },
   {
     key: 'wifi',
@@ -70,5 +77,19 @@ export const SENSOR_CONFIGS: SensorConfig[] = [
     unit: 'dBm',
     color: '#06b6d4',
     extract: r => (r.bt_rssi as number | null) ?? (r.rssi as number | null) ?? null,
+  },
+  {
+    key: 'calls',
+    label: 'Call Duration',
+    unit: 's',
+    color: '#f97316',
+    extract: r => (r.call_duration as number | null) ?? null,
+  },
+  {
+    key: 'pedometer',
+    label: 'Step Count',
+    unit: 'steps',
+    color: '#ec4899',
+    extract: r => (r.step_count as number | null) ?? null,
   },
 ]
