@@ -28,11 +28,18 @@ COPY . .
 COPY --from=frontend /app/reactapp/build ./reactapp/build
 
 ENV PUBLIC_HOST="localhost"
-ENV DJANGO_STATIC_ROOT="/app/staticfiles"
+ENV DJANGO_STATIC_ROOT="/app/staticfiles_baked"
 
 RUN sed -i 's/\r$//' /app/start.sh && chmod +x /app/start.sh
 
-RUN mkdir -p /app/saved_json_files /app/staticfiles
+RUN mkdir -p /app/saved_json_files /app/staticfiles_baked /app/staticfiles
+
+# Collect statics at build time into staticfiles_baked so startup is a fast copy
+ARG DJANGO_SECRET_KEY=build-time-collectstatic
+RUN DJANGO_SECRET_KEY=${DJANGO_SECRET_KEY} python manage.py collectstatic --noinput && \
+    find reactapp/build -maxdepth 1 -type f ! -name 'index.html' -exec cp {} staticfiles_baked/ \;
+
+ENV DJANGO_STATIC_ROOT="/app/staticfiles"
 
 EXPOSE 8000
 CMD ["/app/start.sh"]
