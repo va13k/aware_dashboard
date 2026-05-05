@@ -6,9 +6,20 @@ function Layout() {
   return (
     <div className="min-h-screen bg-page text-ink font-sans flex flex-col">
       <header className="sticky top-0 z-10 flex items-center justify-between px-6 h-13 bg-card backdrop-blur-xl border-b border-wire">
-        <span className="font-bold text-[15px] tracking-tight">
-          AWARE Dashboard
-        </span>
+        <div className="flex items-center gap-3">
+          <span className="font-bold text-[15px] tracking-tight">
+            AWARE Dashboard
+          </span>
+          <a
+            href="/"
+            className="flex items-center gap-1 text-[12px] font-medium text-sage hover:text-ink transition-colors no-underline px-2.5 py-1 rounded-lg hover:bg-teal-soft/50"
+          >
+            <svg width="13" height="13" viewBox="0 0 16 16" fill="none">
+              <path d="M10 12L6 8l4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+            Main page
+          </a>
+        </div>
         <nav className="flex gap-1">
           {[
             { to: "/", label: "Overview", end: true },

@@ -64,7 +64,7 @@ function DetailField({ label, value }: { label: string; value: unknown }) {
       <div className="text-[10px] uppercase tracking-[0.5px] text-sage">
         {label}
       </div>
-      <div className="mt-1 text-[12px] font-semibold text-ink break-words">
+      <div className="mt-1 text-[12px] font-semibold text-ink wrap-break-word">
         {formatValue(value)}
       </div>
     </div>
@@ -430,6 +430,7 @@ export default function DevicePage() {
                   onClick={() =>
                     navigate(
                       `/devices/${d.platform}/${encodeURIComponent(d.device_id)}`,
+                      { replace: true },
                     )
                   }
                   className={`w-full text-left px-3.5 py-3 rounded-2xl border transition-colors cursor-pointer
