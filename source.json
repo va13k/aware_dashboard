@@ -1,7 +1,7 @@
 {
   "version": 1,
   "study": {
-    "id": "aware-default-study",
+    "id": "0726c940dc967513",
     "title": "AWARE Default Study",
     "description": "Default study configuration generated during deployment.",
     "active": true,
@@ -37,43 +37,39 @@
   },
   "android": {
     "created_at": "",
-    "updated_at": "2026-04-27T09:26:58.883Z",
+    "updated_at": "2026-05-04T22:50:30.733Z",
     "questions": [
       {
         "esm_submit": "Submit",
-        "esm_title": "Question1",
-        "instructions": "Are you okay?",
+        "esm_title": "How are you feeling: okay or no",
+        "instructions": "Please select one of the options:",
         "esm_type": 2,
-        "esm_radios": [
-          "Yes",
-          "No"
-        ],
-        "id": 1
+        "esm_radios": ["Yes", "No"],
+        "id": 1,
+        "esm_notification_timeout": 6000,
+        "esm_expiration_threshold": 6002
       }
     ],
     "schedules": [
       {
         "title": "Schedule 1",
-        "type": "interval",
+        "type": "repeat",
         "esm_keep": false,
-        "questions": [
-          1
-        ],
-        "hours": [],
-        "days": []
+        "questions": [1],
+        "repeatInterval": 1
       }
     ],
     "settings": {
       "webservice_wifi_only": false,
       "webservice_charging": false,
-      "frequency_webservice": 60,
+      "frequency_webservice": 1,
       "frequency_clean_old_data": 0,
       "webservice_silent": false,
       "fallback_network": 30,
       "remind_to_charge": false,
       "foreground_priority": false,
       "debug_flag": false,
-      "frequency_sync_config": 60,
+      "frequency_sync_config": 1,
       "enable_config_update": false,
       "status_notifications": false,
       "status_crashes": false,
@@ -118,6 +114,34 @@
       "plugin_openweather_frequency": 60,
       "plugin_openweather_api_key": "",
       "plugin_openweather_measurement_units": "metric",
+      "status_plugin_google_activity_recognition": false,
+      "frequency_plugin_google_activity_recognition": 10,
+      "status_plugin_sentimental": false,
+      "status_plugin_esm_scheduler": false,
+      "status_plugin_fitbit": false,
+      "units_plugin_fitbit": "metric",
+      "fitbit_granularity": 15,
+      "fitbit_hr_granularity": 1,
+      "plugin_fitbit_frequency": 60,
+      "api_key_plugin_fitbit": "",
+      "api_secret_plugin_fitbit": "",
+      "status_plugin_sensortag": false,
+      "frequency_plugin_sensortag": 1000,
+      "status_plugin_contacts": false,
+      "frequency_plugin_contacts": 30,
+      "status_plugin_google_login": false,
+      "status_google_fused_location": false,
+      "frequency_google_fused_location": 300,
+      "max_frequency_google_fused_location": 60,
+      "fallback_location_timeout": 20,
+      "location_sensitivity": 3,
+      "accuracy_google_fused_location": 0,
+      "status_plugin_device_usage": false,
+      "status_plugin_studentlife_audio": false,
+      "plugin_conversations_delay": 5,
+      "plugin_conversations_off_duty": 30,
+      "plugin_conversations_length": 60,
+      "plugin_ambient_noise_no_raw": false,
       "status_webservice": true
     }
   },
@@ -166,6 +190,7 @@
       "com.aware.plugin.sentimental": false,
       "plugin_openweather": false,
       "plugin_esm_scheduler": false,
+      "plugin_ios_esm": false,
       "plugin_fitbit": false,
       "com.aware.plugin.sensortag": false,
       "plugin_contacts_list": false,
@@ -176,6 +201,29 @@
     }
   },
   "shared": {
+    "esms": {
+      "questions": [
+        {
+          "esm_submit": "Submit",
+          "esm_title": "How are you feeling: okay or no",
+          "instructions": "Please select one of the options:",
+          "esm_type": 2,
+          "esm_radios": ["Yes", "No"],
+          "id": 1,
+          "esm_notification_timeout": 6000,
+          "esm_expiration_threshold": 6002
+        }
+      ],
+      "schedules": [
+        {
+          "title": "Schedule 1",
+          "type": "repeat",
+          "esm_keep": false,
+          "questions": [1],
+          "repeatInterval": 1
+        }
+      ]
+    },
     "sensors": {
       "accelerometer": {
         "enabled": false,
@@ -204,16 +252,16 @@
         "enabled": true
       },
       "gravity": {
-        "enabled": false,
+        "enabled": true,
         "frequency": 20000,
         "threshold": 0,
-        "enforce": false
+        "enforce": true
       },
       "gyroscope": {
         "enabled": false,
         "frequency": 20000,
         "threshold": 0,
-        "enforce": false
+        "enforce": true
       },
       "light": {
         "enabled": false,
