@@ -149,6 +149,7 @@ export default function SensorComponent(inputs) {
   const [pluginData, setPluginData] = useRecoilState(pluginSensorState);
   const updatePluginData = (fieldName, value) => {
     setPluginData({
+      ...pluginData,
       [fieldName]: value,
     });
   };

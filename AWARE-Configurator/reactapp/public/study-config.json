@@ -470,6 +470,118 @@
       "value": "metric"
     },
     {
+      "setting": "status_plugin_google_activity_recognition",
+      "value": false
+    },
+    {
+      "setting": "frequency_plugin_google_activity_recognition",
+      "value": 10
+    },
+    {
+      "setting": "status_plugin_sentimental",
+      "value": false
+    },
+    {
+      "setting": "status_plugin_esm_scheduler",
+      "value": false
+    },
+    {
+      "setting": "status_plugin_fitbit",
+      "value": false
+    },
+    {
+      "setting": "units_plugin_fitbit",
+      "value": "metric"
+    },
+    {
+      "setting": "fitbit_granularity",
+      "value": 15
+    },
+    {
+      "setting": "fitbit_hr_granularity",
+      "value": 1
+    },
+    {
+      "setting": "plugin_fitbit_frequency",
+      "value": 60
+    },
+    {
+      "setting": "api_key_plugin_fitbit",
+      "value": ""
+    },
+    {
+      "setting": "api_secret_plugin_fitbit",
+      "value": ""
+    },
+    {
+      "setting": "status_plugin_sensortag",
+      "value": false
+    },
+    {
+      "setting": "frequency_plugin_sensortag",
+      "value": 1000
+    },
+    {
+      "setting": "status_plugin_contacts",
+      "value": false
+    },
+    {
+      "setting": "frequency_plugin_contacts",
+      "value": 30
+    },
+    {
+      "setting": "status_plugin_google_login",
+      "value": false
+    },
+    {
+      "setting": "status_google_fused_location",
+      "value": false
+    },
+    {
+      "setting": "frequency_google_fused_location",
+      "value": 300
+    },
+    {
+      "setting": "max_frequency_google_fused_location",
+      "value": 60
+    },
+    {
+      "setting": "fallback_location_timeout",
+      "value": 20
+    },
+    {
+      "setting": "location_sensitivity",
+      "value": 3
+    },
+    {
+      "setting": "accuracy_google_fused_location",
+      "value": 0
+    },
+    {
+      "setting": "status_plugin_device_usage",
+      "value": false
+    },
+    {
+      "setting": "status_plugin_studentlife_audio",
+      "value": false
+    },
+    {
+      "setting": "plugin_conversations_delay",
+      "value": 5
+    },
+    {
+      "setting": "plugin_conversations_off_duty",
+      "value": 30
+    },
+    {
+      "setting": "plugin_conversations_length",
+      "value": 60
+    },
+    {
+      "setting": "plugin_ambient_noise_no_raw",
+      "value": false
+    },
+    {
       "setting": "status_esm",
       "value": true
     },

@@ -279,7 +279,7 @@ export default function ScheduleComponent(input) {
       <CustomizedCheckbox
         key={idx}
         recoilState={studyFormScheduleConfigurationState}
-        field={question.esm_title}
+        field={`${question.id || idx + 1}`}
         index={scheduleIndex}
         inGroup
         groupField="questions"
@@ -357,7 +357,8 @@ export default function ScheduleComponent(input) {
               <div className="schedule-selection-card">
                 <p className="schedule-selection-title">Question set</p>
                 <p className="schedule-selection-copy">
-                  Pick the questions that should be shown when this schedule is triggered.
+                  Pick the questions that should be shown when this schedule is
+                  triggered.
                 </p>
                 <div className="schedule-question-list">{questionList}</div>
               </div>

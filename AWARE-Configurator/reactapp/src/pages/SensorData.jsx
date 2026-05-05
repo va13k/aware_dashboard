@@ -58,7 +58,7 @@ export default function SensorData() {
 
   // software sensor states
   const [applicationSensor, setapplicationSensor] = useRecoilState(
-    applicationSensorState,
+    applicationSensorState
   );
 
   const updateApplicationSensorData = (fieldName, value) => {
@@ -71,7 +71,7 @@ export default function SensorData() {
   const [screenData, setscreenData] = useRecoilState(screenSensorState);
 
   const [communicationData, setcommunicationData] = useRecoilState(
-    communicationSensorState,
+    communicationSensorState
   );
 
   const [accelerometerData, setaccelerometerData] =
@@ -88,7 +88,7 @@ export default function SensorData() {
   const [lightData, setlightData] = useRecoilState(lightState);
 
   const [linearAccelerometerData, setLinearAccelerometerData] = useRecoilState(
-    linearAccelerometerState,
+    linearAccelerometerState
   );
 
   const [locationsData, setLocationsData] = useRecoilState(locationsState);
@@ -112,7 +112,7 @@ export default function SensorData() {
   const [wifiData, setWifiData] = useRecoilState(wifiState);
 
   const [screenshotData, setScreenshotData] = useRecoilState(
-    screenshotSensorState,
+    screenshotSensorState
   );
 
   const [noteData, setNoteData] = useRecoilState(noteState);
@@ -980,7 +980,7 @@ export default function SensorData() {
                   onClick={(_, checked) => {
                     updateApplicationSensorData(
                       "screenshot_package_specification",
-                      "0",
+                      "0"
                     );
                   }}
                 />
@@ -991,7 +991,7 @@ export default function SensorData() {
                   onClick={(_, checked) => {
                     updateApplicationSensorData(
                       "screenshot_package_specification",
-                      "1",
+                      "1"
                     );
                   }}
                 />
@@ -1002,7 +1002,7 @@ export default function SensorData() {
                   onClick={(_, checked) => {
                     updateApplicationSensorData(
                       "screenshot_package_specification",
-                      "2",
+                      "2"
                     );
                   }}
                 />
@@ -1119,7 +1119,7 @@ export default function SensorData() {
               onClick={(_, checked) => {
                 updatePluginData(
                   "plugin_openweather_measurement_units",
-                  "metric",
+                  "metric"
                 );
               }}
             />
@@ -1130,11 +1130,292 @@ export default function SensorData() {
               onClick={(_, checked) => {
                 updatePluginData(
                   "plugin_openweather_measurement_units",
-                  "imperial",
+                  "imperial"
                 );
               }}
             />
           </RadioGroup>
+        </Grid>
+      </Grid>
+    );
+  }
+
+  // eslint-disable-next-line react/no-unstable-nested-components
+  function PluginActivityRecognitionSubContent() {
+    return (
+      <Grid container rowSpacing={1} columnSpacing={{ xs: 1, sm: 2, md: 3 }}>
+        <Grid width="10%" />
+        <Grid width="70%">
+          <FrequencyField
+            id="frequency_plugin_google_activity_recognition"
+            title="Update Frequency"
+            inputLabel="How often to detect activity (seconds)"
+            defaultNum={10}
+            description="Frequency of Google Activity Recognition updates in seconds."
+            field="frequency_plugin_google_activity_recognition"
+            studyField={pluginData.frequency_plugin_google_activity_recognition}
+            modeState="plugin"
+          />
+        </Grid>
+      </Grid>
+    );
+  }
+
+  // eslint-disable-next-line react/no-unstable-nested-components
+  function PluginFitbitSubContent() {
+    return (
+      <Grid container rowSpacing={1} columnSpacing={{ xs: 1, sm: 2, md: 3 }}>
+        <Grid width="10%" />
+        <Grid width="70%">
+          <FrequencyField
+            id="plugin_fitbit_frequency"
+            title="Sync Frequency"
+            inputLabel="How often to sync Fitbit data (minutes)"
+            defaultNum={60}
+            description="Frequency of Fitbit data synchronisation in minutes."
+            field="plugin_fitbit_frequency"
+            studyField={pluginData.plugin_fitbit_frequency}
+            modeState="plugin"
+          />
+
+          <PluginAPIField
+            id="api_key_plugin_fitbit"
+            title="API Key"
+            inputLabel="Fitbit OAuth Client ID"
+            description="Fitbit OAuth 2.0 Client ID from dev.fitbit.com"
+            field="api_key_plugin_fitbit"
+            studyField={pluginData.api_key_plugin_fitbit}
+            modeState="plugin"
+          />
+
+          <PluginAPIField
+            id="api_secret_plugin_fitbit"
+            title="API Secret"
+            inputLabel="Fitbit OAuth Client Secret"
+            description="Fitbit OAuth 2.0 Client Secret from dev.fitbit.com"
+            field="api_secret_plugin_fitbit"
+            studyField={pluginData.api_secret_plugin_fitbit}
+            modeState="plugin"
+          />
+
+          <Grid>
+            <p className="field_name" mb={10}>
+              Measurement unit
+            </p>
+          </Grid>
+          <RadioGroup
+            aria-labelledby="Fitbit units"
+            name="fitbit units"
+            value={pluginData.units_plugin_fitbit || "metric"}
+            row
+          >
+            <FormControlLabel
+              value="metric"
+              control={<Radio />}
+              label="Metric"
+              onClick={() => updatePluginData("units_plugin_fitbit", "metric")}
+            />
+            <FormControlLabel
+              value="imperial"
+              control={<Radio />}
+              label="Imperial"
+              onClick={() =>
+                updatePluginData("units_plugin_fitbit", "imperial")
+              }
+            />
+          </RadioGroup>
+
+          <Grid>
+            <p className="field_name" mb={10}>
+              Steps/sleep granularity (minutes)
+            </p>
+          </Grid>
+          <RadioGroup
+            aria-labelledby="Fitbit granularity"
+            name="fitbit granularity"
+            value={String(pluginData.fitbit_granularity ?? 15)}
+            row
+          >
+            {[1, 15, 30, 60].map((v) => (
+              <FormControlLabel
+                key={v}
+                value={String(v)}
+                control={<Radio />}
+                label={`${v} min`}
+                onClick={() => updatePluginData("fitbit_granularity", v)}
+              />
+            ))}
+          </RadioGroup>
+
+          <Grid>
+            <p className="field_name" mb={10}>
+              Heart-rate granularity
+            </p>
+          </Grid>
+          <RadioGroup
+            aria-labelledby="Fitbit HR granularity"
+            name="fitbit hr granularity"
+            value={String(pluginData.fitbit_hr_granularity ?? 1)}
+            row
+          >
+            <FormControlLabel
+              value="1"
+              control={<Radio />}
+              label="1 second"
+              onClick={() => updatePluginData("fitbit_hr_granularity", 1)}
+            />
+            <FormControlLabel
+              value="60"
+              control={<Radio />}
+              label="1 minute"
+              onClick={() => updatePluginData("fitbit_hr_granularity", 60)}
+            />
+          </RadioGroup>
+        </Grid>
+      </Grid>
+    );
+  }
+
+  // eslint-disable-next-line react/no-unstable-nested-components
+  function PluginSensorTagSubContent() {
+    return (
+      <Grid container rowSpacing={1} columnSpacing={{ xs: 1, sm: 2, md: 3 }}>
+        <Grid width="10%" />
+        <Grid width="70%">
+          <FrequencyField
+            id="frequency_plugin_sensortag"
+            title="Sampling Frequency"
+            inputLabel="How often to sample SensorTag (milliseconds)"
+            defaultNum={1000}
+            description="Frequency of SensorTag data collection in milliseconds."
+            field="frequency_plugin_sensortag"
+            studyField={pluginData.frequency_plugin_sensortag}
+            modeState="plugin"
+          />
+        </Grid>
+      </Grid>
+    );
+  }
+
+  // eslint-disable-next-line react/no-unstable-nested-components
+  function PluginContactsListSubContent() {
+    return (
+      <Grid container rowSpacing={1} columnSpacing={{ xs: 1, sm: 2, md: 3 }}>
+        <Grid width="10%" />
+        <Grid width="70%">
+          <FrequencyField
+            id="frequency_plugin_contacts"
+            title="Sync Frequency"
+            inputLabel="How often to sync contacts (minutes)"
+            defaultNum={30}
+            description="Frequency of contacts list synchronisation in minutes."
+            field="frequency_plugin_contacts"
+            studyField={pluginData.frequency_plugin_contacts}
+            modeState="plugin"
+          />
+        </Grid>
+      </Grid>
+    );
+  }
+
+  // eslint-disable-next-line react/no-unstable-nested-components
+  function PluginGoogleFusedLocationSubContent() {
+    return (
+      <Grid container rowSpacing={1} columnSpacing={{ xs: 1, sm: 2, md: 3 }}>
+        <Grid width="10%" />
+        <Grid width="70%">
+          <FrequencyField
+            id="frequency_google_fused_location"
+            title="Update Frequency"
+            inputLabel="How often to request location (seconds)"
+            defaultNum={300}
+            description="Frequency of fused location updates in seconds."
+            field="frequency_google_fused_location"
+            studyField={pluginData.frequency_google_fused_location}
+            modeState="plugin"
+          />
+          <FrequencyField
+            id="max_frequency_google_fused_location"
+            title="Max Update Frequency"
+            inputLabel="Fastest location update interval (seconds)"
+            defaultNum={60}
+            description="Maximum frequency at which the app can receive location updates."
+            field="max_frequency_google_fused_location"
+            studyField={pluginData.max_frequency_google_fused_location}
+            modeState="plugin"
+          />
+          <FrequencyField
+            id="fallback_location_timeout"
+            title="Fallback Timeout"
+            inputLabel="Fallback timeout (seconds)"
+            defaultNum={20}
+            description="Timeout before switching to a lower-accuracy provider."
+            field="fallback_location_timeout"
+            studyField={pluginData.fallback_location_timeout}
+            modeState="plugin"
+          />
+          <Grid>
+            <p className="field_name" mb={10}>
+              Location sensitivity
+            </p>
+          </Grid>
+          <RadioGroup
+            aria-labelledby="Location sensitivity"
+            name="location sensitivity"
+            value={String(pluginData.location_sensitivity ?? 3)}
+            row
+          >
+            {[0, 1, 2, 3].map((v) => (
+              <FormControlLabel
+                key={v}
+                value={String(v)}
+                control={<Radio />}
+                label={["No power", "Low", "Balanced", "High"][v]}
+                onClick={() => updatePluginData("location_sensitivity", v)}
+              />
+            ))}
+          </RadioGroup>
+        </Grid>
+      </Grid>
+    );
+  }
+
+  // eslint-disable-next-line react/no-unstable-nested-components
+  function PluginConversationsSubContent() {
+    return (
+      <Grid container rowSpacing={1} columnSpacing={{ xs: 1, sm: 2, md: 3 }}>
+        <Grid width="10%" />
+        <Grid width="70%">
+          <FrequencyField
+            id="plugin_conversations_delay"
+            title="Start Delay"
+            inputLabel="Delay before recording starts (seconds)"
+            defaultNum={5}
+            description="Delay in seconds before the plugin begins audio detection."
+            field="plugin_conversations_delay"
+            studyField={pluginData.plugin_conversations_delay}
+            modeState="plugin"
+          />
+          <FrequencyField
+            id="plugin_conversations_off_duty"
+            title="Off-duty Period"
+            inputLabel="Off-duty period between samples (seconds)"
+            defaultNum={30}
+            description="Period of silence (in seconds) between audio detection windows."
+            field="plugin_conversations_off_duty"
+            studyField={pluginData.plugin_conversations_off_duty}
+            modeState="plugin"
+          />
+          <FrequencyField
+            id="plugin_conversations_length"
+            title="Sample Length"
+            inputLabel="Duration of each audio sample (seconds)"
+            defaultNum={60}
+            description="Duration in seconds of each audio detection window."
+            field="plugin_conversations_length"
+            studyField={pluginData.plugin_conversations_length}
+            modeState="plugin"
+          />
         </Grid>
       </Grid>
     );
@@ -1150,7 +1431,8 @@ export default function SensorData() {
             Some sensors require specific permissions to be enabled on the
             phone. These are automatically requested when the study is joined.
             Keep in mind that the collection of multiple sensors at high
-            frequency can decrease battery life of the phone.
+            frequency can decrease battery life of the phone. Sensors are
+            grouped by platform availability.
           </p>
         </div>
 
@@ -1306,7 +1588,7 @@ export default function SensorData() {
         </div>
 
         <div className="border">
-          <p className="title">Software sensors</p>
+          <p className="title">Shared software sensors</p>
           <SensorComponent
             sensorName="Application"
             sensorDescription="Application usage and incoming notifications on the device."
@@ -1343,14 +1625,6 @@ export default function SensorData() {
           )}
 
           <SensorComponent
-            sensorName="Installations"
-            sensorDescription="Application installations, removal, and updates."
-            stateField={sensorData.sensor_installation}
-            field="sensor_installation"
-            modeState="sensor"
-          />
-
-          <SensorComponent
             sensorName="Screen"
             sensorDescription="Smartphone screen status; turning on, turning off, lock, and unlock."
             stateField={sensorData.sensor_screen}
@@ -1358,19 +1632,6 @@ export default function SensorData() {
             modeState="sensor"
           />
           {sensorData.sensor_screen ? SensorScreenSubContent() : <div />}
-
-          <SensorComponent
-            sensorName="Screenshot"
-            sensorDescription="Smartphone screenshot capture;"
-            stateField={sensorData.sensor_screenshot}
-            field="sensor_screenshot"
-            modeState="sensor"
-          />
-          {sensorData.sensor_screenshot ? (
-            SensorScreenshotSubContent()
-          ) : (
-            <div />
-          )}
 
           <SensorComponent
             sensorName="Telephony"
@@ -1388,18 +1649,10 @@ export default function SensorData() {
           />
 
           {sensorData.sensor_timezone ? SensorTimezoneSubContent() : <div />}
-
-          <SensorComponent
-            sensorName="Taking Note"
-            sensorDescription="Allow participants to take notes. Maximum length of each note is 10000 characters."
-            stateField={sensorData.sensor_notes}
-            field="sensor_notes"
-            modeState="sensor"
-          />
         </div>
 
         <div className="border">
-          <p className="title">Hardware sensors</p>
+          <p className="title">Shared hardware sensors</p>
           <SensorComponent
             sensorName="Accelerometer"
             sensorDescription="Acceleration applied to the device, including the force of gravity."
@@ -1567,7 +1820,66 @@ export default function SensorData() {
         </div>
 
         <div className="border">
-          <p className="title">Plugin</p>
+          <p className="title">Android-only sensors</p>
+          <SensorComponent
+            sensorName="Installations"
+            sensorDescription="Application installations, removal, and updates."
+            stateField={sensorData.sensor_installation}
+            field="sensor_installation"
+            modeState="sensor"
+          />
+
+          <SensorComponent
+            sensorName="Screenshot"
+            sensorDescription="Smartphone screenshot capture."
+            stateField={sensorData.sensor_screenshot}
+            field="sensor_screenshot"
+            modeState="sensor"
+          />
+          {sensorData.sensor_screenshot ? (
+            SensorScreenshotSubContent()
+          ) : (
+            <div />
+          )}
+
+          <SensorComponent
+            sensorName="Taking Note"
+            sensorDescription="Allow participants to take notes. Maximum length of each note is 10000 characters."
+            stateField={sensorData.sensor_notes}
+            field="sensor_notes"
+            modeState="sensor"
+          />
+        </div>
+
+        <div className="border">
+          <p className="title">iPhone-only sensors</p>
+          <SensorComponent
+            sensorName="Significant Motion"
+            sensorDescription="Motion co-processor signal for significant movement changes on iPhone."
+            stateField={sensorData.ios_significant_motion}
+            field="ios_significant_motion"
+            modeState="sensor"
+          />
+
+          <SensorComponent
+            sensorName="WebSocket"
+            sensorDescription="iPhone streaming transport for realtime sensor updates."
+            stateField={sensorData.ios_websocket}
+            field="ios_websocket"
+            modeState="sensor"
+          />
+
+          <SensorComponent
+            sensorName="MQTT"
+            sensorDescription="iPhone MQTT transport for realtime sensor updates."
+            stateField={sensorData.ios_mqtt}
+            field="ios_mqtt"
+            modeState="sensor"
+          />
+        </div>
+
+        <div className="border">
+          <p className="title">Shared plugins</p>
           <SensorComponent
             sensorName="Ambient Noise Plugin"
             sensorDescription="Ambient noise sampling plugin for smartphones"
@@ -1590,6 +1902,140 @@ export default function SensorData() {
           />
           {sensorData.status_plugin_openweather ? (
             PluginOpenWeatherSubContent()
+          ) : (
+            <div />
+          )}
+
+          <SensorComponent
+            sensorName="Google Activity Recognition"
+            sensorDescription="Detect physical activity (walking, running, driving, etc.) using Google's activity recognition API"
+            stateField={sensorData.status_plugin_google_activity_recognition}
+            field="status_plugin_google_activity_recognition"
+            modeState="sensor"
+          />
+          {sensorData.status_plugin_google_activity_recognition ? (
+            PluginActivityRecognitionSubContent()
+          ) : (
+            <div />
+          )}
+
+          <SensorComponent
+            sensorName="Sentimental Plugin"
+            sensorDescription="Analyse sentiment from text input on the device"
+            stateField={sensorData.status_plugin_sentimental}
+            field="status_plugin_sentimental"
+            modeState="sensor"
+          />
+
+          <SensorComponent
+            sensorName="ESM Scheduler Plugin"
+            sensorDescription="Schedule and deliver ESM questionnaires to participants"
+            stateField={sensorData.status_plugin_esm_scheduler}
+            field="status_plugin_esm_scheduler"
+            modeState="sensor"
+          />
+          {sensorData.status_plugin_esm_scheduler ? (
+            <Grid container spacing={2} sx={{ mt: 1, mb: 2, ml: "10%" }}>
+              <Grid>
+                <Button
+                  color="main"
+                  variant="outlined"
+                  onClick={() => {
+                    navigateTo("/study/questions");
+                  }}
+                >
+                  EDIT ESM QUESTIONS
+                </Button>
+              </Grid>
+              <Grid>
+                <Button
+                  color="main"
+                  variant="outlined"
+                  onClick={() => {
+                    navigateTo("/study/schedule_configuration");
+                  }}
+                >
+                  EDIT ESM SCHEDULES
+                </Button>
+              </Grid>
+            </Grid>
+          ) : (
+            <div />
+          )}
+
+          <SensorComponent
+            sensorName="Fitbit Plugin"
+            sensorDescription="Sync Fitbit wearable data (steps, heart rate, sleep) via the Fitbit API"
+            stateField={sensorData.status_plugin_fitbit}
+            field="status_plugin_fitbit"
+            modeState="sensor"
+          />
+          {sensorData.status_plugin_fitbit ? PluginFitbitSubContent() : <div />}
+
+          <SensorComponent
+            sensorName="SensorTag Plugin"
+            sensorDescription="Collect data from Texas Instruments SensorTag Bluetooth devices"
+            stateField={sensorData.status_plugin_sensortag}
+            field="status_plugin_sensortag"
+            modeState="sensor"
+          />
+          {sensorData.status_plugin_sensortag ? (
+            PluginSensorTagSubContent()
+          ) : (
+            <div />
+          )}
+
+          <SensorComponent
+            sensorName="Contacts List Plugin"
+            sensorDescription="Periodically sync the device contacts list (hashed for privacy)"
+            stateField={sensorData.status_plugin_contacts}
+            field="status_plugin_contacts"
+            modeState="sensor"
+          />
+          {sensorData.status_plugin_contacts ? (
+            PluginContactsListSubContent()
+          ) : (
+            <div />
+          )}
+
+          <SensorComponent
+            sensorName="Google Auth Plugin"
+            sensorDescription="Authenticate participants with their Google account"
+            stateField={sensorData.status_plugin_google_login}
+            field="status_plugin_google_login"
+            modeState="sensor"
+          />
+
+          <SensorComponent
+            sensorName="Google Fused Location Plugin"
+            sensorDescription="High-accuracy location using Google's fused location provider (GPS + network)"
+            stateField={sensorData.status_google_fused_location}
+            field="status_google_fused_location"
+            modeState="sensor"
+          />
+          {sensorData.status_google_fused_location ? (
+            PluginGoogleFusedLocationSubContent()
+          ) : (
+            <div />
+          )}
+
+          <SensorComponent
+            sensorName="Device Usage Plugin"
+            sensorDescription="Track app usage and screen-on/off events"
+            stateField={sensorData.status_plugin_device_usage}
+            field="status_plugin_device_usage"
+            modeState="sensor"
+          />
+
+          <SensorComponent
+            sensorName="Conversations Plugin"
+            sensorDescription="Detect conversational audio events without recording content"
+            stateField={sensorData.status_plugin_studentlife_audio}
+            field="status_plugin_studentlife_audio"
+            modeState="sensor"
+          />
+          {sensorData.status_plugin_studentlife_audio ? (
+            PluginConversationsSubContent()
           ) : (
             <div />
           )}

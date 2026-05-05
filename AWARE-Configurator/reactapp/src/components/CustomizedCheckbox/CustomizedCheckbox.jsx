@@ -39,9 +39,15 @@ export default function CustomizedCheckbox(inputs) {
           // if in group
           let newCheckboxGroup = {};
           if (each[groupField] !== undefined) {
-            newCheckboxGroup = { ...each[groupField] };
+            if (Array.isArray(each[groupField])) {
+              each[groupField].forEach((selectedField) => {
+                newCheckboxGroup[selectedField] = true;
+              });
+            } else {
+              newCheckboxGroup = { ...each[groupField] };
+            }
           }
-          newCheckboxGroup[label] = curValue;
+          newCheckboxGroup[curFieldName] = curValue;
           return { ...each, [groupField]: newCheckboxGroup };
         }
         return each;
@@ -62,6 +68,10 @@ export default function CustomizedCheckbox(inputs) {
     // for in group
     if (information[index][groupField] === undefined) {
       return false;
+    }
+
+    if (Array.isArray(information[index][groupField])) {
+      return information[index][groupField].map(String).includes(field);
     }
 
     return information[index][groupField][field] || false;

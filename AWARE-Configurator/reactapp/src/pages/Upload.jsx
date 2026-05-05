@@ -67,7 +67,7 @@ export default function Upload() {
   const setGyroscopeData = useSetRecoilState(gyroscopeState);
   const setLightData = useSetRecoilState(lightState);
   const setLinearAccelerometerData = useSetRecoilState(
-    linearAccelerometerState,
+    linearAccelerometerState
   );
   const setLocationsData = useSetRecoilState(locationsState);
   const setMagnetometerData = useSetRecoilState(magnetometerState);
@@ -87,8 +87,9 @@ export default function Upload() {
 
   const readJsonObject = (strValue) => {
     const jsonValue = JSON.parse(strValue);
+    const { _id: studyId } = jsonValue;
 
-    setStudyId(jsonValue._id);
+    setStudyId(studyId);
     setStudyInformation(jsonValue.study_info);
     setDatabaseInfo(jsonValue.database || {});
     setCreateTime(jsonValue.createdAt);
@@ -98,7 +99,7 @@ export default function Upload() {
         const newQuestion = { ...question };
         delete newQuestion.id;
         return question;
-      }),
+      })
     );
 
     setSchedules(
@@ -114,7 +115,7 @@ export default function Upload() {
           for (let j = 0; j < schedule.questions.length; j += 1) {
             const selectedId = schedule.questions[j];
             if (qId === selectedId) {
-              newSchedule.questions[question.esm_title] = true;
+              newSchedule.questions[qId] = true;
             }
           }
         }
@@ -147,7 +148,7 @@ export default function Upload() {
         }
 
         return newSchedule;
-      }),
+      })
     );
 
     const sensorData = {};
@@ -171,6 +172,16 @@ export default function Upload() {
     const communicationData = {};
     const screenshotData = {};
     const pluginData = {};
+    const iosSensors = jsonValue.ios_sensors || {};
+
+    sensorData.ios_significant_motion =
+      iosSensors.significant_motion !== undefined
+        ? iosSensors.significant_motion
+        : false;
+    sensorData.ios_websocket =
+      iosSensors.websocket !== undefined ? iosSensors.websocket : false;
+    sensorData.ios_mqtt =
+      iosSensors.mqtt !== undefined ? iosSensors.mqtt : false;
 
     for (let i = 0; i < jsonValue.sensors.length; i += 1) {
       const { setting, value } = jsonValue.sensors[i];
@@ -263,7 +274,7 @@ export default function Upload() {
           sensorData.sensor_screen = value;
           break;
         case "status_touch":
-          screenData.touch = value;
+          screenData.sensor_touch = value;
           break;
         case "status_telephony":
           sensorData.sensor_telephony = value;
@@ -496,6 +507,90 @@ export default function Upload() {
           break;
         case "plugin_openweather_measurement_units":
           pluginData.plugin_openweather_measurement_units = value;
+          break;
+        case "status_plugin_google_activity_recognition":
+          sensorData.status_plugin_google_activity_recognition = value;
+          break;
+        case "frequency_plugin_google_activity_recognition":
+          pluginData.frequency_plugin_google_activity_recognition = value;
+          break;
+        case "status_plugin_sentimental":
+          sensorData.status_plugin_sentimental = value;
+          break;
+        case "status_plugin_esm_scheduler":
+          sensorData.status_plugin_esm_scheduler = value;
+          break;
+        case "status_plugin_fitbit":
+          sensorData.status_plugin_fitbit = value;
+          break;
+        case "units_plugin_fitbit":
+          pluginData.units_plugin_fitbit = value;
+          break;
+        case "fitbit_granularity":
+          pluginData.fitbit_granularity = value;
+          break;
+        case "fitbit_hr_granularity":
+          pluginData.fitbit_hr_granularity = value;
+          break;
+        case "plugin_fitbit_frequency":
+          pluginData.plugin_fitbit_frequency = value;
+          break;
+        case "api_key_plugin_fitbit":
+          pluginData.api_key_plugin_fitbit = value;
+          break;
+        case "api_secret_plugin_fitbit":
+          pluginData.api_secret_plugin_fitbit = value;
+          break;
+        case "status_plugin_sensortag":
+          sensorData.status_plugin_sensortag = value;
+          break;
+        case "frequency_plugin_sensortag":
+          pluginData.frequency_plugin_sensortag = value;
+          break;
+        case "status_plugin_contacts":
+          sensorData.status_plugin_contacts = value;
+          break;
+        case "frequency_plugin_contacts":
+          pluginData.frequency_plugin_contacts = value;
+          break;
+        case "status_plugin_google_login":
+          sensorData.status_plugin_google_login = value;
+          break;
+        case "status_google_fused_location":
+          sensorData.status_google_fused_location = value;
+          break;
+        case "frequency_google_fused_location":
+          pluginData.frequency_google_fused_location = value;
+          break;
+        case "max_frequency_google_fused_location":
+          pluginData.max_frequency_google_fused_location = value;
+          break;
+        case "fallback_location_timeout":
+          pluginData.fallback_location_timeout = value;
+          break;
+        case "location_sensitivity":
+          pluginData.location_sensitivity = value;
+          break;
+        case "accuracy_google_fused_location":
+          pluginData.accuracy_google_fused_location = value;
+          break;
+        case "status_plugin_device_usage":
+          sensorData.status_plugin_device_usage = value;
+          break;
+        case "status_plugin_studentlife_audio":
+          sensorData.status_plugin_studentlife_audio = value;
+          break;
+        case "plugin_conversations_delay":
+          pluginData.plugin_conversations_delay = value;
+          break;
+        case "plugin_conversations_off_duty":
+          pluginData.plugin_conversations_off_duty = value;
+          break;
+        case "plugin_conversations_length":
+          pluginData.plugin_conversations_length = value;
+          break;
+        case "plugin_ambient_noise_no_raw":
+          pluginData.plugin_ambient_noise_no_raw = value;
           break;
         default:
       }

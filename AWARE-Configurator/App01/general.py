@@ -16,6 +16,9 @@ from shared_config.source_store import update_source
 from shared_config.runtime import get_runtime_settings, load_env, normalize_public_env
 from shared_config.serializers import (
     COMMON_SHARED_SENSOR_FIELDS,
+    IOS_ESM_CONFIG_FILENAME,
+    IOS_ONLY_SENSOR_NAMES,
+    build_ios_esm_config,
     build_sensor_setting_name,
     serialize_android_config,
     serialize_ios_config,
@@ -31,6 +34,7 @@ ANDROID_TEMPLATE_PATH = (
 )
 IOS_EXAMPLE_PATH = PROJECT_ROOT / "aware-micro-server" / "aware-config.example.json"
 IOS_CONFIG_PATH = PROJECT_ROOT / "aware-micro-server" / "aware-config.json"
+IOS_ESM_CONFIG_PATH = PROJECT_ROOT / "aware-micro-server" / "esm" / IOS_ESM_CONFIG_FILENAME
 STUDY_CONFIG_PATH = pathlib.Path(storage_path) / STUDY_CONFIG_FILE_NAME
 ABSTRACT_DATABASE_HOST = "db.internal"
 
@@ -80,6 +84,7 @@ def save(content):
 
 
 def write_json(path, content):
+    path.parent.mkdir(parents=True, exist_ok=True)
     with open(path, 'w', encoding='utf-8') as file:
         json.dump(content, file, indent=2)
         file.write("\n")
@@ -168,8 +173,11 @@ def update_source_from_android_config(source, content):
     source["android"]["updated_at"] = content.get(
         "updatedAt", source["android"].get("updated_at", "")
     )
-    source["android"]["questions"] = content.get("questions", [])
-    source["android"]["schedules"] = content.get("schedules", [])
+    questions = content.get("questions", [])
+    schedules = content.get("schedules", [])
+    sync_shared_esms_from_config(source, questions, schedules)
+    source["android"]["questions"] = questions
+    source["android"]["schedules"] = schedules
     android_settings = {
         item["setting"]: item.get("value")
         for item in content.get("sensors", [])
@@ -177,7 +185,42 @@ def update_source_from_android_config(source, content):
     }
     sync_shared_sensors_from_android_settings(source, android_settings)
     source["android"]["settings"] = android_settings
+    sync_ios_only_sensors_from_config(source, content.get("ios_sensors", {}))
     return source
+
+
+def sync_ios_only_sensors_from_config(source, ios_sensor_settings):
+    if not isinstance(ios_sensor_settings, dict):
+        return
+
+    ios_sensors = source.setdefault("ios", {}).setdefault("sensors", {})
+    for sensor_name in IOS_ONLY_SENSOR_NAMES:
+        if sensor_name in ios_sensor_settings:
+            ios_sensors[sensor_name] = bool(ios_sensor_settings[sensor_name])
+
+
+def sync_shared_esms_from_config(source, questions, schedules):
+    shared = source.setdefault("shared", {})
+    shared["esms"] = {
+        "questions": questions if isinstance(questions, list) else [],
+        "schedules": schedules if isinstance(schedules, list) else [],
+    }
+
+
+_ANDROID_STATUS_TO_IOS_PLUGIN = {
+    "status_plugin_ambient_noise": "plugin_ambient_noise",
+    "status_plugin_google_activity_recognition": "plugin_google_activity_recognition",
+    "status_plugin_sentimental": "com.aware.plugin.sentimental",
+    "status_plugin_openweather": "plugin_openweather",
+    "status_plugin_esm_scheduler": "plugin_esm_scheduler",
+    "status_plugin_fitbit": "plugin_fitbit",
+    "status_plugin_sensortag": "com.aware.plugin.sensortag",
+    "status_plugin_contacts": "plugin_contacts_list",
+    "status_plugin_google_login": "plugin_google_auth",
+    "status_google_fused_location": "plugin_google_fused_location",
+    "status_plugin_device_usage": "plugin_device_usage",
+    "status_plugin_studentlife_audio": "plugin_conversations",
+}
 
 
 def sync_shared_sensors_from_android_settings(source, android_settings):
@@ -202,6 +245,16 @@ def sync_shared_sensors_from_android_settings(source, android_settings):
                                ["status_calls", "status_messages"])
     _sync_ios_compound_sensor(ios_sensors, android_settings, "locations",
                                ["status_location_gps"])
+
+    # Sync plugin enable/disable from android.settings to ios.plugins.
+    ios_plugins = source.setdefault("ios", {}).setdefault("plugins", {})
+    for android_key, ios_plugin_name in _ANDROID_STATUS_TO_IOS_PLUGIN.items():
+        if android_key in android_settings:
+            ios_plugins[ios_plugin_name] = bool(android_settings[android_key])
+    if "status_plugin_esm_scheduler" in android_settings:
+        ios_plugins["plugin_ios_esm"] = bool(
+            android_settings["status_plugin_esm_scheduler"]
+        )
 
 
 def _sync_ios_compound_sensor(ios_sensors, android_settings, ios_name, android_keys):
@@ -240,5 +293,7 @@ def write_outputs(source):
         IOS_EXAMPLE_PATH,
         IOS_CONFIG_PATH,
     )
+    ios_esm_config = build_ios_esm_config(source)
     write_json(STUDY_CONFIG_PATH, android_config)
     write_json(IOS_CONFIG_PATH, ios_config)
+    write_json(IOS_ESM_CONFIG_PATH, ios_esm_config)

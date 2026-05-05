@@ -215,6 +215,12 @@ function FrequencyField(inputs) {
             [fieldName]: numValue,
           }));
           break;
+        case "plugin":
+          setPluginData((prevData) => ({
+            ...prevData,
+            [fieldName]: numValue,
+          }));
+          break;
 
         default:
           console.warn(`Unexpected mode: ${mode}`);

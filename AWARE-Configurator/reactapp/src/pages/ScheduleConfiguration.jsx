@@ -47,6 +47,18 @@ export default function ScheduleConfiguration() {
     setValidation(value);
   };
 
+  const hasSelectedQuestions = (schedule) => {
+    if (Array.isArray(schedule.questions)) {
+      return schedule.questions.length > 0;
+    }
+    if (!schedule.questions || typeof schedule.questions !== "object") {
+      return false;
+    }
+    return Object.values(schedule.questions).some(
+      (value) => value === true || value === "true" || value === 1
+    );
+  };
+
   function alertDialog() {
     // console.log(blankFields);
     return (
@@ -65,7 +77,9 @@ export default function ScheduleConfiguration() {
               Please fix the following before continuing:
               {blankFields.map((item) => (
                 <li key={item}>
-                  {typeof item === "number" ? `Schedule ${item + 1} — missing title or questions` : item}
+                  {typeof item === "number"
+                    ? `Schedule ${item + 1} — missing title or questions`
+                    : item}
                 </li>
               ))}
             </DialogContentText>
@@ -110,15 +124,7 @@ export default function ScheduleConfiguration() {
         return false;
       }
 
-      let flag = false;
-      // eslint-disable-next-line no-restricted-syntax
-      for (const key in each.questions) {
-        if (each.questions[key] === true) {
-          flag = true;
-          break;
-        }
-      }
-      if (!flag) {
+      if (!hasSelectedQuestions(each)) {
         return false;
       }
     }

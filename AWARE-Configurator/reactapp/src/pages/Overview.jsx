@@ -102,6 +102,61 @@ export default function Main() {
     message: "",
   });
 
+  const normalizeScheduleQuestionIds = (schedule) => {
+    const selectedQuestions = schedule?.questions;
+    if (Array.isArray(selectedQuestions)) {
+      return [
+        ...new Set(
+          selectedQuestions
+            .map((questionId) => parseInt(questionId, 10))
+            .filter(
+              (questionId) =>
+                !Number.isNaN(questionId) &&
+                questionId >= 1 &&
+                questionId <= questions.length
+            )
+        ),
+      ];
+    }
+
+    if (!selectedQuestions || typeof selectedQuestions !== "object") {
+      return [];
+    }
+
+    const questionIds = [];
+    Object.entries(selectedQuestions).forEach(([key, value]) => {
+      if (value !== true && value !== "true" && value !== 1) {
+        return;
+      }
+
+      const numericId = parseInt(key, 10);
+      if (
+        !Number.isNaN(numericId) &&
+        `${numericId}` === key &&
+        numericId >= 1 &&
+        numericId <= questions.length
+      ) {
+        questionIds.push(numericId);
+        return;
+      }
+
+      const questionIndex = questions.findIndex(
+        (question) => question.esm_title === key
+      );
+      if (questionIndex >= 0) {
+        questionIds.push(questionIndex + 1);
+      }
+    });
+
+    return [...new Set(questionIds)];
+  };
+
+  const getScheduleQuestionLabels = (schedule) => {
+    return normalizeScheduleQuestionIds(schedule).map((questionId) => {
+      return questions[questionId - 1]?.esm_title || `Question ${questionId}`;
+    });
+  };
+
   const checkStudyInformationValidation = () => {
     return (
       studyInformation.study_title &&
@@ -131,15 +186,7 @@ export default function Main() {
         return false;
       }
 
-      let flag = false;
-      // eslint-disable-next-line no-restricted-syntax
-      for (const key in each.questions) {
-        if (each.questions[key] === true) {
-          flag = true;
-          break;
-        }
-      }
-      if (!flag) {
+      if (normalizeScheduleQuestionIds(each).length === 0) {
         return false;
       }
     }
@@ -202,7 +249,10 @@ export default function Main() {
         )}
         {/* {console.log(schedule.questions)} */}
         {schedule.questions ? (
-          displayInfo(`Questions`, Object.keys(schedule.questions).join(", "))
+          displayInfo(
+            `Questions`,
+            getScheduleQuestionLabels(schedule).join(", ")
+          )
         ) : (
           <div />
         )}
@@ -247,15 +297,7 @@ export default function Main() {
         newSchedule.title = schedule.title;
         newSchedule.type = schedule.type;
         newSchedule.esm_keep = schedule.esm_keep ? schedule.esm_keep : false;
-        newSchedule.questions = [];
-        for (const key in schedule.questions) {
-          const isSelected = schedule.questions[key];
-          for (let i = 0; i < questions.length; i += 1) {
-            if (key === questions[i].esm_title && isSelected) {
-              newSchedule.questions.push(i + 1);
-            }
-          }
-        }
+        newSchedule.questions = normalizeScheduleQuestionIds(schedule);
 
         if (schedule.type === SET_SCHEDULES) {
           newSchedule.hours = [];
@@ -877,10 +919,202 @@ export default function Main() {
             ? pluginData.plugin_openweather_measurement_units
             : "metric",
         },
+        // plugin: google activity recognition
+        {
+          setting: "status_plugin_google_activity_recognition",
+          value: sensorData.status_plugin_google_activity_recognition
+            ? sensorData.status_plugin_google_activity_recognition
+            : false,
+        },
+        {
+          setting: "frequency_plugin_google_activity_recognition",
+          value: pluginData.frequency_plugin_google_activity_recognition
+            ? pluginData.frequency_plugin_google_activity_recognition
+            : 10,
+        },
+        // plugin: sentimental
+        {
+          setting: "status_plugin_sentimental",
+          value: sensorData.status_plugin_sentimental
+            ? sensorData.status_plugin_sentimental
+            : false,
+        },
+        // plugin: esm scheduler
+        {
+          setting: "status_plugin_esm_scheduler",
+          value: sensorData.status_plugin_esm_scheduler
+            ? sensorData.status_plugin_esm_scheduler
+            : false,
+        },
+        // plugin: fitbit
+        {
+          setting: "status_plugin_fitbit",
+          value: sensorData.status_plugin_fitbit
+            ? sensorData.status_plugin_fitbit
+            : false,
+        },
+        {
+          setting: "units_plugin_fitbit",
+          value: pluginData.units_plugin_fitbit
+            ? pluginData.units_plugin_fitbit
+            : "metric",
+        },
+        {
+          setting: "fitbit_granularity",
+          value: pluginData.fitbit_granularity
+            ? pluginData.fitbit_granularity
+            : 15,
+        },
+        {
+          setting: "fitbit_hr_granularity",
+          value: pluginData.fitbit_hr_granularity
+            ? pluginData.fitbit_hr_granularity
+            : 1,
+        },
+        {
+          setting: "plugin_fitbit_frequency",
+          value: pluginData.plugin_fitbit_frequency
+            ? pluginData.plugin_fitbit_frequency
+            : 60,
+        },
+        {
+          setting: "api_key_plugin_fitbit",
+          value: pluginData.api_key_plugin_fitbit
+            ? pluginData.api_key_plugin_fitbit
+            : "",
+        },
+        {
+          setting: "api_secret_plugin_fitbit",
+          value: pluginData.api_secret_plugin_fitbit
+            ? pluginData.api_secret_plugin_fitbit
+            : "",
+        },
+        // plugin: sensortag
+        {
+          setting: "status_plugin_sensortag",
+          value: sensorData.status_plugin_sensortag
+            ? sensorData.status_plugin_sensortag
+            : false,
+        },
+        {
+          setting: "frequency_plugin_sensortag",
+          value: pluginData.frequency_plugin_sensortag
+            ? pluginData.frequency_plugin_sensortag
+            : 1000,
+        },
+        // plugin: contacts list
+        {
+          setting: "status_plugin_contacts",
+          value: sensorData.status_plugin_contacts
+            ? sensorData.status_plugin_contacts
+            : false,
+        },
+        {
+          setting: "frequency_plugin_contacts",
+          value: pluginData.frequency_plugin_contacts
+            ? pluginData.frequency_plugin_contacts
+            : 30,
+        },
+        // plugin: google auth
+        {
+          setting: "status_plugin_google_login",
+          value: sensorData.status_plugin_google_login
+            ? sensorData.status_plugin_google_login
+            : false,
+        },
+        // plugin: google fused location
+        {
+          setting: "status_google_fused_location",
+          value: sensorData.status_google_fused_location
+            ? sensorData.status_google_fused_location
+            : false,
+        },
+        {
+          setting: "frequency_google_fused_location",
+          value: pluginData.frequency_google_fused_location
+            ? pluginData.frequency_google_fused_location
+            : 300,
+        },
+        {
+          setting: "max_frequency_google_fused_location",
+          value: pluginData.max_frequency_google_fused_location
+            ? pluginData.max_frequency_google_fused_location
+            : 60,
+        },
+        {
+          setting: "fallback_location_timeout",
+          value: pluginData.fallback_location_timeout
+            ? pluginData.fallback_location_timeout
+            : 20,
+        },
+        {
+          setting: "location_sensitivity",
+          value:
+            pluginData.location_sensitivity !== undefined
+              ? pluginData.location_sensitivity
+              : 3,
+        },
+        {
+          setting: "accuracy_google_fused_location",
+          value:
+            pluginData.accuracy_google_fused_location !== undefined
+              ? pluginData.accuracy_google_fused_location
+              : 0,
+        },
+        // plugin: device usage
+        {
+          setting: "status_plugin_device_usage",
+          value: sensorData.status_plugin_device_usage
+            ? sensorData.status_plugin_device_usage
+            : false,
+        },
+        // plugin: conversations
+        {
+          setting: "status_plugin_studentlife_audio",
+          value: sensorData.status_plugin_studentlife_audio
+            ? sensorData.status_plugin_studentlife_audio
+            : false,
+        },
+        {
+          setting: "plugin_conversations_delay",
+          value: pluginData.plugin_conversations_delay
+            ? pluginData.plugin_conversations_delay
+            : 5,
+        },
+        {
+          setting: "plugin_conversations_off_duty",
+          value: pluginData.plugin_conversations_off_duty
+            ? pluginData.plugin_conversations_off_duty
+            : 30,
+        },
+        {
+          setting: "plugin_conversations_length",
+          value: pluginData.plugin_conversations_length
+            ? pluginData.plugin_conversations_length
+            : 60,
+        },
+        // ambient noise: iOS no-raw flag
+        {
+          setting: "plugin_ambient_noise_no_raw",
+          value: pluginData.plugin_ambient_noise_no_raw
+            ? pluginData.plugin_ambient_noise_no_raw
+            : false,
+        },
         // default sensors
         { setting: "status_esm", value: true },
         { setting: "status_webservice", value: true },
       ],
+      ios_sensors: {
+        significant_motion:
+          sensorData.ios_significant_motion !== undefined
+            ? sensorData.ios_significant_motion
+            : false,
+        websocket:
+          sensorData.ios_websocket !== undefined
+            ? sensorData.ios_websocket
+            : false,
+        mqtt: sensorData.ios_mqtt !== undefined ? sensorData.ios_mqtt : false,
+      },
     };
   }
 
@@ -1044,16 +1278,15 @@ export default function Main() {
               <p className="title">Sensor data</p>
             </Grid>
 
+            <Grid width={250} ml={5} mt={3}>
+              <p className="title">Shared sensors</p>
+            </Grid>
             {displaySensors("sensor_application", "Application")}
             {displaySensors("sensor_battery", "Battery")}
             {displaySensors("sensor_communication", "Communication")}
-            {displaySensors("sensor_processor", "Processor")}
-            {displaySensors("sensor_installation", "Installation")}
             {displaySensors("sensor_screen", "Screen")}
-            {displaySensors("sensor_screenshot", "Screenshot")}
             {displaySensors("sensor_telephony", "Telephony")}
             {displaySensors("sensor_timezone", "Timezone")}
-            {displaySensors("sensor_notes", "Notes")}
 
             {displaySensors("sensor_accelerometer", "Accelerometer")}
             {displaySensors("sensor_barometer", "Barometer")}
@@ -1071,13 +1304,44 @@ export default function Main() {
             {displaySensors("sensor_proximity", "Proximity")}
             {displaySensors("sensor_rotation", "Rotation")}
             {displaySensors("sensor_temperature", "Temperature")}
-            {displaySensors("sensor_sensor_wifi", "Wifi")}
+            {displaySensors("sensor_wifi", "Wifi")}
 
             <Grid width={250} ml={5} mt={3}>
-              <p className="title">Plugin</p>
+              <p className="title">Android-only sensors</p>
             </Grid>
+            {displaySensors("sensor_installation", "Installation")}
+            {displaySensors("sensor_screenshot", "Screenshot")}
+            {displaySensors("sensor_notes", "Notes")}
+
+            <Grid width={250} ml={5} mt={3}>
+              <p className="title">iPhone-only sensors</p>
+            </Grid>
+            {displaySensors("ios_significant_motion", "Significant Motion")}
+            {displaySensors("ios_websocket", "WebSocket")}
+            {displaySensors("ios_mqtt", "MQTT")}
+
+            <Grid width={250} ml={5} mt={3}>
+              <p className="title">Shared plugins</p>
+            </Grid>
+
             {displaySensors("status_plugin_ambient_noise", "Ambient Noise")}
             {displaySensors("status_plugin_openweather", "OpenWeather")}
+            {displaySensors(
+              "status_plugin_google_activity_recognition",
+              "Activity Recognition"
+            )}
+            {displaySensors("status_plugin_sentimental", "Sentimental")}
+            {displaySensors("status_plugin_esm_scheduler", "ESM Scheduler")}
+            {displaySensors("status_plugin_fitbit", "Fitbit")}
+            {displaySensors("status_plugin_sensortag", "SensorTag")}
+            {displaySensors("status_plugin_contacts", "Contacts List")}
+            {displaySensors("status_plugin_google_login", "Google Auth")}
+            {displaySensors(
+              "status_google_fused_location",
+              "Google Fused Location"
+            )}
+            {displaySensors("status_plugin_device_usage", "Device Usage")}
+            {displaySensors("status_plugin_studentlife_audio", "Conversations")}
 
             <Grid
               container
@@ -1116,7 +1380,9 @@ export default function Main() {
                 </p>
                 {saveState.status !== "idle" && (
                   <Alert
-                    severity={saveState.status === "success" ? "success" : "error"}
+                    severity={
+                      saveState.status === "success" ? "success" : "error"
+                    }
                     sx={{ mt: 2, maxWidth: "680px" }}
                   >
                     <AlertTitle>
@@ -1130,75 +1396,75 @@ export default function Main() {
               </Grid>
               <Grid xs={12} md="auto">
                 <div className="overview-actions">
-                <Button
-                  color="main"
-                  variant="contained"
-                  onClick={async () => {
-                    setSaveState({
-                      status: "idle",
-                      message: "",
-                    });
-                    setBlankFields([]);
-                    validationOn();
+                  <Button
+                    color="main"
+                    variant="contained"
+                    onClick={async () => {
+                      setSaveState({
+                        status: "idle",
+                        message: "",
+                      });
+                      setBlankFields([]);
+                      validationOn();
 
-                    const validility =
-                      checkStudyInformationValidation() &&
-                      checkQuestionValidation() &&
-                      checkScheduleValidation();
+                      const validility =
+                        checkStudyInformationValidation() &&
+                        checkQuestionValidation() &&
+                        checkScheduleValidation();
 
-                    validate(validility);
+                      validate(validility);
 
-                    if (!checkStudyInformationValidation()) {
-                      updateBlankFields("Study information page");
-                    }
-                    if (!checkQuestionValidation()) {
-                      updateBlankFields("Question page");
-                    }
-                    if (!checkScheduleValidation()) {
-                      updateBlankFields("Schedule page");
-                    }
-
-                    if (validility) {
-                      try {
-                        validationClose();
-                        await saveJsonFile();
-                        setSaveState({
-                          status: "success",
-                          message:
-                            "The shared study configuration was updated successfully.",
-                        });
-                      } catch (error) {
-                        setSaveState({
-                          status: "error",
-                          message:
-                            error?.response?.data?.msg ||
-                            error.message ||
-                            "The configuration could not be updated.",
-                        });
+                      if (!checkStudyInformationValidation()) {
+                        updateBlankFields("Study information page");
                       }
-                    }
-                  }}
-                >
-                  UPDATE CONFIGURATION
-                </Button>
-                <Button
-                  color="main"
-                  variant="outlined"
-                  onClick={() => {
-                    window.location.assign("/studies/");
-                  }}
-                >
-                  OPEN STUDIES
-                </Button>
-                <Button
-                  color="main"
-                  variant="outlined"
-                  onClick={() => {
-                    window.location.assign("/");
-                  }}
-                >
-                  MAIN PAGE
-                </Button>
+                      if (!checkQuestionValidation()) {
+                        updateBlankFields("Question page");
+                      }
+                      if (!checkScheduleValidation()) {
+                        updateBlankFields("Schedule page");
+                      }
+
+                      if (validility) {
+                        try {
+                          validationClose();
+                          await saveJsonFile();
+                          setSaveState({
+                            status: "success",
+                            message:
+                              "The shared study configuration was updated successfully.",
+                          });
+                        } catch (error) {
+                          setSaveState({
+                            status: "error",
+                            message:
+                              error?.response?.data?.msg ||
+                              error.message ||
+                              "The configuration could not be updated.",
+                          });
+                        }
+                      }
+                    }}
+                  >
+                    UPDATE CONFIGURATION
+                  </Button>
+                  <Button
+                    color="main"
+                    variant="outlined"
+                    onClick={() => {
+                      window.location.assign("/studies/");
+                    }}
+                  >
+                    OPEN STUDIES
+                  </Button>
+                  <Button
+                    color="main"
+                    variant="outlined"
+                    onClick={() => {
+                      window.location.assign("/");
+                    }}
+                  >
+                    MAIN PAGE
+                  </Button>
                 </div>
                 {!validation ? AlertDialog() : <div />}
               </Grid>
