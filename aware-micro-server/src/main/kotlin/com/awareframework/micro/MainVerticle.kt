@@ -45,6 +45,7 @@ class MainVerticle : AbstractVerticle() {
     val router = Router.router(vertx)
     router.route().handler(BodyHandler.create().setBodyLimit(1024 * 1024 * 50));
     router.route("/cache/*").handler(StaticHandler.create("cache"))
+    router.route("/esm/*").handler(StaticHandler.create("esm"))
     router.route().handler {
       logger.info { "Processing ${it.request().scheme()} ${it.request().method()} : ${it.request().path()} with the following data ${it.request().params().toList()}" }
       it.next()

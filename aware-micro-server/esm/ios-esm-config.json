@@ -1,0 +1,50 @@
+[
+  {
+    "schedule_id": "schedule_1",
+    "hours": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+      11,
+      12,
+      13,
+      14,
+      15,
+      16,
+      17,
+      18,
+      19,
+      20,
+      21,
+      22,
+      23
+    ],
+    "notification_title": "Schedule 1",
+    "notification_body": "Tap to answer",
+    "esms": [
+      {
+        "esm": {
+          "esm_type": 2,
+          "esm_title": "How are you feeling: okay or no",
+          "esm_instructions": "Please select one of the options:",
+          "esm_submit": "Submit",
+          "esm_trigger": "q1",
+          "esm_radios": [
+            "Yes",
+            "No"
+          ],
+          "esm_notification_timeout": 6000,
+          "esm_expiration_threshold": 6002
+        }
+      }
+    ]
+  }
+]

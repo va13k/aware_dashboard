@@ -173,7 +173,7 @@ exit /b 0
 
 :deploy_stack
 if not exist studies mkdir studies
-if not exist aware-micro-server\cache mkdir aware-micro-server\cache
+if not exist aware-micro-server\cache mkdir aware-micro-server\cache aware-micro-server\esm
 %PYTHON% setup\deploy_config.py
 if errorlevel 1 exit /b 1
 docker compose up --build -d
