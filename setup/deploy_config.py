@@ -4,6 +4,7 @@ import pathlib
 import secrets
 import subprocess
 import sys
+import uuid
 
 SCRIPT_DIR = pathlib.Path(__file__).resolve().parent
 PROJECT = pathlib.Path("/project")
@@ -22,13 +23,19 @@ from shared_config.runtime import (
     load_env,
     normalize_public_env,
 )
-from shared_config.serializers import serialize_android_config, serialize_ios_config
+from shared_config.serializers import (
+    IOS_ESM_CONFIG_FILENAME,
+    build_ios_esm_config,
+    serialize_android_config,
+    serialize_ios_config,
+)
 HTPASSWD_PATH = PROJECT / "nginx" / "auth" / ".htpasswd"
 SOURCE_PATH = PROJECT / "source.json"
 ENV_PATH = PROJECT / ".env"
 REQUEST_ENV_PATH = pathlib.Path("/tmp/aware-dashboard-request.env")
 CONFIG_PATH = PROJECT / "aware-micro-server" / "aware-config.json"
 EXAMPLE_PATH = PROJECT / "aware-micro-server" / "aware-config.example.json"
+ESM_CONFIG_PATH = PROJECT / "aware-micro-server" / "esm" / IOS_ESM_CONFIG_FILENAME
 ANDROID_TEMPLATE_PATH = PROJECT / "AWARE-Configurator" / "reactapp" / "public" / "study-config.json"
 STUDY_CONFIG_PATH = PROJECT / "studies" / "studyConfig.json"
 STUDIES_INDEX_PATH = PROJECT / "studies" / "index.html"
@@ -49,6 +56,18 @@ def ensure_django_secret_key(env: dict[str, str]) -> None:
     django_secret_key = str(env.get("DJANGO_SECRET_KEY", "")).strip()
     if not django_secret_key or django_secret_key == "CHANGE_ME":
         env["DJANGO_SECRET_KEY"] = secrets.token_urlsafe(50)
+
+
+def ensure_study_key(env: dict[str, str]) -> None:
+    study_key = str(env.get("STUDY_KEY", "")).strip()
+    if not study_key or study_key in {"CHANGE_ME", "your_study_key"}:
+        env["STUDY_KEY"] = secrets.token_urlsafe(9)
+
+
+def ensure_study_id(env: dict[str, str]) -> None:
+    study_id = str(env.get("STUDY_ID", "")).strip()
+    if not study_id or study_id in {"CHANGE_ME", "aware-default-study"}:
+        env["STUDY_ID"] = str(uuid.uuid4())
 
 
 def ensure_researcher_credentials(env: dict[str, str]) -> None:
@@ -74,6 +93,8 @@ def persist_env(env: dict[str, str]) -> None:
     ordered_keys = [
         "MYSQL_ROOT_PASSWORD",
         "DJANGO_SECRET_KEY",
+        "STUDY_KEY",
+        "STUDY_ID",
         "RESEARCHER_USERNAME",
         "RESEARCHER_PASSWORD",
         "PUBLIC_HOST",
@@ -98,6 +119,11 @@ def persist_env(env: dict[str, str]) -> None:
 
 def write_micro_config(config: dict) -> None:
     CONFIG_PATH.write_text(json.dumps(config, indent=2) + "\n", encoding="utf-8")
+
+
+def write_ios_esm_config(config: list[dict]) -> None:
+    ESM_CONFIG_PATH.parent.mkdir(parents=True, exist_ok=True)
+    ESM_CONFIG_PATH.write_text(json.dumps(config, indent=2) + "\n", encoding="utf-8")
 
 
 def write_android_config(config: dict) -> None:
@@ -150,6 +176,8 @@ def write_studies_index(base_url: str, study_join_path: str, study_join_url: str
 def main() -> None:
     env = load_merged_env()
     ensure_django_secret_key(env)
+    ensure_study_key(env)
+    ensure_study_id(env)
     ensure_researcher_credentials(env)
     env = normalize_public_env(env)
 
@@ -178,11 +206,12 @@ def main() -> None:
         }
     )
 
-    android_config = serialize_android_config(source, settings, ANDROID_TEMPLATE_PATH)
+    android_config = serialize_android_config(source, settings, ANDROID_TEMPLATE_PATH, env["STUDY_ID"])
     write_android_config(android_config)
 
-    config, study = serialize_ios_config(source, settings, EXAMPLE_PATH, CONFIG_PATH)
+    config, study = serialize_ios_config(source, settings, EXAMPLE_PATH, CONFIG_PATH, env["STUDY_KEY"])
     write_micro_config(config)
+    write_ios_esm_config(build_ios_esm_config(source))
 
     base_url, study_join_path, study_join_url = build_study_join_urls(
         str(settings["protocol"]),
