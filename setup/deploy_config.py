@@ -156,19 +156,22 @@ def render_android_study_link() -> str:
 
 
 def build_studies_index(
-    base_url: str, study_join_path: str, study_join_url: str
+    base_url: str, study_join_path: str, study_join_url: str, android_join_url: str = ""
 ) -> str:
     template = STUDIES_TEMPLATE_PATH.read_text(encoding="utf-8")
     return (
         template.replace("{{STUDY_JOIN_URL}}", html.escape(study_join_url))
         .replace("{{STUDY_JOIN_PATH}}", html.escape(study_join_path))
         .replace("{{ANDROID_STUDY_LINK}}", render_android_study_link())
+        .replace("{{ANDROID_JOIN_URL}}", html.escape(android_join_url))
     )
 
 
-def write_studies_index(base_url: str, study_join_path: str, study_join_url: str) -> None:
+def write_studies_index(
+    base_url: str, study_join_path: str, study_join_url: str, android_join_url: str = ""
+) -> None:
     STUDIES_INDEX_PATH.write_text(
-        build_studies_index(base_url, study_join_path, study_join_url),
+        build_studies_index(base_url, study_join_path, study_join_url, android_join_url),
         encoding="utf-8",
     )
 
@@ -211,17 +214,16 @@ def main() -> None:
         str(settings["public_host"]),
         int(settings["public_port"]),
     )
-    android_webservice_url = f"{base_url}/index.php/1/{env['STUDY_KEY']}"
-    android_config = serialize_android_config(source, settings, ANDROID_TEMPLATE_PATH, env["STUDY_ID"], android_webservice_url)
+    android_study_url = f"{base_url}/studies/files/{STUDY_CONFIG_PATH.name}"
+    android_config = serialize_android_config(source, settings, ANDROID_TEMPLATE_PATH, env["STUDY_ID"], android_study_url)
     write_android_config(android_config)
 
     config, study = serialize_ios_config(source, settings, EXAMPLE_PATH, CONFIG_PATH, env["STUDY_KEY"])
     write_micro_config(config)
     write_ios_esm_config(build_ios_esm_config(source))
-
     study_join_path = f"/{study['study_number']}/{study['study_key']}"
     study_join_url = f"{base_url}{study_join_path}"
-    write_studies_index(base_url, study_join_path, study_join_url)
+    write_studies_index(base_url, study_join_path, study_join_url, android_study_url)
 
 
 if __name__ == "__main__":
