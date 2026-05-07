@@ -1,0 +1,22 @@
+[
+  {
+    "schedule_id": "schedule_1",
+    "expiration": 60,
+    "hours": [9, 12, 15, 18],
+    "notification_title": "Schedule 1",
+    "notification_body": "Tap to answer",
+    "esms": [
+      {
+        "esm": {
+          "esm_type": 2,
+          "esm_title": "How are you feeling: okay or no",
+          "esm_instructions": "Please select one of the options:",
+          "esm_submit": "Submit",
+          "esm_trigger": "q1",
+          "esm_radios": ["Yes", "No"],
+          "esm_expiration_threshold": 60
+        }
+      }
+    ]
+  }
+]

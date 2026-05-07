@@ -99,10 +99,9 @@ export default function ScheduleConfiguration() {
       ...schedules,
       {
         type: SET_SCHEDULES,
-        firsthour: `08:00`,
-        lasthour: `20:00`,
-        randomCount: 6,
-        randomInterval: 15,
+        hours: {},
+        expiration: 60,
+        notification_body: "Tap to answer",
       },
     ];
     setSchedules(newQuestions);

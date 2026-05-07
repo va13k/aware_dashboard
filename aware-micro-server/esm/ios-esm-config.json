@@ -1,34 +1,35 @@
 [
   {
     "schedule_id": "schedule_1",
+    "expiration": 60,
     "hours": [
       0,
       1,
       2,
       3,
       4,
+      9,
+      8,
+      7,
       5,
       6,
-      7,
-      8,
-      9,
       10,
-      11,
       12,
+      11,
       13,
       14,
-      15,
-      16,
-      17,
-      18,
       19,
-      20,
-      21,
+      18,
+      23,
       22,
-      23
+      17,
+      16,
+      21,
+      20,
+      15
     ],
     "notification_title": "Schedule 1",
-    "notification_body": "Tap to answer",
+    "notification_body": "Please see the message",
     "esms": [
       {
         "esm": {
@@ -42,7 +43,7 @@
             "No"
           ],
           "esm_notification_timeout": 6000,
-          "esm_expiration_threshold": 6002
+          "esm_expiration_threshold": 6000
         }
       }
     ]
