@@ -294,11 +294,11 @@
       "value": false
     },
     {
-      "setting": "frequency_gps",
+      "setting": "frequency_location_gps",
       "value": 180
     },
     {
-      "setting": "frequency_network",
+      "setting": "frequency_location_network",
       "value": 300
     },
     {
@@ -348,6 +348,10 @@
     {
       "setting": "status_network_traffic",
       "value": false
+    },
+    {
+      "setting": "frequency_network_traffic",
+      "value": 30
     },
     {
       "setting": "status_processor",
@@ -408,6 +412,10 @@
     {
       "setting": "frequency_wifi",
       "value": 60
+    },
+    {
+      "setting": "status_significant_motion",
+      "value": false
     },
     {
       "setting": "status_screenshot",

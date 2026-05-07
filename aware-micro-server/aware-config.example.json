@@ -203,36 +203,6 @@
       ]
     },
     {
-      "sensor": "gravity",
-      "title": "Gravity",
-      "icon": "ic_action_gravity.png",
-      "summary": "Force of gravity as a 3D vector with direction and magnitude of gravity (m/s^2)",
-      "settings": [
-        {
-          "setting": "status_gravity",
-          "title": "Active",
-          "defaultValue": "true"
-        },
-        {
-          "setting": "frequency_gravity",
-          "title": "Sampling rate",
-          "defaultValue": "20000"
-        },
-        {
-          "setting": "threshold_gravity",
-          "title": "Sensitivity (0 = disabled)",
-          "defaultValue": "10",
-          "summary": "e.g., log only if [x,y,z] >= 0.01"
-        },
-        {
-          "setting": "frequency_gravity_enforce",
-          "title": "Enforce the frequency",
-          "defaultValue": "true",
-          "summary": "If Android gives points more often than frequency, ignore them."
-        }
-      ]
-    },
-    {
       "sensor": "gyroscope",
       "title": "Gyroscope",
       "icon": "ic_action_gyroscope.png",
