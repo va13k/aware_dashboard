@@ -72,8 +72,10 @@
       }
 
       .grid {
-        display: grid;
-        grid-template-columns: 1.1fr 0.9fr;
+        display: flex;
+        flex-wrap: nowrap;
+        justify-content: center;
+        align-items: center;
         gap: 18px;
       }
 
@@ -176,9 +178,77 @@
         word-break: break-all;
       }
 
-      @media (max-width: 900px) {
+      .copy-box {
+        position: relative;
+        padding: 12px 14px;
+        margin-bottom: 18px;
+        border-radius: 14px;
+        background: rgba(24, 48, 40, 0.05);
+        border: 1px solid var(--border);
+        cursor: pointer;
+        transition:
+          background 0.15s,
+          border-color 0.15s;
+        user-select: none;
+      }
+
+      .copy-box:hover {
+        background: var(--accent-soft);
+        border-color: var(--accent);
+      }
+
+      .copy-box code {
+        display: block;
+        font-size: 0.9rem;
+        word-break: break-all;
+        line-height: 1.5;
+        margin-bottom: 6px;
+        pointer-events: none;
+      }
+
+      .copy-hint {
+        font-size: 0.75rem;
+        color: var(--muted);
+        pointer-events: none;
+      }
+
+      .copy-toast {
+        position: fixed;
+        bottom: 28px;
+        left: 50%;
+        transform: translateX(-50%) translateY(12px);
+        background: var(--text);
+        color: white;
+        padding: 10px 20px;
+        border-radius: 12px;
+        font-size: 0.88rem;
+        font-weight: 600;
+        opacity: 0;
+        pointer-events: none;
+        transition:
+          opacity 0.18s,
+          transform 0.18s;
+        z-index: 100;
+      }
+
+      .copy-toast.show {
+        opacity: 1;
+        transform: translateX(-50%) translateY(0);
+      }
+
+      .qr-img {
+        display: block;
+        width: 200px;
+        height: 200px;
+        margin: 0 auto;
+        border-radius: 10px;
+        border: 1px solid var(--border);
+      }
+
+      @media (max-width: 600px) {
         .grid {
-          grid-template-columns: 1fr;
+          flex-direction: column;
+          align-items: stretch;
         }
       }
     </style>
@@ -189,32 +259,45 @@
         <p class="eyebrow">AWARE Dashboard</p>
         <h1>Studies</h1>
         <p class="subtitle">
-          This page combines the public Android study file with the iOS join
-          entry point. Researchers can share the Android JSON from the left card
-          and open the current iOS join page from the right card.
+          Share the Android join URL with Android participants and the iOS join
+          URL with iOS participants.
         </p>
       </section>
 
       <section class="grid">
         <article class="card">
-          <h2>Android study file</h2>
+          <h2>Android join URL</h2>
           <p>
-            The canonical Android config is listed below. Researchers can copy
-            this URL directly and share it with Android participants.
+            Copy this URL and paste it into the AWARE Android app to enrol
+            participants in the study.
           </p>
-          {{ANDROID_STUDY_LINK}}
+          <div class="copy-box" data-copy-id="android-join-url">
+            <code id="android-join-url" data-path="{{ANDROID_JOIN_URL}}"
+              >{{ANDROID_JOIN_URL}}</code
+            >
+            <span class="copy-hint">Click to copy</span>
+          </div>
         </article>
 
         <article class="card">
           <h2>iOS join URL</h2>
           <p>
-            This is the participant join endpoint generated from the current
-            micro-server study configuration.
+            Share this URL with iOS participants or let them scan the QR code
+            below with the AWARE iOS app.
           </p>
-          <a class="study-link dynamic-link" data-path="{{STUDY_JOIN_PATH}}" href="{{STUDY_JOIN_PATH}}">
-            <span>ios-study</span>
-            <code>{{STUDY_JOIN_PATH}}</code>
-          </a>
+          <div class="copy-box" data-copy-id="ios-join-url">
+            <code id="ios-join-url" data-path="{{STUDY_JOIN_PATH}}"
+              >{{STUDY_JOIN_PATH}}</code
+            >
+            <span class="copy-hint">Click to copy</span>
+          </div>
+          <img
+            id="ios-qrcode"
+            class="qr-img"
+            src=""
+            alt="iOS QR Code"
+            style="display: none"
+          />
         </article>
       </section>
 
@@ -222,18 +305,70 @@
         <a class="button button-secondary" href="/">Back to main page</a>
       </div>
     </main>
+    <div class="copy-toast" id="copy-toast">Copied!</div>
     <script>
       (function () {
         var origin = window.location.origin;
-        var links = document.querySelectorAll(".dynamic-link[data-path]");
-        for (var i = 0; i < links.length; i += 1) {
-          var link = links[i];
-          var path = link.getAttribute("data-path");
-          if (!path) continue;
-          var absoluteUrl = origin + path;
-          link.setAttribute("href", path);
-          var code = link.querySelector("code");
-          if (code) code.textContent = absoluteUrl;
+
+        // Resolve Android and iOS join URLs to absolute URLs
+        ["android-join-url", "ios-join-url"].forEach(function (id) {
+          var el = document.getElementById(id);
+          if (el) {
+            var path = el.getAttribute("data-path");
+            if (path) el.textContent = path.startsWith("http") ? path : origin + path;
+          }
+        });
+
+        // Clickable copy boxes
+        var toast = document.getElementById("copy-toast");
+        var toastTimer;
+        function showToast() {
+          clearTimeout(toastTimer);
+          toast.classList.add("show");
+          toastTimer = setTimeout(function () {
+            toast.classList.remove("show");
+          }, 2000);
+        }
+
+        function copyText(text) {
+          if (navigator.clipboard) {
+            navigator.clipboard.writeText(text).then(showToast, showToast);
+          } else {
+            var ta = document.createElement("textarea");
+            ta.value = text;
+            ta.style.cssText = "position:fixed;top:-9999px;left:-9999px";
+            document.body.appendChild(ta);
+            ta.select();
+            document.execCommand("copy");
+            document.body.removeChild(ta);
+            showToast();
+          }
+        }
+
+        var copyBoxes = document.querySelectorAll(".copy-box[data-copy-id]");
+        for (var j = 0; j < copyBoxes.length; j += 1) {
+          (function (box) {
+            box.addEventListener("click", function () {
+              var target = document.getElementById(
+                box.getAttribute("data-copy-id"),
+              );
+              if (!target) return;
+              copyText(target.textContent);
+            });
+          })(copyBoxes[j]);
+        }
+
+        // Trigger QR code generation via the micro-server and display it
+        var iosEl = document.getElementById("ios-join-url");
+        var iosPath = iosEl && iosEl.getAttribute("data-path");
+        if (iosPath) {
+          fetch(iosPath).then(function () {
+            var img = document.getElementById("ios-qrcode");
+            if (img) {
+              img.src = "/cache/qrcode.png?" + Date.now();
+              img.style.display = "block";
+            }
+          });
         }
       })();
     </script>
