@@ -354,6 +354,10 @@
       "value": false
     },
     {
+      "setting": "frequency_processor",
+      "value": 10
+    },
+    {
       "setting": "status_proximity",
       "value": false
     },
@@ -588,6 +592,46 @@
     {
       "setting": "status_webservice",
       "value": true
+    },
+    {
+      "setting": "status_mqtt",
+      "value": false
+    },
+    {
+      "setting": "mqtt_server",
+      "value": ""
+    },
+    {
+      "setting": "mqtt_port",
+      "value": 1883
+    },
+    {
+      "setting": "mqtt_username",
+      "value": ""
+    },
+    {
+      "setting": "mqtt_password",
+      "value": ""
+    },
+    {
+      "setting": "mqtt_keep_alive",
+      "value": 600
+    },
+    {
+      "setting": "mqtt_qos",
+      "value": 2
+    },
+    {
+      "setting": "webservice_simple",
+      "value": false
+    },
+    {
+      "setting": "webservice_remove_data",
+      "value": false
+    },
+    {
+      "setting": "debug_db_slow",
+      "value": false
     }
   ]
 }
