@@ -1,7 +1,7 @@
 {
   "version": 1,
   "study": {
-    "id": "0726c940dc967513",
+    "id": "9c27abb5-c78d-48c3-87ff-585b9e21b2d5",
     "title": "AWARE Default Study",
     "description": "Default study configuration generated during deployment.",
     "active": true,
@@ -37,26 +37,58 @@
   },
   "android": {
     "created_at": "",
-    "updated_at": "2026-05-04T22:50:30.733Z",
+    "updated_at": "2026-05-06T23:32:08.378Z",
     "questions": [
       {
         "esm_submit": "Submit",
         "esm_title": "How are you feeling: okay or no",
         "instructions": "Please select one of the options:",
         "esm_type": 2,
-        "esm_radios": ["Yes", "No"],
+        "esm_radios": [
+          "Yes",
+          "No"
+        ],
         "id": 1,
         "esm_notification_timeout": 6000,
-        "esm_expiration_threshold": 6002
+        "esm_expiration_threshold": 6000
       }
     ],
     "schedules": [
       {
         "title": "Schedule 1",
-        "type": "repeat",
+        "type": "interval",
         "esm_keep": false,
-        "questions": [1],
-        "repeatInterval": 1
+        "questions": [
+          1
+        ],
+        "hours": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          9,
+          8,
+          7,
+          5,
+          6,
+          10,
+          12,
+          11,
+          13,
+          14,
+          19,
+          18,
+          23,
+          22,
+          17,
+          16,
+          21,
+          20,
+          15
+        ],
+        "expiration": 60,
+        "notification_body": "Please see the message"
       }
     ],
     "settings": {
@@ -71,42 +103,43 @@
       "debug_flag": false,
       "frequency_sync_config": 1,
       "enable_config_update": false,
-      "status_notifications": false,
-      "status_crashes": false,
-      "status_keyboard": false,
-      "mask_notification": false,
-      "mask_keyboard": false,
-      "mask_touch_text": false,
-      "status_screentext": false,
+      "status_mqtt": true,
+      "status_notifications": true,
+      "status_crashes": true,
+      "status_keyboard": true,
+      "mask_notification": true,
+      "mask_keyboard": true,
+      "mask_touch_text": true,
+      "status_screentext": true,
       "package_specification": "2",
-      "package_names": "",
-      "communication": false,
-      "status_communication_events": false,
-      "status_calls": false,
-      "status_messages": false,
-      "status_installations": false,
-      "status_touch": false,
-      "location": false,
-      "status_location_gps": false,
-      "status_location_network": false,
+      "package_names": "aware_androidpacks",
+      "communication": true,
+      "status_communication_events": true,
+      "status_calls": true,
+      "status_messages": true,
+      "status_installations": true,
+      "status_touch": true,
+      "location": true,
+      "status_location_gps": true,
+      "status_location_network": true,
       "frequency_gps": 180,
       "frequency_network": 300,
       "min_location_gps_accuracy": 150,
       "min_location_network_accuracy": 1500,
       "location_expiration_time": 300,
-      "status_location_passive": false,
-      "location_save_all": false,
-      "network": false,
-      "status_network_events": false,
-      "status_network_traffic": false,
-      "status_screenshot": false,
+      "status_location_passive": true,
+      "location_save_all": true,
+      "network": true,
+      "status_network_events": true,
+      "status_network_traffic": true,
+      "status_screenshot": true,
       "capture_time_interval": 5,
       "compress_rate": 80,
-      "status_screenshot_local_storage": false,
-      "screenshot_package_names": "",
+      "status_screenshot_local_storage": true,
+      "screenshot_package_names": "androidpacks",
       "screenshot_package_specification": "2",
-      "status_notes": false,
-      "status_plugin_ambient_noise": false,
+      "status_notes": true,
+      "status_plugin_ambient_noise": true,
       "frequency_plugin_ambient_noise": 5,
       "plugin_ambient_noise_sample_size": 1024,
       "plugin_ambient_noise_silence_threshold": 50,
@@ -114,10 +147,10 @@
       "plugin_openweather_frequency": 60,
       "plugin_openweather_api_key": "",
       "plugin_openweather_measurement_units": "metric",
-      "status_plugin_google_activity_recognition": false,
+      "status_plugin_google_activity_recognition": true,
       "frequency_plugin_google_activity_recognition": 10,
       "status_plugin_sentimental": false,
-      "status_plugin_esm_scheduler": false,
+      "status_plugin_esm_scheduler": true,
       "status_plugin_fitbit": false,
       "units_plugin_fitbit": "metric",
       "fitbit_granularity": 15,
@@ -127,17 +160,17 @@
       "api_secret_plugin_fitbit": "",
       "status_plugin_sensortag": false,
       "frequency_plugin_sensortag": 1000,
-      "status_plugin_contacts": false,
+      "status_plugin_contacts": true,
       "frequency_plugin_contacts": 30,
-      "status_plugin_google_login": false,
-      "status_google_fused_location": false,
+      "status_plugin_google_login": true,
+      "status_google_fused_location": true,
       "frequency_google_fused_location": 300,
       "max_frequency_google_fused_location": 60,
       "fallback_location_timeout": 20,
       "location_sensitivity": 3,
       "accuracy_google_fused_location": 0,
-      "status_plugin_device_usage": false,
-      "status_plugin_studentlife_audio": false,
+      "status_plugin_device_usage": true,
+      "status_plugin_studentlife_audio": true,
       "plugin_conversations_delay": 5,
       "plugin_conversations_off_duty": 30,
       "plugin_conversations_length": 60,
@@ -161,43 +194,59 @@
       "barometer": false,
       "battery": false,
       "bluetooth": false,
-      "communication": false,
+      "communication": true,
       "esm": false,
       "gravity": false,
       "gyroscope": false,
-      "locations": false,
+      "locations": true,
       "light": false,
       "linear_accelerometer": false,
-      "network": false,
+      "network": true,
       "magnetometer": false,
       "processor": false,
       "timezone": false,
       "proximity": false,
       "rotation": false,
       "screen": false,
-      "significant_motion": false,
+      "significant_motion": true,
       "temperature": false,
       "telephony": false,
       "wifi": false,
       "websocket": false,
-      "mqtt": false,
+      "mqtt": true,
       "webservice": true,
       "advanced": false
     },
     "plugins": {
-      "plugin_ambient_noise": false,
-      "plugin_google_activity_recognition": false,
+      "plugin_ambient_noise": true,
+      "plugin_google_activity_recognition": true,
       "com.aware.plugin.sentimental": false,
       "plugin_openweather": false,
-      "plugin_esm_scheduler": false,
-      "plugin_ios_esm": false,
+      "plugin_esm_scheduler": true,
+      "plugin_ios_esm": true,
       "plugin_fitbit": false,
       "com.aware.plugin.sensortag": false,
-      "plugin_contacts_list": false,
-      "plugin_google_auth": false,
-      "plugin_google_fused_location": false,
-      "plugin_device_usage": false,
-      "plugin_conversations": false
+      "plugin_contacts_list": true,
+      "plugin_google_auth": true,
+      "plugin_google_fused_location": true,
+      "plugin_device_usage": true,
+      "plugin_conversations": true,
+      "plugin_calendar": true,
+      "plugin_headphone_motion": true,
+      "plugin_health_kit": true,
+      "plugin_ble_heartrate": true,
+      "plugin_ntptime": true,
+      "plugin_ios_pedometer": true,
+      "plugin_push_notification": false
+    },
+    "plugin_settings": {
+      "frequency_health_kit": 30,
+      "preperiod_days_health_kit": 7,
+      "plugin_ble_heartrate_interval_min": 1,
+      "plugin_ble_heartrate_active_time_sec": 30,
+      "frequency_ios_pedometer": 30,
+      "preperiod_days_ios_pedometer": 7,
+      "plugin_push_notification_server": ""
     }
   },
   "shared": {
@@ -208,44 +257,76 @@
           "esm_title": "How are you feeling: okay or no",
           "instructions": "Please select one of the options:",
           "esm_type": 2,
-          "esm_radios": ["Yes", "No"],
+          "esm_radios": [
+            "Yes",
+            "No"
+          ],
           "id": 1,
           "esm_notification_timeout": 6000,
-          "esm_expiration_threshold": 6002
+          "esm_expiration_threshold": 6000
         }
       ],
       "schedules": [
         {
           "title": "Schedule 1",
-          "type": "repeat",
+          "type": "interval",
           "esm_keep": false,
-          "questions": [1],
-          "repeatInterval": 1
+          "questions": [
+            1
+          ],
+          "hours": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            9,
+            8,
+            7,
+            5,
+            6,
+            10,
+            12,
+            11,
+            13,
+            14,
+            19,
+            18,
+            23,
+            22,
+            17,
+            16,
+            21,
+            20,
+            15
+          ],
+          "expiration": 60,
+          "notification_body": "Please see the message"
         }
       ]
     },
     "sensors": {
       "accelerometer": {
-        "enabled": false,
+        "enabled": true,
         "frequency": 20000,
-        "threshold": 0,
-        "enforce": false
+        "threshold": 10,
+        "enforce": true
       },
       "applications": {
-        "enabled": false,
+        "enabled": true,
         "frequency": 30
       },
       "barometer": {
-        "enabled": false,
+        "enabled": true,
         "frequency": 20000,
-        "threshold": 0,
-        "enforce": false
+        "threshold": 10,
+        "enforce": true
       },
       "battery": {
-        "enabled": false
+        "enabled": true
       },
       "bluetooth": {
-        "enabled": false,
+        "enabled": true,
         "frequency": 60
       },
       "esm": {
@@ -254,67 +335,71 @@
       "gravity": {
         "enabled": true,
         "frequency": 20000,
-        "threshold": 0,
+        "threshold": 10,
         "enforce": true
       },
       "gyroscope": {
-        "enabled": false,
+        "enabled": true,
         "frequency": 20000,
-        "threshold": 0,
+        "threshold": 10,
         "enforce": true
       },
       "light": {
-        "enabled": false,
+        "enabled": true,
         "frequency": 20000,
-        "threshold": 0,
-        "enforce": false
+        "threshold": 10,
+        "enforce": true
       },
       "linear_accelerometer": {
-        "enabled": false,
+        "enabled": true,
         "frequency": 20000,
-        "threshold": 0,
-        "enforce": false
+        "threshold": 1,
+        "enforce": true
       },
       "magnetometer": {
-        "enabled": false,
+        "enabled": true,
         "frequency": 20000,
-        "threshold": 0,
-        "enforce": false
+        "threshold": 10,
+        "enforce": true
       },
       "processor": {
-        "enabled": false
+        "enabled": true,
+        "frequency": 10
       },
       "proximity": {
-        "enabled": false,
+        "enabled": true,
         "frequency": 20000,
-        "threshold": 0,
-        "enforce": false
+        "threshold": 10,
+        "enforce": true
       },
       "rotation": {
-        "enabled": false,
+        "enabled": true,
         "frequency": 20000,
-        "threshold": 0,
-        "enforce": false
+        "threshold": 10,
+        "enforce": true
       },
       "screen": {
-        "enabled": false
+        "enabled": true
       },
       "telephony": {
-        "enabled": false
+        "enabled": true
       },
       "temperature": {
-        "enabled": false,
+        "enabled": true,
         "frequency": 20000,
-        "threshold": 0,
-        "enforce": false
+        "threshold": 10,
+        "enforce": true
       },
       "timezone": {
-        "enabled": false,
+        "enabled": true,
         "frequency": 20000
       },
       "wifi": {
-        "enabled": false,
+        "enabled": true,
         "frequency": 60
+      },
+      "significant_motion": {
+        "enabled": false
       }
     }
   }

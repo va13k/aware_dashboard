@@ -1421,6 +1421,119 @@ export default function SensorData() {
     );
   }
 
+  // eslint-disable-next-line react/no-unstable-nested-components
+  function PluginHealthKitSubContent() {
+    return (
+      <Grid container rowSpacing={1} columnSpacing={{ xs: 1, sm: 2, md: 3 }}>
+        <Grid width="10%" />
+        <Grid width="70%">
+          <FrequencyField
+            id="frequency_health_kit"
+            title="Sync Frequency"
+            inputLabel="How often to sync HealthKit data (minutes)"
+            defaultNum={30}
+            description="Frequency of HealthKit data synchronisation in minutes."
+            field="frequency_health_kit"
+            studyField={pluginData.frequency_health_kit}
+            modeState="plugin"
+          />
+          <FrequencyField
+            id="preperiod_days_health_kit"
+            title="Pre-period Days"
+            inputLabel="Days of historical data to fetch on join"
+            defaultNum={7}
+            description="Number of days of historical HealthKit data to fetch when a participant joins."
+            field="preperiod_days_health_kit"
+            studyField={pluginData.preperiod_days_health_kit}
+            modeState="plugin"
+          />
+        </Grid>
+      </Grid>
+    );
+  }
+
+  // eslint-disable-next-line react/no-unstable-nested-components
+  function PluginBLEHeartRateSubContent() {
+    return (
+      <Grid container rowSpacing={1} columnSpacing={{ xs: 1, sm: 2, md: 3 }}>
+        <Grid width="10%" />
+        <Grid width="70%">
+          <FrequencyField
+            id="plugin_ble_heartrate_interval_min"
+            title="Measurement Interval"
+            inputLabel="How often to measure heart rate (minutes)"
+            defaultNum={1}
+            description="How frequently the BLE heart rate sensor is activated for a measurement."
+            field="plugin_ble_heartrate_interval_min"
+            studyField={pluginData.plugin_ble_heartrate_interval_min}
+            modeState="plugin"
+          />
+          <FrequencyField
+            id="plugin_ble_heartrate_active_time_sec"
+            title="Active Time"
+            inputLabel="BLE sensor active duration (seconds)"
+            defaultNum={30}
+            description="How long the BLE sensor stays active to acquire each measurement."
+            field="plugin_ble_heartrate_active_time_sec"
+            studyField={pluginData.plugin_ble_heartrate_active_time_sec}
+            modeState="plugin"
+          />
+        </Grid>
+      </Grid>
+    );
+  }
+
+  // eslint-disable-next-line react/no-unstable-nested-components
+  function PluginIosPedometerSubContent() {
+    return (
+      <Grid container rowSpacing={1} columnSpacing={{ xs: 1, sm: 2, md: 3 }}>
+        <Grid width="10%" />
+        <Grid width="70%">
+          <FrequencyField
+            id="frequency_ios_pedometer"
+            title="Sync Frequency"
+            inputLabel="How often to sync pedometer data (minutes)"
+            defaultNum={30}
+            description="Frequency of pedometer data synchronisation in minutes."
+            field="frequency_ios_pedometer"
+            studyField={pluginData.frequency_ios_pedometer}
+            modeState="plugin"
+          />
+          <FrequencyField
+            id="preperiod_days_ios_pedometer"
+            title="Pre-period Days"
+            inputLabel="Days of historical data to fetch on join"
+            defaultNum={7}
+            description="Number of days of historical pedometer data to fetch when a participant joins."
+            field="preperiod_days_ios_pedometer"
+            studyField={pluginData.preperiod_days_ios_pedometer}
+            modeState="plugin"
+          />
+        </Grid>
+      </Grid>
+    );
+  }
+
+  // eslint-disable-next-line react/no-unstable-nested-components
+  function PluginPushNotificationSubContent() {
+    return (
+      <Grid container rowSpacing={1} columnSpacing={{ xs: 1, sm: 2, md: 3 }}>
+        <Grid width="10%" />
+        <Grid width="70%">
+          <PluginAPIField
+            id="plugin_push_notification_server"
+            title="Server URL"
+            inputLabel="Push notification server endpoint URL"
+            description="URL of the push notification server that delivers notifications to participants."
+            field="plugin_push_notification_server"
+            studyField={pluginData.plugin_push_notification_server}
+            modeState="plugin"
+          />
+        </Grid>
+      </Grid>
+    );
+  }
+
   return (
     <ThemeProvider theme={customisedTheme}>
       <div className="main_vertical_layout">
@@ -1588,21 +1701,7 @@ export default function SensorData() {
         </div>
 
         <div className="border">
-          <p className="title">Shared software sensors</p>
-          <SensorComponent
-            sensorName="Application"
-            sensorDescription="Application usage and incoming notifications on the device."
-            stateField={sensorData.sensor_application}
-            field="sensor_application"
-            modeState="sensor"
-          />
-
-          {sensorData.sensor_application ? (
-            SensorApplicationSubContent()
-          ) : (
-            <div />
-          )}
-
+          <p className="title">Shared sensors</p>
           <SensorComponent
             sensorName="Battery"
             sensorDescription="Battery information and power related events (phone shutting down, rebooting)."
@@ -1634,13 +1733,6 @@ export default function SensorData() {
           {sensorData.sensor_screen ? SensorScreenSubContent() : <div />}
 
           <SensorComponent
-            sensorName="Telephony"
-            sensorDescription="Information on the mobile phone capabilities of the device, connected cell towers, and neighboring towers."
-            stateField={sensorData.sensor_telephony}
-            field="sensor_telephony"
-            modeState="sensor"
-          />
-          <SensorComponent
             sensorName="Timezone"
             sensorDescription="Logs user's current timezone."
             stateField={sensorData.sensor_timezone}
@@ -1649,10 +1741,7 @@ export default function SensorData() {
           />
 
           {sensorData.sensor_timezone ? SensorTimezoneSubContent() : <div />}
-        </div>
 
-        <div className="border">
-          <p className="title">Shared hardware sensors</p>
           <SensorComponent
             sensorName="Accelerometer"
             sensorDescription="Acceleration applied to the device, including the force of gravity."
@@ -1688,16 +1777,6 @@ export default function SensorData() {
           {sensorData.sensor_bluetooth ? SensorBluetoothSubContent() : <div />}
 
           <SensorComponent
-            sensorName="Gravity"
-            sensorDescription="Force of gravity applied to the the device, provides a three dimensional vector indicating the direction and magnitude of gravity."
-            stateField={sensorData.sensor_gravity}
-            field="sensor_gravity"
-            modeState="sensor"
-          />
-
-          {sensorData.sensor_gravity ? SensorGravitySubContent() : <div />}
-
-          <SensorComponent
             sensorName="Gyroscope"
             sensorDescription="Rate or rotation in rad/s around a device’s x-, y-, and z-axis."
             stateField={sensorData.sensor_gyroscope}
@@ -1705,16 +1784,6 @@ export default function SensorData() {
             modeState="sensor"
           />
           {sensorData.sensor_gyroscope ? SensorGyroscopeSubContent() : <div />}
-
-          <SensorComponent
-            sensorName="Light"
-            sensorDescription="Level of ambient light."
-            stateField={sensorData.sensor_light}
-            field="sensor_light"
-            modeState="sensor"
-          />
-
-          {sensorData.sensor_light ? SensorLightSubContent() : <div />}
 
           <SensorComponent
             sensorName="Linear accelerometer"
@@ -1775,16 +1844,6 @@ export default function SensorData() {
           {sensorData.sensor_processor ? SensorProcessorSubContent() : <div />}
 
           <SensorComponent
-            sensorName="Proximity"
-            sensorDescription="Distance to an object in front of the device."
-            stateField={sensorData.sensor_proximity}
-            field="sensor_proximity"
-            modeState="sensor"
-          />
-
-          {sensorData.sensor_proximity ? SensorProximitySubContent() : <div />}
-
-          <SensorComponent
             sensorName="Rotation"
             sensorDescription="Orientation of the device as a combination of an angle and an axis."
             stateField={sensorData.sensor_rotation}
@@ -1793,6 +1852,57 @@ export default function SensorData() {
           />
 
           {sensorData.sensor_rotation ? SensorRotationSubContent() : <div />}
+
+          <SensorComponent
+            sensorName="Significant Motion"
+            sensorDescription="Motion co-processor signal for significant movement changes."
+            stateField={sensorData.ios_significant_motion}
+            field="ios_significant_motion"
+            modeState="sensor"
+          />
+
+          <SensorComponent
+            sensorName="Wi-Fi"
+            sensorDescription="The device’s Wi-Fi sensor, current AP, and surrounding Wi-Fi visible devices with respective RSSI dB values."
+            stateField={sensorData.sensor_wifi}
+            field="sensor_wifi"
+            modeState="sensor"
+          />
+
+          {sensorData.sensor_wifi ? SensorWifiSubContent() : <div />}
+        </div>
+
+        <div className="border">
+          <p className="title">Android-only sensors</p>
+          <SensorComponent
+            sensorName="Gravity"
+            sensorDescription="Force of gravity applied to the the device, provides a three dimensional vector indicating the direction and magnitude of gravity."
+            stateField={sensorData.sensor_gravity}
+            field="sensor_gravity"
+            modeState="sensor"
+          />
+
+          {sensorData.sensor_gravity ? SensorGravitySubContent() : <div />}
+
+          <SensorComponent
+            sensorName="Light"
+            sensorDescription="Level of ambient light."
+            stateField={sensorData.sensor_light}
+            field="sensor_light"
+            modeState="sensor"
+          />
+
+          {sensorData.sensor_light ? SensorLightSubContent() : <div />}
+
+          <SensorComponent
+            sensorName="Proximity"
+            sensorDescription="Distance to an object in front of the device."
+            stateField={sensorData.sensor_proximity}
+            field="sensor_proximity"
+            modeState="sensor"
+          />
+
+          {sensorData.sensor_proximity ? SensorProximitySubContent() : <div />}
 
           <SensorComponent
             sensorName="Temperature"
@@ -1809,18 +1919,19 @@ export default function SensorData() {
           )}
 
           <SensorComponent
-            sensorName="Wi-Fi"
-            sensorDescription="The device’s Wi-Fi sensor, current AP, and surrounding Wi-Fi visible devices with respective RSSI dB values."
-            stateField={sensorData.sensor_wifi}
-            field="sensor_wifi"
+            sensorName="Applications"
+            sensorDescription="Application usage and incoming notifications on the device."
+            stateField={sensorData.sensor_application}
+            field="sensor_application"
             modeState="sensor"
           />
 
-          {sensorData.sensor_wifi ? SensorWifiSubContent() : <div />}
-        </div>
+          {sensorData.sensor_application ? (
+            SensorApplicationSubContent()
+          ) : (
+            <div />
+          )}
 
-        <div className="border">
-          <p className="title">Android-only sensors</p>
           <SensorComponent
             sensorName="Installations"
             sensorDescription="Application installations, removal, and updates."
@@ -1830,100 +1941,10 @@ export default function SensorData() {
           />
 
           <SensorComponent
-            sensorName="Screenshot"
-            sensorDescription="Smartphone screenshot capture."
-            stateField={sensorData.sensor_screenshot}
-            field="sensor_screenshot"
-            modeState="sensor"
-          />
-          {sensorData.sensor_screenshot ? (
-            SensorScreenshotSubContent()
-          ) : (
-            <div />
-          )}
-
-          <SensorComponent
-            sensorName="Taking Note"
-            sensorDescription="Allow participants to take notes. Maximum length of each note is 10000 characters."
-            stateField={sensorData.sensor_notes}
-            field="sensor_notes"
-            modeState="sensor"
-          />
-        </div>
-
-        <div className="border">
-          <p className="title">iPhone-only sensors</p>
-          <SensorComponent
-            sensorName="Significant Motion"
-            sensorDescription="Motion co-processor signal for significant movement changes on iPhone."
-            stateField={sensorData.ios_significant_motion}
-            field="ios_significant_motion"
-            modeState="sensor"
-          />
-
-          <SensorComponent
-            sensorName="WebSocket"
-            sensorDescription="iPhone streaming transport for realtime sensor updates."
-            stateField={sensorData.ios_websocket}
-            field="ios_websocket"
-            modeState="sensor"
-          />
-
-          <SensorComponent
-            sensorName="MQTT"
-            sensorDescription="iPhone MQTT transport for realtime sensor updates."
-            stateField={sensorData.ios_mqtt}
-            field="ios_mqtt"
-            modeState="sensor"
-          />
-        </div>
-
-        <div className="border">
-          <p className="title">Shared plugins</p>
-          <SensorComponent
-            sensorName="Ambient Noise Plugin"
-            sensorDescription="Ambient noise sampling plugin for smartphones"
-            stateField={sensorData.status_plugin_ambient_noise}
-            field="status_plugin_ambient_noise"
-            modeState="sensor"
-          />
-          {sensorData.status_plugin_ambient_noise ? (
-            PluginAmbientNoiseSubContent()
-          ) : (
-            <div />
-          )}
-
-          <SensorComponent
-            sensorName="OpenWeather Plugin"
-            sensorDescription="Fetch local weather data using OpenWeather API"
-            stateField={sensorData.status_plugin_openweather}
-            field="status_plugin_openweather"
-            modeState="sensor"
-          />
-          {sensorData.status_plugin_openweather ? (
-            PluginOpenWeatherSubContent()
-          ) : (
-            <div />
-          )}
-
-          <SensorComponent
-            sensorName="Google Activity Recognition"
-            sensorDescription="Detect physical activity (walking, running, driving, etc.) using Google's activity recognition API"
-            stateField={sensorData.status_plugin_google_activity_recognition}
-            field="status_plugin_google_activity_recognition"
-            modeState="sensor"
-          />
-          {sensorData.status_plugin_google_activity_recognition ? (
-            PluginActivityRecognitionSubContent()
-          ) : (
-            <div />
-          )}
-
-          <SensorComponent
-            sensorName="Sentimental Plugin"
-            sensorDescription="Analyse sentiment from text input on the device"
-            stateField={sensorData.status_plugin_sentimental}
-            field="status_plugin_sentimental"
+            sensorName="Telephony"
+            sensorDescription="Information on the mobile phone capabilities of the device, connected cell towers, and neighboring towers."
+            stateField={sensorData.sensor_telephony}
+            field="sensor_telephony"
             modeState="sensor"
           />
 
@@ -1964,29 +1985,52 @@ export default function SensorData() {
           )}
 
           <SensorComponent
-            sensorName="Fitbit Plugin"
-            sensorDescription="Sync Fitbit wearable data (steps, heart rate, sleep) via the Fitbit API"
-            stateField={sensorData.status_plugin_fitbit}
-            field="status_plugin_fitbit"
+            sensorName="MQTT"
+            sensorDescription="MQTT transport for realtime sensor updates."
+            stateField={sensorData.status_mqtt}
+            field="status_mqtt"
             modeState="sensor"
           />
-          {sensorData.status_plugin_fitbit ? PluginFitbitSubContent() : <div />}
 
           <SensorComponent
-            sensorName="SensorTag Plugin"
-            sensorDescription="Collect data from Texas Instruments SensorTag Bluetooth devices"
-            stateField={sensorData.status_plugin_sensortag}
-            field="status_plugin_sensortag"
+            sensorName="Screenshot"
+            sensorDescription="Smartphone screenshot capture."
+            stateField={sensorData.sensor_screenshot}
+            field="sensor_screenshot"
             modeState="sensor"
           />
-          {sensorData.status_plugin_sensortag ? (
-            PluginSensorTagSubContent()
+          {sensorData.sensor_screenshot ? (
+            SensorScreenshotSubContent()
           ) : (
             <div />
           )}
 
           <SensorComponent
-            sensorName="Contacts List Plugin"
+            sensorName="Taking Note"
+            sensorDescription="Allow participants to take notes. Maximum length of each note is 10000 characters."
+            stateField={sensorData.sensor_notes}
+            field="sensor_notes"
+            modeState="sensor"
+          />
+        </div>
+
+        <div className="border">
+          <p className="title">iOS-only sensors</p>
+          <SensorComponent
+            sensorName="Activity Recognition"
+            sensorDescription="Detect physical activity (walking, running, driving, etc.) using Google's activity recognition API"
+            stateField={sensorData.status_plugin_google_activity_recognition}
+            field="status_plugin_google_activity_recognition"
+            modeState="sensor"
+          />
+          {sensorData.status_plugin_google_activity_recognition ? (
+            PluginActivityRecognitionSubContent()
+          ) : (
+            <div />
+          )}
+
+          <SensorComponent
+            sensorName="Contacts"
             sensorDescription="Periodically sync the device contacts list (hashed for privacy)"
             stateField={sensorData.status_plugin_contacts}
             field="status_plugin_contacts"
@@ -1999,7 +2043,16 @@ export default function SensorData() {
           )}
 
           <SensorComponent
-            sensorName="Google Auth Plugin"
+            sensorName="Fitbit"
+            sensorDescription="Sync Fitbit wearable data (steps, heart rate, sleep) via the Fitbit API"
+            stateField={sensorData.status_plugin_fitbit}
+            field="status_plugin_fitbit"
+            modeState="sensor"
+          />
+          {sensorData.status_plugin_fitbit ? PluginFitbitSubContent() : <div />}
+
+          <SensorComponent
+            sensorName="Google Login"
             sensorDescription="Authenticate participants with their Google account"
             stateField={sensorData.status_plugin_google_login}
             field="status_plugin_google_login"
@@ -2007,7 +2060,20 @@ export default function SensorData() {
           />
 
           <SensorComponent
-            sensorName="Google Fused Location Plugin"
+            sensorName="Conversation"
+            sensorDescription="Detect conversational audio events without recording content"
+            stateField={sensorData.status_plugin_studentlife_audio}
+            field="status_plugin_studentlife_audio"
+            modeState="sensor"
+          />
+          {sensorData.status_plugin_studentlife_audio ? (
+            PluginConversationsSubContent()
+          ) : (
+            <div />
+          )}
+
+          <SensorComponent
+            sensorName="Fused Location"
             sensorDescription="High-accuracy location using Google's fused location provider (GPS + network)"
             stateField={sensorData.status_google_fused_location}
             field="status_google_fused_location"
@@ -2020,7 +2086,7 @@ export default function SensorData() {
           )}
 
           <SensorComponent
-            sensorName="Device Usage Plugin"
+            sensorName="Device Usage"
             sensorDescription="Track app usage and screen-on/off events"
             stateField={sensorData.status_plugin_device_usage}
             field="status_plugin_device_usage"
@@ -2028,14 +2094,90 @@ export default function SensorData() {
           />
 
           <SensorComponent
-            sensorName="Conversations Plugin"
-            sensorDescription="Detect conversational audio events without recording content"
-            stateField={sensorData.status_plugin_studentlife_audio}
-            field="status_plugin_studentlife_audio"
+            sensorName="Calendar"
+            sensorDescription="Log calendar events (title, location, dates)."
+            stateField={sensorData.status_plugin_calendar}
+            field="status_plugin_calendar"
             modeState="sensor"
           />
-          {sensorData.status_plugin_studentlife_audio ? (
-            PluginConversationsSubContent()
+
+          <SensorComponent
+            sensorName="Headphone Motion"
+            sensorDescription="Log motion sensor data from AirPods and compatible headphones."
+            stateField={sensorData.status_plugin_headphone_motion}
+            field="status_plugin_headphone_motion"
+            modeState="sensor"
+          />
+
+          <SensorComponent
+            sensorName="HealthKit"
+            sensorDescription="Sync HealthKit data (steps, sleep, heart rate, workouts, etc.)."
+            stateField={sensorData.status_health_kit}
+            field="status_health_kit"
+            modeState="sensor"
+          />
+          {sensorData.status_health_kit ? PluginHealthKitSubContent() : <div />}
+
+          <SensorComponent
+            sensorName="Heart Rate (BLE)"
+            sensorDescription="Measure heart rate via a Bluetooth Low Energy wearable sensor."
+            stateField={sensorData.status_plugin_ble_heartrate}
+            field="status_plugin_ble_heartrate"
+            modeState="sensor"
+          />
+          {sensorData.status_plugin_ble_heartrate ? PluginBLEHeartRateSubContent() : <div />}
+
+          <SensorComponent
+            sensorName="NTP"
+            sensorDescription="Sync and log the device clock offset against NTP servers."
+            stateField={sensorData.status_plugin_ntptime}
+            field="status_plugin_ntptime"
+            modeState="sensor"
+          />
+
+          <SensorComponent
+            sensorName="Pedometer"
+            sensorDescription="Log step count, distance, floors climbed, and cadence via CoreMotion."
+            stateField={sensorData.status_plugin_ios_pedometer}
+            field="status_plugin_ios_pedometer"
+            modeState="sensor"
+          />
+          {sensorData.status_plugin_ios_pedometer ? PluginIosPedometerSubContent() : <div />}
+
+          <SensorComponent
+            sensorName="Push Notification"
+            sensorDescription="Enable push notification delivery to study participants."
+            stateField={sensorData.status_push_notication}
+            field="status_push_notication"
+            modeState="sensor"
+          />
+          {sensorData.status_push_notication ? PluginPushNotificationSubContent() : <div />}
+        </div>
+
+        <div className="border">
+          <p className="title">Shared plugins</p>
+          <SensorComponent
+            sensorName="Ambient Noise Plugin"
+            sensorDescription="Ambient noise sampling plugin for smartphones"
+            stateField={sensorData.status_plugin_ambient_noise}
+            field="status_plugin_ambient_noise"
+            modeState="sensor"
+          />
+          {sensorData.status_plugin_ambient_noise ? (
+            PluginAmbientNoiseSubContent()
+          ) : (
+            <div />
+          )}
+
+          <SensorComponent
+            sensorName="OpenWeather Plugin"
+            sensorDescription="Fetch local weather data using OpenWeather API"
+            stateField={sensorData.status_plugin_openweather}
+            field="status_plugin_openweather"
+            modeState="sensor"
+          />
+          {sensorData.status_plugin_openweather ? (
+            PluginOpenWeatherSubContent()
           ) : (
             <div />
           )}

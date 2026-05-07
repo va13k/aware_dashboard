@@ -7,7 +7,7 @@
     "database_pwd": "participantpass",
     "database_port": 3306,
     "server_host": "0.0.0.0",
-    "external_server_host": "http://localhost",
+    "external_server_host": "http://your-server-address",
     "external_server_port": 80,
     "server_port": 8080,
     "websocket_port": 8081,
@@ -15,15 +15,15 @@
     "path_key_pem": ""
   },
   "study": {
-    "study_key": "your_study_key",
+    "study_key": "9qFNcpdTs_CN",
     "study_number": 1,
-    "study_name": "AWARE Micro demo study",
+    "study_name": "AWARE Default Study",
     "study_active": true,
-    "study_start": 1774610378222,
-    "study_description": "This is a demo study to test AWARE Micro",
+    "study_start": 0,
+    "study_description": "Default study configuration generated during deployment.",
     "researcher_first": "First Name",
     "researcher_last": "Last Name",
-    "researcher_contact": "your@email.com"
+    "researcher_contact": "researcher@example.com"
   },
   "sensors": [
     {
@@ -35,23 +35,23 @@
         {
           "setting": "status_accelerometer",
           "title": "Activate",
-          "defaultValue": "false"
+          "defaultValue": "true"
         },
         {
           "setting": "frequency_accelerometer",
           "title": "Sampling rate",
-          "defaultValue": "200000"
+          "defaultValue": "20000"
         },
         {
           "setting": "threshold_accelerometer",
           "title": "Sensitivity (0 = disabled)",
-          "defaultValue": "0",
+          "defaultValue": "10",
           "summary": "e.g., log only if [x,y,z] >= 0.01"
         },
         {
           "setting": "frequency_accelerometer_enforce",
           "title": "Enforce the frequency",
-          "defaultValue": "false",
+          "defaultValue": "true",
           "summary": "If Android gives points more often than frequency, ignore them."
         }
       ]
@@ -65,43 +65,43 @@
         {
           "setting": "status_applications",
           "title": "Application usage",
-          "defaultValue": "false",
+          "defaultValue": "true",
           "summary": "Current visible and background applications"
         },
         {
           "setting": "frequency_applications",
           "title": "Background processes",
-          "defaultValue": "0",
+          "defaultValue": "30",
           "summary": "Update every X minute(s). 0 to disable."
         },
         {
           "setting": "status_installations",
           "title": "Application installations",
-          "defaultValue": "false",
+          "defaultValue": "true",
           "summary": "Application installs, uninstalls and updates"
         },
         {
           "setting": "status_keyboard",
           "title": "Keyboard",
-          "defaultValue": "false",
+          "defaultValue": "true",
           "summary": "Logs keyboard input (no passwords)"
         },
         {
           "setting": "mask_keyboard",
           "title": "Mask keyboard input",
-          "defaultValue": "false",
+          "defaultValue": "true",
           "summary": "Swaps all alphanumeric characters by A, a, and 1"
         },
         {
           "setting": "status_notifications",
           "title": "Application notifications",
-          "defaultValue": "false",
+          "defaultValue": "true",
           "summary": "Notifications sent by any application, without text content"
         },
         {
           "setting": "status_crashes",
           "title": "Application crashes",
-          "defaultValue": "false",
+          "defaultValue": "true",
           "summary": "Log crashes (error and ANR), with ADB trace"
         }
       ]
@@ -115,23 +115,23 @@
         {
           "setting": "status_barometer",
           "title": "Activate",
-          "defaultValue": "false"
+          "defaultValue": "true"
         },
         {
           "setting": "frequency_barometer",
           "title": "Sampling rate",
-          "defaultValue": "200000"
+          "defaultValue": "20000"
         },
         {
           "setting": "threshold_barometer",
           "title": "Sensitivity (0 = disabled)",
-          "defaultValue": "0",
+          "defaultValue": "10",
           "summary": "e.g., log only if [x,y,z] >= 0.01"
         },
         {
           "setting": "frequency_barometer_enforce",
           "title": "Enforce the frequency",
-          "defaultValue": "false",
+          "defaultValue": "true",
           "summary": "If Android gives points more often than frequency, ignore them."
         }
       ]
@@ -177,13 +177,13 @@
         {
           "setting": "status_calls",
           "title": "Call events",
-          "defaultValue": "false",
+          "defaultValue": "true",
           "summary": "Calls made, received, missed"
         },
         {
           "setting": "status_messages",
           "title": "Message events",
-          "defaultValue": "false",
+          "defaultValue": "true",
           "summary": "Sent or received SMS/MMS"
         }
       ]
@@ -197,7 +197,7 @@
         {
           "setting": "status_esm",
           "title": "Active",
-          "defaultValue": "false",
+          "defaultValue": "true",
           "summary": "Allow remote and applications ESM requests for human-based sensing"
         }
       ]
@@ -211,23 +211,23 @@
         {
           "setting": "status_gravity",
           "title": "Active",
-          "defaultValue": "false"
+          "defaultValue": "true"
         },
         {
           "setting": "frequency_gravity",
           "title": "Sampling rate",
-          "defaultValue": "200000"
+          "defaultValue": "20000"
         },
         {
           "setting": "threshold_gravity",
           "title": "Sensitivity (0 = disabled)",
-          "defaultValue": "0",
+          "defaultValue": "10",
           "summary": "e.g., log only if [x,y,z] >= 0.01"
         },
         {
           "setting": "frequency_gravity_enforce",
           "title": "Enforce the frequency",
-          "defaultValue": "false",
+          "defaultValue": "true",
           "summary": "If Android gives points more often than frequency, ignore them."
         }
       ]
@@ -241,23 +241,23 @@
         {
           "setting": "status_gyroscope",
           "title": "Active",
-          "defaultValue": "false"
+          "defaultValue": "true"
         },
         {
           "setting": "frequency_gyroscope",
           "title": "Sampling rate",
-          "defaultValue": "200000"
+          "defaultValue": "20000"
         },
         {
           "setting": "threshold_gyroscope",
           "title": "Sensitivity (0 = disabled)",
-          "defaultValue": "0",
+          "defaultValue": "10",
           "summary": "e.g., log only if [x,y,z] >= 0.01"
         },
         {
           "setting": "frequency_gyroscope_enforce",
           "title": "Enforce the frequency",
-          "defaultValue": "false",
+          "defaultValue": "true",
           "summary": "If Android gives points more often than frequency, ignore them."
         }
       ]
@@ -271,7 +271,7 @@
         {
           "setting": "status_location_gps",
           "title": "GPS",
-          "defaultValue": "false",
+          "defaultValue": "true",
           "summary": "GPS location tracking"
         },
         {
@@ -289,7 +289,7 @@
         {
           "setting": "status_location_network",
           "title": "Triangulation (cell tower and Wi-Fi)",
-          "defaultValue": "false",
+          "defaultValue": "true",
           "summary": "Triangulation location tracking"
         },
         {
@@ -307,7 +307,7 @@
         {
           "setting": "status_location_passive",
           "title": "Passive location provider",
-          "defaultValue": "false",
+          "defaultValue": "true",
           "summary": "Don't fetch locations, but use locations if other apps request them."
         },
         {
@@ -319,7 +319,7 @@
         {
           "setting": "location_save_all",
           "title": "Save all locations",
-          "defaultValue": "false",
+          "defaultValue": "true",
           "summary": "Don't use heuristics to only record best locations"
         }
       ]
@@ -333,23 +333,23 @@
         {
           "setting": "status_light",
           "title": "Active",
-          "defaultValue": "false"
+          "defaultValue": "true"
         },
         {
           "setting": "frequency_light",
           "title": "Sampling rate",
-          "defaultValue": "200000"
+          "defaultValue": "20000"
         },
         {
           "setting": "threshold_light",
           "title": "Sensitivity (0 = disabled)",
-          "defaultValue": "0",
+          "defaultValue": "10",
           "summary": "e.g., log only if [x,y,z] >= 0.01"
         },
         {
           "setting": "frequency_light_enforce",
           "title": "Enforce the frequency",
-          "defaultValue": "false",
+          "defaultValue": "true",
           "summary": "If Android gives points more often than frequency, ignore them."
         }
       ]
@@ -363,23 +363,23 @@
         {
           "setting": "status_linear_accelerometer",
           "title": "Active",
-          "defaultValue": "false"
+          "defaultValue": "true"
         },
         {
           "setting": "frequency_linear_accelerometer",
           "title": "Sampling rate",
-          "defaultValue": "200000"
+          "defaultValue": "20000"
         },
         {
           "setting": "threshold_linear_accelerometer",
           "title": "Sensitivity (0 = disabled)",
-          "defaultValue": "0",
+          "defaultValue": "1",
           "summary": "e.g., log only if [x,y,z] >= 0.01"
         },
         {
           "setting": "frequency_linear_accelerometer_enforce",
           "title": "Enforce the frequency",
-          "defaultValue": "false",
+          "defaultValue": "true",
           "summary": "If Android gives points more often than frequency, ignore them."
         }
       ]
@@ -393,13 +393,13 @@
         {
           "setting": "status_network_events",
           "title": "Network events",
-          "defaultValue": "false",
+          "defaultValue": "true",
           "summary": "Network usage states"
         },
         {
           "setting": "status_network_traffic",
           "title": "Network traffic",
-          "defaultValue": "false",
+          "defaultValue": "true",
           "summary": "Wi-Fi & mobile network traffic (bytes,packets)"
         }
       ]
@@ -408,28 +408,28 @@
       "sensor": "magnetometer",
       "title": "Magnetometer",
       "icon": "ic_action_magnetometer.png",
-      "summary": "Geomagnetic field strength around the device (\u00b5T)",
+      "summary": "Geomagnetic field strength around the device (µT)",
       "settings": [
         {
           "setting": "status_magnetometer",
           "title": "Active",
-          "defaultValue": "false"
+          "defaultValue": "true"
         },
         {
           "setting": "frequency_magnetometer",
           "title": "Sampling rate",
-          "defaultValue": "200000"
+          "defaultValue": "20000"
         },
         {
           "setting": "threshold_magnetometer",
           "title": "Sensitivity (0 = disabled)",
-          "defaultValue": "0",
+          "defaultValue": "10",
           "summary": "e.g., log only if [x,y,z] >= 0.01"
         },
         {
           "setting": "frequency_magnetometer_enforce",
           "title": "Enforce the frequency",
-          "defaultValue": "false",
+          "defaultValue": "true",
           "summary": "If Android gives points more often than frequency, ignore them."
         }
       ]
@@ -443,7 +443,7 @@
         {
           "setting": "status_processor",
           "title": "Active",
-          "defaultValue": "false"
+          "defaultValue": "true"
         },
         {
           "setting": "frequency_processor",
@@ -462,7 +462,7 @@
         {
           "setting": "status_timezone",
           "title": "Active",
-          "defaultValue": "false"
+          "defaultValue": "true"
         }
       ]
     },
@@ -475,23 +475,23 @@
         {
           "setting": "status_proximity",
           "title": "Active",
-          "defaultValue": "false"
+          "defaultValue": "true"
         },
         {
           "setting": "frequency_proximity",
           "title": "Sampling rate",
-          "defaultValue": "200000"
+          "defaultValue": "20000"
         },
         {
           "setting": "threshold_proximity",
           "title": "Sensitivity (0 = disabled)",
-          "defaultValue": "0",
+          "defaultValue": "10",
           "summary": "e.g., log only if [x,y,z] >= 0.01"
         },
         {
           "setting": "frequency_proximity_enforce",
           "title": "Enforce the frequency",
-          "defaultValue": "false",
+          "defaultValue": "true",
           "summary": "If Android gives points more often than frequency, ignore them."
         }
       ]
@@ -505,23 +505,23 @@
         {
           "setting": "status_rotation",
           "title": "Active",
-          "defaultValue": "false"
+          "defaultValue": "true"
         },
         {
           "setting": "frequency_rotation",
           "title": "Sampling rate",
-          "defaultValue": "200000"
+          "defaultValue": "20000"
         },
         {
           "setting": "threshold_rotation",
           "title": "Sensitivity (0 = disabled)",
-          "defaultValue": "0",
+          "defaultValue": "10",
           "summary": "e.g., log only if [x,y,z] >= 0.01"
         },
         {
           "setting": "frequency_rotation_enforce",
           "title": "Enforce the frequency",
-          "defaultValue": "false",
+          "defaultValue": "true",
           "summary": "If Android gives points more often than frequency, ignore them."
         }
       ]
@@ -535,19 +535,19 @@
         {
           "setting": "status_screen",
           "title": "Screen usage",
-          "defaultValue": "false",
+          "defaultValue": "true",
           "summary": "Capture screen events (on, off, locked, unlocked)"
         },
         {
           "setting": "status_touch",
           "title": "Screen interaction",
-          "defaultValue": "false",
+          "defaultValue": "true",
           "summary": "Capture clicks, long clicks and scroll up/down events"
         },
         {
           "setting": "mask_touch_text",
           "title": "Mask text in touch events",
-          "defaultValue": "false",
+          "defaultValue": "true",
           "summary": "Swaps all alphanumeric characters by A, a, and 1"
         }
       ]
@@ -561,7 +561,7 @@
         {
           "setting": "status_significant_motion",
           "title": "Active",
-          "defaultValue": "false",
+          "defaultValue": "true",
           "summary": "Log motion events. Saves battery life, stops motion sensors logs if idle!"
         }
       ]
@@ -575,23 +575,23 @@
         {
           "setting": "status_temperature",
           "title": "Active",
-          "defaultValue": "false"
+          "defaultValue": "true"
         },
         {
           "setting": "frequency_temperature",
           "title": "Sampling rate",
-          "defaultValue": "200000"
+          "defaultValue": "20000"
         },
         {
           "setting": "threshold_temperature",
           "title": "Sensitivity (0 = disabled)",
-          "defaultValue": "0",
+          "defaultValue": "10",
           "summary": "e.g., log only if [x,y,z] >= 0.01"
         },
         {
           "setting": "frequency_temperature_enforce",
           "title": "Enforce the frequency",
-          "defaultValue": "false",
+          "defaultValue": "true",
           "summary": "If Android gives points more often than frequency, ignore them."
         }
       ]
@@ -605,7 +605,7 @@
         {
           "setting": "status_telephony",
           "title": "Active",
-          "defaultValue": "false",
+          "defaultValue": "true",
           "summary": "Cell operator, current cell tower and neighbor towers"
         }
       ]
@@ -619,7 +619,7 @@
         {
           "setting": "status_wifi",
           "title": "Active",
-          "defaultValue": "false"
+          "defaultValue": "true"
         },
         {
           "setting": "frequency_wifi",
@@ -638,7 +638,7 @@
         {
           "setting": "status_websocket",
           "title": "Enable real-time streaming to AWARE Micro",
-          "defaultValue": "false"
+          "defaultValue": "true"
         }
       ]
     },
@@ -651,7 +651,7 @@
         {
           "setting": "status_mqtt",
           "title": "Connect",
-          "defaultValue": "false"
+          "defaultValue": "true"
         },
         {
           "setting": "mqtt_port",
@@ -687,7 +687,7 @@
         {
           "setting": "webservice_server",
           "title": "Study URL",
-          "defaultValue": "http://your-server/index.php/",
+          "defaultValue": "http://your-server-address/index.php/",
           "summary": "URL"
         },
         {
@@ -699,7 +699,7 @@
         {
           "setting": "fallback_network",
           "title": "Fallback to 3G after x hours",
-          "defaultValue": "0"
+          "defaultValue": "30"
         },
         {
           "setting": "webservice_charging",
@@ -710,7 +710,7 @@
         {
           "setting": "frequency_webservice",
           "title": "Sync interval (0 to disable)",
-          "defaultValue": "30",
+          "defaultValue": "1",
           "summary": "Every X minutes"
         },
         {
@@ -733,7 +733,7 @@
         {
           "setting": "foreground_priority",
           "title": "Foreground priority",
-          "defaultValue": "true",
+          "defaultValue": "false",
           "summary": "RECOMMENDED to keep AWARE running non-stop."
         }
       ]
@@ -746,7 +746,7 @@
         {
           "setting": "debug_flag",
           "title": "Debugging",
-          "defaultValue": "true",
+          "defaultValue": "false",
           "summary": "Show messages in logcat"
         },
         {
@@ -808,7 +808,7 @@
         {
           "setting": "plugin_ambient_noise_sample_size",
           "title": "How long to sample for (in seconds)",
-          "defaultValue": "30",
+          "defaultValue": "1024",
           "summary": "Listen 30 second(s)"
         },
         {
@@ -820,7 +820,7 @@
         {
           "setting": "plugin_ambient_noise_no_raw",
           "title": "Don't save raw audio",
-          "defaultValue": "true",
+          "defaultValue": "false",
           "summary": "If enabled, the audio is not recorded."
         }
       ]
@@ -832,13 +832,13 @@
         {
           "setting": "status_plugin_google_activity_recognition",
           "title": "Active",
-          "defaultValue": "true",
+          "defaultValue": "false",
           "summary": "Detects: still, on foot (walking, running), in vehicle, on bicycle"
         },
         {
           "setting": "frequency_plugin_google_activity_recognition",
           "title": "Activity recognition interval (in seconds)",
-          "defaultValue": "60",
+          "defaultValue": "10",
           "summary": "60 seconds"
         }
       ]
@@ -878,7 +878,7 @@
         {
           "setting": "api_key_plugin_openweather",
           "title": "API Key",
-          "defaultValue": "ada11fb870974565377df238f3046aa9",
+          "defaultValue": "",
           "summary": "Get your free API key from openweathermap.org"
         }
       ]
@@ -912,31 +912,31 @@
         {
           "setting": "fitbit_granularity",
           "title": "Fitbit intraday granularity",
-          "defaultValue": "15min",
+          "defaultValue": "15",
           "summary": "Every 15 minutes"
         },
         {
           "setting": "fitbit_hr_granularity",
           "title": "Heart rate granularity",
-          "defaultValue": "1sec",
+          "defaultValue": "1",
           "summary": "Every second"
         },
         {
           "setting": "plugin_fitbit_frequency",
           "title": "Update frequency",
-          "defaultValue": "15",
+          "defaultValue": "60",
           "summary": "Every 15 minute(s)"
         },
         {
           "setting": "api_key_plugin_fitbit",
           "title": "API Key",
-          "defaultValue": "227YG3",
+          "defaultValue": "",
           "summary": "API Key from developer.fitbit.com"
         },
         {
           "setting": "api_secret_plugin_fitbit",
           "title": "API Secret",
-          "defaultValue": "033ed2a3710c0cde04343d073c09e378",
+          "defaultValue": "",
           "summary": "API Secret from developer.fitbit.com"
         }
       ]
@@ -953,7 +953,7 @@
         {
           "setting": "frequency_plugin_sensortag",
           "title": "Sampling Frequency (Hz)",
-          "defaultValue": "30",
+          "defaultValue": "1000",
           "summary": "30 Hz"
         }
       ]
@@ -971,7 +971,7 @@
         {
           "setting": "frequency_plugin_contacts",
           "title": "Frequency (in days)",
-          "defaultValue": "1",
+          "defaultValue": "30",
           "summary": "Every 1 day(s)"
         }
       ]
@@ -1017,13 +1017,13 @@
         {
           "setting": "location_sensitivity",
           "title": "Motion sensitivity",
-          "defaultValue": "5",
+          "defaultValue": "3",
           "summary": "More than 5 meter(s)"
         },
         {
           "setting": "accuracy_google_fused_location",
           "title": "Location accuracy",
-          "defaultValue": "102",
+          "defaultValue": "0",
           "summary": "Medium (network + WiFi)"
         }
       ]
@@ -1053,20 +1053,162 @@
         {
           "setting": "plugin_conversations_delay",
           "title": "Delay period",
-          "defaultValue": "1",
+          "defaultValue": "5",
           "summary": "How long we wait until we start classification (in minutes)"
         },
         {
           "setting": "plugin_conversations_off_duty",
           "title": "Time between samples",
-          "defaultValue": "3",
+          "defaultValue": "30",
           "summary": "How long we wait until we sample again (in minutes)"
         },
         {
           "setting": "plugin_conversations_length",
           "title": "Recording length",
-          "defaultValue": "1",
+          "defaultValue": "60",
           "summary": "For how long we collect data for (in minutes, >= delay period)"
+        }
+      ]
+    },
+    {
+      "package_name": "com.aware.plugin.ios_esm",
+      "plugin": "plugin_ios_esm",
+      "settings": [
+        {
+          "setting": "status_plugin_ios_esm",
+          "title": "Active",
+          "defaultValue": "false"
+        },
+        {
+          "setting": "plugin_ios_esm_config_url",
+          "title": "iOS ESM Config URL",
+          "defaultValue": "http://your-server-address/esm/ios-esm-config.json"
+        }
+      ]
+    },
+    {
+      "package_name": "com.aware.plugin.calendar",
+      "plugin": "plugin_calendar",
+      "settings": [
+        {
+          "setting": "status_plugin_calendar",
+          "title": "Active",
+          "defaultValue": "false",
+          "summary": "Log calendar events (title, location, dates)"
+        }
+      ]
+    },
+    {
+      "package_name": "com.aware.plugin.headphone_motion",
+      "plugin": "plugin_headphone_motion",
+      "settings": [
+        {
+          "setting": "status_plugin_headphone_motion",
+          "title": "Active",
+          "defaultValue": "false",
+          "summary": "Log headphone motion sensor data (AirPods and compatible)"
+        }
+      ]
+    },
+    {
+      "package_name": "com.aware.plugin.health_kit",
+      "plugin": "plugin_health_kit",
+      "settings": [
+        {
+          "setting": "status_health_kit",
+          "title": "Active",
+          "defaultValue": "false",
+          "summary": "Sync HealthKit data (steps, sleep, heart rate, etc.)"
+        },
+        {
+          "setting": "frequency_health_kit",
+          "title": "Sync Frequency",
+          "defaultValue": "30",
+          "summary": "How often to sync HealthKit data (minutes)"
+        },
+        {
+          "setting": "preperiod_days_health_kit",
+          "title": "Pre-period Days",
+          "defaultValue": "7",
+          "summary": "Days of historical HealthKit data to fetch on study join"
+        }
+      ]
+    },
+    {
+      "package_name": "com.aware.plugin.ble_heartrate",
+      "plugin": "plugin_ble_heartrate",
+      "settings": [
+        {
+          "setting": "status_plugin_ble_heartrate",
+          "title": "Active",
+          "defaultValue": "false",
+          "summary": "Measure heart rate via BLE wearable"
+        },
+        {
+          "setting": "plugin_ble_heartrate_interval_min",
+          "title": "Measurement Interval",
+          "defaultValue": "1",
+          "summary": "How often to take a heart rate measurement (minutes)"
+        },
+        {
+          "setting": "plugin_ble_heartrate_active_time_sec",
+          "title": "Active Time",
+          "defaultValue": "30",
+          "summary": "How long to keep BLE sensor active per measurement (seconds)"
+        }
+      ]
+    },
+    {
+      "package_name": "com.aware.plugin.ntptime",
+      "plugin": "plugin_ntptime",
+      "settings": [
+        {
+          "setting": "status_plugin_ntptime",
+          "title": "Active",
+          "defaultValue": "false",
+          "summary": "Sync and log device clock offset against NTP servers"
+        }
+      ]
+    },
+    {
+      "package_name": "com.aware.plugin.ios_pedometer",
+      "plugin": "plugin_ios_pedometer",
+      "settings": [
+        {
+          "setting": "status_plugin_ios_pedometer",
+          "title": "Active",
+          "defaultValue": "false",
+          "summary": "Log step count, distance, floors, and cadence via CoreMotion"
+        },
+        {
+          "setting": "frequency_ios_pedometer",
+          "title": "Sync Frequency",
+          "defaultValue": "30",
+          "summary": "How often to sync pedometer data (minutes)"
+        },
+        {
+          "setting": "preperiod_days_ios_pedometer",
+          "title": "Pre-period Days",
+          "defaultValue": "7",
+          "summary": "Days of historical pedometer data to fetch on study join"
+        }
+      ]
+    },
+    {
+      "package_name": "com.aware.plugin.push_notification",
+      "plugin": "plugin_push_notification",
+      "settings": [
+        {
+          "setting": "status_push_notication",
+          "title": "Active",
+          "defaultValue": "false",
+          "summary": "Enable push notification delivery to study participants"
+        },
+        {
+          "setting": "plugin_push_notification_server",
+          "title": "Server URL",
+          "defaultValue": "",
+          "summary": "Push notification server endpoint URL"
         }
       ]
     }

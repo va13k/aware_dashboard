@@ -33,6 +33,7 @@ import {
   locationsState,
   magnetometerState,
   networkState,
+  processorState,
   proximityState,
   rotationState,
   screenSensorState,
@@ -48,11 +49,7 @@ import {
   noteState,
   pluginSensorState,
 } from "../functions/atom";
-import {
-  RANDOM_TRIGGERS,
-  REPEAT_INTERVALS,
-  SET_SCHEDULES,
-} from "../components/ScheduleComponent/ScheduleComponent";
+import { SET_SCHEDULES } from "../components/ScheduleComponent/ScheduleComponent";
 import Axios from "../functions/axiosSettings";
 
 const TYPE_MAP = {
@@ -95,6 +92,7 @@ export default function Main() {
   const createTime = useRecoilValue(createTimeState);
   const date = new Date().toJSON();
   const screenshotData = useRecoilValue(screenshotSensorState);
+  const processorData = useRecoilValue(processorState);
   const noteData = useRecoilValue(noteState);
   const pluginData = useRecoilValue(pluginSensorState);
   const [saveState, setSaveState] = useState({
@@ -206,10 +204,8 @@ export default function Main() {
     );
   }
 
-  // eslint-disable-next-line consistent-return
   function displaySensors(sensor, sensorName) {
-    if (sensor in sensorData) {
-      console.log(sensor);
+    if (sensorData[sensor]) {
       return (
         <Grid width="100%" ml="10%" mt="3%">
           <div>{sensorName}</div>
@@ -267,6 +263,13 @@ export default function Main() {
   });
 
   function buildResult() {
+    let mqttEnabled = false;
+    if (sensorData.status_mqtt !== undefined) {
+      mqttEnabled = sensorData.status_mqtt;
+    } else if (sensorData.ios_mqtt !== undefined) {
+      mqttEnabled = sensorData.ios_mqtt;
+    }
+
     return {
       _id: studyId,
       study_info: studyInformation,
@@ -293,42 +296,21 @@ export default function Main() {
         return { ...question, id: idx + 1 };
       }),
       schedules: [...schedules].map((schedule) => {
-        const newSchedule = {};
-        newSchedule.title = schedule.title;
-        newSchedule.type = schedule.type;
-        newSchedule.esm_keep = schedule.esm_keep ? schedule.esm_keep : false;
-        newSchedule.questions = normalizeScheduleQuestionIds(schedule);
-
-        if (schedule.type === SET_SCHEDULES) {
-          newSchedule.hours = [];
-          for (const key in schedule.hours) {
-            const val = schedule.hours[key];
-            // console.log(key);
-            if (val === true) {
-              newSchedule.hours.push(parseInt(key.slice(0, 2), 10));
-            }
-          }
-          newSchedule.days = [];
-          for (const key in schedule.days) {
-            const val = schedule.days[key];
-            if (val === true) {
-              newSchedule.days.push(key.toLowerCase());
-            }
+        const hours = [];
+        for (const key in schedule.hours) {
+          if (schedule.hours[key] === true) {
+            hours.push(parseInt(key.slice(0, 2), 10));
           }
         }
-
-        if (schedule.type === RANDOM_TRIGGERS) {
-          newSchedule.firsthour = schedule.firsthour;
-          newSchedule.lasthour = schedule.lasthour;
-          newSchedule.randomCount = schedule.randomCount;
-          newSchedule.randomInterval = schedule.randomInterval;
-        }
-
-        if (schedule.type === REPEAT_INTERVALS) {
-          newSchedule.repeatInterval = schedule.repeatInterval;
-        }
-
-        return newSchedule;
+        return {
+          title: schedule.title,
+          type: SET_SCHEDULES,
+          esm_keep: schedule.esm_keep ? schedule.esm_keep : false,
+          questions: normalizeScheduleQuestionIds(schedule),
+          hours,
+          expiration: schedule.expiration !== undefined ? schedule.expiration : 60,
+          notification_body: schedule.notification_body || "Tap to answer",
+        };
       }),
       sensors: [
         {
@@ -382,6 +364,10 @@ export default function Main() {
         {
           setting: "enable_config_update",
           value: sensorData.setting_update ? sensorData.setting_update : false,
+        },
+        {
+          setting: "status_mqtt",
+          value: sensorData.status_mqtt ? sensorData.status_mqtt : false,
         },
 
         // application
@@ -754,6 +740,12 @@ export default function Main() {
             ? sensorData.sensor_processor
             : false,
         },
+        {
+          setting: "frequency_processor",
+          value: processorData.frequency_processor
+            ? processorData.frequency_processor
+            : 10,
+        },
 
         // proximity
         {
@@ -1113,7 +1105,25 @@ export default function Main() {
           sensorData.ios_websocket !== undefined
             ? sensorData.ios_websocket
             : false,
-        mqtt: sensorData.ios_mqtt !== undefined ? sensorData.ios_mqtt : false,
+        mqtt: mqttEnabled,
+      },
+      ios_plugins: {
+        plugin_calendar: sensorData.status_plugin_calendar ? sensorData.status_plugin_calendar : false,
+        plugin_headphone_motion: sensorData.status_plugin_headphone_motion ? sensorData.status_plugin_headphone_motion : false,
+        plugin_health_kit: sensorData.status_health_kit ? sensorData.status_health_kit : false,
+        plugin_ble_heartrate: sensorData.status_plugin_ble_heartrate ? sensorData.status_plugin_ble_heartrate : false,
+        plugin_ntptime: sensorData.status_plugin_ntptime ? sensorData.status_plugin_ntptime : false,
+        plugin_ios_pedometer: sensorData.status_plugin_ios_pedometer ? sensorData.status_plugin_ios_pedometer : false,
+        plugin_push_notification: sensorData.status_push_notication ? sensorData.status_push_notication : false,
+      },
+      ios_plugin_settings: {
+        frequency_health_kit: pluginData.frequency_health_kit ? pluginData.frequency_health_kit : 30,
+        preperiod_days_health_kit: pluginData.preperiod_days_health_kit ? pluginData.preperiod_days_health_kit : 7,
+        plugin_ble_heartrate_interval_min: pluginData.plugin_ble_heartrate_interval_min ? pluginData.plugin_ble_heartrate_interval_min : 1,
+        plugin_ble_heartrate_active_time_sec: pluginData.plugin_ble_heartrate_active_time_sec ? pluginData.plugin_ble_heartrate_active_time_sec : 30,
+        frequency_ios_pedometer: pluginData.frequency_ios_pedometer ? pluginData.frequency_ios_pedometer : 30,
+        preperiod_days_ios_pedometer: pluginData.preperiod_days_ios_pedometer ? pluginData.preperiod_days_ios_pedometer : 7,
+        plugin_push_notification_server: pluginData.plugin_push_notification_server ? pluginData.plugin_push_notification_server : "",
       },
     };
   }
@@ -1281,67 +1291,67 @@ export default function Main() {
             <Grid width={250} ml={5} mt={3}>
               <p className="title">Shared sensors</p>
             </Grid>
-            {displaySensors("sensor_application", "Application")}
-            {displaySensors("sensor_battery", "Battery")}
-            {displaySensors("sensor_communication", "Communication")}
-            {displaySensors("sensor_screen", "Screen")}
-            {displaySensors("sensor_telephony", "Telephony")}
-            {displaySensors("sensor_timezone", "Timezone")}
-
             {displaySensors("sensor_accelerometer", "Accelerometer")}
-            {displaySensors("sensor_barometer", "Barometer")}
-            {displaySensors("sensor_bluetooth", "Bluetooth")}
-            {displaySensors("sensor_gravity", "Gravity")}
             {displaySensors("sensor_gyroscope", "Gyroscope")}
-            {displaySensors("sensor_light", "Light")}
+            {displaySensors("sensor_magnetometer", "Magnetometer")}
+            {displaySensors("sensor_rotation", "Rotation")}
             {displaySensors(
               "sensor_linear_accelerometer",
               "Linear accelerometer"
             )}
-            {displaySensors("sensor_locations", "Locations")}
-            {displaySensors("sensor_network", "Network")}
-            {displaySensors("sensor_processor", "Processor")}
-            {displaySensors("sensor_proximity", "Proximity")}
-            {displaySensors("sensor_rotation", "Rotation")}
-            {displaySensors("sensor_temperature", "Temperature")}
+            {displaySensors("sensor_barometer", "Barometer")}
+            {displaySensors("sensor_battery", "Battery")}
+            {displaySensors("sensor_bluetooth", "Bluetooth")}
             {displaySensors("sensor_wifi", "Wifi")}
-
-            <Grid width={250} ml={5} mt={3}>
-              <p className="title">Android-only sensors</p>
-            </Grid>
-            {displaySensors("sensor_installation", "Installation")}
-            {displaySensors("sensor_screenshot", "Screenshot")}
-            {displaySensors("sensor_notes", "Notes")}
-
-            <Grid width={250} ml={5} mt={3}>
-              <p className="title">iPhone-only sensors</p>
-            </Grid>
+            {displaySensors("sensor_screen", "Screen")}
+            {displaySensors("sensor_locations", "Locations")}
+            {displaySensors("sensor_processor", "Processor")}
+            {displaySensors("sensor_timezone", "Timezone")}
             {displaySensors("ios_significant_motion", "Significant Motion")}
-            {displaySensors("ios_websocket", "WebSocket")}
-            {displaySensors("ios_mqtt", "MQTT")}
+            {displaySensors("sensor_network", "Network")}
+            {displaySensors("sensor_communication", "Communication")}
 
             <Grid width={250} ml={5} mt={3}>
               <p className="title">Shared plugins</p>
             </Grid>
-
             {displaySensors("status_plugin_ambient_noise", "Ambient Noise")}
             {displaySensors("status_plugin_openweather", "OpenWeather")}
+
+            <Grid width={250} ml={5} mt={3}>
+              <p className="title">Android-only sensors</p>
+            </Grid>
+            {displaySensors("sensor_gravity", "Gravity")}
+            {displaySensors("sensor_light", "Light")}
+            {displaySensors("sensor_proximity", "Proximity")}
+            {displaySensors("sensor_temperature", "Temperature")}
+            {displaySensors("sensor_application", "Applications")}
+            {displaySensors("sensor_installation", "Installation")}
+            {displaySensors("sensor_telephony", "Telephony")}
+            {displaySensors("sensor_screenshot", "Screenshot")}
+            {displaySensors("sensor_notes", "Notes")}
+            {displaySensors("status_plugin_esm_scheduler", "ESM Scheduler")}
+            {displaySensors("status_mqtt", "MQTT")}
+
+            <Grid width={250} ml={5} mt={3}>
+              <p className="title">iOS-only sensors</p>
+            </Grid>
             {displaySensors(
               "status_plugin_google_activity_recognition",
               "Activity Recognition"
             )}
-            {displaySensors("status_plugin_sentimental", "Sentimental")}
-            {displaySensors("status_plugin_esm_scheduler", "ESM Scheduler")}
             {displaySensors("status_plugin_fitbit", "Fitbit")}
-            {displaySensors("status_plugin_sensortag", "SensorTag")}
-            {displaySensors("status_plugin_contacts", "Contacts List")}
-            {displaySensors("status_plugin_google_login", "Google Auth")}
-            {displaySensors(
-              "status_google_fused_location",
-              "Google Fused Location"
-            )}
+            {displaySensors("status_plugin_contacts", "Contacts")}
+            {displaySensors("status_plugin_google_login", "Google Login")}
+            {displaySensors("status_google_fused_location", "Fused Location")}
             {displaySensors("status_plugin_device_usage", "Device Usage")}
-            {displaySensors("status_plugin_studentlife_audio", "Conversations")}
+            {displaySensors("status_plugin_studentlife_audio", "Conversation")}
+            {displaySensors("status_plugin_calendar", "Calendar")}
+            {displaySensors("status_plugin_headphone_motion", "Headphone Motion")}
+            {displaySensors("status_health_kit", "HealthKit")}
+            {displaySensors("status_plugin_ble_heartrate", "Heart Rate (BLE)")}
+            {displaySensors("status_plugin_ntptime", "NTP")}
+            {displaySensors("status_plugin_ios_pedometer", "Pedometer")}
+            {displaySensors("status_push_notication", "Push Notification")}
 
             <Grid
               container

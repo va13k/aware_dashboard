@@ -19,6 +19,7 @@ import {
   locationsState,
   magnetometerState,
   networkState,
+  processorState,
   proximityState,
   rotationState,
   screenSensorState,
@@ -34,11 +35,7 @@ import {
   pluginSensorState,
 } from "../functions/atom";
 import Axios from "../functions/axiosSettings";
-import {
-  RANDOM_TRIGGERS,
-  REPEAT_INTERVALS,
-  SET_SCHEDULES,
-} from "../components/ScheduleComponent/ScheduleComponent";
+import { SET_SCHEDULES } from "../components/ScheduleComponent/ScheduleComponent";
 import { padding } from "../functions/utils";
 
 const STUDY_CONFIG_URL = "/studies/files/studyConfig.json";
@@ -79,6 +76,7 @@ export default function Upload() {
   const setTimezoneData = useSetRecoilState(timezoneState);
   const setCommunicationData = useSetRecoilState(communicationSensorState);
   const setScreenshotData = useSetRecoilState(screenshotSensorState);
+  const setProcessorData = useSetRecoilState(processorState);
   const setPluginData = useSetRecoilState(pluginSensorState);
   const [loadState, setLoadState] = useState({
     status: "loading",
@@ -106,8 +104,10 @@ export default function Upload() {
       jsonValue.schedules.map((schedule) => {
         const newSchedule = {};
         newSchedule.title = schedule.title;
-        newSchedule.type = schedule.type;
+        newSchedule.type = SET_SCHEDULES;
         newSchedule.esm_keep = schedule.esm_keep;
+        newSchedule.expiration = schedule.expiration !== undefined ? schedule.expiration : 60;
+        newSchedule.notification_body = schedule.notification_body || "Tap to answer";
         newSchedule.questions = {};
         for (let i = 0; i < jsonValue.questions.length; i += 1) {
           const question = jsonValue.questions[i];
@@ -120,31 +120,11 @@ export default function Upload() {
           }
         }
 
-        if (schedule.type === SET_SCHEDULES) {
-          newSchedule.hours = {};
-          for (let i = 0; i < schedule.hours.length; i += 1) {
-            const hour = schedule.hours[i];
-            newSchedule.hours[`${padding(hour, 2)}:00`] = true;
-          }
-
-          newSchedule.days = {};
-          for (let i = 0; i < schedule.days.length; i += 1) {
-            const day = schedule.days[i];
-            newSchedule.days[
-              day.slice(0, 1).toUpperCase() + day.slice(1).toLowerCase()
-            ] = true;
-          }
-        }
-
-        if (schedule.type === RANDOM_TRIGGERS) {
-          newSchedule.firsthour = schedule.firsthour;
-          newSchedule.lasthour = schedule.lasthour;
-          newSchedule.randomCount = schedule.randomCount;
-          newSchedule.randomInterval = schedule.randomInterval;
-        }
-
-        if (schedule.type === REPEAT_INTERVALS) {
-          newSchedule.repeatInterval = schedule.repeatInterval;
+        newSchedule.hours = {};
+        const hoursSource = Array.isArray(schedule.hours) ? schedule.hours : [];
+        for (let i = 0; i < hoursSource.length; i += 1) {
+          const hour = hoursSource[i];
+          newSchedule.hours[`${padding(hour, 2)}:00`] = true;
         }
 
         return newSchedule;
@@ -171,8 +151,11 @@ export default function Upload() {
     const timezoneData = {};
     const communicationData = {};
     const screenshotData = {};
+    const processorData = {};
     const pluginData = {};
     const iosSensors = jsonValue.ios_sensors || {};
+    const iosPlugins = jsonValue.ios_plugins || {};
+    const iosPluginSettings = jsonValue.ios_plugin_settings || {};
 
     sensorData.ios_significant_motion =
       iosSensors.significant_motion !== undefined
@@ -182,6 +165,22 @@ export default function Upload() {
       iosSensors.websocket !== undefined ? iosSensors.websocket : false;
     sensorData.ios_mqtt =
       iosSensors.mqtt !== undefined ? iosSensors.mqtt : false;
+
+    sensorData.status_plugin_calendar = iosPlugins.plugin_calendar !== undefined ? iosPlugins.plugin_calendar : false;
+    sensorData.status_plugin_headphone_motion = iosPlugins.plugin_headphone_motion !== undefined ? iosPlugins.plugin_headphone_motion : false;
+    sensorData.status_health_kit = iosPlugins.plugin_health_kit !== undefined ? iosPlugins.plugin_health_kit : false;
+    sensorData.status_plugin_ble_heartrate = iosPlugins.plugin_ble_heartrate !== undefined ? iosPlugins.plugin_ble_heartrate : false;
+    sensorData.status_plugin_ntptime = iosPlugins.plugin_ntptime !== undefined ? iosPlugins.plugin_ntptime : false;
+    sensorData.status_plugin_ios_pedometer = iosPlugins.plugin_ios_pedometer !== undefined ? iosPlugins.plugin_ios_pedometer : false;
+    sensorData.status_push_notication = iosPlugins.plugin_push_notification !== undefined ? iosPlugins.plugin_push_notification : false;
+
+    if (iosPluginSettings.frequency_health_kit !== undefined) pluginData.frequency_health_kit = iosPluginSettings.frequency_health_kit;
+    if (iosPluginSettings.preperiod_days_health_kit !== undefined) pluginData.preperiod_days_health_kit = iosPluginSettings.preperiod_days_health_kit;
+    if (iosPluginSettings.plugin_ble_heartrate_interval_min !== undefined) pluginData.plugin_ble_heartrate_interval_min = iosPluginSettings.plugin_ble_heartrate_interval_min;
+    if (iosPluginSettings.plugin_ble_heartrate_active_time_sec !== undefined) pluginData.plugin_ble_heartrate_active_time_sec = iosPluginSettings.plugin_ble_heartrate_active_time_sec;
+    if (iosPluginSettings.frequency_ios_pedometer !== undefined) pluginData.frequency_ios_pedometer = iosPluginSettings.frequency_ios_pedometer;
+    if (iosPluginSettings.preperiod_days_ios_pedometer !== undefined) pluginData.preperiod_days_ios_pedometer = iosPluginSettings.preperiod_days_ios_pedometer;
+    if (iosPluginSettings.plugin_push_notification_server !== undefined) pluginData.plugin_push_notification_server = iosPluginSettings.plugin_push_notification_server;
 
     for (let i = 0; i < jsonValue.sensors.length; i += 1) {
       const { setting, value } = jsonValue.sensors[i];
@@ -218,6 +217,9 @@ export default function Upload() {
           break;
         case "enable_config_update":
           sensorData.setting_update = value;
+          break;
+        case "status_mqtt":
+          sensorData.status_mqtt = value;
           break;
         case "status_applications":
           sensorData.sensor_application = value;
@@ -400,10 +402,10 @@ export default function Upload() {
           magnetometerData.frequency_magnetometer = value;
           break;
         case "threshold_magnetometer":
-          magnetometerData.threshold_magnetometer = value;
+          magnetometerData.threshold = value;
           break;
         case "frequency_magnetometer_enforce":
-          magnetometerData.frequency_magnetometer_enforce = value;
+          magnetometerData.enforce = value;
           break;
         case "network":
           sensorData.sensor_network = value;
@@ -416,6 +418,9 @@ export default function Upload() {
           break;
         case "status_processor":
           sensorData.sensor_processor = value;
+          break;
+        case "frequency_processor":
+          processorData.frequency_processor = value;
           break;
         case "status_proximity":
           sensorData.sensor_proximity = value;
@@ -616,6 +621,7 @@ export default function Upload() {
     setTimezoneData(timezoneData);
     setCommunicationData(communicationData);
     setScreenshotData(screenshotData);
+    setProcessorData(processorData);
     setPluginData(pluginData);
     navigateTo("/study/study_information");
   };

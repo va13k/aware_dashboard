@@ -22,7 +22,7 @@ COMMON_SHARED_SENSOR_FIELDS: dict[str, tuple[str, ...]] = {
     "light": ("enabled", "frequency", "threshold", "enforce"),
     "linear_accelerometer": ("enabled", "frequency", "threshold", "enforce"),
     "magnetometer": ("enabled", "frequency", "threshold", "enforce"),
-    "processor": ("enabled",),
+    "processor": ("enabled", "frequency"),
     "proximity": ("enabled", "frequency", "threshold", "enforce"),
     "rotation": ("enabled", "frequency", "threshold", "enforce"),
     "screen": ("enabled",),
@@ -187,6 +187,7 @@ def build_ios_esm_config(source: dict) -> list[dict]:
     for index, schedule in enumerate(schedules):
         schedule_output = {
             "schedule_id": schedule.get("schedule_id") or f"schedule_{index + 1}",
+            "expiration": schedule.get("expiration", 60),
             "hours": ios_esm_schedule_hours(schedule),
             "notification_title": schedule.get("notification_title")
             or schedule.get("title")
@@ -310,6 +311,9 @@ _ANDROID_TO_IOS_DIRECT = frozenset({
     "webservice_wifi_only", "webservice_charging", "frequency_webservice",
     "frequency_clean_old_data", "webservice_silent", "fallback_network",
     "remind_to_charge", "foreground_priority",
+    "webservice_simple", "webservice_remove_data", "debug_db_slow",
+    "status_mqtt", "mqtt_server", "mqtt_port", "mqtt_username",
+    "mqtt_password", "mqtt_keep_alive", "mqtt_qos",
     # debug
     "debug_flag",
     # applications
@@ -451,6 +455,7 @@ def serialize_android_config(
     settings: dict[str, str | int],
     template_path: pathlib.Path,
     study_id: str = "",
+    webservice_server: str = "",
 ) -> dict:
     config = load_android_template(template_path)
     study = source["study"]
@@ -493,6 +498,15 @@ def serialize_android_config(
         for sensor_name in IOS_ONLY_SENSOR_NAMES
     }
     update_sensor_settings(config["sensors"], android_settings)
+    if webservice_server:
+        existing = next(
+            (s for s in config["sensors"] if s.get("setting") == "webservice_server"),
+            None,
+        )
+        if existing is None:
+            config["sensors"].append({"setting": "webservice_server", "value": webservice_server})
+        else:
+            existing["value"] = webservice_server
     return config
 
 

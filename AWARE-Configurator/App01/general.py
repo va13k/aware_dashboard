@@ -13,7 +13,7 @@ if PROJECT_ROOT.exists() and str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 from shared_config.source_store import update_source
-from shared_config.runtime import get_runtime_settings, load_env, normalize_public_env
+from shared_config.runtime import build_public_base_url, get_runtime_settings, load_env, normalize_public_env
 from shared_config.serializers import (
     COMMON_SHARED_SENSOR_FIELDS,
     IOS_ESM_CONFIG_FILENAME,
@@ -22,6 +22,7 @@ from shared_config.serializers import (
     build_sensor_setting_name,
     serialize_android_config,
     serialize_ios_config,
+    update_ios_plugin_settings,
 )
 
 logger = logging.getLogger(__name__)
@@ -186,7 +187,24 @@ def update_source_from_android_config(source, content):
     sync_shared_sensors_from_android_settings(source, android_settings)
     source["android"]["settings"] = android_settings
     sync_ios_only_sensors_from_config(source, content.get("ios_sensors", {}))
+    sync_ios_plugins_from_config(source, content.get("ios_plugins", {}))
+    sync_ios_plugin_settings_from_config(source, content.get("ios_plugin_settings", {}))
     return source
+
+
+def sync_ios_plugins_from_config(source, ios_plugins):
+    if not isinstance(ios_plugins, dict):
+        return
+    plugins = source.setdefault("ios", {}).setdefault("plugins", {})
+    for plugin_name, enabled in ios_plugins.items():
+        plugins[plugin_name] = bool(enabled)
+
+
+def sync_ios_plugin_settings_from_config(source, ios_plugin_settings):
+    if not isinstance(ios_plugin_settings, dict):
+        return
+    plugin_settings = source.setdefault("ios", {}).setdefault("plugin_settings", {})
+    plugin_settings.update(ios_plugin_settings)
 
 
 def sync_ios_only_sensors_from_config(source, ios_sensor_settings):
@@ -286,13 +304,22 @@ def build_ios_settings(source):
 
 def write_outputs(source):
     settings = build_ios_settings(source)
-    android_config = serialize_android_config(source, settings, ANDROID_TEMPLATE_PATH)
-    ios_config, _study = serialize_ios_config(
+    ios_config, study = serialize_ios_config(
         source,
         settings,
         IOS_EXAMPLE_PATH,
         IOS_CONFIG_PATH,
     )
+    ios_plugin_settings = source.get("ios", {}).get("plugin_settings", {})
+    if ios_plugin_settings:
+        update_ios_plugin_settings(ios_config.get("plugins", []), ios_plugin_settings)
+    base_url = build_public_base_url(
+        str(settings["protocol"]),
+        str(settings["public_host"]),
+        int(settings["public_port"]),
+    )
+    android_webservice_url = f"{base_url}/index.php/{study['study_number']}/{study['study_key']}"
+    android_config = serialize_android_config(source, settings, ANDROID_TEMPLATE_PATH, webservice_server=android_webservice_url)
     ios_esm_config = build_ios_esm_config(source)
     write_json(STUDY_CONFIG_PATH, android_config)
     write_json(IOS_CONFIG_PATH, ios_config)
