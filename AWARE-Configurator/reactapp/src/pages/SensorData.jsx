@@ -743,6 +743,17 @@ export default function SensorData() {
             field="traffic"
             modeState="network"
           />
+
+          <FrequencyField
+            id="frequency_network_traffic"
+            title="Network traffic frequency"
+            inputLabel="frequency in seconds"
+            defaultNum={30}
+            description="How often to record network traffic data (default 30 seconds)."
+            field="frequency_network_traffic"
+            studyField={networkData.frequency_network_traffic}
+            modeState="network"
+          />
         </Grid>
       </Grid>
     );
@@ -1876,7 +1887,7 @@ export default function SensorData() {
           <p className="title">Android-only sensors</p>
           <SensorComponent
             sensorName="Gravity"
-            sensorDescription="Force of gravity applied to the the device, provides a three dimensional vector indicating the direction and magnitude of gravity."
+            sensorDescription="Force of gravity applied to the device, provides a three dimensional vector indicating the direction and magnitude of gravity."
             stateField={sensorData.sensor_gravity}
             field="sensor_gravity"
             modeState="sensor"
@@ -2098,6 +2109,14 @@ export default function SensorData() {
             sensorDescription="Log calendar events (title, location, dates)."
             stateField={sensorData.status_plugin_calendar}
             field="status_plugin_calendar"
+            modeState="sensor"
+          />
+
+          <SensorComponent
+            sensorName="Google Calendar ESM"
+            sensorDescription="Schedule ESM questionnaires using iOS calendar events (Google Calendar ESM scheduler)."
+            stateField={sensorData.status_ios_esm_scheduler}
+            field="status_ios_esm_scheduler"
             modeState="sensor"
           />
 

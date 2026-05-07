@@ -663,13 +663,13 @@ export default function Main() {
           value: locationsData.network ? locationsData.network : false,
         },
         {
-          setting: "frequency_gps",
+          setting: "frequency_location_gps",
           value: locationsData.frequency_gps
             ? locationsData.frequency_gps
             : 180,
         },
         {
-          setting: "frequency_network",
+          setting: "frequency_location_network",
           value: locationsData.frequency_network
             ? locationsData.frequency_network
             : 300,
@@ -731,6 +731,12 @@ export default function Main() {
         {
           setting: "status_network_traffic",
           value: networkData.traffic ? networkData.traffic : false,
+        },
+        {
+          setting: "frequency_network_traffic",
+          value: networkData.frequency_network_traffic
+            ? networkData.frequency_network_traffic
+            : 30,
         },
 
         // processor
@@ -1092,6 +1098,13 @@ export default function Main() {
             ? pluginData.plugin_ambient_noise_no_raw
             : false,
         },
+        // significant motion (shared: controls both Android and iOS)
+        {
+          setting: "status_significant_motion",
+          value: sensorData.ios_significant_motion !== undefined
+            ? sensorData.ios_significant_motion
+            : false,
+        },
         // default sensors
         { setting: "status_esm", value: true },
         { setting: "status_webservice", value: true },
@@ -1109,6 +1122,7 @@ export default function Main() {
       },
       ios_plugins: {
         plugin_calendar: sensorData.status_plugin_calendar ? sensorData.status_plugin_calendar : false,
+        plugin_esm_scheduler: sensorData.status_ios_esm_scheduler ? sensorData.status_ios_esm_scheduler : false,
         plugin_headphone_motion: sensorData.status_plugin_headphone_motion ? sensorData.status_plugin_headphone_motion : false,
         plugin_health_kit: sensorData.status_health_kit ? sensorData.status_health_kit : false,
         plugin_ble_heartrate: sensorData.status_plugin_ble_heartrate ? sensorData.status_plugin_ble_heartrate : false,

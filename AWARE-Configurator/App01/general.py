@@ -230,7 +230,6 @@ _ANDROID_STATUS_TO_IOS_PLUGIN = {
     "status_plugin_google_activity_recognition": "plugin_google_activity_recognition",
     "status_plugin_sentimental": "com.aware.plugin.sentimental",
     "status_plugin_openweather": "plugin_openweather",
-    "status_plugin_esm_scheduler": "plugin_esm_scheduler",
     "status_plugin_fitbit": "plugin_fitbit",
     "status_plugin_sensortag": "com.aware.plugin.sensortag",
     "status_plugin_contacts": "plugin_contacts_list",

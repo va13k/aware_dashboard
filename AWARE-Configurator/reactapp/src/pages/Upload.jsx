@@ -167,6 +167,7 @@ export default function Upload() {
       iosSensors.mqtt !== undefined ? iosSensors.mqtt : false;
 
     sensorData.status_plugin_calendar = iosPlugins.plugin_calendar !== undefined ? iosPlugins.plugin_calendar : false;
+    sensorData.status_ios_esm_scheduler = iosPlugins.plugin_esm_scheduler !== undefined ? iosPlugins.plugin_esm_scheduler : false;
     sensorData.status_plugin_headphone_motion = iosPlugins.plugin_headphone_motion !== undefined ? iosPlugins.plugin_headphone_motion : false;
     sensorData.status_health_kit = iosPlugins.plugin_health_kit !== undefined ? iosPlugins.plugin_health_kit : false;
     sensorData.status_plugin_ble_heartrate = iosPlugins.plugin_ble_heartrate !== undefined ? iosPlugins.plugin_ble_heartrate : false;
@@ -374,10 +375,10 @@ export default function Upload() {
         case "status_location_network":
           locationsData.network = value;
           break;
-        case "frequency_gps":
+        case "frequency_location_gps":
           locationsData.frequency_gps = value;
           break;
-        case "frequency_network":
+        case "frequency_location_network":
           locationsData.frequency_network = value;
           break;
         case "min_location_gps_accuracy":
@@ -415,6 +416,12 @@ export default function Upload() {
           break;
         case "status_network_traffic":
           networkData.traffic = value;
+          break;
+        case "frequency_network_traffic":
+          networkData.frequency_network_traffic = value;
+          break;
+        case "status_significant_motion":
+          sensorData.ios_significant_motion = value;
           break;
         case "status_processor":
           sensorData.sensor_processor = value;
