@@ -94,10 +94,10 @@ SOURCE = {
             "status_battery": True,
             "status_screen": False,
             "status_location_gps": True,
-            "frequency_gps": 180,
+            "frequency_location_gps": 180,
             "min_location_gps_accuracy": 150,
             "status_location_network": False,
-            "frequency_network": 300,
+            "frequency_location_network": 300,
             "min_location_network_accuracy": 1500,
             "status_location_passive": False,
             "location_expiration_time": 300,
@@ -235,9 +235,13 @@ def android_template(tmp_path):
             {"setting": "status_battery", "value": False},
             {"setting": "status_screen", "value": False},
             {"setting": "status_location_gps", "value": False},
-            {"setting": "frequency_gps", "value": 180},
+            {"setting": "frequency_location_gps", "value": 180},
+            {"setting": "status_location_network", "value": False},
+            {"setting": "frequency_location_network", "value": 300},
             {"setting": "status_network_events", "value": False},
             {"setting": "status_network_traffic", "value": False},
+            {"setting": "frequency_network_traffic", "value": 30},
+            {"setting": "status_significant_motion", "value": False},
             {"setting": "status_calls", "value": False},
             {"setting": "status_messages", "value": False},
             {"setting": "status_plugin_esm_scheduler", "value": False},
@@ -789,3 +793,211 @@ class TestSourceJsonCoverage:
         }
         for sensor_name in expected:
             assert sensor_name in sensors, f"shared.sensors missing {sensor_name}"
+
+
+# ===========================================================================
+# Gravity sensor — Android-only
+# ===========================================================================
+
+class TestGravitySensor:
+    """Gravity is Android-only: iOS receives no gravity settings."""
+
+    GRAVITY = {
+        "enabled": True,
+        "frequency": 20000,
+        "threshold": 10,
+        "enforce": True,
+    }
+
+    def test_gravity_not_in_common_shared_sensor_fields(self):
+        assert "gravity" not in COMMON_SHARED_SENSOR_FIELDS
+
+    def test_gravity_not_in_ios_sensor_settings(self, source):
+        source["shared"]["sensors"]["gravity"] = self.GRAVITY
+        result = build_ios_sensor_settings(source)
+        assert "status_gravity" not in result
+        assert "frequency_gravity" not in result
+        assert "threshold_gravity" not in result
+        assert "frequency_gravity_enforce" not in result
+
+    def test_gravity_in_android_config(self, source, settings, android_template):
+        source["android"]["settings"]["status_gravity"] = True
+        source["android"]["settings"]["frequency_gravity"] = 20000
+        source["android"]["settings"]["threshold_gravity"] = 10
+        source["android"]["settings"]["frequency_gravity_enforce"] = True
+        template = json.loads(android_template.read_text())
+        template["sensors"] += [
+            {"setting": "status_gravity", "value": False},
+            {"setting": "frequency_gravity", "value": 200000},
+            {"setting": "threshold_gravity", "value": 0},
+            {"setting": "frequency_gravity_enforce", "value": False},
+        ]
+        android_template.write_text(json.dumps(template))
+
+        config = serialize_android_config(source, settings, android_template)
+        assert sensor_value(config, "status_gravity") is True
+        assert sensor_value(config, "frequency_gravity") == 20000
+        assert sensor_value(config, "threshold_gravity") == 10
+        assert sensor_value(config, "frequency_gravity_enforce") is True
+
+    def test_gravity_not_written_to_ios_config(
+        self, source, settings, ios_existing, tmp_path
+    ):
+        source["shared"]["sensors"]["gravity"] = self.GRAVITY
+        example = {
+            "server": {
+                "database_engine": "mysql",
+                "database_host": "localhost",
+                "database_name": "aware_ios",
+                "database_user": "u",
+                "database_pwd": "p",
+                "database_port": 3306,
+                "server_host": "0.0.0.0",
+                "external_server_host": "http://localhost",
+                "external_server_port": 80,
+                "server_port": 8080,
+                "websocket_port": 8081,
+                "path_fullchain_pem": "",
+                "path_key_pem": "",
+            },
+            "study": {
+                "study_key": "placeholder",
+                "study_number": 1,
+                "study_name": "",
+                "study_active": True,
+                "study_start": 0,
+                "study_description": "",
+                "researcher_first": "",
+                "researcher_last": "",
+                "researcher_contact": "",
+            },
+            "sensors": [],
+            "plugins": [],
+        }
+        example_path = tmp_path / "aware-config-no-gravity.example.json"
+        example_path.write_text(json.dumps(example))
+
+        config, _ = serialize_ios_config(source, settings, example_path, ios_existing)
+        sensor_names = [s.get("sensor") for s in config.get("sensors", [])]
+        assert "gravity" not in sensor_names
+
+    def test_gravity_disabled_in_source_json_ios(self):
+        """Verify the real source.json marks gravity as disabled for iOS."""
+        source_path = pathlib.Path(__file__).resolve().parent.parent / "source.json"
+        real_source = json.loads(source_path.read_text(encoding="utf-8"))
+        ios_gravity = real_source["ios"]["sensors"].get("gravity")
+        assert ios_gravity is False, "ios.sensors.gravity should be False in source.json"
+
+
+# ===========================================================================
+# Android config correctness — key names and presence
+# ===========================================================================
+
+def _android_setting(config: dict, key: str):
+    """Return the value of a named setting in the Android config sensors list."""
+    for item in config.get("sensors", []):
+        if item.get("setting") == key:
+            return item["value"]
+    raise KeyError(f"Setting '{key}' not found in Android config")
+
+
+def _android_has(config: dict, key: str) -> bool:
+    return any(item.get("setting") == key for item in config.get("sensors", []))
+
+
+class TestAndroidConfigCorrectness:
+    """Verify that serialize_android_config produces correct setting keys and values."""
+
+    def test_frequency_location_gps_key_correct(self, source, settings, android_template):
+        source["android"]["settings"]["frequency_location_gps"] = 120
+        template = json.loads(android_template.read_text())
+        android_template.write_text(json.dumps(template))
+        config = serialize_android_config(source, settings, android_template)
+        assert _android_has(config, "frequency_location_gps"), \
+            "frequency_location_gps must be present (not frequency_gps)"
+        assert not _android_has(config, "frequency_gps"), \
+            "frequency_gps must NOT appear in Android config"
+        assert _android_setting(config, "frequency_location_gps") == 120
+
+    def test_frequency_location_network_key_correct(self, source, settings, android_template):
+        source["android"]["settings"]["frequency_location_network"] = 240
+        config = serialize_android_config(source, settings, android_template)
+        assert _android_has(config, "frequency_location_network"), \
+            "frequency_location_network must be present (not frequency_network)"
+        assert not _android_has(config, "frequency_network"), \
+            "frequency_network must NOT appear in Android config"
+        assert _android_setting(config, "frequency_location_network") == 240
+
+    def test_status_significant_motion_present(self, source, settings, android_template):
+        source["android"]["settings"]["status_significant_motion"] = True
+        config = serialize_android_config(source, settings, android_template)
+        assert _android_has(config, "status_significant_motion"), \
+            "status_significant_motion must be present in Android config"
+        assert _android_setting(config, "status_significant_motion") is True
+
+    def test_frequency_network_traffic_present(self, source, settings, android_template):
+        source["android"]["settings"]["frequency_network_traffic"] = 45
+        config = serialize_android_config(source, settings, android_template)
+        assert _android_has(config, "frequency_network_traffic"), \
+            "frequency_network_traffic must be present in Android config"
+        assert _android_setting(config, "frequency_network_traffic") == 45
+
+    def test_status_network_traffic_present(self, source, settings, android_template):
+        source["android"]["settings"]["status_network_traffic"] = True
+        config = serialize_android_config(source, settings, android_template)
+        assert _android_has(config, "status_network_traffic")
+        assert _android_setting(config, "status_network_traffic") is True
+
+    def test_sensor_toggles_round_trip(self, source, settings, android_template):
+        """Core sensor on/off toggles appear under the correct setting names."""
+        source["android"]["settings"].update({
+            "status_accelerometer": True,
+            "status_bluetooth": True,
+            "status_location_gps": True,
+            "status_location_network": False,
+            "status_network_events": True,
+            "status_network_traffic": True,
+            "status_calls": True,
+            "status_messages": False,
+            "webservice_wifi_only": True,
+        })
+        config = serialize_android_config(source, settings, android_template)
+        assert _android_setting(config, "status_accelerometer") is True
+        assert _android_setting(config, "status_bluetooth") is True
+        assert _android_setting(config, "status_location_gps") is True
+        assert _android_setting(config, "status_location_network") is False
+        assert _android_setting(config, "status_network_events") is True
+        assert _android_setting(config, "status_network_traffic") is True
+        assert _android_setting(config, "status_calls") is True
+        assert _android_setting(config, "status_messages") is False
+        assert _android_setting(config, "webservice_wifi_only") is True
+
+    def test_location_frequency_propagates_to_ios(self, source, settings):
+        """frequency_location_gps/network in android.settings flow into iOS config."""
+        source["android"]["settings"]["frequency_location_gps"] = 90
+        source["android"]["settings"]["frequency_location_network"] = 200
+        ios_settings = build_ios_sensor_settings(source)
+        assert ios_settings.get("frequency_location_gps") == 90
+        assert ios_settings.get("frequency_location_network") == 200
+
+    def test_no_legacy_gps_keys_in_ios(self, source, settings):
+        """The old frequency_gps / frequency_network keys must not appear in iOS settings."""
+        source["android"]["settings"]["frequency_location_gps"] = 90
+        source["android"]["settings"]["frequency_location_network"] = 200
+        ios_settings = build_ios_sensor_settings(source)
+        assert "frequency_gps" not in ios_settings
+        assert "frequency_network" not in ios_settings
+
+    def test_real_source_json_uses_correct_location_keys(self):
+        """The committed source.json must use the correct GPS/network frequency keys."""
+        source_path = pathlib.Path(__file__).resolve().parent.parent / "source.json"
+        real_source = json.loads(source_path.read_text(encoding="utf-8"))
+        android_settings = real_source.get("android", {}).get("settings", {})
+        assert "frequency_location_gps" in android_settings, \
+            "source.json must use frequency_location_gps"
+        assert "frequency_location_network" in android_settings, \
+            "source.json must use frequency_location_network"
+        assert "frequency_gps" not in android_settings, \
+            "source.json must not have legacy frequency_gps"
+        assert "frequency_network" not in android_settings, \
+            "source.json must not have legacy frequency_network"
