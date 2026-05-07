@@ -206,19 +206,21 @@ def main() -> None:
         }
     )
 
-    android_config = serialize_android_config(source, settings, ANDROID_TEMPLATE_PATH, env["STUDY_ID"])
+    base_url = build_public_base_url(
+        str(settings["protocol"]),
+        str(settings["public_host"]),
+        int(settings["public_port"]),
+    )
+    android_webservice_url = f"{base_url}/index.php/1/{env['STUDY_KEY']}"
+    android_config = serialize_android_config(source, settings, ANDROID_TEMPLATE_PATH, env["STUDY_ID"], android_webservice_url)
     write_android_config(android_config)
 
     config, study = serialize_ios_config(source, settings, EXAMPLE_PATH, CONFIG_PATH, env["STUDY_KEY"])
     write_micro_config(config)
     write_ios_esm_config(build_ios_esm_config(source))
 
-    base_url, study_join_path, study_join_url = build_study_join_urls(
-        str(settings["protocol"]),
-        str(settings["public_host"]),
-        int(settings["public_port"]),
-        study,
-    )
+    study_join_path = f"/{study['study_number']}/{study['study_key']}"
+    study_join_url = f"{base_url}{study_join_path}"
     write_studies_index(base_url, study_join_path, study_join_url)
 
 
