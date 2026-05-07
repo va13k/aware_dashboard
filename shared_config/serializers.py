@@ -17,7 +17,6 @@ COMMON_SHARED_SENSOR_FIELDS: dict[str, tuple[str, ...]] = {
     "battery": ("enabled",),
     "bluetooth": ("enabled", "frequency"),
     "esm": ("enabled",),
-    "gravity": ("enabled", "frequency", "threshold", "enforce"),
     "gyroscope": ("enabled", "frequency", "threshold", "enforce"),
     "light": ("enabled", "frequency", "threshold", "enforce"),
     "linear_accelerometer": ("enabled", "frequency", "threshold", "enforce"),
@@ -231,9 +230,8 @@ def ios_esm_plugin_enabled(source: dict) -> bool:
         return bool(android_settings["status_plugin_esm_scheduler"])
 
     ios_plugins = source.get("ios", {}).get("plugins", {})
-    for plugin_name in ("plugin_ios_esm", "plugin_esm_scheduler"):
-        if plugin_name in ios_plugins:
-            return bool(ios_plugins[plugin_name])
+    if "plugin_ios_esm" in ios_plugins:
+        return bool(ios_plugins["plugin_ios_esm"])
 
     return bool(build_ios_esm_config(source))
 
@@ -269,7 +267,9 @@ def upsert_ios_esm_plugin(config: dict, esm_url: str, enabled: bool) -> None:
             "title": "Active",
         }
         settings.append(status_setting)
-    status_setting["defaultValue"] = to_bool_string(enabled)
+    str_enabled = to_bool_string(enabled)
+    status_setting["defaultValue"] = str_enabled
+    status_setting["value"] = str_enabled
 
     url_setting = settings_by_name.get("plugin_ios_esm_config_url")
     if url_setting is None:
@@ -279,6 +279,7 @@ def upsert_ios_esm_plugin(config: dict, esm_url: str, enabled: bool) -> None:
         }
         settings.append(url_setting)
     url_setting["defaultValue"] = esm_url
+    url_setting["value"] = esm_url
 
 
 def source_database_host(
@@ -325,6 +326,7 @@ _ANDROID_TO_IOS_DIRECT = frozenset({
     "status_location_gps", "min_location_gps_accuracy",
     "status_location_network", "min_location_network_accuracy",
     "status_location_passive", "location_expiration_time", "location_save_all",
+    "frequency_location_gps", "frequency_location_network",
     # communication / network (granular)
     "status_calls", "status_messages",
     "status_network_events", "status_network_traffic",
@@ -364,8 +366,6 @@ _ANDROID_TO_IOS_DIRECT = frozenset({
 
 # Android setting keys that appear under a different name in the iOS config.
 _ANDROID_TO_IOS_RENAME: dict[str, str] = {
-    "frequency_gps": "frequency_location_gps",
-    "frequency_network": "frequency_location_network",
     "plugin_openweather_api_key": "api_key_plugin_openweather",
     "plugin_openweather_measurement_units": "units_plugin_openweather",
 }
@@ -419,10 +419,9 @@ def update_ios_sensor_defaults(sensor_items: list[dict], values: dict[str, objec
             if setting_name not in values:
                 continue
             value = values[setting_name]
-            if isinstance(value, bool):
-                setting["defaultValue"] = to_bool_string(value)
-            else:
-                setting["defaultValue"] = str(value)
+            str_value = to_bool_string(value) if isinstance(value, bool) else str(value)
+            setting["defaultValue"] = str_value
+            setting["value"] = str_value
 
 
 def update_ios_plugin_defaults(plugin_items: list[dict], values: dict[str, object]) -> None:
@@ -431,9 +430,11 @@ def update_ios_plugin_defaults(plugin_items: list[dict], values: dict[str, objec
         if plugin_name not in values:
             continue
         enabled = values[plugin_name]
+        str_value = to_bool_string(enabled)
         for setting in plugin.get("settings", []):
             if setting.get("setting", "").startswith("status_"):
-                setting["defaultValue"] = to_bool_string(enabled)
+                setting["defaultValue"] = str_value
+                setting["value"] = str_value
                 break
 
 
@@ -444,10 +445,9 @@ def update_ios_plugin_settings(plugin_items: list[dict], values: dict[str, objec
             setting_name = setting.get("setting")
             if setting_name in values:
                 value = values[setting_name]
-                if isinstance(value, bool):
-                    setting["defaultValue"] = to_bool_string(value)
-                else:
-                    setting["defaultValue"] = str(value)
+                str_value = to_bool_string(value) if isinstance(value, bool) else str(value)
+                setting["defaultValue"] = str_value
+                setting["value"] = str_value
 
 
 def serialize_android_config(
