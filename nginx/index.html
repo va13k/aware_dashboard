@@ -150,9 +150,10 @@
       }
 
       .sensor-note-title {
-        margin: 0 0 14px;
+        text-align: center;
+        margin: 0 0 30px;
         font-weight: 700;
-        font-size: 0.95rem;
+        font-size: 1.5rem;
       }
 
       .sensor-table {
@@ -236,6 +237,16 @@
         display: block;
       }
 
+      .sensor-table .section-row td {
+        padding: 15px 10px 5px;
+        font-weight: 700;
+        font-size: 0.9rem;
+        text-transform: uppercase;
+        letter-spacing: 0.12em;
+        color: var(--text);
+        border-bottom: 2px solid var(--border);
+      }
+
       @media (max-width: 640px) {
         main {
           padding-top: 28px;
@@ -295,44 +306,32 @@
       </section>
 
       <div class="sensor-note">
-        <h2 class="sensor-note-title">Platform sensor differences</h2>
+        <h2 class="sensor-note-title">Sensors and plugins: Android and iOS</h2>
         <table class="sensor-table">
           <thead>
             <tr>
-              <th>Sensor</th>
+              <th>Name</th>
               <th>Android</th>
               <th>iOS</th>
             </tr>
           </thead>
           <tbody>
-            <!-- ── Motion & inertial ── -->
+            <!-- ══ SENSORS ══ -->
+            <tr class="section-row">
+              <td colspan="3">Sensors</td>
+            </tr>
             <tr>
               <td>Accelerometer</td>
               <td><span class="badge badge-yes">Yes</span></td>
               <td><span class="badge badge-yes">Yes</span></td>
             </tr>
             <tr>
-              <td>Gyroscope</td>
-              <td><span class="badge badge-yes">Yes</span></td>
-              <td><span class="badge badge-yes">Yes</span></td>
-            </tr>
-            <tr>
-              <td>Magnetometer</td>
-              <td><span class="badge badge-yes">Yes</span></td>
-              <td><span class="badge badge-yes">Yes</span></td>
-            </tr>
-            <tr>
-              <td>Gravity</td>
+              <td>App Installs</td>
               <td><span class="badge badge-yes">Yes</span></td>
               <td><span class="badge badge-no">No</span></td>
             </tr>
             <tr>
-              <td>Linear accelerometer</td>
-              <td><span class="badge badge-yes">Yes</span></td>
-              <td><span class="badge badge-yes">Yes</span></td>
-            </tr>
-            <tr>
-              <td>Rotation</td>
+              <td class="has-tip">Applications *<span class="info-tooltip">Android: foreground/background app launch events.<br />iOS: screen time via Device Usage plugin.</span></td>
               <td><span class="badge badge-yes">Yes</span></td>
               <td><span class="badge badge-yes">Yes</span></td>
             </tr>
@@ -342,85 +341,7 @@
               <td><span class="badge badge-yes">Yes</span></td>
             </tr>
             <tr>
-              <td>Proximity</td>
-              <td><span class="badge badge-yes">Yes</span></td>
-              <td><span class="badge badge-yes">Yes</span></td>
-            </tr>
-            <tr>
-              <td class="has-tip">
-                Significant motion *<span class="info-tooltip"
-                  >Android: accelerometer-based software detection.<br />iOS:
-                  dedicated motion coprocessor sensor.</span
-                >
-              </td>
-              <td><span class="badge badge-yes">Yes</span></td>
-              <td><span class="badge badge-yes">Yes</span></td>
-            </tr>
-            <!-- ── Environment (Android only) ── -->
-            <tr>
-              <td>Light</td>
-              <td><span class="badge badge-yes">Yes</span></td>
-              <td><span class="badge badge-no">No</span></td>
-            </tr>
-            <tr>
-              <td>Temperature</td>
-              <td><span class="badge badge-yes">Yes</span></td>
-              <td><span class="badge badge-no">No</span></td>
-            </tr>
-            <!-- ── Activity & health ── -->
-            <tr>
-              <td>Activity recognition</td>
-              <td><span class="badge badge-no">No</span></td>
-              <td><span class="badge badge-yes">Yes</span></td>
-            </tr>
-            <tr>
-              <td>Pedometer</td>
-              <td><span class="badge badge-no">No</span></td>
-              <td><span class="badge badge-yes">Yes</span></td>
-            </tr>
-            <tr>
-              <td>HealthKit</td>
-              <td><span class="badge badge-no">No</span></td>
-              <td><span class="badge badge-yes">Yes</span></td>
-            </tr>
-            <tr>
-              <td>Heart rate (BLE)</td>
-              <td><span class="badge badge-no">No</span></td>
-              <td><span class="badge badge-yes">Yes</span></td>
-            </tr>
-            <tr>
-              <td class="has-tip">
-                Ambient noise *<span class="info-tooltip"
-                  >Available as a plugin on both platforms.</span
-                >
-              </td>
-              <td><span class="badge badge-yes">Yes</span></td>
-              <td><span class="badge badge-yes">Yes</span></td>
-            </tr>
-            <!-- ── Device state ── -->
-            <tr>
               <td>Battery</td>
-              <td><span class="badge badge-yes">Yes</span></td>
-              <td><span class="badge badge-yes">Yes</span></td>
-            </tr>
-            <tr>
-              <td>Screen</td>
-              <td><span class="badge badge-yes">Yes</span></td>
-              <td><span class="badge badge-yes">Yes</span></td>
-            </tr>
-            <tr>
-              <td>Processor</td>
-              <td><span class="badge badge-yes">Yes</span></td>
-              <td><span class="badge badge-yes">Yes</span></td>
-            </tr>
-            <tr>
-              <td>Timezone</td>
-              <td><span class="badge badge-yes">Yes</span></td>
-              <td><span class="badge badge-yes">Yes</span></td>
-            </tr>
-            <!-- ── Connectivity ── -->
-            <tr>
-              <td>WiFi</td>
               <td><span class="badge badge-yes">Yes</span></td>
               <td><span class="badge badge-yes">Yes</span></td>
             </tr>
@@ -430,53 +351,22 @@
               <td><span class="badge badge-yes">Yes</span></td>
             </tr>
             <tr>
-              <td class="has-tip">
-                Location *<span class="info-tooltip"
-                  >Android: separate GPS, network and passive providers.<br />iOS:
-                  single unified location sensor.</span
-                >
-              </td>
+              <td class="has-tip">Communication *<span class="info-tooltip">Android: separate calls and messages controls.<br />iOS: single communication sensor covering both.</span></td>
               <td><span class="badge badge-yes">Yes</span></td>
               <td><span class="badge badge-yes">Yes</span></td>
             </tr>
             <tr>
-              <td class="has-tip">
-                Network *<span class="info-tooltip"
-                  >Android: connection events + traffic bytes/packets.<br />iOS:
-                  reachability events only.</span
-                >
-              </td>
+              <td>ESM (Surveys)</td>
               <td><span class="badge badge-yes">Yes</span></td>
               <td><span class="badge badge-yes">Yes</span></td>
             </tr>
             <tr>
-              <td>Network traffic</td>
-              <td><span class="badge badge-yes">Yes</span></td>
-              <td><span class="badge badge-no">No</span></td>
-            </tr>
-            <!-- ── Behaviour & usage ── -->
-            <tr>
-              <td class="has-tip">
-                Calls &amp; messages *<span class="info-tooltip"
-                  >Android: separate calls and messages tables.<br />iOS:
-                  bundled as a single communication sensor.</span
-                >
-              </td>
+              <td>Gravity</td>
               <td><span class="badge badge-yes">Yes</span></td>
               <td><span class="badge badge-yes">Yes</span></td>
             </tr>
             <tr>
-              <td class="has-tip">
-                Applications *<span class="info-tooltip"
-                  >Android: tracks app foreground/background launch events.<br />iOS:
-                  device usage time via Screen Time API.</span
-                >
-              </td>
-              <td><span class="badge badge-yes">Yes</span></td>
-              <td><span class="badge badge-yes">Yes</span></td>
-            </tr>
-            <tr>
-              <td>ESM (surveys)</td>
+              <td>Gyroscope</td>
               <td><span class="badge badge-yes">Yes</span></td>
               <td><span class="badge badge-yes">Yes</span></td>
             </tr>
@@ -486,21 +376,120 @@
               <td><span class="badge badge-no">No</span></td>
             </tr>
             <tr>
+              <td>Light</td>
+              <td><span class="badge badge-yes">Yes</span></td>
+              <td><span class="badge badge-no">No</span></td>
+            </tr>
+            <tr>
+              <td>Linear Accelerometer</td>
+              <td><span class="badge badge-yes">Yes</span></td>
+              <td><span class="badge badge-yes">Yes</span></td>
+            </tr>
+            <tr>
+              <td class="has-tip">Location *<span class="info-tooltip">Android: separate GPS, network and passive providers.<br />iOS: single unified location sensor.</span></td>
+              <td><span class="badge badge-yes">Yes</span></td>
+              <td><span class="badge badge-yes">Yes</span></td>
+            </tr>
+            <tr>
+              <td>Magnetometer</td>
+              <td><span class="badge badge-yes">Yes</span></td>
+              <td><span class="badge badge-yes">Yes</span></td>
+            </tr>
+            <tr>
+              <td class="has-tip">MQTT *<span class="info-tooltip">iOS: config keys are stored but the sensor is not implemented in the client.</span></td>
+              <td><span class="badge badge-yes">Yes</span></td>
+              <td><span class="badge badge-no">No</span></td>
+            </tr>
+            <tr>
+              <td class="has-tip">Network *<span class="info-tooltip">Android: separate events and traffic controls.<br />iOS: single network toggle covering both.</span></td>
+              <td><span class="badge badge-yes">Yes</span></td>
+              <td><span class="badge badge-yes">Yes</span></td>
+            </tr>
+            <tr>
+              <td>Notes</td>
+              <td><span class="badge badge-yes">Yes</span></td>
+              <td><span class="badge badge-no">No</span></td>
+            </tr>
+            <tr>
+              <td>Processor</td>
+              <td><span class="badge badge-yes">Yes</span></td>
+              <td><span class="badge badge-yes">Yes</span></td>
+            </tr>
+            <tr>
+              <td>Proximity</td>
+              <td><span class="badge badge-yes">Yes</span></td>
+              <td><span class="badge badge-yes">Yes</span></td>
+            </tr>
+            <tr>
+              <td>Rotation</td>
+              <td><span class="badge badge-yes">Yes</span></td>
+              <td><span class="badge badge-yes">Yes</span></td>
+            </tr>
+            <tr>
+              <td>Screen</td>
+              <td><span class="badge badge-yes">Yes</span></td>
+              <td><span class="badge badge-yes">Yes</span></td>
+            </tr>
+            <tr>
+              <td>Screen Text (OCR)</td>
+              <td><span class="badge badge-yes">Yes</span></td>
+              <td><span class="badge badge-no">No</span></td>
+            </tr>
+            <tr>
               <td>Screenshots</td>
               <td><span class="badge badge-yes">Yes</span></td>
               <td><span class="badge badge-no">No</span></td>
             </tr>
             <tr>
-              <td>Screen text (OCR)</td>
+              <td class="has-tip">Significant Motion *<span class="info-tooltip">Android: software detection via accelerometer.<br />iOS: dedicated motion coprocessor.</span></td>
+              <td><span class="badge badge-yes">Yes</span></td>
+              <td><span class="badge badge-yes">Yes</span></td>
+            </tr>
+            <tr>
+              <td>Telephony</td>
+              <td><span class="badge badge-yes">Yes</span></td>
+              <td><span class="badge badge-yes">Yes</span></td>
+            </tr>
+            <tr>
+              <td>Temperature</td>
+              <td><span class="badge badge-yes">Yes</span></td>
+              <td><span class="badge badge-yes">Yes</span></td>
+            </tr>
+            <tr>
+              <td>Timezone</td>
+              <td><span class="badge badge-yes">Yes</span></td>
+              <td><span class="badge badge-yes">Yes</span></td>
+            </tr>
+            <tr>
+              <td>Touch</td>
               <td><span class="badge badge-yes">Yes</span></td>
               <td><span class="badge badge-no">No</span></td>
             </tr>
             <tr>
-              <td>App installs</td>
+              <td>Webservice</td>
               <td><span class="badge badge-yes">Yes</span></td>
-              <td><span class="badge badge-no">No</span></td>
+              <td><span class="badge badge-yes">Yes</span></td>
             </tr>
-            <!-- ── Personal data (iOS only) ── -->
+            <tr>
+              <td>WiFi</td>
+              <td><span class="badge badge-yes">Yes</span></td>
+              <td><span class="badge badge-yes">Yes</span></td>
+            </tr>
+
+            <!-- ══ PLUGINS ══ -->
+            <tr class="section-row">
+              <td colspan="3">Plugins</td>
+            </tr>
+            <tr>
+              <td>Activity Recognition (Google)</td>
+              <td><span class="badge badge-yes">Yes</span></td>
+              <td><span class="badge badge-yes">Yes</span></td>
+            </tr>
+            <tr>
+              <td>Ambient Noise</td>
+              <td><span class="badge badge-yes">Yes</span></td>
+              <td><span class="badge badge-yes">Yes</span></td>
+            </tr>
             <tr>
               <td>Calendar</td>
               <td><span class="badge badge-no">No</span></td>
@@ -508,25 +497,82 @@
             </tr>
             <tr>
               <td>Contacts</td>
+              <td><span class="badge badge-yes">Yes</span></td>
+              <td><span class="badge badge-yes">Yes</span></td>
+            </tr>
+            <tr>
+              <td>Conversations</td>
+              <td><span class="badge badge-yes">Yes</span></td>
+              <td><span class="badge badge-yes">Yes</span></td>
+            </tr>
+            <tr>
+              <td>Device Usage</td>
+              <td><span class="badge badge-yes">Yes</span></td>
+              <td><span class="badge badge-yes">Yes</span></td>
+            </tr>
+            <tr>
+              <td>ESM Scheduler</td>
+              <td><span class="badge badge-yes">Yes</span></td>
+              <td><span class="badge badge-yes">Yes</span></td>
+            </tr>
+            <tr>
+              <td>Fitbit</td>
+              <td><span class="badge badge-yes">Yes</span></td>
+              <td><span class="badge badge-yes">Yes</span></td>
+            </tr>
+            <tr>
+              <td>Google Fused Location</td>
+              <td><span class="badge badge-yes">Yes</span></td>
+              <td><span class="badge badge-yes">Yes</span></td>
+            </tr>
+            <tr>
+              <td>Google Login / Auth</td>
+              <td><span class="badge badge-yes">Yes</span></td>
+              <td><span class="badge badge-yes">Yes</span></td>
+            </tr>
+            <tr>
+              <td class="has-tip">Headphone Motion *<span class="info-tooltip">Requires iOS 14+ and AirPods or compatible headphones.</span></td>
               <td><span class="badge badge-no">No</span></td>
               <td><span class="badge badge-yes">Yes</span></td>
             </tr>
             <tr>
-              <td class="has-tip">
-                Visits *<span class="info-tooltip"
-                  >iOS CoreLocation significant location visit detection.</span
-                >
-              </td>
+              <td>HealthKit</td>
               <td><span class="badge badge-no">No</span></td>
               <td><span class="badge badge-yes">Yes</span></td>
             </tr>
             <tr>
-              <td class="has-tip">
-                Headphone motion *<span class="info-tooltip"
-                  >Requires iOS 14+ and AirPods or compatible headphones.</span
-                >
-              </td>
+              <td>Heart Rate (BLE)</td>
               <td><span class="badge badge-no">No</span></td>
+              <td><span class="badge badge-yes">Yes</span></td>
+            </tr>
+            <tr>
+              <td>NTP</td>
+              <td><span class="badge badge-no">No</span></td>
+              <td><span class="badge badge-yes">Yes</span></td>
+            </tr>
+            <tr>
+              <td>OpenWeather</td>
+              <td><span class="badge badge-yes">Yes</span></td>
+              <td><span class="badge badge-yes">Yes</span></td>
+            </tr>
+            <tr>
+              <td>Pedometer</td>
+              <td><span class="badge badge-no">No</span></td>
+              <td><span class="badge badge-yes">Yes</span></td>
+            </tr>
+            <tr>
+              <td>Push Notification</td>
+              <td><span class="badge badge-no">No</span></td>
+              <td><span class="badge badge-yes">Yes</span></td>
+            </tr>
+            <tr>
+              <td>SensorTag</td>
+              <td><span class="badge badge-yes">Yes</span></td>
+              <td><span class="badge badge-yes">Yes</span></td>
+            </tr>
+            <tr>
+              <td>Sentimental</td>
+              <td><span class="badge badge-yes">Yes</span></td>
               <td><span class="badge badge-yes">Yes</span></td>
             </tr>
           </tbody>
