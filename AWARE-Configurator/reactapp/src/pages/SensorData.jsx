@@ -58,7 +58,7 @@ export default function SensorData() {
 
   // software sensor states
   const [applicationSensor, setapplicationSensor] = useRecoilState(
-    applicationSensorState
+    applicationSensorState,
   );
 
   const updateApplicationSensorData = (fieldName, value) => {
@@ -71,7 +71,7 @@ export default function SensorData() {
   const [screenData, setscreenData] = useRecoilState(screenSensorState);
 
   const [communicationData, setcommunicationData] = useRecoilState(
-    communicationSensorState
+    communicationSensorState,
   );
 
   const [accelerometerData, setaccelerometerData] =
@@ -88,7 +88,7 @@ export default function SensorData() {
   const [lightData, setlightData] = useRecoilState(lightState);
 
   const [linearAccelerometerData, setLinearAccelerometerData] = useRecoilState(
-    linearAccelerometerState
+    linearAccelerometerState,
   );
 
   const [locationsData, setLocationsData] = useRecoilState(locationsState);
@@ -112,7 +112,7 @@ export default function SensorData() {
   const [wifiData, setWifiData] = useRecoilState(wifiState);
 
   const [screenshotData, setScreenshotData] = useRecoilState(
-    screenshotSensorState
+    screenshotSensorState,
   );
 
   const [noteData, setNoteData] = useRecoilState(noteState);
@@ -276,19 +276,21 @@ export default function SensorData() {
       <Grid container rowSpacing={1} columnSpacing={{ xs: 1, sm: 2, md: 3 }}>
         <Grid width="10%" />
         <Grid width="70%">
-          <SensorComponent
-            sensorName="Communication events"
-            sensorDescription="Activate or deactivate high-level context of users’ communication usage."
-            stateField={communicationData.events}
-            field="events"
-            modeState="communication"
-          />
-
+          <p style={{ fontSize: "0.7rem", fontWeight: 700, color: "#666", textTransform: "uppercase", letterSpacing: "0.08em", margin: "8px 0 2px", borderBottom: "1px solid #e0e0e0", paddingBottom: 2 }}>Android &amp; iPhone</p>
           <SensorComponent
             sensorName="Calls sensor"
             sensorDescription="Activate or deactivate calls sensor."
             stateField={communicationData.calls}
             field="calls"
+            modeState="communication"
+          />
+
+          <p style={{ fontSize: "0.7rem", fontWeight: 700, color: "#666", textTransform: "uppercase", letterSpacing: "0.08em", margin: "12px 0 2px", borderBottom: "1px solid #e0e0e0", paddingBottom: 2 }}>Android only</p>
+          <SensorComponent
+            sensorName="Communication events"
+            sensorDescription="Activate or deactivate high-level context of users’ communication usage."
+            stateField={communicationData.events}
+            field="events"
             modeState="communication"
           />
 
@@ -592,19 +594,12 @@ export default function SensorData() {
       <Grid container rowSpacing={1} columnSpacing={{ xs: 1, sm: 2, md: 3 }}>
         <Grid width="10%" />
         <Grid width="70%">
+          <p style={{ fontSize: "0.7rem", fontWeight: 700, color: "#666", textTransform: "uppercase", letterSpacing: "0.08em", margin: "8px 0 2px", borderBottom: "1px solid #e0e0e0", paddingBottom: 2 }}>Android &amp; iPhone</p>
           <SensorComponent
             sensorName="Location (GPS)"
             sensorDescription="Activate or deactivate GPS locations."
             stateField={locationsData.gps}
             field="gps"
-            modeState="locations"
-          />
-
-          <SensorComponent
-            sensorName="Location (Network)"
-            sensorDescription="Activate or deactivate Network locations."
-            stateField={locationsData.network}
-            field="network"
             modeState="locations"
           />
 
@@ -620,6 +615,26 @@ export default function SensorData() {
           />
 
           <FrequencyField
+            id="min_gps_freq"
+            title="Min GPS accuracy"
+            inputLabel="minimum accuracy in meters"
+            defaultNum={150}
+            description="The minimum acceptable accuracy of GPS location, in meters. By default, 150 meters."
+            field="min_gps_freq"
+            studyField={locationsData.min_gps_freq}
+            modeState="locations"
+          />
+
+          <p style={{ fontSize: "0.7rem", fontWeight: 700, color: "#666", textTransform: "uppercase", letterSpacing: "0.08em", margin: "12px 0 2px", borderBottom: "1px solid #e0e0e0", paddingBottom: 2 }}>Android only</p>
+          <SensorComponent
+            sensorName="Location (Network)"
+            sensorDescription="Activate or deactivate Network locations."
+            stateField={locationsData.network}
+            field="network"
+            modeState="locations"
+          />
+
+          <FrequencyField
             id="frequency_network"
             title="Frequency network"
             inputLabel="frequency in seconds"
@@ -629,23 +644,13 @@ export default function SensorData() {
             studyField={locationsData.frequency_network}
             modeState="locations"
           />
-          <FrequencyField
-            id="min_gps_freq"
-            title="Min location gps accuracy"
-            inputLabel="minimum accuracy in meters"
-            defaultNum={150}
-            description="The minimum acceptable accuracy of GPS location, in meters. By default, 150 meters. Setting to 0 (zero) will keep the GPS location tracking always on."
-            field="min_gps_freq"
-            studyField={locationsData.min_gps_freq}
-            modeState="locations"
-          />
 
           <FrequencyField
             id="min_network_freq"
             title="Min location network accuracy"
             inputLabel="minimum accuracy in meters"
             defaultNum={1500}
-            description="The minimum acceptable accuracy of network location, in meters. By default, 1500 meters. Setting to 0 (zero) will keep the network location tracking always on."
+            description="The minimum acceptable accuracy of network location, in meters. By default, 1500 meters."
             field="min_network_freq"
             studyField={locationsData.min_network_freq}
             modeState="locations"
@@ -728,6 +733,7 @@ export default function SensorData() {
       <Grid container rowSpacing={1} columnSpacing={{ xs: 1, sm: 2, md: 3 }}>
         <Grid width="10%" />
         <Grid width="70%">
+          <p style={{ fontSize: "0.7rem", fontWeight: 700, color: "#666", textTransform: "uppercase", letterSpacing: "0.08em", margin: "8px 0 2px", borderBottom: "1px solid #e0e0e0", paddingBottom: 2 }}>Android &amp; iPhone</p>
           <SensorComponent
             sensorName="Network events"
             sensorDescription="Activate or deactivate sensor."
@@ -736,6 +742,7 @@ export default function SensorData() {
             modeState="network"
           />
 
+          <p style={{ fontSize: "0.7rem", fontWeight: 700, color: "#666", textTransform: "uppercase", letterSpacing: "0.08em", margin: "12px 0 2px", borderBottom: "1px solid #e0e0e0", paddingBottom: 2 }}>Android only</p>
           <SensorComponent
             sensorName="Network traffic"
             sensorDescription="Activate or deactivate sensor."
@@ -786,6 +793,7 @@ export default function SensorData() {
       <Grid container rowSpacing={1} columnSpacing={{ xs: 1, sm: 2, md: 3 }}>
         <Grid width="10%" />
         <Grid width="70%">
+          <p style={{ fontSize: "0.7rem", fontWeight: 700, color: "#666", textTransform: "uppercase", letterSpacing: "0.08em", margin: "8px 0 2px", borderBottom: "1px solid #e0e0e0", paddingBottom: 2 }}>Android only</p>
           <FrequencyField
             id="frequency_proximity"
             title="Frequency proximity"
@@ -927,6 +935,7 @@ export default function SensorData() {
       <Grid container rowSpacing={1} columnSpacing={{ xs: 1, sm: 2, md: 3 }}>
         <Grid width="10%" />
         <Grid width="70%">
+          <p style={{ fontSize: "0.7rem", fontWeight: 700, color: "#666", textTransform: "uppercase", letterSpacing: "0.08em", margin: "8px 0 2px", borderBottom: "1px solid #e0e0e0", paddingBottom: 2 }}>Android only</p>
           <SensorComponent
             sensorName="Touch"
             sensorDescription="Logs clicks, long-clicks and scroll up/down events."
@@ -991,7 +1000,7 @@ export default function SensorData() {
                   onClick={(_, checked) => {
                     updateApplicationSensorData(
                       "screenshot_package_specification",
-                      "0"
+                      "0",
                     );
                   }}
                 />
@@ -1002,7 +1011,7 @@ export default function SensorData() {
                   onClick={(_, checked) => {
                     updateApplicationSensorData(
                       "screenshot_package_specification",
-                      "1"
+                      "1",
                     );
                   }}
                 />
@@ -1013,7 +1022,7 @@ export default function SensorData() {
                   onClick={(_, checked) => {
                     updateApplicationSensorData(
                       "screenshot_package_specification",
-                      "2"
+                      "2",
                     );
                   }}
                 />
@@ -1130,7 +1139,7 @@ export default function SensorData() {
               onClick={(_, checked) => {
                 updatePluginData(
                   "plugin_openweather_measurement_units",
-                  "metric"
+                  "metric",
                 );
               }}
             />
@@ -1141,7 +1150,7 @@ export default function SensorData() {
               onClick={(_, checked) => {
                 updatePluginData(
                   "plugin_openweather_measurement_units",
-                  "imperial"
+                  "imperial",
                 );
               }}
             />
@@ -1865,6 +1874,16 @@ export default function SensorData() {
           {sensorData.sensor_rotation ? SensorRotationSubContent() : <div />}
 
           <SensorComponent
+            sensorName="Proximity"
+            sensorDescription="Proximity sensor (near/far) — present on both Android and iPhone."
+            stateField={sensorData.sensor_proximity}
+            field="sensor_proximity"
+            modeState="sensor"
+          />
+
+          {sensorData.sensor_proximity ? SensorProximitySubContent() : <div />}
+
+          <SensorComponent
             sensorName="Significant Motion"
             sensorDescription="Motion co-processor signal for significant movement changes."
             stateField={sensorData.ios_significant_motion}
@@ -1904,16 +1923,6 @@ export default function SensorData() {
           />
 
           {sensorData.sensor_light ? SensorLightSubContent() : <div />}
-
-          <SensorComponent
-            sensorName="Proximity"
-            sensorDescription="Distance to an object in front of the device."
-            stateField={sensorData.sensor_proximity}
-            field="sensor_proximity"
-            modeState="sensor"
-          />
-
-          {sensorData.sensor_proximity ? SensorProximitySubContent() : <div />}
 
           <SensorComponent
             sensorName="Temperature"
@@ -1958,42 +1967,6 @@ export default function SensorData() {
             field="sensor_telephony"
             modeState="sensor"
           />
-
-          <SensorComponent
-            sensorName="ESM Scheduler Plugin"
-            sensorDescription="Schedule and deliver ESM questionnaires to participants"
-            stateField={sensorData.status_plugin_esm_scheduler}
-            field="status_plugin_esm_scheduler"
-            modeState="sensor"
-          />
-          {sensorData.status_plugin_esm_scheduler ? (
-            <Grid container spacing={2} sx={{ mt: 1, mb: 2, ml: "10%" }}>
-              <Grid>
-                <Button
-                  color="main"
-                  variant="outlined"
-                  onClick={() => {
-                    navigateTo("/study/questions");
-                  }}
-                >
-                  EDIT ESM QUESTIONS
-                </Button>
-              </Grid>
-              <Grid>
-                <Button
-                  color="main"
-                  variant="outlined"
-                  onClick={() => {
-                    navigateTo("/study/schedule_configuration");
-                  }}
-                >
-                  EDIT ESM SCHEDULES
-                </Button>
-              </Grid>
-            </Grid>
-          ) : (
-            <div />
-          )}
 
           <SensorComponent
             sensorName="MQTT"
@@ -2144,7 +2117,11 @@ export default function SensorData() {
             field="status_plugin_ble_heartrate"
             modeState="sensor"
           />
-          {sensorData.status_plugin_ble_heartrate ? PluginBLEHeartRateSubContent() : <div />}
+          {sensorData.status_plugin_ble_heartrate ? (
+            PluginBLEHeartRateSubContent()
+          ) : (
+            <div />
+          )}
 
           <SensorComponent
             sensorName="NTP"
@@ -2161,20 +2138,64 @@ export default function SensorData() {
             field="status_plugin_ios_pedometer"
             modeState="sensor"
           />
-          {sensorData.status_plugin_ios_pedometer ? PluginIosPedometerSubContent() : <div />}
+          {sensorData.status_plugin_ios_pedometer ? (
+            PluginIosPedometerSubContent()
+          ) : (
+            <div />
+          )}
 
           <SensorComponent
             sensorName="Push Notification"
             sensorDescription="Enable push notification delivery to study participants."
-            stateField={sensorData.status_push_notication}
-            field="status_push_notication"
+            stateField={sensorData.status_push_notification}
+            field="status_push_notification"
             modeState="sensor"
           />
-          {sensorData.status_push_notication ? PluginPushNotificationSubContent() : <div />}
+          {sensorData.status_push_notification ? (
+            PluginPushNotificationSubContent()
+          ) : (
+            <div />
+          )}
         </div>
 
         <div className="border">
           <p className="title">Shared plugins</p>
+          <SensorComponent
+            sensorName="ESM Scheduler Plugin"
+            sensorDescription="Schedule and deliver ESM questionnaires to participants"
+            stateField={sensorData.status_plugin_esm_scheduler}
+            field="status_plugin_esm_scheduler"
+            modeState="sensor"
+          />
+          {sensorData.status_plugin_esm_scheduler ? (
+            <Grid container spacing={2} sx={{ mt: 1, mb: 2, ml: "10%" }}>
+              <Grid>
+                <Button
+                  color="main"
+                  variant="outlined"
+                  onClick={() => {
+                    navigateTo("/study/questions");
+                  }}
+                >
+                  EDIT ESM QUESTIONS
+                </Button>
+              </Grid>
+              <Grid>
+                <Button
+                  color="main"
+                  variant="outlined"
+                  onClick={() => {
+                    navigateTo("/study/schedule_configuration");
+                  }}
+                >
+                  EDIT ESM SCHEDULES
+                </Button>
+              </Grid>
+            </Grid>
+          ) : (
+            <div />
+          )}
+
           <SensorComponent
             sensorName="Ambient Noise Plugin"
             sensorDescription="Ambient noise sampling plugin for smartphones"
