@@ -930,13 +930,6 @@ export default function Main() {
             ? pluginData.frequency_plugin_google_activity_recognition
             : 10,
         },
-        // plugin: sentimental
-        {
-          setting: "status_plugin_sentimental",
-          value: sensorData.status_plugin_sentimental
-            ? sensorData.status_plugin_sentimental
-            : false,
-        },
         // plugin: esm scheduler
         {
           setting: "status_plugin_esm_scheduler",
@@ -986,19 +979,6 @@ export default function Main() {
           value: pluginData.api_secret_plugin_fitbit
             ? pluginData.api_secret_plugin_fitbit
             : "",
-        },
-        // plugin: sensortag
-        {
-          setting: "status_plugin_sensortag",
-          value: sensorData.status_plugin_sensortag
-            ? sensorData.status_plugin_sensortag
-            : false,
-        },
-        {
-          setting: "frequency_plugin_sensortag",
-          value: pluginData.frequency_plugin_sensortag
-            ? pluginData.frequency_plugin_sensortag
-            : 1000,
         },
         // plugin: contacts list
         {

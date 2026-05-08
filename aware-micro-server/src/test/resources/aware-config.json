@@ -679,14 +679,6 @@
       "summary" : "60 seconds"
     } ]
   }, {
-    "package_name" : "com.aware.plugin.sentimental",
-    "settings" : [ {
-      "setting" : "status_plugin_sentimental",
-      "title" : "Active",
-      "defaultValue" : "false",
-      "summary" : "Enable/disable plugin"
-    } ]
-  }, {
     "package_name" : "com.aware.plugin.openweather",
     "plugin" : "plugin_openweather",
     "settings" : [ {
@@ -754,19 +746,6 @@
       "title" : "API Secret",
       "defaultValue" : "033ed2a3710c0cde04343d073c09e378",
       "summary" : "API Secret from developer.fitbit.com"
-    } ]
-  }, {
-    "package_name" : "com.aware.plugin.sensortag",
-    "settings" : [ {
-      "setting" : "status_plugin_sensortag",
-      "title" : "Active",
-      "defaultValue" : "false",
-      "summary" : "Enable/disable sensor tag plugin"
-    }, {
-      "setting" : "frequency_plugin_sensortag",
-      "title" : "Sampling Frequency (Hz)",
-      "defaultValue" : "30",
-      "summary" : "30 Hz"
     } ]
   }, {
     "package_name" : "com.aware.plugin.contacts_list",

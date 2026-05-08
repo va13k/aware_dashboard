@@ -37,7 +37,7 @@
   },
   "android": {
     "created_at": "",
-    "updated_at": "2026-05-08T13:20:35.253Z",
+    "updated_at": "2026-05-08T14:27:23.769Z",
     "questions": [
       {
         "esm_submit": "Submit",
@@ -154,7 +154,6 @@
       "plugin_openweather_measurement_units": "metric",
       "status_plugin_google_activity_recognition": false,
       "frequency_plugin_google_activity_recognition": 10,
-      "status_plugin_sentimental": false,
       "status_plugin_esm_scheduler": false,
       "status_plugin_fitbit": false,
       "units_plugin_fitbit": "metric",
@@ -163,8 +162,6 @@
       "plugin_fitbit_frequency": 60,
       "api_key_plugin_fitbit": "",
       "api_secret_plugin_fitbit": "",
-      "status_plugin_sensortag": false,
-      "frequency_plugin_sensortag": 1000,
       "status_plugin_contacts": false,
       "frequency_plugin_contacts": 30,
       "status_plugin_google_login": false,
@@ -221,12 +218,10 @@
     "plugins": {
       "plugin_ambient_noise": false,
       "plugin_google_activity_recognition": false,
-      "com.aware.plugin.sentimental": false,
       "plugin_openweather": false,
       "plugin_esm_scheduler": false,
       "plugin_ios_esm": false,
       "plugin_fitbit": false,
-      "com.aware.plugin.sensortag": false,
       "plugin_contacts_list": false,
       "plugin_google_auth": false,
       "plugin_google_fused_location": false,

@@ -526,9 +526,6 @@ export default function Upload() {
         case "frequency_plugin_google_activity_recognition":
           pluginData.frequency_plugin_google_activity_recognition = value;
           break;
-        case "status_plugin_sentimental":
-          sensorData.status_plugin_sentimental = value;
-          break;
         case "status_plugin_esm_scheduler":
           sensorData.status_plugin_esm_scheduler = value;
           break;
@@ -552,12 +549,6 @@ export default function Upload() {
           break;
         case "api_secret_plugin_fitbit":
           pluginData.api_secret_plugin_fitbit = value;
-          break;
-        case "status_plugin_sensortag":
-          sensorData.status_plugin_sensortag = value;
-          break;
-        case "frequency_plugin_sensortag":
-          pluginData.frequency_plugin_sensortag = value;
           break;
         case "status_plugin_contacts":
           sensorData.status_plugin_contacts = value;

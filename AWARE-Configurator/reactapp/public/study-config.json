@@ -490,10 +490,6 @@
       "value": 10
     },
     {
-      "setting": "status_plugin_sentimental",
-      "value": false
-    },
-    {
       "setting": "status_plugin_esm_scheduler",
       "value": false
     },
@@ -524,14 +520,6 @@
     {
       "setting": "api_secret_plugin_fitbit",
       "value": ""
-    },
-    {
-      "setting": "status_plugin_sensortag",
-      "value": false
-    },
-    {
-      "setting": "frequency_plugin_sensortag",
-      "value": 1000
     },
     {
       "setting": "status_plugin_contacts",

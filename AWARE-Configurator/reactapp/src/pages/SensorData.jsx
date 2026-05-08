@@ -1297,27 +1297,6 @@ export default function SensorData() {
   }
 
   // eslint-disable-next-line react/no-unstable-nested-components
-  function PluginSensorTagSubContent() {
-    return (
-      <Grid container rowSpacing={1} columnSpacing={{ xs: 1, sm: 2, md: 3 }}>
-        <Grid width="10%" />
-        <Grid width="70%">
-          <FrequencyField
-            id="frequency_plugin_sensortag"
-            title="Sampling Frequency"
-            inputLabel="How often to sample SensorTag (milliseconds)"
-            defaultNum={1000}
-            description="Frequency of SensorTag data collection in milliseconds."
-            field="frequency_plugin_sensortag"
-            studyField={pluginData.frequency_plugin_sensortag}
-            modeState="plugin"
-          />
-        </Grid>
-      </Grid>
-    );
-  }
-
-  // eslint-disable-next-line react/no-unstable-nested-components
   function PluginContactsListSubContent() {
     return (
       <Grid container rowSpacing={1} columnSpacing={{ xs: 1, sm: 2, md: 3 }}>

@@ -228,10 +228,8 @@ def sync_shared_esms_from_config(source, questions, schedules):
 _ANDROID_STATUS_TO_IOS_PLUGIN = {
     "status_plugin_ambient_noise": "plugin_ambient_noise",
     "status_plugin_google_activity_recognition": "plugin_google_activity_recognition",
-    "status_plugin_sentimental": "com.aware.plugin.sentimental",
     "status_plugin_openweather": "plugin_openweather",
     "status_plugin_fitbit": "plugin_fitbit",
-    "status_plugin_sensortag": "com.aware.plugin.sensortag",
     "status_plugin_contacts": "plugin_contacts_list",
     "status_plugin_google_login": "plugin_google_auth",
     "status_google_fused_location": "plugin_google_fused_location",
