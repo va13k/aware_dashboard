@@ -37,7 +37,7 @@
   },
   "android": {
     "created_at": "",
-    "updated_at": "2026-05-07T22:19:16.099Z",
+    "updated_at": "2026-05-08T13:20:35.253Z",
     "questions": [
       {
         "esm_submit": "Submit",
@@ -104,38 +104,38 @@
       "frequency_sync_config": 1,
       "enable_config_update": false,
       "status_mqtt": false,
-      "status_notifications": true,
-      "status_crashes": true,
-      "status_keyboard": true,
-      "mask_notification": true,
-      "mask_keyboard": true,
-      "mask_touch_text": true,
-      "status_screentext": true,
+      "status_notifications": false,
+      "status_crashes": false,
+      "status_keyboard": false,
+      "mask_notification": false,
+      "mask_keyboard": false,
+      "mask_touch_text": false,
+      "status_screentext": false,
       "package_specification": "2",
       "package_names": "aware_androidpacks",
       "communication": false,
-      "status_communication_events": true,
-      "status_calls": true,
-      "status_messages": true,
+      "status_communication_events": false,
+      "status_calls": false,
+      "status_messages": false,
       "status_installations": false,
-      "status_touch": true,
+      "status_touch": false,
       "status_gravity": false,
       "frequency_gravity": 20000,
       "threshold_gravity": 10,
       "frequency_gravity_enforce": true,
       "location": false,
-      "status_location_gps": true,
-      "status_location_network": true,
+      "status_location_gps": false,
+      "status_location_network": false,
       "frequency_location_gps": 180,
       "frequency_location_network": 300,
       "min_location_gps_accuracy": 150,
       "min_location_network_accuracy": 1500,
       "location_expiration_time": 300,
-      "status_location_passive": true,
-      "location_save_all": true,
+      "status_location_passive": false,
+      "location_save_all": false,
       "network": false,
-      "status_network_events": true,
-      "status_network_traffic": true,
+      "status_network_events": false,
+      "status_network_traffic": false,
       "frequency_network_traffic": 30,
       "status_screenshot": false,
       "capture_time_interval": 5,
@@ -196,18 +196,15 @@
     },
     "sensors": {
       "accelerometer": false,
-      "applications": false,
       "barometer": false,
       "battery": false,
       "bluetooth": false,
-      "communication": true,
+      "communication": false,
       "esm": false,
-      "gravity": false,
       "gyroscope": false,
-      "locations": true,
-      "light": false,
+      "locations": false,
       "linear_accelerometer": false,
-      "network": true,
+      "network": false,
       "magnetometer": false,
       "processor": false,
       "timezone": false,
@@ -215,8 +212,6 @@
       "rotation": false,
       "screen": false,
       "significant_motion": false,
-      "temperature": false,
-      "telephony": false,
       "wifi": false,
       "websocket": false,
       "mqtt": false,
@@ -246,6 +241,23 @@
       "plugin_push_notification": false
     },
     "plugin_settings": {
+      "frequency_plugin_google_activity_recognition": 10,
+      "status_plugin_fitbit": false,
+      "plugin_fitbit_frequency": 60,
+      "units_plugin_fitbit": "metric",
+      "fitbit_granularity": 15,
+      "fitbit_hr_granularity": 1,
+      "api_key_plugin_fitbit": "",
+      "api_secret_plugin_fitbit": "",
+      "frequency_plugin_contacts": 30,
+      "frequency_google_fused_location": 300,
+      "max_frequency_google_fused_location": 60,
+      "fallback_location_timeout": 20,
+      "location_sensitivity": 3,
+      "accuracy_google_fused_location": 0,
+      "plugin_conversations_delay": 5,
+      "plugin_conversations_off_duty": 30,
+      "plugin_conversations_length": 60,
       "frequency_health_kit": 30,
       "preperiod_days_health_kit": 7,
       "plugin_ble_heartrate_interval_min": 1,
@@ -316,17 +328,17 @@
         "enabled": false,
         "frequency": 20000,
         "threshold": 10,
-        "enforce": true
+        "enforce": false
       },
       "applications": {
         "enabled": false,
-        "frequency": 30
+        "frequency": 60
       },
       "barometer": {
         "enabled": false,
         "frequency": 20000,
         "threshold": 10,
-        "enforce": true
+        "enforce": false
       },
       "battery": {
         "enabled": false
@@ -338,35 +350,29 @@
       "esm": {
         "enabled": true
       },
-      "gravity": {
-        "enabled": true,
-        "frequency": 20000,
-        "threshold": 10,
-        "enforce": true
-      },
       "gyroscope": {
         "enabled": false,
         "frequency": 20000,
         "threshold": 10,
-        "enforce": true
+        "enforce": false
       },
       "light": {
         "enabled": false,
         "frequency": 20000,
         "threshold": 10,
-        "enforce": true
+        "enforce": false
       },
       "linear_accelerometer": {
         "enabled": false,
         "frequency": 20000,
         "threshold": 100,
-        "enforce": true
+        "enforce": false
       },
       "magnetometer": {
         "enabled": false,
         "frequency": 20000,
         "threshold": 10,
-        "enforce": true
+        "enforce": false
       },
       "processor": {
         "enabled": false,
@@ -376,13 +382,13 @@
         "enabled": false,
         "frequency": 20000,
         "threshold": 10,
-        "enforce": true
+        "enforce": false
       },
       "rotation": {
         "enabled": false,
         "frequency": 20000,
         "threshold": 10,
-        "enforce": true
+        "enforce": false
       },
       "screen": {
         "enabled": false
@@ -394,7 +400,7 @@
         "enabled": false,
         "frequency": 20000,
         "threshold": 10,
-        "enforce": true
+        "enforce": false
       },
       "timezone": {
         "enabled": false,

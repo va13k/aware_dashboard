@@ -15,6 +15,7 @@ import pathlib
 import pytest
 
 from shared_config.serializers import (
+    ANDROID_ONLY_SHARED_SENSOR_NAMES,
     COMMON_SHARED_SENSOR_FIELDS,
     IOS_ONLY_SENSOR_NAMES,
     apply_ios_study_config,
@@ -294,15 +295,14 @@ def ios_example(tmp_path):
                     {"setting": "status_accelerometer", "defaultValue": "false"},
                     {"setting": "frequency_accelerometer", "defaultValue": "200000"},
                     {"setting": "threshold_accelerometer", "defaultValue": "0"},
-                    {"setting": "frequency_accelerometer_enforce", "defaultValue": "false"},
                 ],
             },
             {
                 "sensor": "locations",
                 "settings": [
                     {"setting": "status_location_gps", "defaultValue": "false"},
-                    {"setting": "frequency_location_gps", "defaultValue": "180"},
-                    {"setting": "min_location_gps_accuracy", "defaultValue": "150"},
+                    {"setting": "frequency_gps", "defaultValue": "180"},
+                    {"setting": "min_gps_accuracy", "defaultValue": "150"},
                 ],
             },
             {
@@ -560,28 +560,30 @@ class TestBuildIosSensorSettings:
         assert result["frequency_webservice"] == 60
 
     def test_rename_frequency_gps(self, source):
+        # frequency_location_gps in android.settings is renamed to frequency_gps for iOS
         result = build_ios_sensor_settings(source)
-        assert "frequency_location_gps" in result
-        assert result["frequency_location_gps"] == 180
-        assert "frequency_gps" not in result
+        assert "frequency_gps" in result
+        assert result["frequency_gps"] == 180
+        assert "frequency_location_gps" not in result
 
     def test_rename_frequency_network(self, source):
+        # iOS has no separate network location frequency — Android-only setting
         result = build_ios_sensor_settings(source)
-        assert "frequency_location_network" in result
-        assert result["frequency_location_network"] == 300
+        assert "frequency_location_network" not in result
 
     def test_ios_sensors_network_compound_expansion(self, source):
-        # ios.sensors.network=False → status_network_events=False, status_network_traffic=False
-        # but android.settings.status_network_events=True overrides
+        # ios.sensors.network=False → status_network_events=False (no traffic on iOS)
+        # android.settings.status_network_events=True overrides the baseline
         result = build_ios_sensor_settings(source)
         assert result["status_network_events"] is True  # android overrides ios.sensors
+        assert "status_network_traffic" not in result  # iOS has no network traffic sensor
 
     def test_ios_sensors_communication_compound(self, source):
-        # ios.sensors.communication=True → status_calls, status_messages
-        # android.settings.status_calls=True, status_messages=False override
+        # ios.sensors.communication=True → status_calls only (iOS has no SMS access)
+        # android.settings.status_calls=True overrides the baseline
         result = build_ios_sensor_settings(source)
         assert result["status_calls"] is True
-        assert result["status_messages"] is False
+        assert "status_messages" not in result
 
     def test_shared_sensors_take_highest_priority(self, source):
         # android.settings has frequency_accelerometer=20000, shared.sensors has 20000
@@ -881,12 +883,430 @@ class TestGravitySensor:
         sensor_names = [s.get("sensor") for s in config.get("sensors", [])]
         assert "gravity" not in sensor_names
 
-    def test_gravity_disabled_in_source_json_ios(self):
-        """Verify the real source.json marks gravity as disabled for iOS."""
+    def test_gravity_absent_from_source_json_ios(self):
+        """Verify the real source.json has no gravity entry in ios.sensors."""
         source_path = pathlib.Path(__file__).resolve().parent.parent / "source.json"
         real_source = json.loads(source_path.read_text(encoding="utf-8"))
-        ios_gravity = real_source["ios"]["sensors"].get("gravity")
-        assert ios_gravity is False, "ios.sensors.gravity should be False in source.json"
+        assert "gravity" not in real_source["ios"]["sensors"], \
+            "ios.sensors must not contain gravity in source.json"
+
+
+# ===========================================================================
+# Temperature sensor — Android-only
+# ===========================================================================
+
+class TestTemperatureSensor:
+    """Temperature is Android-only: iPhones have no ambient thermometer hardware."""
+
+    TEMPERATURE = {
+        "enabled": True,
+        "frequency": 20000,
+        "threshold": 10,
+        "enforce": True,
+    }
+
+    def test_temperature_in_common_shared_sensor_fields(self):
+        assert "temperature" in COMMON_SHARED_SENSOR_FIELDS
+
+    def test_temperature_in_android_only_shared_sensor_names(self):
+        assert "temperature" in ANDROID_ONLY_SHARED_SENSOR_NAMES
+
+    def test_temperature_not_in_ios_sensor_settings(self, source):
+        source["shared"]["sensors"]["temperature"] = self.TEMPERATURE
+        result = build_ios_sensor_settings(source)
+        assert "status_temperature" not in result
+        assert "frequency_temperature" not in result
+        assert "threshold_temperature" not in result
+        assert "frequency_temperature_enforce" not in result
+
+    def test_temperature_in_android_config(self, source, settings, android_template):
+        source["android"]["settings"]["status_temperature"] = True
+        source["android"]["settings"]["frequency_temperature"] = 20000
+        source["android"]["settings"]["threshold_temperature"] = 10
+        source["android"]["settings"]["frequency_temperature_enforce"] = True
+        template = json.loads(android_template.read_text())
+        template["sensors"] += [
+            {"setting": "status_temperature", "value": False},
+            {"setting": "frequency_temperature", "value": 200000},
+            {"setting": "threshold_temperature", "value": 0},
+            {"setting": "frequency_temperature_enforce", "value": False},
+        ]
+        android_template.write_text(json.dumps(template))
+        config = serialize_android_config(source, settings, android_template)
+        assert sensor_value(config, "status_temperature") is True
+        assert sensor_value(config, "frequency_temperature") == 20000
+        assert sensor_value(config, "threshold_temperature") == 10
+        assert sensor_value(config, "frequency_temperature_enforce") is True
+
+    def test_temperature_shared_sensor_flows_to_android(self, source, settings, android_template):
+        source["shared"]["sensors"]["temperature"] = self.TEMPERATURE
+        template = json.loads(android_template.read_text())
+        template["sensors"] += [
+            {"setting": "status_temperature", "value": False},
+            {"setting": "frequency_temperature", "value": 0},
+            {"setting": "threshold_temperature", "value": 0},
+            {"setting": "frequency_temperature_enforce", "value": False},
+        ]
+        android_template.write_text(json.dumps(template))
+        config = serialize_android_config(source, settings, android_template)
+        assert sensor_value(config, "status_temperature") is True
+        assert sensor_value(config, "frequency_temperature") == 20000
+
+    def test_temperature_not_written_to_ios_config(
+        self, source, settings, ios_existing, tmp_path
+    ):
+        source["shared"]["sensors"]["temperature"] = self.TEMPERATURE
+        example = {
+            "server": {
+                "database_engine": "mysql",
+                "database_host": "localhost",
+                "database_name": "aware_ios",
+                "database_user": "u",
+                "database_pwd": "p",
+                "database_port": 3306,
+                "server_host": "0.0.0.0",
+                "external_server_host": "http://localhost",
+                "external_server_port": 80,
+                "server_port": 8080,
+                "websocket_port": 8081,
+                "path_fullchain_pem": "",
+                "path_key_pem": "",
+            },
+            "study": {
+                "study_key": "placeholder",
+                "study_number": 1,
+                "study_name": "",
+                "study_active": True,
+                "study_start": 0,
+                "study_description": "",
+                "researcher_first": "",
+                "researcher_last": "",
+                "researcher_contact": "",
+            },
+            "sensors": [],
+            "plugins": [],
+        }
+        example_path = tmp_path / "aware-config-no-temperature.example.json"
+        example_path.write_text(json.dumps(example))
+        config, _ = serialize_ios_config(source, settings, example_path, ios_existing)
+        sensor_names = [s.get("sensor") for s in config.get("sensors", [])]
+        assert "temperature" not in sensor_names
+
+    def test_temperature_absent_from_source_json_ios_sensors(self):
+        source_path = pathlib.Path(__file__).resolve().parent.parent / "source.json"
+        real_source = json.loads(source_path.read_text(encoding="utf-8"))
+        assert "temperature" not in real_source["ios"]["sensors"], \
+            "ios.sensors must not contain temperature in source.json"
+
+    def test_temperature_present_in_source_json_shared_sensors(self):
+        source_path = pathlib.Path(__file__).resolve().parent.parent / "source.json"
+        real_source = json.loads(source_path.read_text(encoding="utf-8"))
+        assert "temperature" in real_source["shared"]["sensors"], \
+            "shared.sensors must contain temperature for Android config"
+
+
+# ===========================================================================
+# Telephony sensor — Android-only
+# ===========================================================================
+
+class TestTelephonySensor:
+    """Telephony is Android-only: iOS has no equivalent cell-tower/operator API."""
+
+    def test_telephony_in_common_shared_sensor_fields(self):
+        assert "telephony" in COMMON_SHARED_SENSOR_FIELDS
+
+    def test_telephony_in_android_only_shared_sensor_names(self):
+        assert "telephony" in ANDROID_ONLY_SHARED_SENSOR_NAMES
+
+    def test_telephony_not_in_ios_sensor_settings(self, source):
+        source["shared"]["sensors"]["telephony"] = {"enabled": True}
+        result = build_ios_sensor_settings(source)
+        assert "status_telephony" not in result
+
+    def test_telephony_in_android_config(self, source, settings, android_template):
+        source["android"]["settings"]["status_telephony"] = True
+        template = json.loads(android_template.read_text())
+        template["sensors"] += [{"setting": "status_telephony", "value": False}]
+        android_template.write_text(json.dumps(template))
+        config = serialize_android_config(source, settings, android_template)
+        assert sensor_value(config, "status_telephony") is True
+
+    def test_telephony_shared_sensor_flows_to_android(self, source, settings, android_template):
+        source["shared"]["sensors"]["telephony"] = {"enabled": True}
+        template = json.loads(android_template.read_text())
+        template["sensors"] += [{"setting": "status_telephony", "value": False}]
+        android_template.write_text(json.dumps(template))
+        config = serialize_android_config(source, settings, android_template)
+        assert sensor_value(config, "status_telephony") is True
+
+    def test_telephony_absent_from_source_json_ios_sensors(self):
+        source_path = pathlib.Path(__file__).resolve().parent.parent / "source.json"
+        real_source = json.loads(source_path.read_text(encoding="utf-8"))
+        assert "telephony" not in real_source["ios"]["sensors"], \
+            "ios.sensors must not contain telephony in source.json"
+
+    def test_telephony_present_in_source_json_shared_sensors(self):
+        source_path = pathlib.Path(__file__).resolve().parent.parent / "source.json"
+        real_source = json.loads(source_path.read_text(encoding="utf-8"))
+        assert "telephony" in real_source["shared"]["sensors"], \
+            "shared.sensors must contain telephony for Android config"
+
+
+# ===========================================================================
+# Applications sensor — Android-only
+# ===========================================================================
+
+class TestApplicationsSensor:
+    """Applications sensor is Android-only: iOS sandboxing prevents app/process enumeration."""
+
+    APPLICATIONS = {"enabled": True, "frequency": 30}
+
+    def test_applications_in_common_shared_sensor_fields(self):
+        assert "applications" in COMMON_SHARED_SENSOR_FIELDS
+
+    def test_applications_in_android_only_shared_sensor_names(self):
+        assert "applications" in ANDROID_ONLY_SHARED_SENSOR_NAMES
+
+    def test_applications_not_in_ios_sensor_settings(self, source):
+        source["shared"]["sensors"]["applications"] = self.APPLICATIONS
+        result = build_ios_sensor_settings(source)
+        assert "status_applications" not in result
+        assert "frequency_applications" not in result
+
+    def test_applications_sub_settings_not_in_ios(self, source):
+        source["android"]["settings"].update({
+            "status_notifications": True,
+            "status_crashes": True,
+            "status_keyboard": True,
+            "mask_keyboard": True,
+            "status_installations": True,
+        })
+        result = build_ios_sensor_settings(source)
+        for key in ("status_notifications", "status_crashes", "status_keyboard",
+                    "mask_keyboard", "status_installations"):
+            assert key not in result, f"{key} must not flow to iOS settings"
+
+    def test_applications_in_android_config(self, source, settings, android_template):
+        source["android"]["settings"]["status_applications"] = True
+        source["android"]["settings"]["frequency_applications"] = 30
+        template = json.loads(android_template.read_text())
+        template["sensors"] += [
+            {"setting": "status_applications", "value": False},
+            {"setting": "frequency_applications", "value": 0},
+        ]
+        android_template.write_text(json.dumps(template))
+        config = serialize_android_config(source, settings, android_template)
+        assert sensor_value(config, "status_applications") is True
+        assert sensor_value(config, "frequency_applications") == 30
+
+    def test_applications_shared_sensor_flows_to_android(self, source, settings, android_template):
+        source["shared"]["sensors"]["applications"] = self.APPLICATIONS
+        template = json.loads(android_template.read_text())
+        template["sensors"] += [
+            {"setting": "status_applications", "value": False},
+            {"setting": "frequency_applications", "value": 0},
+        ]
+        android_template.write_text(json.dumps(template))
+        config = serialize_android_config(source, settings, android_template)
+        assert sensor_value(config, "status_applications") is True
+        assert sensor_value(config, "frequency_applications") == 30
+
+    def test_applications_absent_from_source_json_ios_sensors(self):
+        source_path = pathlib.Path(__file__).resolve().parent.parent / "source.json"
+        real_source = json.loads(source_path.read_text(encoding="utf-8"))
+        assert "applications" not in real_source["ios"]["sensors"], \
+            "ios.sensors must not contain applications in source.json"
+
+    def test_applications_present_in_source_json_shared_sensors(self):
+        source_path = pathlib.Path(__file__).resolve().parent.parent / "source.json"
+        real_source = json.loads(source_path.read_text(encoding="utf-8"))
+        assert "applications" in real_source["shared"]["sensors"], \
+            "shared.sensors must contain applications for Android config"
+
+
+# ===========================================================================
+# Light sensor — Android-only
+# ===========================================================================
+
+class TestLightSensor:
+    """Light sensor is Android-only: iPhones have no ambient light hardware sensor API."""
+
+    LIGHT = {"enabled": True, "frequency": 20000, "threshold": 10, "enforce": True}
+
+    def test_light_in_common_shared_sensor_fields(self):
+        assert "light" in COMMON_SHARED_SENSOR_FIELDS
+
+    def test_light_in_android_only_shared_sensor_names(self):
+        assert "light" in ANDROID_ONLY_SHARED_SENSOR_NAMES
+
+    def test_light_not_in_ios_sensor_settings(self, source):
+        source["shared"]["sensors"]["light"] = self.LIGHT
+        result = build_ios_sensor_settings(source)
+        assert "status_light" not in result
+        assert "frequency_light" not in result
+        assert "threshold_light" not in result
+        assert "frequency_light_enforce" not in result
+
+    def test_light_in_android_config(self, source, settings, android_template):
+        source["android"]["settings"]["status_light"] = True
+        source["android"]["settings"]["frequency_light"] = 20000
+        source["android"]["settings"]["threshold_light"] = 10
+        source["android"]["settings"]["frequency_light_enforce"] = True
+        template = json.loads(android_template.read_text())
+        template["sensors"] += [
+            {"setting": "status_light", "value": False},
+            {"setting": "frequency_light", "value": 0},
+            {"setting": "threshold_light", "value": 0},
+            {"setting": "frequency_light_enforce", "value": False},
+        ]
+        android_template.write_text(json.dumps(template))
+        config = serialize_android_config(source, settings, android_template)
+        assert sensor_value(config, "status_light") is True
+        assert sensor_value(config, "frequency_light") == 20000
+        assert sensor_value(config, "threshold_light") == 10
+        assert sensor_value(config, "frequency_light_enforce") is True
+
+    def test_light_shared_sensor_flows_to_android(self, source, settings, android_template):
+        source["shared"]["sensors"]["light"] = self.LIGHT
+        template = json.loads(android_template.read_text())
+        template["sensors"] += [
+            {"setting": "status_light", "value": False},
+            {"setting": "frequency_light", "value": 0},
+            {"setting": "threshold_light", "value": 0},
+            {"setting": "frequency_light_enforce", "value": False},
+        ]
+        android_template.write_text(json.dumps(template))
+        config = serialize_android_config(source, settings, android_template)
+        assert sensor_value(config, "status_light") is True
+        assert sensor_value(config, "frequency_light") == 20000
+
+    def test_light_absent_from_source_json_ios_sensors(self):
+        source_path = pathlib.Path(__file__).resolve().parent.parent / "source.json"
+        real_source = json.loads(source_path.read_text(encoding="utf-8"))
+        assert "light" not in real_source["ios"]["sensors"], \
+            "ios.sensors must not contain light in source.json"
+
+    def test_light_present_in_source_json_shared_sensors(self):
+        source_path = pathlib.Path(__file__).resolve().parent.parent / "source.json"
+        real_source = json.loads(source_path.read_text(encoding="utf-8"))
+        assert "light" in real_source["shared"]["sensors"], \
+            "shared.sensors must contain light for Android config"
+
+
+# ===========================================================================
+# Screen sensor — iOS has status_screen only (no touch/keyboard sub-settings)
+# ===========================================================================
+
+class TestScreenSensorIos:
+    """status_touch and mask_touch_text are Android-only; iOS only exposes status_screen."""
+
+    def test_status_touch_not_in_ios_sensor_settings(self, source):
+        source["android"]["settings"]["status_touch"] = True
+        result = build_ios_sensor_settings(source)
+        assert "status_touch" not in result
+
+    def test_mask_touch_text_not_in_ios_sensor_settings(self, source):
+        source["android"]["settings"]["mask_touch_text"] = True
+        result = build_ios_sensor_settings(source)
+        assert "mask_touch_text" not in result
+
+    def test_status_screen_does_flow_to_ios(self, source):
+        source["android"]["settings"]["status_screen"] = True
+        result = build_ios_sensor_settings(source)
+        assert result.get("status_screen") is True
+
+    def test_status_touch_flows_to_android(self, source, settings, android_template):
+        source["android"]["settings"]["status_touch"] = True
+        config = serialize_android_config(source, settings, android_template)
+        # status_touch is written to Android via android.settings directly
+        assert sensor_value(config, "status_screen") is False  # default from template
+
+    def test_status_touch_in_android_template(self, android_template):
+        import json
+        template = json.loads(android_template.read_text())
+        assert any(s.get("setting") == "status_screen" for s in template["sensors"])
+
+
+# ===========================================================================
+# Accelerometer — iOS has no "enforce frequency" concept (CoreMotion)
+# ===========================================================================
+
+class TestAccelerometerIos:
+    """iOS CoreMotion delivers data at hardware rate; *_enforce keys must not appear."""
+
+    def test_enforce_not_in_ios_sensor_settings(self, source):
+        result = build_ios_sensor_settings(source)
+        assert "frequency_accelerometer_enforce" not in result
+
+    def test_status_frequency_threshold_flow_to_ios(self, source):
+        result = build_ios_sensor_settings(source)
+        assert "status_accelerometer" in result
+        assert "frequency_accelerometer" in result
+        assert "threshold_accelerometer" in result
+
+    def test_enforce_not_updated_in_ios_config(self, source, settings, ios_example, ios_existing):
+        config, _ = serialize_ios_config(source, settings, ios_example, ios_existing)
+        for sensor in config.get("sensors", []):
+            if sensor.get("sensor") == "accelerometer":
+                setting_names = [s.get("setting") for s in sensor.get("settings", [])]
+                assert "frequency_accelerometer_enforce" not in setting_names
+
+    def test_enforce_still_flows_to_android(self, source, settings, android_template):
+        source["shared"]["sensors"]["accelerometer"]["enforce"] = True
+        config = serialize_android_config(source, settings, android_template)
+        assert sensor_value(config, "frequency_accelerometer_enforce") is True
+
+    def test_all_enforce_keys_stripped_from_ios(self, source):
+        # Plant enforce values across multiple shared sensors and verify none reach iOS.
+        for sensor_name in ("barometer", "gyroscope", "magnetometer", "proximity", "rotation"):
+            source["shared"]["sensors"].setdefault(sensor_name, {})["enforce"] = True
+        result = build_ios_sensor_settings(source)
+        enforce_keys = [k for k in result if k.endswith("_enforce")]
+        assert enforce_keys == [], f"Unexpected _enforce keys in iOS settings: {enforce_keys}"
+
+
+# ===========================================================================
+# Locations — iOS uses abbreviated GPS field names; network location is Android-only
+# ===========================================================================
+
+class TestLocationsIos:
+    """iOS Core Location: GPS only, renamed frequency/accuracy keys, no network location."""
+
+    def test_frequency_gps_renamed_in_ios_settings(self, source):
+        result = build_ios_sensor_settings(source)
+        assert "frequency_gps" in result
+        assert result["frequency_gps"] == 180
+        assert "frequency_location_gps" not in result
+
+    def test_min_gps_accuracy_renamed_in_ios_settings(self, source):
+        result = build_ios_sensor_settings(source)
+        assert "min_gps_accuracy" in result
+        assert result["min_gps_accuracy"] == 150
+        assert "min_location_gps_accuracy" not in result
+
+    def test_network_location_settings_absent_from_ios(self, source):
+        result = build_ios_sensor_settings(source)
+        for key in (
+            "status_location_network", "frequency_location_network",
+            "min_location_network_accuracy", "status_location_passive",
+            "location_expiration_time", "location_save_all",
+        ):
+            assert key not in result, f"{key} must not flow to iOS settings"
+
+    def test_network_traffic_absent_from_ios(self, source):
+        result = build_ios_sensor_settings(source)
+        assert "status_network_traffic" not in result
+
+    def test_renamed_location_keys_applied_in_ios_config(
+        self, source, settings, ios_example, ios_existing
+    ):
+        config, _ = serialize_ios_config(source, settings, ios_example, ios_existing)
+        assert ios_setting_default(config, "locations", "frequency_gps") == "180"
+        assert ios_setting_default(config, "locations", "min_gps_accuracy") == "150"
+
+    def test_location_gps_status_still_flows_unchanged(self, source):
+        result = build_ios_sensor_settings(source)
+        assert result.get("status_location_gps") is True
 
 
 # ===========================================================================
@@ -973,20 +1393,23 @@ class TestAndroidConfigCorrectness:
         assert _android_setting(config, "webservice_wifi_only") is True
 
     def test_location_frequency_propagates_to_ios(self, source, settings):
-        """frequency_location_gps/network in android.settings flow into iOS config."""
+        """frequency_location_gps is renamed to frequency_gps for iOS."""
         source["android"]["settings"]["frequency_location_gps"] = 90
         source["android"]["settings"]["frequency_location_network"] = 200
         ios_settings = build_ios_sensor_settings(source)
-        assert ios_settings.get("frequency_location_gps") == 90
-        assert ios_settings.get("frequency_location_network") == 200
+        assert ios_settings.get("frequency_gps") == 90
+        assert "frequency_location_gps" not in ios_settings
+        assert "frequency_location_network" not in ios_settings  # Android-only
 
-    def test_no_legacy_gps_keys_in_ios(self, source, settings):
-        """The old frequency_gps / frequency_network keys must not appear in iOS settings."""
+    def test_ios_uses_abbreviated_gps_keys(self, source, settings):
+        """iOS uses frequency_gps / min_gps_accuracy, not the full Android names."""
         source["android"]["settings"]["frequency_location_gps"] = 90
-        source["android"]["settings"]["frequency_location_network"] = 200
+        source["android"]["settings"]["min_location_gps_accuracy"] = 75
         ios_settings = build_ios_sensor_settings(source)
-        assert "frequency_gps" not in ios_settings
-        assert "frequency_network" not in ios_settings
+        assert ios_settings.get("frequency_gps") == 90
+        assert ios_settings.get("min_gps_accuracy") == 75
+        assert "frequency_location_gps" not in ios_settings
+        assert "min_location_gps_accuracy" not in ios_settings
 
     def test_real_source_json_uses_correct_location_keys(self):
         """The committed source.json must use the correct GPS/network frequency keys."""

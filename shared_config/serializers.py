@@ -31,6 +31,10 @@ COMMON_SHARED_SENSOR_FIELDS: dict[str, tuple[str, ...]] = {
     "wifi": ("enabled", "frequency"),
 }
 
+# Sensors that live in shared.sensors (for Android config) but have no
+# hardware equivalent on iPhone and must be excluded from the iOS config.
+ANDROID_ONLY_SHARED_SENSOR_NAMES: frozenset[str] = frozenset({"applications", "light", "telephony", "temperature"})
+
 IOS_ONLY_SENSOR_NAMES = ("significant_motion", "websocket", "mqtt")
 
 IOS_ESM_CONFIG_FILENAME = "ios-esm-config.json"
@@ -307,67 +311,40 @@ def resolve_database_host(
 
 
 # Android setting keys that have the same name in the iOS config.
+# Only keys for settings that exist on BOTH platforms belong here.
+# iOS-only plugin settings are stored in ios.plugin_settings and merged separately.
 _ANDROID_TO_IOS_DIRECT = frozenset({
-    # webservice / sync
+    # webservice / sync (iOS subset — Android-only keys removed)
     "webservice_wifi_only", "webservice_charging", "frequency_webservice",
-    "frequency_clean_old_data", "webservice_silent", "fallback_network",
-    "remind_to_charge", "foreground_priority",
-    "webservice_simple", "webservice_remove_data", "debug_db_slow",
+    "frequency_clean_old_data",
+    "webservice_simple",
     "status_mqtt", "mqtt_server", "mqtt_port", "mqtt_username",
     "mqtt_password", "mqtt_keep_alive", "mqtt_qos",
     # debug
     "debug_flag",
-    # applications
-    "status_notifications", "status_crashes", "frequency_applications",
-    "status_keyboard", "mask_keyboard", "status_installations",
-    # screen
-    "status_touch", "mask_touch_text",
-    # locations (exact-match subset)
-    "status_location_gps", "min_location_gps_accuracy",
-    "status_location_network", "min_location_network_accuracy",
-    "status_location_passive", "location_expiration_time", "location_save_all",
-    "frequency_location_gps", "frequency_location_network",
-    # communication / network (granular)
-    "status_calls", "status_messages",
-    "status_network_events", "status_network_traffic",
-    # plugin: ambient noise
+    # locations: only GPS toggle passes through unchanged; frequency and accuracy
+    # are renamed via _ANDROID_TO_IOS_RENAME; network/passive/expiry are Android-only
+    "status_location_gps",
+    # communication / network (iOS only has network events, not traffic)
+    "status_calls",
+    "status_network_events",
+    # plugin: ambient noise (shared — both Android and iOS)
     "status_plugin_ambient_noise",
     "frequency_plugin_ambient_noise", "plugin_ambient_noise_sample_size",
     "plugin_ambient_noise_silence_threshold", "plugin_ambient_noise_no_raw",
-    # plugin: openweather
+    # plugin: openweather (shared — both Android and iOS)
     "status_plugin_openweather", "plugin_openweather_frequency",
-    # plugin: google activity recognition
-    "status_plugin_google_activity_recognition",
-    "frequency_plugin_google_activity_recognition",
-    # plugin: sentimental
-    "status_plugin_sentimental",
-    # plugin: esm scheduler
+    # plugin: esm scheduler (shared — both Android and iOS)
     "status_plugin_esm_scheduler",
-    # plugin: fitbit
-    "status_plugin_fitbit", "units_plugin_fitbit",
-    "fitbit_granularity", "fitbit_hr_granularity",
-    "plugin_fitbit_frequency", "api_key_plugin_fitbit", "api_secret_plugin_fitbit",
-    # plugin: sensortag
-    "status_plugin_sensortag", "frequency_plugin_sensortag",
-    # plugin: contacts list
-    "status_plugin_contacts", "frequency_plugin_contacts",
-    # plugin: google auth
-    "status_plugin_google_login",
-    # plugin: google fused location
-    "status_google_fused_location", "frequency_google_fused_location",
-    "max_frequency_google_fused_location", "fallback_location_timeout",
-    "location_sensitivity", "accuracy_google_fused_location",
-    # plugin: device usage
-    "status_plugin_device_usage",
-    # plugin: conversations
-    "status_plugin_studentlife_audio", "plugin_conversations_delay",
-    "plugin_conversations_off_duty", "plugin_conversations_length",
 })
 
 # Android setting keys that appear under a different name in the iOS config.
 _ANDROID_TO_IOS_RENAME: dict[str, str] = {
     "plugin_openweather_api_key": "api_key_plugin_openweather",
     "plugin_openweather_measurement_units": "units_plugin_openweather",
+    # iOS Core Location uses abbreviated field names for GPS
+    "frequency_location_gps": "frequency_gps",
+    "min_location_gps_accuracy": "min_gps_accuracy",
 }
 
 
@@ -381,10 +358,8 @@ def build_ios_sensor_settings(source: dict) -> dict[str, object]:
     for sensor_name, enabled in ios_sensors.items():
         if sensor_name == "network":
             sensor_settings["status_network_events"] = enabled
-            sensor_settings["status_network_traffic"] = enabled
         elif sensor_name == "communication":
             sensor_settings["status_calls"] = enabled
-            sensor_settings["status_messages"] = enabled
         elif sensor_name == "locations":
             sensor_settings["status_location_gps"] = enabled
         else:
@@ -401,7 +376,15 @@ def build_ios_sensor_settings(source: dict) -> dict[str, object]:
 
     # Step 3: shared sensor settings (frequency/threshold/enforce) take
     # highest priority as the authoritative cross-platform values.
-    sensor_settings.update(build_shared_sensor_settings(source))
+    # Android-only sensors are stripped before merging so they never reach iOS.
+    # All *_enforce keys are also stripped: CoreMotion on iOS delivers data at
+    # its own hardware rate and has no "enforce frequency" concept.
+    shared = build_shared_sensor_settings(source)
+    for sensor_name in ANDROID_ONLY_SHARED_SENSOR_NAMES:
+        for field_name in COMMON_SHARED_SENSOR_FIELDS.get(sensor_name, ()):
+            shared.pop(build_sensor_setting_name(sensor_name, field_name), None)
+    shared = {k: v for k, v in shared.items() if not k.endswith("_enforce")}
+    sensor_settings.update(shared)
     return sensor_settings
 
 
@@ -591,6 +574,8 @@ def serialize_ios_config(
     update_ios_server_config(config, source["database"], settings)
     study = apply_ios_study_config(config, source, existing_config, study_key)
     ios_sensor_settings = build_ios_sensor_settings(source)
+    # Merge iOS-only plugin sub-settings (not in android.settings)
+    ios_sensor_settings.update(source.get("ios", {}).get("plugin_settings", {}))
     update_ios_sensor_defaults(config.get("sensors", []), ios_sensor_settings)
     update_ios_plugin_defaults(config.get("plugins", []), source["ios"].get("plugins", {}))
     update_ios_plugin_settings(config.get("plugins", []), ios_sensor_settings)
