@@ -15,7 +15,7 @@ interface Props {
 function makeTickFormatter(spanMs: number) {
   const multiDay = spanMs > 24 * 60 * 60 * 1000
   return (ts: number) => {
-    const d = new Date(ts * 1000)
+    const d = new Date(ts)
     if (multiDay) {
       return d.toLocaleDateString([], { month: 'short', day: 'numeric' })
         + ' ' + d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
@@ -33,7 +33,7 @@ export default function SensorTimeSeriesCard({ config, records, loading }: Props
   const values = data.map(d => d.value)
   const lastVal = values.length ? values[values.length - 1] : null
   const spanMs = data.length > 1
-    ? (data[data.length - 1].time - data[0].time) * 1000
+    ? data[data.length - 1].time - data[0].time
     : 0
   const tickFormatter = makeTickFormatter(spanMs)
 
@@ -76,7 +76,7 @@ export default function SensorTimeSeriesCard({ config, records, loading }: Props
             />
             <YAxis tick={{ fill: '#5f746b', fontSize: 11 }} width={45} />
             <Tooltip
-              labelFormatter={v => new Date((v as number) * 1000).toLocaleString()}
+              labelFormatter={v => new Date(v as number).toLocaleString()}
               contentStyle={{ background: '#fffdf8', border: '1px solid rgba(48,67,54,0.14)', borderRadius: 10 }}
               labelStyle={{ color: '#5f746b' }}
               itemStyle={{ color: '#193229' }}

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { fetchDeviceDetail, fetchDevices, fetchSensor } from "../api/client";
-import { SENSOR_CONFIGS } from "../config/sensors";
+import { SENSOR_CONFIGS, sensorsForPlatform } from "../config/sensors";
 import SensorTimeSeriesCard from "../components/SensorTimeSeriesCard";
 import NetworkTypeCard from "../components/NetworkTypeCard";
 import ActivityCard from "../components/ActivityCard";
@@ -42,7 +42,7 @@ function deviceLabel(d: Device): string {
 
 function lastSeenLabel(ts: number | null | undefined): string {
   if (!ts) return "never";
-  const diff = Date.now() / 1000 - ts;
+  const diff = (Date.now() - ts) / 1000;
   if (diff < 60) return "just now";
   if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
   if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
@@ -209,10 +209,11 @@ export default function DevicePage() {
       : null;
   const currentSensorState =
     sensorState.key === selectedKey ? sensorState : EMPTY_SENSOR_STATE;
+  const platformSensors = selected ? sensorsForPlatform(selected.platform) : SENSOR_CONFIGS;
   const pendingSensorKeys =
     currentSensorState.key === selectedKey
       ? currentSensorState.loadingKeys
-      : new Set(SENSOR_CONFIGS.map((s) => s.key));
+      : new Set(platformSensors.map((s) => s.key));
 
   useEffect(() => {
     if (!selected) return;
@@ -236,22 +237,26 @@ export default function DevicePage() {
     if (!selected) return;
     let cancelled = false;
 
-    for (const sensor of SENSOR_CONFIGS) {
+    const sensors = sensorsForPlatform(selected.platform);
+    const initialLoadingKeys = new Set(sensors.map((s) => s.key));
+    const isIos = selected.platform === "ios";
+
+    const emptyState = () => ({
+      key: selectedKey,
+      sensorData: {} as Record<string, SensorRecord[]>,
+      networkData: [] as SensorRecord[],
+      activityData: [] as SensorRecord[],
+      loadingKeys: initialLoadingKeys,
+      networkLoading: true,
+      activityLoading: isIos,
+    });
+
+    for (const sensor of sensors) {
       fetchSensor(selected.platform, selected.device_id, sensor.key)
         .then((records) => {
           if (cancelled) return;
           setSensorState((prev) => ({
-            ...(prev.key === selectedKey
-              ? prev
-              : {
-                  key: selectedKey,
-                  sensorData: {},
-                  networkData: [],
-                  activityData: [],
-                  loadingKeys: new Set(SENSOR_CONFIGS.map((s) => s.key)),
-                  networkLoading: true,
-                  activityLoading: true,
-                }),
+            ...(prev.key === selectedKey ? prev : emptyState()),
             sensorData: {
               ...(prev.key === selectedKey ? prev.sensorData : {}),
               [sensor.key]: records,
@@ -261,17 +266,7 @@ export default function DevicePage() {
         .catch(() => {
           if (cancelled) return;
           setSensorState((prev) => ({
-            ...(prev.key === selectedKey
-              ? prev
-              : {
-                  key: selectedKey,
-                  sensorData: {},
-                  networkData: [],
-                  activityData: [],
-                  loadingKeys: new Set(SENSOR_CONFIGS.map((s) => s.key)),
-                  networkLoading: true,
-                  activityLoading: true,
-                }),
+            ...(prev.key === selectedKey ? prev : emptyState()),
             sensorData: {
               ...(prev.key === selectedKey ? prev.sensorData : {}),
               [sensor.key]: [],
@@ -281,18 +276,7 @@ export default function DevicePage() {
         .finally(() => {
           if (cancelled) return;
           setSensorState((prev) => {
-            const base =
-              prev.key === selectedKey
-                ? prev
-                : {
-                    key: selectedKey,
-                    sensorData: {},
-                    networkData: [],
-                    activityData: [],
-                    loadingKeys: new Set(SENSOR_CONFIGS.map((s) => s.key)),
-                    networkLoading: true,
-                    activityLoading: true,
-                  };
+            const base = prev.key === selectedKey ? prev : emptyState();
             const next = new Set(base.loadingKeys);
             next.delete(sensor.key);
             return { ...base, loadingKeys: next };
@@ -302,83 +286,41 @@ export default function DevicePage() {
 
     fetchSensor(selected.platform, selected.device_id, "network")
       .then((records) => {
-        if (!cancelled) {
+        if (!cancelled)
           setSensorState((prev) => ({
-            ...(prev.key === selectedKey
-              ? prev
-              : {
-                  key: selectedKey,
-                  sensorData: {},
-                  networkData: [],
-                  activityData: [],
-                  loadingKeys: new Set(SENSOR_CONFIGS.map((s) => s.key)),
-                  networkLoading: true,
-                  activityLoading: true,
-                }),
+            ...(prev.key === selectedKey ? prev : emptyState()),
             networkData: records,
             networkLoading: false,
           }));
-        }
       })
       .catch(() => {
-        if (!cancelled) {
+        if (!cancelled)
           setSensorState((prev) => ({
-            ...(prev.key === selectedKey
-              ? prev
-              : {
-                  key: selectedKey,
-                  sensorData: {},
-                  networkData: [],
-                  activityData: [],
-                  loadingKeys: new Set(SENSOR_CONFIGS.map((s) => s.key)),
-                  networkLoading: true,
-                  activityLoading: true,
-                }),
+            ...(prev.key === selectedKey ? prev : emptyState()),
             networkData: [],
             networkLoading: false,
           }));
-        }
       });
 
-    fetchSensor(selected.platform, selected.device_id, "activity")
-      .then((records) => {
-        if (!cancelled) {
-          setSensorState((prev) => ({
-            ...(prev.key === selectedKey
-              ? prev
-              : {
-                  key: selectedKey,
-                  sensorData: {},
-                  networkData: [],
-                  activityData: [],
-                  loadingKeys: new Set(SENSOR_CONFIGS.map((s) => s.key)),
-                  networkLoading: true,
-                  activityLoading: true,
-                }),
-            activityData: records,
-            activityLoading: false,
-          }));
-        }
-      })
-      .catch(() => {
-        if (!cancelled) {
-          setSensorState((prev) => ({
-            ...(prev.key === selectedKey
-              ? prev
-              : {
-                  key: selectedKey,
-                  sensorData: {},
-                  networkData: [],
-                  activityData: [],
-                  loadingKeys: new Set(SENSOR_CONFIGS.map((s) => s.key)),
-                  networkLoading: true,
-                  activityLoading: true,
-                }),
-            activityData: [],
-            activityLoading: false,
-          }));
-        }
-      });
+    if (isIos) {
+      fetchSensor(selected.platform, selected.device_id, "activity")
+        .then((records) => {
+          if (!cancelled)
+            setSensorState((prev) => ({
+              ...(prev.key === selectedKey ? prev : emptyState()),
+              activityData: records,
+              activityLoading: false,
+            }));
+        })
+        .catch(() => {
+          if (!cancelled)
+            setSensorState((prev) => ({
+              ...(prev.key === selectedKey ? prev : emptyState()),
+              activityData: [],
+              activityLoading: false,
+            }));
+        });
+    }
 
     return () => {
       cancelled = true;
@@ -469,32 +411,53 @@ export default function DevicePage() {
           loading={Boolean(selected && !currentDetail)}
         />
 
-        {selected && (
-          <div className="grid grid-cols-[repeat(auto-fill,minmax(320px,1fr))] gap-4">
-            {SENSOR_CONFIGS.map((config) => (
-              <SensorTimeSeriesCard
-                key={config.key}
-                config={config}
-                records={currentSensorState.sensorData[config.key] ?? []}
-                loading={pendingSensorKeys.has(config.key)}
-              />
-            ))}
-            <NetworkTypeCard
-              records={currentSensorState.networkData}
-              loading={
-                currentSensorState.key !== selectedKey ||
-                currentSensorState.networkLoading
-              }
-            />
-            <ActivityCard
-              records={currentSensorState.activityData}
-              loading={
-                currentSensorState.key !== selectedKey ||
-                currentSensorState.activityLoading
-              }
-            />
-          </div>
-        )}
+        {selected && (() => {
+          const sharedSensors = platformSensors.filter(s => s.platform === 'shared');
+          const specificSensors = platformSensors.filter(s => s.platform !== 'shared');
+          const specificLabel = selected.platform === 'android' ? 'Android only' : 'iPhone only';
+          const networkLoading = currentSensorState.key !== selectedKey || currentSensorState.networkLoading;
+          const activityLoading = currentSensorState.key !== selectedKey || currentSensorState.activityLoading;
+
+          return (
+            <>
+              <div className="text-[11px] font-semibold uppercase tracking-[0.6px] text-sage px-1">
+                Shared
+              </div>
+              <div className="grid grid-cols-[repeat(auto-fill,minmax(320px,1fr))] gap-4">
+                {sharedSensors.map((config) => (
+                  <SensorTimeSeriesCard
+                    key={config.key}
+                    config={config}
+                    records={currentSensorState.sensorData[config.key] ?? []}
+                    loading={pendingSensorKeys.has(config.key)}
+                  />
+                ))}
+                <NetworkTypeCard records={currentSensorState.networkData} loading={networkLoading} />
+              </div>
+
+              {specificSensors.length > 0 || selected.platform === 'ios' ? (
+                <>
+                  <div className="text-[11px] font-semibold uppercase tracking-[0.6px] text-sage px-1 mt-2">
+                    {specificLabel}
+                  </div>
+                  <div className="grid grid-cols-[repeat(auto-fill,minmax(320px,1fr))] gap-4">
+                    {specificSensors.map((config) => (
+                      <SensorTimeSeriesCard
+                        key={config.key}
+                        config={config}
+                        records={currentSensorState.sensorData[config.key] ?? []}
+                        loading={pendingSensorKeys.has(config.key)}
+                      />
+                    ))}
+                    {selected.platform === 'ios' && (
+                      <ActivityCard records={currentSensorState.activityData} loading={activityLoading} />
+                    )}
+                  </div>
+                </>
+              ) : null}
+            </>
+          );
+        })()}
       </div>
     </div>
   );

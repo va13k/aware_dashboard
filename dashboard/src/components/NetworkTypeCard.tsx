@@ -69,7 +69,7 @@ export default function NetworkTypeCard({ records, loading }: Props) {
                 return (
                   <tr key={r.id} className="border-b border-wire/50">
                     <td className="py-1 text-sage pr-4 whitespace-nowrap">
-                      {new Date(r.timestamp * 1000).toLocaleTimeString([], {
+                      {new Date(r.timestamp).toLocaleTimeString([], {
                         hour: '2-digit',
                         minute: '2-digit',
                         second: '2-digit',
