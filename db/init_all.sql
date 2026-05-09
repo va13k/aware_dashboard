@@ -125,6 +125,7 @@ CREATE TABLE IF NOT EXISTS `aware_studies` (
   `study_title` text,
   `study_description` text,
   `double_join` double DEFAULT '0',
+  `double_updated` double DEFAULT '0',
   `double_exit` double DEFAULT '0',
   `study_compliance` text,
   PRIMARY KEY (`_id`),
@@ -232,55 +233,6 @@ CREATE TABLE IF NOT EXISTS `esms` (
   `double_esm_user_answer_timestamp` double DEFAULT '0',
   `esm_user_answer` text,
   `esm_trigger` text,
-  PRIMARY KEY (`_id`),
-  KEY `time_device` (`timestamp`,`device_id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-
-CREATE TABLE IF NOT EXISTS `fitbit_data` (
-  `_id` bigint unsigned NOT NULL AUTO_INCREMENT,
-  `timestamp` double DEFAULT '0',
-  `device_id` varchar(150) DEFAULT '',
-  `fitbit_id` text,
-  `fitbit_data_type` text,
-  `fitbit_data` text,
-  PRIMARY KEY (`_id`),
-  KEY `time_device` (`timestamp`,`device_id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-
-CREATE TABLE IF NOT EXISTS `fitbit_devices` (
-  `_id` bigint unsigned NOT NULL AUTO_INCREMENT,
-  `timestamp` double DEFAULT '0',
-  `device_id` varchar(150) DEFAULT '',
-  `fitbit_id` text,
-  `fitbit_version` text,
-  `fitbit_battery` text,
-  `fitbit_mac` text,
-  `fitbit_last_sync` text,
-  PRIMARY KEY (`_id`),
-  KEY `time_device` (`timestamp`,`device_id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-
-CREATE TABLE IF NOT EXISTS `fused_geofences` (
-  `_id` bigint unsigned NOT NULL AUTO_INCREMENT,
-  `timestamp` double DEFAULT '0',
-  `device_id` varchar(150) DEFAULT '',
-  `geofence_label` text,
-  `double_latitude` double DEFAULT NULL,
-  `double_longitude` double DEFAULT NULL,
-  `double_radius` double DEFAULT NULL,
-  PRIMARY KEY (`_id`),
-  KEY `time_device` (`timestamp`,`device_id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-
-CREATE TABLE IF NOT EXISTS `fused_geofences_data` (
-  `_id` bigint unsigned NOT NULL AUTO_INCREMENT,
-  `timestamp` double DEFAULT '0',
-  `device_id` varchar(150) DEFAULT '',
-  `geofence_label` text,
-  `double_latitude` double DEFAULT NULL,
-  `double_longitude` double DEFAULT NULL,
-  `double_distance` double DEFAULT NULL,
-  `status` int(11) DEFAULT NULL,
   PRIMARY KEY (`_id`),
   KEY `time_device` (`timestamp`,`device_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
@@ -424,13 +376,24 @@ CREATE TABLE IF NOT EXISTS `messages` (
   KEY `time_device` (`timestamp`,`device_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
-CREATE TABLE IF NOT EXISTS `mqtt_history` (
-  `id` int(9) NOT NULL AUTO_INCREMENT,
-  `timestamp` double NOT NULL,
-  `topic` text NOT NULL,
-  `message` text NOT NULL,
-  `receivers` text NOT NULL,
-  PRIMARY KEY (`id`)
+CREATE TABLE IF NOT EXISTS `mqtt_messages` (
+  `_id` bigint unsigned NOT NULL AUTO_INCREMENT,
+  `timestamp` double DEFAULT '0',
+  `device_id` varchar(150) DEFAULT '',
+  `topic` text,
+  `message` text,
+  `status` int(11) DEFAULT '0',
+  PRIMARY KEY (`_id`),
+  KEY `time_device` (`timestamp`,`device_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS `mqtt_subscriptions` (
+  `_id` bigint unsigned NOT NULL AUTO_INCREMENT,
+  `timestamp` double DEFAULT '0',
+  `device_id` varchar(150) DEFAULT '',
+  `topic` text,
+  PRIMARY KEY (`_id`),
+  KEY `time_device` (`timestamp`,`device_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 CREATE TABLE IF NOT EXISTS `network` (
@@ -506,20 +469,6 @@ CREATE TABLE IF NOT EXISTS `proximity` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 CREATE TABLE IF NOT EXISTS `rotation` (
-  `_id` bigint unsigned NOT NULL AUTO_INCREMENT,
-  `timestamp` double DEFAULT '0',
-  `device_id` varchar(150) DEFAULT '',
-  `double_values_0` double DEFAULT '0',
-  `double_values_1` double DEFAULT '0',
-  `double_values_2` double DEFAULT '0',
-  `double_values_3` double DEFAULT '0',
-  `accuracy` int(11) DEFAULT '0',
-  `label` text,
-  PRIMARY KEY (`_id`),
-  KEY `time_device` (`timestamp`,`device_id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-
-CREATE TABLE IF NOT EXISTS `rotation_edited` (
   `_id` bigint unsigned NOT NULL AUTO_INCREMENT,
   `timestamp` double DEFAULT '0',
   `device_id` varchar(150) DEFAULT '',
@@ -837,11 +786,6 @@ CREATE TABLE IF NOT EXISTS `notes` (
 
 USE `aware_ios`;
 
-USE `aware_ios`;
-
--- Helper macro: all iOS tables share the same schema.
--- timestamp is DOUBLE to match AWARE's Unix epoch float format.
-
 -- Core sensors
 CREATE TABLE IF NOT EXISTS `accelerometer` (`_id` INT UNSIGNED AUTO_INCREMENT PRIMARY KEY, `timestamp` DOUBLE NOT NULL, `device_id` VARCHAR(128) NOT NULL, `data` JSON NOT NULL, INDEX `timestamp_device` (`timestamp`, `device_id`));
 CREATE TABLE IF NOT EXISTS `barometer` (`_id` INT UNSIGNED AUTO_INCREMENT PRIMARY KEY, `timestamp` DOUBLE NOT NULL, `device_id` VARCHAR(128) NOT NULL, `data` JSON NOT NULL, INDEX `timestamp_device` (`timestamp`, `device_id`));
@@ -850,37 +794,27 @@ CREATE TABLE IF NOT EXISTS `battery_charges` (`_id` INT UNSIGNED AUTO_INCREMENT 
 CREATE TABLE IF NOT EXISTS `battery_discharges` (`_id` INT UNSIGNED AUTO_INCREMENT PRIMARY KEY, `timestamp` DOUBLE NOT NULL, `device_id` VARCHAR(128) NOT NULL, `data` JSON NOT NULL, INDEX `timestamp_device` (`timestamp`, `device_id`));
 CREATE TABLE IF NOT EXISTS `bluetooth` (`_id` INT UNSIGNED AUTO_INCREMENT PRIMARY KEY, `timestamp` DOUBLE NOT NULL, `device_id` VARCHAR(128) NOT NULL, `data` JSON NOT NULL, INDEX `timestamp_device` (`timestamp`, `device_id`));
 CREATE TABLE IF NOT EXISTS `calls` (`_id` INT UNSIGNED AUTO_INCREMENT PRIMARY KEY, `timestamp` DOUBLE NOT NULL, `device_id` VARCHAR(128) NOT NULL, `data` JSON NOT NULL, INDEX `timestamp_device` (`timestamp`, `device_id`));
-CREATE TABLE IF NOT EXISTS `communication` (`_id` INT UNSIGNED AUTO_INCREMENT PRIMARY KEY, `timestamp` DOUBLE NOT NULL, `device_id` VARCHAR(128) NOT NULL, `data` JSON NOT NULL, INDEX `timestamp_device` (`timestamp`, `device_id`));
 CREATE TABLE IF NOT EXISTS `esm` (`_id` INT UNSIGNED AUTO_INCREMENT PRIMARY KEY, `timestamp` DOUBLE NOT NULL, `device_id` VARCHAR(128) NOT NULL, `data` JSON NOT NULL, INDEX `timestamp_device` (`timestamp`, `device_id`));
 CREATE TABLE IF NOT EXISTS `gyroscope` (`_id` INT UNSIGNED AUTO_INCREMENT PRIMARY KEY, `timestamp` DOUBLE NOT NULL, `device_id` VARCHAR(128) NOT NULL, `data` JSON NOT NULL, INDEX `timestamp_device` (`timestamp`, `device_id`));
 CREATE TABLE IF NOT EXISTS `linear_accelerometer` (`_id` INT UNSIGNED AUTO_INCREMENT PRIMARY KEY, `timestamp` DOUBLE NOT NULL, `device_id` VARCHAR(128) NOT NULL, `data` JSON NOT NULL, INDEX `timestamp_device` (`timestamp`, `device_id`));
-CREATE TABLE IF NOT EXISTS `location_gps` (`_id` INT UNSIGNED AUTO_INCREMENT PRIMARY KEY, `timestamp` DOUBLE NOT NULL, `device_id` VARCHAR(128) NOT NULL, `data` JSON NOT NULL, INDEX `timestamp_device` (`timestamp`, `device_id`));
 CREATE TABLE IF NOT EXISTS `locations` (`_id` INT UNSIGNED AUTO_INCREMENT PRIMARY KEY, `timestamp` DOUBLE NOT NULL, `device_id` VARCHAR(128) NOT NULL, `data` JSON NOT NULL, INDEX `timestamp_device` (`timestamp`, `device_id`));
 CREATE TABLE IF NOT EXISTS `magnetometer` (`_id` INT UNSIGNED AUTO_INCREMENT PRIMARY KEY, `timestamp` DOUBLE NOT NULL, `device_id` VARCHAR(128) NOT NULL, `data` JSON NOT NULL, INDEX `timestamp_device` (`timestamp`, `device_id`));
 CREATE TABLE IF NOT EXISTS `network` (`_id` INT UNSIGNED AUTO_INCREMENT PRIMARY KEY, `timestamp` DOUBLE NOT NULL, `device_id` VARCHAR(128) NOT NULL, `data` JSON NOT NULL, INDEX `timestamp_device` (`timestamp`, `device_id`));
-CREATE TABLE IF NOT EXISTS `orientation` (`_id` INT UNSIGNED AUTO_INCREMENT PRIMARY KEY, `timestamp` DOUBLE NOT NULL, `device_id` VARCHAR(128) NOT NULL, `data` JSON NOT NULL, INDEX `timestamp_device` (`timestamp`, `device_id`));
 CREATE TABLE IF NOT EXISTS `processor` (`_id` INT UNSIGNED AUTO_INCREMENT PRIMARY KEY, `timestamp` DOUBLE NOT NULL, `device_id` VARCHAR(128) NOT NULL, `data` JSON NOT NULL, INDEX `timestamp_device` (`timestamp`, `device_id`));
-CREATE TABLE IF NOT EXISTS `proximity` (`_id` INT UNSIGNED AUTO_INCREMENT PRIMARY KEY, `timestamp` DOUBLE NOT NULL, `device_id` VARCHAR(128) NOT NULL, `data` JSON NOT NULL, INDEX `timestamp_device` (`timestamp`, `device_id`));
 CREATE TABLE IF NOT EXISTS `rotation` (`_id` INT UNSIGNED AUTO_INCREMENT PRIMARY KEY, `timestamp` DOUBLE NOT NULL, `device_id` VARCHAR(128) NOT NULL, `data` JSON NOT NULL, INDEX `timestamp_device` (`timestamp`, `device_id`));
 CREATE TABLE IF NOT EXISTS `screen` (`_id` INT UNSIGNED AUTO_INCREMENT PRIMARY KEY, `timestamp` DOUBLE NOT NULL, `device_id` VARCHAR(128) NOT NULL, `data` JSON NOT NULL, INDEX `timestamp_device` (`timestamp`, `device_id`));
 CREATE TABLE IF NOT EXISTS `significant_motion` (`_id` INT UNSIGNED AUTO_INCREMENT PRIMARY KEY, `timestamp` DOUBLE NOT NULL, `device_id` VARCHAR(128) NOT NULL, `data` JSON NOT NULL, INDEX `timestamp_device` (`timestamp`, `device_id`));
-CREATE TABLE IF NOT EXISTS `telephony` (`_id` INT UNSIGNED AUTO_INCREMENT PRIMARY KEY, `timestamp` DOUBLE NOT NULL, `device_id` VARCHAR(128) NOT NULL, `data` JSON NOT NULL, INDEX `timestamp_device` (`timestamp`, `device_id`));
-CREATE TABLE IF NOT EXISTS `temperature` (`_id` INT UNSIGNED AUTO_INCREMENT PRIMARY KEY, `timestamp` DOUBLE NOT NULL, `device_id` VARCHAR(128) NOT NULL, `data` JSON NOT NULL, INDEX `timestamp_device` (`timestamp`, `device_id`));
 CREATE TABLE IF NOT EXISTS `timezone` (`_id` INT UNSIGNED AUTO_INCREMENT PRIMARY KEY, `timestamp` DOUBLE NOT NULL, `device_id` VARCHAR(128) NOT NULL, `data` JSON NOT NULL, INDEX `timestamp_device` (`timestamp`, `device_id`));
 CREATE TABLE IF NOT EXISTS `wifi` (`_id` INT UNSIGNED AUTO_INCREMENT PRIMARY KEY, `timestamp` DOUBLE NOT NULL, `device_id` VARCHAR(128) NOT NULL, `data` JSON NOT NULL, INDEX `timestamp_device` (`timestamp`, `device_id`));
 
 -- System / device tables
 CREATE TABLE IF NOT EXISTS `aware_device` (`_id` INT UNSIGNED AUTO_INCREMENT PRIMARY KEY, `timestamp` DOUBLE NOT NULL, `device_id` VARCHAR(128) NOT NULL, `data` JSON NOT NULL, INDEX `timestamp_device` (`timestamp`, `device_id`));
 CREATE TABLE IF NOT EXISTS `aware_debug` (`_id` INT UNSIGNED AUTO_INCREMENT PRIMARY KEY, `timestamp` DOUBLE NOT NULL, `device_id` VARCHAR(128) NOT NULL, `data` JSON NOT NULL, INDEX `timestamp_device` (`timestamp`, `device_id`));
-CREATE TABLE IF NOT EXISTS `applications` (`_id` INT UNSIGNED AUTO_INCREMENT PRIMARY KEY, `timestamp` DOUBLE NOT NULL, `device_id` VARCHAR(128) NOT NULL, `data` JSON NOT NULL, INDEX `timestamp_device` (`timestamp`, `device_id`));
-CREATE TABLE IF NOT EXISTS `applications_history` (`_id` INT UNSIGNED AUTO_INCREMENT PRIMARY KEY, `timestamp` DOUBLE NOT NULL, `device_id` VARCHAR(128) NOT NULL, `data` JSON NOT NULL, INDEX `timestamp_device` (`timestamp`, `device_id`));
 CREATE TABLE IF NOT EXISTS `basic_settings` (`_id` INT UNSIGNED AUTO_INCREMENT PRIMARY KEY, `timestamp` DOUBLE NOT NULL, `device_id` VARCHAR(128) NOT NULL, `data` JSON NOT NULL, INDEX `timestamp_device` (`timestamp`, `device_id`));
 CREATE TABLE IF NOT EXISTS `labels` (`_id` INT UNSIGNED AUTO_INCREMENT PRIMARY KEY, `timestamp` DOUBLE NOT NULL, `device_id` VARCHAR(128) NOT NULL, `data` JSON NOT NULL, INDEX `timestamp_device` (`timestamp`, `device_id`));
 CREATE TABLE IF NOT EXISTS `labels_boolean` (`_id` INT UNSIGNED AUTO_INCREMENT PRIMARY KEY, `timestamp` DOUBLE NOT NULL, `device_id` VARCHAR(128) NOT NULL, `data` JSON NOT NULL, INDEX `timestamp_device` (`timestamp`, `device_id`));
 CREATE TABLE IF NOT EXISTS `labels_text` (`_id` INT UNSIGNED AUTO_INCREMENT PRIMARY KEY, `timestamp` DOUBLE NOT NULL, `device_id` VARCHAR(128) NOT NULL, `data` JSON NOT NULL, INDEX `timestamp_device` (`timestamp`, `device_id`));
-CREATE TABLE IF NOT EXISTS `memory` (`_id` INT UNSIGNED AUTO_INCREMENT PRIMARY KEY, `timestamp` DOUBLE NOT NULL, `device_id` VARCHAR(128) NOT NULL, `data` JSON NOT NULL, INDEX `timestamp_device` (`timestamp`, `device_id`));
 CREATE TABLE IF NOT EXISTS `push_notification` (`_id` INT UNSIGNED AUTO_INCREMENT PRIMARY KEY, `timestamp` DOUBLE NOT NULL, `device_id` VARCHAR(128) NOT NULL, `data` JSON NOT NULL, INDEX `timestamp_device` (`timestamp`, `device_id`));
-CREATE TABLE IF NOT EXISTS `scheduler` (`_id` INT UNSIGNED AUTO_INCREMENT PRIMARY KEY, `timestamp` DOUBLE NOT NULL, `device_id` VARCHAR(128) NOT NULL, `data` JSON NOT NULL, INDEX `timestamp_device` (`timestamp`, `device_id`));
 
 -- Location extras
 CREATE TABLE IF NOT EXISTS `google_fused_location` (`_id` INT UNSIGNED AUTO_INCREMENT PRIMARY KEY, `timestamp` DOUBLE NOT NULL, `device_id` VARCHAR(128) NOT NULL, `data` JSON NOT NULL, INDEX `timestamp_device` (`timestamp`, `device_id`));
