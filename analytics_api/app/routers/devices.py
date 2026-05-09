@@ -121,14 +121,28 @@ async def _device_detail(platform: str, device_id: str, db: AsyncSession):
 
 @router.get("/android")
 async def list_android_devices(db: AsyncSession = Depends(get_android_db)):
+    # Subquery: latest timestamp per device_id
+    subq = (
+        select(
+            AndroidDevice.device_id,
+            func.max(AndroidDevice.timestamp).label("max_ts"),
+        )
+        .group_by(AndroidDevice.device_id)
+        .subquery()
+    )
     result = await db.execute(
         select(
             AndroidDevice.device_id,
             AndroidDevice.manufacturer,
             AndroidDevice.model,
-            func.max(AndroidDevice.timestamp).label("last_seen"),
-        ).group_by(AndroidDevice.device_id, AndroidDevice.manufacturer, AndroidDevice.model)
-        .order_by(func.max(AndroidDevice.timestamp).desc())
+            subq.c.max_ts.label("last_seen"),
+        )
+        .join(
+            subq,
+            (AndroidDevice.device_id == subq.c.device_id)
+            & (AndroidDevice.timestamp == subq.c.max_ts),
+        )
+        .order_by(subq.c.max_ts.desc())
     )
     rows = result.all()
     return [
