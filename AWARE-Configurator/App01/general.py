@@ -15,6 +15,7 @@ if PROJECT_ROOT.exists() and str(PROJECT_ROOT) not in sys.path:
 from shared_config.source_store import update_source
 from shared_config.runtime import build_public_base_url, get_runtime_settings, load_env, normalize_public_env
 from shared_config.serializers import (
+    ANDROID_ONLY_SHARED_SENSOR_NAMES,
     COMMON_SHARED_SENSOR_FIELDS,
     IOS_ESM_CONFIG_FILENAME,
     IOS_ONLY_SENSOR_NAMES,
@@ -260,6 +261,17 @@ def sync_shared_sensors_from_android_settings(source, android_settings):
                                ["status_calls", "status_messages"])
     _sync_ios_compound_sensor(ios_sensors, android_settings, "locations",
                                ["status_location_gps"])
+
+    # Mirror shared sensor enabled states to ios.sensors so source.json stays
+    # consistent. Android-only sensors (applications, light, etc.) are skipped.
+    for sensor_name in COMMON_SHARED_SENSOR_FIELDS:
+        if sensor_name in ANDROID_ONLY_SHARED_SENSOR_NAMES:
+            continue
+        sensor_shared = shared_sensors.get(sensor_name, {})
+        if isinstance(sensor_shared, bool):
+            ios_sensors[sensor_name] = sensor_shared
+        elif isinstance(sensor_shared, dict) and "enabled" in sensor_shared:
+            ios_sensors[sensor_name] = bool(sensor_shared["enabled"])
 
     # Sync plugin enable/disable from android.settings to ios.plugins.
     ios_plugins = source.setdefault("ios", {}).setdefault("plugins", {})
