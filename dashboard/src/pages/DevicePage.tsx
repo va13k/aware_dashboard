@@ -5,6 +5,7 @@ import { SENSOR_CONFIGS, sensorsForPlatform } from "../config/sensors";
 import SensorTimeSeriesCard from "../components/SensorTimeSeriesCard";
 import NetworkTypeCard from "../components/NetworkTypeCard";
 import ActivityCard from "../components/ActivityCard";
+import ApplicationsCard from "../components/ApplicationsCard";
 import type {
   Device,
   DeviceDetail,
@@ -17,9 +18,11 @@ interface DeviceSensorState {
   sensorData: Record<string, SensorRecord[]>;
   networkData: SensorRecord[];
   activityData: SensorRecord[];
+  applicationsData: SensorRecord[];
   loadingKeys: Set<string>;
   networkLoading: boolean;
   activityLoading: boolean;
+  applicationsLoading: boolean;
 }
 
 const EMPTY_SENSOR_STATE: DeviceSensorState = {
@@ -27,9 +30,11 @@ const EMPTY_SENSOR_STATE: DeviceSensorState = {
   sensorData: {},
   networkData: [],
   activityData: [],
+  applicationsData: [],
   loadingKeys: new Set(),
   networkLoading: false,
   activityLoading: false,
+  applicationsLoading: false,
 };
 
 function deviceLabel(d: Device): string {
@@ -240,15 +245,18 @@ export default function DevicePage() {
     const sensors = sensorsForPlatform(selected.platform);
     const initialLoadingKeys = new Set(sensors.map((s) => s.key));
     const isIos = selected.platform === "ios";
+    const isAndroid = selected.platform === "android";
 
-    const emptyState = () => ({
+    const emptyState = (): DeviceSensorState => ({
       key: selectedKey,
-      sensorData: {} as Record<string, SensorRecord[]>,
-      networkData: [] as SensorRecord[],
-      activityData: [] as SensorRecord[],
+      sensorData: {},
+      networkData: [],
+      activityData: [],
+      applicationsData: [],
       loadingKeys: initialLoadingKeys,
       networkLoading: true,
       activityLoading: isIos,
+      applicationsLoading: isAndroid,
     });
 
     for (const sensor of sensors) {
@@ -318,6 +326,26 @@ export default function DevicePage() {
               ...(prev.key === selectedKey ? prev : emptyState()),
               activityData: [],
               activityLoading: false,
+            }));
+        });
+    }
+
+    if (isAndroid) {
+      fetchSensor(selected.platform, selected.device_id, "applications")
+        .then((records) => {
+          if (!cancelled)
+            setSensorState((prev) => ({
+              ...(prev.key === selectedKey ? prev : emptyState()),
+              applicationsData: records,
+              applicationsLoading: false,
+            }));
+        })
+        .catch(() => {
+          if (!cancelled)
+            setSensorState((prev) => ({
+              ...(prev.key === selectedKey ? prev : emptyState()),
+              applicationsData: [],
+              applicationsLoading: false,
             }));
         });
     }
@@ -417,6 +445,7 @@ export default function DevicePage() {
           const specificLabel = selected.platform === 'android' ? 'Android only' : 'iPhone only';
           const networkLoading = currentSensorState.key !== selectedKey || currentSensorState.networkLoading;
           const activityLoading = currentSensorState.key !== selectedKey || currentSensorState.activityLoading;
+          const applicationsLoading = currentSensorState.key !== selectedKey || currentSensorState.applicationsLoading;
 
           return (
             <>
@@ -451,6 +480,9 @@ export default function DevicePage() {
                     ))}
                     {selected.platform === 'ios' && (
                       <ActivityCard records={currentSensorState.activityData} loading={activityLoading} />
+                    )}
+                    {selected.platform === 'android' && (
+                      <ApplicationsCard records={currentSensorState.applicationsData} loading={applicationsLoading} />
                     )}
                   </div>
                 </>

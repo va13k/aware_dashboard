@@ -105,18 +105,74 @@ export const SENSOR_CONFIGS: SensorConfig[] = [
     unit: 'lux',
     color: '#fbbf24',
     platform: 'android',
-    // Android: double_values_0 column (the raw lux reading)
-    extract: r => (r.double_values_0 as number | null) ?? null,
+    // Android: double_light_lux column
+    extract: r => (r.double_light_lux as number | null) ?? null,
   },
 
   // ── iOS only ─────────────────────────────────────────────────────────────
+  {
+    key: 'barometer',
+    label: 'Barometer',
+    unit: 'hPa',
+    color: '#64748b',
+    platform: 'ios',
+    // iOS JSON: pressure (kPa from CoreMotion, displayed as hPa)
+    extract: r => (r.pressure as number | null) ?? null,
+  },
+  {
+    key: 'magnetometer',
+    label: 'Magnetometer',
+    unit: 'µT',
+    color: '#a855f7',
+    platform: 'ios',
+    // iOS JSON: x/y/z (µT from CoreMotion CMMagneticField)
+    extract: r => magnitude(r, 'x', 'y', 'z'),
+  },
+  {
+    key: 'rotation',
+    label: 'Rotation',
+    unit: 'rad/s',
+    color: '#f43f5e',
+    platform: 'ios',
+    // iOS JSON: x/y/z (CMRotationRate) or roll/pitch/yaw (CMAttitude)
+    extract: r =>
+      magnitude(r, 'x', 'y', 'z') ??
+      magnitude(r, 'roll', 'pitch', 'yaw'),
+  },
+  {
+    key: 'ambient-noise',
+    label: 'Ambient Noise',
+    unit: 'dB',
+    color: '#0ea5e9',
+    platform: 'ios',
+    // iOS JSON: decibels (plugin_ambient_noise table)
+    extract: r => (r.decibels as number | null) ?? (r.db as number | null) ?? null,
+  },
+  {
+    key: 'health-kit',
+    label: 'HealthKit',
+    unit: '',
+    color: '#e11d48',
+    platform: 'ios',
+    // iOS JSON: value (generic health_kit quantity)
+    extract: r => (r.value as number | null) ?? null,
+  },
+  {
+    key: 'health-kit/quantity',
+    label: 'HealthKit Quantity',
+    unit: '',
+    color: '#be123c',
+    platform: 'ios',
+    // iOS JSON: quantity or value (health_kit_quantity table)
+    extract: r => (r.quantity as number | null) ?? (r.value as number | null) ?? null,
+  },
   {
     key: 'pedometer',
     label: 'Step Count',
     unit: 'steps',
     color: '#ec4899',
     platform: 'ios',
-    // iOS JSON: step_count or steps (plugin_ios_pedometer table)
+    // iOS JSON: step_count (plugin_ios_pedometer table)
     extract: r => (r.step_count as number | null) ?? (r.steps as number | null) ?? null,
   },
 ]
