@@ -13,6 +13,15 @@ import type {
   SensorRecord,
 } from "../types";
 
+const POLL_INTERVAL_MS = 60_000;
+
+function timeSince(ts: number): string {
+  const s = Math.floor((Date.now() - ts) / 1000);
+  if (s < 10) return "just now";
+  if (s < 60) return `${s}s ago`;
+  return `${Math.floor(s / 60)}m ago`;
+}
+
 interface DeviceSensorState {
   key: string | null;
   sensorData: Record<string, SensorRecord[]>;
@@ -187,6 +196,9 @@ export default function DevicePage() {
   const [sensorState, setSensorState] =
     useState<DeviceSensorState>(EMPTY_SENSOR_STATE);
   const [error, setError] = useState<string | null>(null);
+  const [lastUpdated, setLastUpdated] = useState<number | null>(null);
+  // Ticks every 10 s so the "X ago" label stays fresh without re-fetching.
+  const [, setTick] = useState(0);
 
   useEffect(() => {
     fetchDevices()
@@ -222,34 +234,23 @@ export default function DevicePage() {
       ? currentSensorState.loadingKeys
       : new Set(platformSensors.map((s) => s.key));
 
+  // Tick every 10 s to keep the "updated X ago" label current.
   useEffect(() => {
-    if (!selected) return;
-
-    let cancelled = false;
-
-    fetchDeviceDetail(selected.platform, selected.device_id)
-      .then((data) => {
-        if (!cancelled) setDetail(data);
-      })
-      .catch((e) => {
-        if (!cancelled) setError(String(e));
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [selected]);
+    const id = setInterval(() => setTick((t) => t + 1), 10_000);
+    return () => clearInterval(id);
+  }, []);
 
   useEffect(() => {
     if (!selected) return;
     let cancelled = false;
+    const isFirstRun = { value: true };
 
     const sensors = sensorsForPlatform(selected.platform);
     const initialLoadingKeys = new Set(sensors.map((s) => s.key));
     const isIos = selected.platform === "ios";
     const isAndroid = selected.platform === "android";
 
-    const emptyState = (): DeviceSensorState => ({
+    const makeEmpty = (): DeviceSensorState => ({
       key: selectedKey,
       sensorData: {},
       networkData: [],
@@ -261,99 +262,124 @@ export default function DevicePage() {
       applicationsLoading: isAndroid,
     });
 
-    for (const sensor of sensors) {
-      fetchSensor(selected.platform, selected.device_id, sensor.key)
-        .then((records) => {
-          if (cancelled) return;
-          setSensorState((prev) => ({
-            ...(prev.key === selectedKey ? prev : emptyState()),
-            sensorData: {
-              ...(prev.key === selectedKey ? prev.sensorData : {}),
-              [sensor.key]: records,
-            },
-          }));
+    const fetchAll = () => {
+      const initial = isFirstRun.value;
+      isFirstRun.value = false;
+
+      if (initial) {
+        setLastUpdated(null);
+        setSensorState(makeEmpty());
+      }
+
+      fetchDeviceDetail(selected.platform, selected.device_id)
+        .then((data) => {
+          if (!cancelled) setDetail(data);
         })
-        .catch(() => {
-          if (cancelled) return;
-          setSensorState((prev) => ({
-            ...(prev.key === selectedKey ? prev : emptyState()),
-            sensorData: {
-              ...(prev.key === selectedKey ? prev.sensorData : {}),
-              [sensor.key]: [],
-            },
-          }));
-        })
-        .finally(() => {
-          if (cancelled) return;
-          setSensorState((prev) => {
-            const base = prev.key === selectedKey ? prev : emptyState();
-            const next = new Set(base.loadingKeys);
-            next.delete(sensor.key);
-            return { ...base, loadingKeys: next };
+        .catch(() => {});
+
+      for (const sensor of sensors) {
+        fetchSensor(selected.platform, selected.device_id, sensor.key)
+          .then((records) => {
+            if (cancelled) return;
+            setSensorState((prev) => {
+              const base = prev.key === selectedKey ? prev : makeEmpty();
+              const updated: DeviceSensorState = {
+                ...base,
+                sensorData: { ...base.sensorData, [sensor.key]: records },
+              };
+              if (initial) {
+                const keys = new Set(base.loadingKeys);
+                keys.delete(sensor.key);
+                updated.loadingKeys = keys;
+              }
+              return updated;
+            });
+          })
+          .catch(() => {
+            if (cancelled) return;
+            setSensorState((prev) => {
+              const base = prev.key === selectedKey ? prev : makeEmpty();
+              const updated: DeviceSensorState = {
+                ...base,
+                sensorData: { ...base.sensorData, [sensor.key]: [] },
+              };
+              if (initial) {
+                const keys = new Set(base.loadingKeys);
+                keys.delete(sensor.key);
+                updated.loadingKeys = keys;
+              }
+              return updated;
+            });
           });
-        });
-    }
+      }
 
-    fetchSensor(selected.platform, selected.device_id, "network")
-      .then((records) => {
-        if (!cancelled)
-          setSensorState((prev) => ({
-            ...(prev.key === selectedKey ? prev : emptyState()),
-            networkData: records,
-            networkLoading: false,
-          }));
-      })
-      .catch(() => {
-        if (!cancelled)
-          setSensorState((prev) => ({
-            ...(prev.key === selectedKey ? prev : emptyState()),
-            networkData: [],
-            networkLoading: false,
-          }));
-      });
-
-    if (isIos) {
-      fetchSensor(selected.platform, selected.device_id, "activity")
+      fetchSensor(selected.platform, selected.device_id, "network")
         .then((records) => {
           if (!cancelled)
             setSensorState((prev) => ({
-              ...(prev.key === selectedKey ? prev : emptyState()),
-              activityData: records,
-              activityLoading: false,
+              ...(prev.key === selectedKey ? prev : makeEmpty()),
+              networkData: records,
+              networkLoading: false,
             }));
         })
         .catch(() => {
           if (!cancelled)
             setSensorState((prev) => ({
-              ...(prev.key === selectedKey ? prev : emptyState()),
-              activityData: [],
-              activityLoading: false,
+              ...(prev.key === selectedKey ? prev : makeEmpty()),
+              networkData: [],
+              networkLoading: false,
             }));
         });
-    }
 
-    if (isAndroid) {
-      fetchSensor(selected.platform, selected.device_id, "applications")
-        .then((records) => {
-          if (!cancelled)
-            setSensorState((prev) => ({
-              ...(prev.key === selectedKey ? prev : emptyState()),
-              applicationsData: records,
-              applicationsLoading: false,
-            }));
-        })
-        .catch(() => {
-          if (!cancelled)
-            setSensorState((prev) => ({
-              ...(prev.key === selectedKey ? prev : emptyState()),
-              applicationsData: [],
-              applicationsLoading: false,
-            }));
-        });
-    }
+      if (isIos) {
+        fetchSensor(selected.platform, selected.device_id, "activity")
+          .then((records) => {
+            if (!cancelled)
+              setSensorState((prev) => ({
+                ...(prev.key === selectedKey ? prev : makeEmpty()),
+                activityData: records,
+                activityLoading: false,
+              }));
+          })
+          .catch(() => {
+            if (!cancelled)
+              setSensorState((prev) => ({
+                ...(prev.key === selectedKey ? prev : makeEmpty()),
+                activityData: [],
+                activityLoading: false,
+              }));
+          });
+      }
+
+      if (isAndroid) {
+        fetchSensor(selected.platform, selected.device_id, "applications")
+          .then((records) => {
+            if (!cancelled)
+              setSensorState((prev) => ({
+                ...(prev.key === selectedKey ? prev : makeEmpty()),
+                applicationsData: records,
+                applicationsLoading: false,
+              }));
+          })
+          .catch(() => {
+            if (!cancelled)
+              setSensorState((prev) => ({
+                ...(prev.key === selectedKey ? prev : makeEmpty()),
+                applicationsData: [],
+                applicationsLoading: false,
+              }));
+          });
+      }
+
+      if (!cancelled) setLastUpdated(Date.now());
+    };
+
+    fetchAll();
+    const pollId = setInterval(fetchAll, POLL_INTERVAL_MS);
 
     return () => {
       cancelled = true;
+      clearInterval(pollId);
     };
   }, [selected, selectedKey]);
 
@@ -463,8 +489,16 @@ export default function DevicePage() {
 
             return (
               <>
-                <div className="text-[11px] font-semibold uppercase tracking-[0.6px] text-sage px-1">
-                  Shared
+                <div className="flex items-center justify-between px-1">
+                  <div className="text-[11px] font-semibold uppercase tracking-[0.6px] text-sage">
+                    Shared
+                  </div>
+                  <div className="flex items-center gap-1.5 text-[11px] text-sage">
+                    <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" />
+                    {lastUpdated
+                      ? `Updated ${timeSince(lastUpdated)}`
+                      : "Loading…"}
+                  </div>
                 </div>
                 <div className="grid grid-cols-[repeat(auto-fill,minmax(320px,1fr))] gap-4">
                   {sharedSensors.map((config) => (

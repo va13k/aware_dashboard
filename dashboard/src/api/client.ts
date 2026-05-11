@@ -3,7 +3,7 @@ import type { DeviceDetail, DevicesResponse, SensorRecord } from "../types";
 const BASE = "/api";
 
 async function get<T>(path: string): Promise<T> {
-  const res = await fetch(`${BASE}${path}`);
+  const res = await fetch(`${BASE}${path}`, { cache: "no-store" });
   if (res.redirected && res.url.includes("/auth/")) {
     window.location.assign(res.url);
     return new Promise<T>(() => {});

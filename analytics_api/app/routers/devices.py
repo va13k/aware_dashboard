@@ -67,11 +67,82 @@ def _row_to_dict(row):
     return {column.name.lstrip("_"): getattr(row, column.name) for column in row.__table__.columns}
 
 
+async def _rollback_after_table_error(db: AsyncSession):
+    await db.rollback()
+
+
 async def _latest_row(db: AsyncSession, model, device_id: str):
     result = await db.execute(
         select(model).where(model.device_id == device_id).order_by(model.timestamp.desc()).limit(1)
     )
     return result.scalars().first()
+
+
+async def _max_timestamps_by_device(db: AsyncSession, model):
+    try:
+        result = await db.execute(
+            select(
+                model.device_id,
+                func.max(model.timestamp).label("last_seen"),
+            ).group_by(model.device_id)
+        )
+    except (ProgrammingError, OperationalError):
+        await _rollback_after_table_error(db)
+        return {}
+
+    return {
+        str(row.device_id): row.last_seen
+        for row in result.all()
+        if row.device_id is not None and row.last_seen is not None
+    }
+
+
+async def _combined_last_seen_by_device(db: AsyncSession, models):
+    last_seen_by_device = {}
+
+    for model in models:
+        timestamps = await _max_timestamps_by_device(db, model)
+        for device_id, last_seen in timestamps.items():
+            current = last_seen_by_device.get(device_id)
+            if current is None or last_seen > current:
+                last_seen_by_device[device_id] = last_seen
+
+    return last_seen_by_device
+
+
+async def _latest_android_metadata_by_device(db: AsyncSession):
+    try:
+        subq = (
+            select(
+                AndroidDevice.device_id,
+                func.max(AndroidDevice.timestamp).label("max_ts"),
+            )
+            .group_by(AndroidDevice.device_id)
+            .subquery()
+        )
+        result = await db.execute(
+            select(
+                AndroidDevice.device_id,
+                AndroidDevice.manufacturer,
+                AndroidDevice.model,
+            )
+            .join(
+                subq,
+                (AndroidDevice.device_id == subq.c.device_id)
+                & (AndroidDevice.timestamp == subq.c.max_ts),
+            )
+        )
+    except (ProgrammingError, OperationalError):
+        await _rollback_after_table_error(db)
+        return {}
+
+    return {
+        str(row.device_id): {
+            "manufacturer": row.manufacturer,
+            "model": row.model,
+        }
+        for row in result.all()
+    }
 
 
 async def _stream_summary(db: AsyncSession, key: str, model, device_id: str):
@@ -98,6 +169,7 @@ async def _device_detail(platform: str, device_id: str, db: AsyncSession):
         try:
             stream_details.append(await _stream_summary(db, key, model, device_id))
         except (ProgrammingError, OperationalError):
+            await _rollback_after_table_error(db)
             stream_details.append(
                 {
                     "key": key,
@@ -117,74 +189,45 @@ async def _device_detail(platform: str, device_id: str, db: AsyncSession):
 
 @router.get("/android")
 async def list_android_devices(db: AsyncSession = Depends(get_android_db)):
-    # Subquery: latest timestamp per device_id
-    subq = (
-        select(
-            AndroidDevice.device_id,
-            func.max(AndroidDevice.timestamp).label("max_ts"),
-        )
-        .group_by(AndroidDevice.device_id)
-        .subquery()
+    last_seen_by_device = await _combined_last_seen_by_device(
+        db,
+        [AndroidDevice, *ANDROID_STREAMS.values()],
     )
-    result = await db.execute(
-        select(
-            AndroidDevice.device_id,
-            AndroidDevice.manufacturer,
-            AndroidDevice.model,
-            subq.c.max_ts.label("last_seen"),
+    metadata_by_device = await _latest_android_metadata_by_device(db)
+
+    devices = []
+    for device_id, last_seen in last_seen_by_device.items():
+        metadata = metadata_by_device.get(device_id, {})
+        devices.append(
+            {
+                "device_id": device_id,
+                "manufacturer": metadata.get("manufacturer"),
+                "model": metadata.get("model"),
+                "last_seen": last_seen,
+                "platform": "android",
+            }
         )
-        .join(
-            subq,
-            (AndroidDevice.device_id == subq.c.device_id)
-            & (AndroidDevice.timestamp == subq.c.max_ts),
-        )
-        .order_by(subq.c.max_ts.desc())
-    )
-    rows = result.all()
-    return [
-        {
-            "device_id": r.device_id,
-            "manufacturer": r.manufacturer,
-            "model": r.model,
-            "last_seen": r.last_seen,
-            "platform": "android",
-        }
-        for r in rows
-    ]
+
+    return sorted(devices, key=lambda d: d["last_seen"], reverse=True)
 
 
 @router.get("/ios")
 async def list_ios_devices(db: AsyncSession = Depends(get_ios_db)):
-    try:
-        result = await db.execute(
-            select(
-                IosDevice.device_id,
-                func.max(IosDevice.timestamp).label("last_seen"),
-            )
-            .group_by(IosDevice.device_id)
-            .order_by(func.max(IosDevice.timestamp).desc())
-        )
-        rows = result.all()
-        if not rows:
-            result = await db.execute(
-                select(
-                    IosBattery.device_id,
-                    func.max(IosBattery.timestamp).label("last_seen"),
-                )
-                .group_by(IosBattery.device_id)
-                .order_by(func.max(IosBattery.timestamp).desc())
-            )
-            rows = result.all()
-        return [
-            {
-                "device_id": r.device_id,
-                "last_seen": r.last_seen,
-                "platform": "ios",
-            }
-            for r in rows
-        ]
-    except (ProgrammingError, OperationalError):
-        return []
+    last_seen_by_device = await _combined_last_seen_by_device(
+        db,
+        [IosDevice, *IOS_STREAMS.values()],
+    )
+
+    devices = [
+        {
+            "device_id": device_id,
+            "last_seen": last_seen,
+            "platform": "ios",
+        }
+        for device_id, last_seen in last_seen_by_device.items()
+    ]
+
+    return sorted(devices, key=lambda d: d["last_seen"], reverse=True)
 
 
 @router.get("")
