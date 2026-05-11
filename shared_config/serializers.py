@@ -119,6 +119,9 @@ def normalize_esm_question(question: dict, index: int) -> dict:
     normalized = dict(question)
     normalized["id"] = normalized.get("id", index + 1)
     normalized["esm_submit"] = normalized.get("esm_submit") or "Submit"
+    # Normalize legacy "instructions" key → canonical "esm_instructions"
+    if "esm_instructions" not in normalized and "instructions" in normalized:
+        normalized["esm_instructions"] = normalized.pop("instructions")
     return normalized
 
 
@@ -131,12 +134,25 @@ def build_android_esm_questions(source: dict) -> list[dict]:
     ]
 
 
+# Android-only question fields that must not appear in the iOS ESM payload.
+_IOS_ESM_QUESTION_EXCLUDED = frozenset({"esm_notification_timeout"})
+
+# iOS-only schedule fields that must not appear in the Android schedule output.
+_ANDROID_ESM_SCHEDULE_EXCLUDED = frozenset(
+    {"expiration", "notification_body", "notification_title", "schedule_id"}
+)
+
+
 def build_android_esm_schedules(source: dict) -> list[dict]:
-    return [
-        dict(schedule)
-        for schedule in get_shared_esm(source)["schedules"]
-        if isinstance(schedule, dict)
-    ]
+    result = []
+    for schedule in get_shared_esm(source)["schedules"]:
+        if not isinstance(schedule, dict):
+            continue
+        s = {k: v for k, v in schedule.items() if k not in _ANDROID_ESM_SCHEDULE_EXCLUDED}
+        if isinstance(s.get("hours"), list):
+            s["hours"] = sorted(set(s["hours"]))
+        result.append(s)
+    return result
 
 
 def ios_esm_question_payload(question: dict, trigger: str) -> dict:
@@ -144,7 +160,9 @@ def ios_esm_question_payload(question: dict, trigger: str) -> dict:
     for key in ("esm_type", "esm_title"):
         if key in question:
             payload[key] = question[key]
-    payload["esm_instructions"] = question.get("esm_instructions", question.get("instructions", ""))
+    payload["esm_instructions"] = question.get(
+        "esm_instructions", question.get("instructions", "")
+    )
     payload["esm_submit"] = question.get("esm_submit") or "Submit"
     payload["esm_trigger"] = question.get("esm_trigger") or trigger
 
@@ -152,6 +170,8 @@ def ios_esm_question_payload(question: dict, trigger: str) -> dict:
         if not key.startswith("esm_"):
             continue
         if key in {"esm_instructions", "esm_submit", "esm_trigger"}:
+            continue
+        if key in _IOS_ESM_QUESTION_EXCLUDED:
             continue
         if key not in payload:
             payload[key] = value
@@ -162,7 +182,7 @@ def ios_esm_question_payload(question: dict, trigger: str) -> dict:
 def ios_esm_schedule_hours(schedule: dict) -> list[int]:
     hours = schedule.get("hours")
     if isinstance(hours, list):
-        return hours
+        return sorted(set(hours))
 
     firsthour = schedule.get("firsthour")
     lasthour = schedule.get("lasthour")
@@ -181,11 +201,13 @@ def ios_esm_schedule_hours(schedule: dict) -> list[int]:
 
 def build_ios_esm_config(source: dict) -> list[dict]:
     questions = build_android_esm_questions(source)
-    schedules = build_android_esm_schedules(source)
+    # Read raw schedules directly so iOS-only fields (expiration, notification_body)
+    # are available, independent of what build_android_esm_schedules strips.
+    raw_schedules = [s for s in get_shared_esm(source)["schedules"] if isinstance(s, dict)]
     questions_by_id = {question.get("id"): question for question in questions}
     schedules_output = []
 
-    for index, schedule in enumerate(schedules):
+    for index, schedule in enumerate(raw_schedules):
         schedule_output = {
             "schedule_id": schedule.get("schedule_id") or f"schedule_{index + 1}",
             "expiration": schedule.get("expiration", 60),
@@ -341,8 +363,10 @@ _ANDROID_TO_IOS_DIRECT = frozenset(
         # plugin: openweather (shared — both Android and iOS)
         "status_plugin_openweather",
         "plugin_openweather_frequency",
-        # plugin: esm scheduler (shared — both Android and iOS)
-        "status_plugin_esm_scheduler",
+        # Note: status_plugin_esm_scheduler is intentionally excluded here.
+        # On iOS the ESM scheduler is plugin_ios_esm, controlled via upsert_ios_esm_plugin.
+        # Passing status_plugin_esm_scheduler through would incorrectly enable
+        # plugin_esm_scheduler (the Google Calendar-based ESM plugin) on iOS.
     }
 )
 

@@ -387,7 +387,7 @@ export default function QuestionComponent(input) {
             recoilState={studyFormQuestionsState}
             index={questionIndex}
             inputLabel="Any instructions for the participant(s)"
-            field="instructions"
+            field="esm_instructions"
           />
 
           <Grid
