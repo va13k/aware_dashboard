@@ -179,8 +179,9 @@ def update_source_from_android_config(source, content):
     questions = content.get("questions", [])
     schedules = content.get("schedules", [])
     sync_shared_esms_from_config(source, questions, schedules)
-    source["android"]["questions"] = questions
-    source["android"]["schedules"] = schedules
+    # ESM data is stored once in shared.esms — do not duplicate into android.questions/schedules.
+    source["android"].pop("questions", None)
+    source["android"].pop("schedules", None)
     android_settings = {
         item["setting"]: item.get("value")
         for item in content.get("sensors", [])
