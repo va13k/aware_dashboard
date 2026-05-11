@@ -8,21 +8,27 @@ load_dotenv()
 ANDROID_DB_URL = os.getenv("ANDROID_DATABASE_URL")
 IOS_DB_URL = os.getenv("IOS_DATABASE_URL")
 
-android_engine = create_async_engine(ANDROID_DB_URL, echo=True, pool_pre_ping=True, pool_recycle=3600)
+android_engine = create_async_engine(
+    ANDROID_DB_URL, echo=True, pool_pre_ping=True, pool_recycle=3600
+)
 ios_engine = create_async_engine(IOS_DB_URL, echo=True, pool_pre_ping=True, pool_recycle=3600)
 
 AndroidSessionLocal = sessionmaker(android_engine, class_=AsyncSession, expire_on_commit=False)
 IosSessionLocal = sessionmaker(ios_engine, class_=AsyncSession, expire_on_commit=False)
 
+
 class AndroidBase(DeclarativeBase):
     pass
+
 
 class IosBase(DeclarativeBase):
     pass
 
+
 async def get_android_db():
     async with AndroidSessionLocal() as session:
         yield session
+
 
 async def get_ios_db():
     async with IosSessionLocal() as session:

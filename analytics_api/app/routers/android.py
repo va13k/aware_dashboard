@@ -102,7 +102,9 @@ async def get_accelerometer(
     offset: int = Query(0),
     db: AsyncSession = Depends(get_android_db),
 ):
-    result = await db.execute(_base_query(AndroidAccelerometer, device_id, from_ts, to_ts, limit, offset))
+    result = await db.execute(
+        _base_query(AndroidAccelerometer, device_id, from_ts, to_ts, limit, offset)
+    )
     return result.scalars().all()
 
 
@@ -115,7 +117,9 @@ async def get_applications(
     offset: int = Query(0),
     db: AsyncSession = Depends(get_android_db),
 ):
-    result = await db.execute(_base_query(AndroidApplicationsForeground, device_id, from_ts, to_ts, limit, offset))
+    result = await db.execute(
+        _base_query(AndroidApplicationsForeground, device_id, from_ts, to_ts, limit, offset)
+    )
     return result.scalars().all()
 
 
@@ -128,7 +132,9 @@ async def get_applications_crashes(
     offset: int = Query(0),
     db: AsyncSession = Depends(get_android_db),
 ):
-    result = await db.execute(_base_query(AndroidApplicationsCrashes, device_id, from_ts, to_ts, limit, offset))
+    result = await db.execute(
+        _base_query(AndroidApplicationsCrashes, device_id, from_ts, to_ts, limit, offset)
+    )
     return result.scalars().all()
 
 
@@ -141,11 +147,15 @@ async def get_applications_history(
     offset: int = Query(0),
     db: AsyncSession = Depends(get_android_db),
 ):
-    result = await db.execute(_base_query(AndroidApplicationsHistory, device_id, from_ts, to_ts, limit, offset))
+    result = await db.execute(
+        _base_query(AndroidApplicationsHistory, device_id, from_ts, to_ts, limit, offset)
+    )
     return result.scalars().all()
 
 
-@router.get("/applications-notifications", response_model=list[AndroidApplicationsNotificationsSchema])
+@router.get(
+    "/applications-notifications", response_model=list[AndroidApplicationsNotificationsSchema]
+)
 async def get_applications_notifications(
     device_id: str,
     from_ts: float | None = Query(None),
@@ -154,7 +164,9 @@ async def get_applications_notifications(
     offset: int = Query(0),
     db: AsyncSession = Depends(get_android_db),
 ):
-    result = await db.execute(_base_query(AndroidApplicationsNotifications, device_id, from_ts, to_ts, limit, offset))
+    result = await db.execute(
+        _base_query(AndroidApplicationsNotifications, device_id, from_ts, to_ts, limit, offset)
+    )
     return result.scalars().all()
 
 
@@ -167,7 +179,9 @@ async def get_barometer(
     offset: int = Query(0),
     db: AsyncSession = Depends(get_android_db),
 ):
-    result = await db.execute(_base_query(AndroidBarometer, device_id, from_ts, to_ts, limit, offset))
+    result = await db.execute(
+        _base_query(AndroidBarometer, device_id, from_ts, to_ts, limit, offset)
+    )
     return result.scalars().all()
 
 
@@ -193,7 +207,9 @@ async def get_battery_charges(
     offset: int = Query(0),
     db: AsyncSession = Depends(get_android_db),
 ):
-    result = await db.execute(_base_query(AndroidBatteryCharges, device_id, from_ts, to_ts, limit, offset))
+    result = await db.execute(
+        _base_query(AndroidBatteryCharges, device_id, from_ts, to_ts, limit, offset)
+    )
     return result.scalars().all()
 
 
@@ -206,7 +222,9 @@ async def get_battery_discharges(
     offset: int = Query(0),
     db: AsyncSession = Depends(get_android_db),
 ):
-    result = await db.execute(_base_query(AndroidBatteryDischarges, device_id, from_ts, to_ts, limit, offset))
+    result = await db.execute(
+        _base_query(AndroidBatteryDischarges, device_id, from_ts, to_ts, limit, offset)
+    )
     return result.scalars().all()
 
 
@@ -219,7 +237,9 @@ async def get_bluetooth(
     offset: int = Query(0),
     db: AsyncSession = Depends(get_android_db),
 ):
-    result = await db.execute(_base_query(AndroidBluetooth, device_id, from_ts, to_ts, limit, offset))
+    result = await db.execute(
+        _base_query(AndroidBluetooth, device_id, from_ts, to_ts, limit, offset)
+    )
     return result.scalars().all()
 
 
@@ -271,7 +291,9 @@ async def get_gyroscope(
     offset: int = Query(0),
     db: AsyncSession = Depends(get_android_db),
 ):
-    result = await db.execute(_base_query(AndroidGyroscope, device_id, from_ts, to_ts, limit, offset))
+    result = await db.execute(
+        _base_query(AndroidGyroscope, device_id, from_ts, to_ts, limit, offset)
+    )
     return result.scalars().all()
 
 
@@ -284,7 +306,9 @@ async def get_installations(
     offset: int = Query(0),
     db: AsyncSession = Depends(get_android_db),
 ):
-    result = await db.execute(_base_query(AndroidInstallations, device_id, from_ts, to_ts, limit, offset))
+    result = await db.execute(
+        _base_query(AndroidInstallations, device_id, from_ts, to_ts, limit, offset)
+    )
     return result.scalars().all()
 
 
@@ -297,7 +321,9 @@ async def get_keyboard(
     offset: int = Query(0),
     db: AsyncSession = Depends(get_android_db),
 ):
-    result = await db.execute(_base_query(AndroidKeyboard, device_id, from_ts, to_ts, limit, offset))
+    result = await db.execute(
+        _base_query(AndroidKeyboard, device_id, from_ts, to_ts, limit, offset)
+    )
     return result.scalars().all()
 
 
@@ -323,7 +349,9 @@ async def get_linear_accelerometer(
     offset: int = Query(0),
     db: AsyncSession = Depends(get_android_db),
 ):
-    result = await db.execute(_base_query(AndroidLinearAccelerometer, device_id, from_ts, to_ts, limit, offset))
+    result = await db.execute(
+        _base_query(AndroidLinearAccelerometer, device_id, from_ts, to_ts, limit, offset)
+    )
     return result.scalars().all()
 
 
@@ -336,7 +364,9 @@ async def get_locations(
     offset: int = Query(0),
     db: AsyncSession = Depends(get_android_db),
 ):
-    result = await db.execute(_base_query(AndroidLocations, device_id, from_ts, to_ts, limit, offset))
+    result = await db.execute(
+        _base_query(AndroidLocations, device_id, from_ts, to_ts, limit, offset)
+    )
     return result.scalars().all()
 
 
@@ -349,7 +379,9 @@ async def get_magnetometer(
     offset: int = Query(0),
     db: AsyncSession = Depends(get_android_db),
 ):
-    result = await db.execute(_base_query(AndroidMagnetometer, device_id, from_ts, to_ts, limit, offset))
+    result = await db.execute(
+        _base_query(AndroidMagnetometer, device_id, from_ts, to_ts, limit, offset)
+    )
     return result.scalars().all()
 
 
@@ -362,7 +394,9 @@ async def get_messages(
     offset: int = Query(0),
     db: AsyncSession = Depends(get_android_db),
 ):
-    result = await db.execute(_base_query(AndroidMessages, device_id, from_ts, to_ts, limit, offset))
+    result = await db.execute(
+        _base_query(AndroidMessages, device_id, from_ts, to_ts, limit, offset)
+    )
     return result.scalars().all()
 
 
@@ -388,7 +422,9 @@ async def get_network_traffic(
     offset: int = Query(0),
     db: AsyncSession = Depends(get_android_db),
 ):
-    result = await db.execute(_base_query(AndroidNetworkTraffic, device_id, from_ts, to_ts, limit, offset))
+    result = await db.execute(
+        _base_query(AndroidNetworkTraffic, device_id, from_ts, to_ts, limit, offset)
+    )
     return result.scalars().all()
 
 
@@ -414,7 +450,9 @@ async def get_plugin_ambient_noise(
     offset: int = Query(0),
     db: AsyncSession = Depends(get_android_db),
 ):
-    result = await db.execute(_base_query(AndroidPluginAmbientNoise, device_id, from_ts, to_ts, limit, offset))
+    result = await db.execute(
+        _base_query(AndroidPluginAmbientNoise, device_id, from_ts, to_ts, limit, offset)
+    )
     return result.scalars().all()
 
 
@@ -427,7 +465,9 @@ async def get_plugin_openweather(
     offset: int = Query(0),
     db: AsyncSession = Depends(get_android_db),
 ):
-    result = await db.execute(_base_query(AndroidPluginOpenweather, device_id, from_ts, to_ts, limit, offset))
+    result = await db.execute(
+        _base_query(AndroidPluginOpenweather, device_id, from_ts, to_ts, limit, offset)
+    )
     return result.scalars().all()
 
 
@@ -440,7 +480,9 @@ async def get_proximity(
     offset: int = Query(0),
     db: AsyncSession = Depends(get_android_db),
 ):
-    result = await db.execute(_base_query(AndroidProximity, device_id, from_ts, to_ts, limit, offset))
+    result = await db.execute(
+        _base_query(AndroidProximity, device_id, from_ts, to_ts, limit, offset)
+    )
     return result.scalars().all()
 
 
@@ -453,7 +495,9 @@ async def get_rotation(
     offset: int = Query(0),
     db: AsyncSession = Depends(get_android_db),
 ):
-    result = await db.execute(_base_query(AndroidRotation, device_id, from_ts, to_ts, limit, offset))
+    result = await db.execute(
+        _base_query(AndroidRotation, device_id, from_ts, to_ts, limit, offset)
+    )
     return result.scalars().all()
 
 
@@ -479,7 +523,9 @@ async def get_screentext(
     offset: int = Query(0),
     db: AsyncSession = Depends(get_android_db),
 ):
-    result = await db.execute(_base_query(AndroidScreentext, device_id, from_ts, to_ts, limit, offset))
+    result = await db.execute(
+        _base_query(AndroidScreentext, device_id, from_ts, to_ts, limit, offset)
+    )
     return result.scalars().all()
 
 
@@ -492,7 +538,9 @@ async def get_significant_motion(
     offset: int = Query(0),
     db: AsyncSession = Depends(get_android_db),
 ):
-    result = await db.execute(_base_query(AndroidSignificant, device_id, from_ts, to_ts, limit, offset))
+    result = await db.execute(
+        _base_query(AndroidSignificant, device_id, from_ts, to_ts, limit, offset)
+    )
     return result.scalars().all()
 
 
@@ -505,7 +553,9 @@ async def get_telephony(
     offset: int = Query(0),
     db: AsyncSession = Depends(get_android_db),
 ):
-    result = await db.execute(_base_query(AndroidTelephony, device_id, from_ts, to_ts, limit, offset))
+    result = await db.execute(
+        _base_query(AndroidTelephony, device_id, from_ts, to_ts, limit, offset)
+    )
     return result.scalars().all()
 
 
@@ -518,7 +568,9 @@ async def get_temperature(
     offset: int = Query(0),
     db: AsyncSession = Depends(get_android_db),
 ):
-    result = await db.execute(_base_query(AndroidTemperature, device_id, from_ts, to_ts, limit, offset))
+    result = await db.execute(
+        _base_query(AndroidTemperature, device_id, from_ts, to_ts, limit, offset)
+    )
     return result.scalars().all()
 
 
@@ -531,7 +583,9 @@ async def get_timezone(
     offset: int = Query(0),
     db: AsyncSession = Depends(get_android_db),
 ):
-    result = await db.execute(_base_query(AndroidTimezone, device_id, from_ts, to_ts, limit, offset))
+    result = await db.execute(
+        _base_query(AndroidTimezone, device_id, from_ts, to_ts, limit, offset)
+    )
     return result.scalars().all()
 
 
@@ -566,42 +620,45 @@ async def get_wifi(
 # ---------------------------------------------------------------------------
 
 _EXPORT_MODELS: dict[str, tuple] = {
-    "accelerometer":               (AndroidAccelerometer,            AndroidAccelerometerSchema),
-    "applications":                (AndroidApplicationsForeground,   AndroidApplicationsForegroundSchema),
-    "applications-crashes":        (AndroidApplicationsCrashes,      AndroidApplicationsCrashesSchema),
-    "applications-history":        (AndroidApplicationsHistory,      AndroidApplicationsHistorySchema),
-    "applications-notifications":  (AndroidApplicationsNotifications, AndroidApplicationsNotificationsSchema),
-    "barometer":                   (AndroidBarometer,                AndroidBarometerSchema),
-    "battery":                     (AndroidBattery,                  AndroidBatterySchema),
-    "battery-charges":             (AndroidBatteryCharges,           AndroidBatteryChargesSchema),
-    "battery-discharges":          (AndroidBatteryDischarges,        AndroidBatteryDischargesSchema),
-    "bluetooth":                   (AndroidBluetooth,                AndroidBluetoothSchema),
-    "calls":                       (AndroidCalls,                    AndroidCallsSchema),
-    "esms":                        (AndroidEsms,                     AndroidEsmsSchema),
-    "gravity":                     (AndroidGravity,                  AndroidGravitySchema),
-    "gyroscope":                   (AndroidGyroscope,                AndroidGyroscopeSchema),
-    "installations":               (AndroidInstallations,            AndroidInstallationsSchema),
-    "keyboard":                    (AndroidKeyboard,                 AndroidKeyboardSchema),
-    "light":                       (AndroidLight,                    AndroidLightSchema),
-    "linear-accelerometer":        (AndroidLinearAccelerometer,      AndroidLinearAccelerometerSchema),
-    "locations":                   (AndroidLocations,                AndroidLocationsSchema),
-    "magnetometer":                (AndroidMagnetometer,             AndroidMagnetometerSchema),
-    "messages":                    (AndroidMessages,                 AndroidMessagesSchema),
-    "network":                     (AndroidNetwork,                  AndroidNetworkSchema),
-    "network-traffic":             (AndroidNetworkTraffic,           AndroidNetworkTrafficSchema),
-    "notes":                       (AndroidNotes,                    AndroidNotesSchema),
-    "plugin-ambient-noise":        (AndroidPluginAmbientNoise,       AndroidPluginAmbientNoiseSchema),
-    "plugin-openweather":          (AndroidPluginOpenweather,        AndroidPluginOpenweatherSchema),
-    "proximity":                   (AndroidProximity,                AndroidProximitySchema),
-    "rotation":                    (AndroidRotation,                 AndroidRotationSchema),
-    "screen":                      (AndroidScreen,                   AndroidScreenSchema),
-    "screentext":                  (AndroidScreentext,               AndroidScreentextSchema),
-    "significant-motion":          (AndroidSignificant,              AndroidSignificantSchema),
-    "telephony":                   (AndroidTelephony,                AndroidTelephonySchema),
-    "temperature":                 (AndroidTemperature,              AndroidTemperatureSchema),
-    "timezone":                    (AndroidTimezone,                 AndroidTimezoneSchema),
-    "touch":                       (AndroidTouch,                    AndroidTouchSchema),
-    "wifi":                        (AndroidWifi,                     AndroidWifiSchema),
+    "accelerometer": (AndroidAccelerometer, AndroidAccelerometerSchema),
+    "applications": (AndroidApplicationsForeground, AndroidApplicationsForegroundSchema),
+    "applications-crashes": (AndroidApplicationsCrashes, AndroidApplicationsCrashesSchema),
+    "applications-history": (AndroidApplicationsHistory, AndroidApplicationsHistorySchema),
+    "applications-notifications": (
+        AndroidApplicationsNotifications,
+        AndroidApplicationsNotificationsSchema,
+    ),
+    "barometer": (AndroidBarometer, AndroidBarometerSchema),
+    "battery": (AndroidBattery, AndroidBatterySchema),
+    "battery-charges": (AndroidBatteryCharges, AndroidBatteryChargesSchema),
+    "battery-discharges": (AndroidBatteryDischarges, AndroidBatteryDischargesSchema),
+    "bluetooth": (AndroidBluetooth, AndroidBluetoothSchema),
+    "calls": (AndroidCalls, AndroidCallsSchema),
+    "esms": (AndroidEsms, AndroidEsmsSchema),
+    "gravity": (AndroidGravity, AndroidGravitySchema),
+    "gyroscope": (AndroidGyroscope, AndroidGyroscopeSchema),
+    "installations": (AndroidInstallations, AndroidInstallationsSchema),
+    "keyboard": (AndroidKeyboard, AndroidKeyboardSchema),
+    "light": (AndroidLight, AndroidLightSchema),
+    "linear-accelerometer": (AndroidLinearAccelerometer, AndroidLinearAccelerometerSchema),
+    "locations": (AndroidLocations, AndroidLocationsSchema),
+    "magnetometer": (AndroidMagnetometer, AndroidMagnetometerSchema),
+    "messages": (AndroidMessages, AndroidMessagesSchema),
+    "network": (AndroidNetwork, AndroidNetworkSchema),
+    "network-traffic": (AndroidNetworkTraffic, AndroidNetworkTrafficSchema),
+    "notes": (AndroidNotes, AndroidNotesSchema),
+    "plugin-ambient-noise": (AndroidPluginAmbientNoise, AndroidPluginAmbientNoiseSchema),
+    "plugin-openweather": (AndroidPluginOpenweather, AndroidPluginOpenweatherSchema),
+    "proximity": (AndroidProximity, AndroidProximitySchema),
+    "rotation": (AndroidRotation, AndroidRotationSchema),
+    "screen": (AndroidScreen, AndroidScreenSchema),
+    "screentext": (AndroidScreentext, AndroidScreentextSchema),
+    "significant-motion": (AndroidSignificant, AndroidSignificantSchema),
+    "telephony": (AndroidTelephony, AndroidTelephonySchema),
+    "temperature": (AndroidTemperature, AndroidTemperatureSchema),
+    "timezone": (AndroidTimezone, AndroidTimezoneSchema),
+    "touch": (AndroidTouch, AndroidTouchSchema),
+    "wifi": (AndroidWifi, AndroidWifiSchema),
 }
 
 

@@ -1,33 +1,39 @@
 import {
-  BarChart, Bar, XAxis, YAxis, Tooltip,
-  ResponsiveContainer, Cell,
-} from 'recharts'
-import type { SensorRecord } from '../types'
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  Tooltip,
+  ResponsiveContainer,
+  Cell,
+} from "recharts";
+import type { SensorRecord } from "../types";
 
 interface Props {
-  records: SensorRecord[]
-  loading: boolean
+  records: SensorRecord[];
+  loading: boolean;
 }
 
-const USER_APP_COLOR = '#10b981'
-const SYSTEM_APP_COLOR = '#94a3b8'
+const USER_APP_COLOR = "#10b981";
+const SYSTEM_APP_COLOR = "#94a3b8";
 
 export default function ApplicationsCard({ records, loading }: Props) {
-  const counts: Record<string, { count: number; isSystem: boolean }> = {}
+  const counts: Record<string, { count: number; isSystem: boolean }> = {};
 
   for (const r of records) {
-    const name = (r.application_name as string | null)
-      ?? (r.package_name as string | null)
-      ?? 'Unknown'
-    const isSystem = Boolean(r.is_system_app)
-    if (!counts[name]) counts[name] = { count: 0, isSystem }
-    counts[name].count++
+    const name =
+      (r.application_name as string | null) ??
+      (r.package_name as string | null) ??
+      "Unknown";
+    const isSystem = Boolean(r.is_system_app);
+    if (!counts[name]) counts[name] = { count: 0, isSystem };
+    counts[name].count++;
   }
 
   const data = Object.entries(counts)
     .map(([name, { count, isSystem }]) => ({ name, count, isSystem }))
     .sort((a, b) => b.count - a.count)
-    .slice(0, 12)
+    .slice(0, 12);
 
   return (
     <div className="bg-card backdrop-blur-xl border border-wire rounded-3xl shadow-card p-5">
@@ -59,23 +65,34 @@ export default function ApplicationsCard({ records, loading }: Props) {
           No data
         </div>
       ) : (
-        <ResponsiveContainer width="100%" height={Math.max(160, data.length * 28)}>
-          <BarChart data={data} layout="vertical" margin={{ top: 4, right: 16, left: 8, bottom: 0 }}>
-            <XAxis type="number" tick={{ fill: '#5f746b', fontSize: 11 }} />
+        <ResponsiveContainer
+          width="100%"
+          height={Math.max(160, data.length * 28)}
+        >
+          <BarChart
+            data={data}
+            layout="vertical"
+            margin={{ top: 4, right: 16, left: 8, bottom: 0 }}
+          >
+            <XAxis type="number" tick={{ fill: "#5f746b", fontSize: 11 }} />
             <YAxis
               type="category"
               dataKey="name"
-              tick={{ fill: '#5f746b', fontSize: 11 }}
+              tick={{ fill: "#5f746b", fontSize: 11 }}
               width={140}
-              tickFormatter={v => v.length > 20 ? v.slice(0, 19) + '…' : v}
+              tickFormatter={(v) => (v.length > 20 ? v.slice(0, 19) + "…" : v)}
             />
             <Tooltip
-              contentStyle={{ background: '#fffdf8', border: '1px solid rgba(48,67,54,0.14)', borderRadius: 10 }}
-              labelStyle={{ color: '#5f746b' }}
-              itemStyle={{ color: '#193229' }}
+              contentStyle={{
+                background: "#fffdf8",
+                border: "1px solid rgba(48,67,54,0.14)",
+                borderRadius: 10,
+              }}
+              labelStyle={{ color: "#5f746b" }}
+              itemStyle={{ color: "#193229" }}
             />
             <Bar dataKey="count" radius={[0, 4, 4, 0]}>
-              {data.map(entry => (
+              {data.map((entry) => (
                 <Cell
                   key={entry.name}
                   fill={entry.isSystem ? SYSTEM_APP_COLOR : USER_APP_COLOR}
@@ -86,5 +103,5 @@ export default function ApplicationsCard({ records, loading }: Props) {
         </ResponsiveContainer>
       )}
     </div>
-  )
+  );
 }

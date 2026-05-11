@@ -7,6 +7,7 @@ import pathlib
 import tempfile
 from typing import Any, Callable
 
+
 def _project_root() -> pathlib.Path:
     container_path = pathlib.Path("/project")
     if container_path.is_dir():

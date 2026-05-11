@@ -26,10 +26,7 @@
       "instructions": "Click",
       "esm_type": 2,
       "esm_submit": "Submit",
-      "esm_radios": [
-        "No",
-        "Yes"
-      ],
+      "esm_radios": ["No", "Yes"],
       "id": 1
     }
   ],
@@ -38,9 +35,7 @@
       "title": "Schedule1",
       "type": "repeat",
       "esm_keep": true,
-      "questions": [
-        1
-      ],
+      "questions": [1],
       "repeatInterval": 30
     }
   ],

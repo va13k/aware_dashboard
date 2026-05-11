@@ -64,18 +64,12 @@ IOS_STREAMS = {
 def _row_to_dict(row):
     if row is None:
         return None
-    return {
-        column.name.lstrip("_"): getattr(row, column.name)
-        for column in row.__table__.columns
-    }
+    return {column.name.lstrip("_"): getattr(row, column.name) for column in row.__table__.columns}
 
 
 async def _latest_row(db: AsyncSession, model, device_id: str):
     result = await db.execute(
-        select(model)
-        .where(model.device_id == device_id)
-        .order_by(model.timestamp.desc())
-        .limit(1)
+        select(model).where(model.device_id == device_id).order_by(model.timestamp.desc()).limit(1)
     )
     return result.scalars().first()
 
@@ -104,12 +98,14 @@ async def _device_detail(platform: str, device_id: str, db: AsyncSession):
         try:
             stream_details.append(await _stream_summary(db, key, model, device_id))
         except (ProgrammingError, OperationalError):
-            stream_details.append({
-                "key": key,
-                "count": 0,
-                "last_seen": None,
-                "latest": None,
-            })
+            stream_details.append(
+                {
+                    "key": key,
+                    "count": 0,
+                    "last_seen": None,
+                    "latest": None,
+                }
+            )
 
     return {
         "platform": platform,
@@ -164,7 +160,8 @@ async def list_ios_devices(db: AsyncSession = Depends(get_ios_db)):
             select(
                 IosDevice.device_id,
                 func.max(IosDevice.timestamp).label("last_seen"),
-            ).group_by(IosDevice.device_id)
+            )
+            .group_by(IosDevice.device_id)
             .order_by(func.max(IosDevice.timestamp).desc())
         )
         rows = result.all()
@@ -173,7 +170,8 @@ async def list_ios_devices(db: AsyncSession = Depends(get_ios_db)):
                 select(
                     IosBattery.device_id,
                     func.max(IosBattery.timestamp).label("last_seen"),
-                ).group_by(IosBattery.device_id)
+                )
+                .group_by(IosBattery.device_id)
                 .order_by(func.max(IosBattery.timestamp).desc())
             )
             rows = result.all()

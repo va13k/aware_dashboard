@@ -13,7 +13,12 @@ if PROJECT_ROOT.exists() and str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 from shared_config.source_store import update_source
-from shared_config.runtime import build_public_base_url, get_runtime_settings, load_env, normalize_public_env
+from shared_config.runtime import (
+    build_public_base_url,
+    get_runtime_settings,
+    load_env,
+    normalize_public_env,
+)
 from shared_config.serializers import (
     ANDROID_ONLY_SHARED_SENSOR_NAMES,
     COMMON_SHARED_SENSOR_FIELDS,
@@ -51,7 +56,7 @@ def save_json_file(request):
     if request.method == "POST":
         json_str = request.body
         json_dict = json.loads(json_str)
-        raw_text = json_dict.get('text', None)
+        raw_text = json_dict.get("text", None)
         try:
             content = json.loads(raw_text)
         except (TypeError, json.JSONDecodeError):
@@ -59,11 +64,13 @@ def save_json_file(request):
 
         file_name = save(content)
         return HttpResponse(
-            json.dumps({
-                "success": True,
-                "file_name": file_name,
-                "url": f"/studies/files/{file_name}",
-            }),
+            json.dumps(
+                {
+                    "success": True,
+                    "file_name": file_name,
+                    "url": f"/studies/files/{file_name}",
+                }
+            ),
             content_type="application/json",
         )
 
@@ -87,7 +94,7 @@ def save(content):
 
 def write_json(path, content):
     path.parent.mkdir(parents=True, exist_ok=True)
-    with open(path, 'w', encoding='utf-8') as file:
+    with open(path, "w", encoding="utf-8") as file:
         json.dump(content, file, indent=2)
         file.write("\n")
 
@@ -132,9 +139,7 @@ def update_source_from_android_config(source, content):
     database = content.get("database", {})
 
     source["study"]["id"] = content.get("_id", source["study"]["id"])
-    source["study"]["title"] = study_info.get(
-        "study_title", source["study"]["title"]
-    )
+    source["study"]["title"] = study_info.get("study_title", source["study"]["title"])
     source["study"]["description"] = study_info.get(
         "study_description", source["study"]["description"]
     )
@@ -156,12 +161,8 @@ def update_source_from_android_config(source, content):
         )
         android_db["port"] = int(database.get("database_port", android_db["port"]))
         android_db["name"] = database.get("database_name", android_db["name"])
-        android_db["username"] = database.get(
-            "database_username", android_db["username"]
-        )
-        android_db["password"] = database.get(
-            "database_password", android_db["password"]
-        )
+        android_db["username"] = database.get("database_username", android_db["username"])
+        android_db["password"] = database.get("database_password", android_db["password"])
         android_db["config_without_password"] = database.get(
             "config_without_password", android_db.get("config_without_password", False)
         )
@@ -255,12 +256,16 @@ def sync_shared_sensors_from_android_settings(source, android_settings):
     # build_ios_sensor_settings expands these in the forward direction;
     # here we do the reverse so iOS tracks whatever Android has enabled.
     ios_sensors = source.setdefault("ios", {}).setdefault("sensors", {})
-    _sync_ios_compound_sensor(ios_sensors, android_settings, "network",
-                               ["status_network_events", "status_network_traffic"])
-    _sync_ios_compound_sensor(ios_sensors, android_settings, "communication",
-                               ["status_calls", "status_messages"])
-    _sync_ios_compound_sensor(ios_sensors, android_settings, "locations",
-                               ["status_location_gps"])
+    _sync_ios_compound_sensor(
+        ios_sensors,
+        android_settings,
+        "network",
+        ["status_network_events", "status_network_traffic"],
+    )
+    _sync_ios_compound_sensor(
+        ios_sensors, android_settings, "communication", ["status_calls", "status_messages"]
+    )
+    _sync_ios_compound_sensor(ios_sensors, android_settings, "locations", ["status_location_gps"])
 
     # Mirror shared sensor enabled states to ios.sensors so source.json stays
     # consistent. Android-only sensors (applications, light, etc.) are skipped.
@@ -279,9 +284,7 @@ def sync_shared_sensors_from_android_settings(source, android_settings):
         if android_key in android_settings:
             ios_plugins[ios_plugin_name] = bool(android_settings[android_key])
     if "status_plugin_esm_scheduler" in android_settings:
-        ios_plugins["plugin_ios_esm"] = bool(
-            android_settings["status_plugin_esm_scheduler"]
-        )
+        ios_plugins["plugin_ios_esm"] = bool(android_settings["status_plugin_esm_scheduler"])
 
 
 def _sync_ios_compound_sensor(ios_sensors, android_settings, ios_name, android_keys):
@@ -328,7 +331,9 @@ def write_outputs(source):
         int(settings["public_port"]),
     )
     android_webservice_url = f"{base_url}/index.php/{study['study_number']}/{study['study_key']}"
-    android_config = serialize_android_config(source, settings, ANDROID_TEMPLATE_PATH, webservice_server=android_webservice_url)
+    android_config = serialize_android_config(
+        source, settings, ANDROID_TEMPLATE_PATH, webservice_server=android_webservice_url
+    )
     ios_esm_config = build_ios_esm_config(source)
     write_json(STUDY_CONFIG_PATH, android_config)
     write_json(IOS_CONFIG_PATH, ios_config)

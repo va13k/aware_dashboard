@@ -3,310 +3,311 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
 class _Base(BaseModel):
-  model_config = ConfigDict(from_attributes=True, populate_by_name=True)
+    model_config = ConfigDict(from_attributes=True, populate_by_name=True)
 
-  id: int = Field(validation_alias="_id")
-  timestamp: float
-  device_id: str
+    id: int = Field(validation_alias="_id")
+    timestamp: float
+    device_id: str
 
 
 # ---------------------------------------------------------------------------
 # Android schemas — flat columns, no JSON blob to resolve
 # ---------------------------------------------------------------------------
 
+
 class AndroidDeviceSchema(_Base):
-  board: str | None = None
-  brand: str | None = None
-  device: str | None = None
-  manufacturer: str | None = None
-  model: str | None = None
-  sdk: str | None = None
-  label: str | None = None
+    board: str | None = None
+    brand: str | None = None
+    device: str | None = None
+    manufacturer: str | None = None
+    model: str | None = None
+    sdk: str | None = None
+    label: str | None = None
 
 
 class AndroidAccelerometerSchema(_Base):
-  double_values_0: float = 0
-  double_values_1: float = 0
-  double_values_2: float = 0
-  accuracy: int = 0
-  label: str | None = None
+    double_values_0: float = 0
+    double_values_1: float = 0
+    double_values_2: float = 0
+    accuracy: int = 0
+    label: str | None = None
 
 
 class AndroidApplicationsCrashesSchema(_Base):
-  package_name: str | None = None
-  application_name: str | None = None
-  application_version: float = 0
-  error_short: str | None = None
-  error_long: str | None = None
-  error_condition: int = 0
-  is_system_app: int = 0
+    package_name: str | None = None
+    application_name: str | None = None
+    application_version: float = 0
+    error_short: str | None = None
+    error_long: str | None = None
+    error_condition: int = 0
+    is_system_app: int = 0
 
 
 class AndroidApplicationsForegroundSchema(_Base):
-  package_name: str | None = None
-  application_name: str | None = None
-  is_system_app: int = 0
+    package_name: str | None = None
+    application_name: str | None = None
+    is_system_app: int = 0
 
 
 class AndroidApplicationsHistorySchema(_Base):
-  package_name: str | None = None
-  application_name: str | None = None
-  process_importance: int = 0
-  process_id: int = 0
-  double_end_timestamp: float = 1
-  is_system_app: int = 0
+    package_name: str | None = None
+    application_name: str | None = None
+    process_importance: int = 0
+    process_id: int = 0
+    double_end_timestamp: float = 1
+    is_system_app: int = 0
 
 
 class AndroidApplicationsNotificationsSchema(_Base):
-  package_name: str | None = None
-  application_name: str | None = None
-  text: str | None = None
-  sound: str | None = None
-  vibrate: str | None = None
-  defaults: int = -1
-  flags: int = -1
+    package_name: str | None = None
+    application_name: str | None = None
+    text: str | None = None
+    sound: str | None = None
+    vibrate: str | None = None
+    defaults: int = -1
+    flags: int = -1
 
 
 class AndroidBarometerSchema(_Base):
-  double_values_0: float = 0
-  accuracy: int = 0
-  label: str | None = None
+    double_values_0: float = 0
+    accuracy: int = 0
+    label: str | None = None
 
 
 class AndroidBatterySchema(_Base):
-  battery_status: int = 0
-  battery_level: int = 0
-  battery_scale: int = 0
-  battery_voltage: int = 0
-  battery_temperature: int = 0
-  battery_adaptor: int = 0
-  battery_health: int = 0
-  battery_technology: str | None = None
+    battery_status: int = 0
+    battery_level: int = 0
+    battery_scale: int = 0
+    battery_voltage: int = 0
+    battery_temperature: int = 0
+    battery_adaptor: int = 0
+    battery_health: int = 0
+    battery_technology: str | None = None
 
 
 class AndroidBatteryChargesSchema(_Base):
-  battery_start: int = 0
-  battery_end: int = 0
-  double_end_timestamp: float = 0
+    battery_start: int = 0
+    battery_end: int = 0
+    double_end_timestamp: float = 0
 
 
 class AndroidBatteryDischargesSchema(_Base):
-  battery_start: int = 0
-  battery_end: int = 0
-  double_end_timestamp: float = 0
+    battery_start: int = 0
+    battery_end: int = 0
+    double_end_timestamp: float = 0
 
 
 class AndroidBluetoothSchema(_Base):
-  bt_address: str = ""
-  bt_name: str | None = None
-  bt_rssi: int = 0
-  label: str | None = None
+    bt_address: str = ""
+    bt_name: str | None = None
+    bt_rssi: int = 0
+    label: str | None = None
 
 
 class AndroidCallsSchema(_Base):
-  call_type: int = 0
-  call_duration: int = 0
-  trace: str | None = None
+    call_type: int = 0
+    call_duration: int = 0
+    trace: str | None = None
 
 
 class AndroidEsmsSchema(_Base):
-  esm_json: str | None = None
-  esm_status: int = 0
-  esm_expiration_threshold: int = 0
-  esm_notification_timeout: int = 0
-  double_esm_user_answer_timestamp: float = 0
-  esm_user_answer: str | None = None
-  esm_trigger: str | None = None
+    esm_json: str | None = None
+    esm_status: int = 0
+    esm_expiration_threshold: int = 0
+    esm_notification_timeout: int = 0
+    double_esm_user_answer_timestamp: float = 0
+    esm_user_answer: str | None = None
+    esm_trigger: str | None = None
 
 
 class AndroidGravitySchema(_Base):
-  double_values_0: float = 0
-  double_values_1: float = 0
-  double_values_2: float = 0
-  accuracy: int = 0
-  label: str | None = None
+    double_values_0: float = 0
+    double_values_1: float = 0
+    double_values_2: float = 0
+    accuracy: int = 0
+    label: str | None = None
 
 
 class AndroidGyroscopeSchema(_Base):
-  double_values_0: float = 0
-  double_values_1: float = 0
-  double_values_2: float = 0
-  accuracy: int = 0
-  label: str | None = None
+    double_values_0: float = 0
+    double_values_1: float = 0
+    double_values_2: float = 0
+    accuracy: int = 0
+    label: str | None = None
 
 
 class AndroidInstallationsSchema(_Base):
-  package_name: str | None = None
-  application_name: str | None = None
-  installation_status: int = -1
-  version_name: str | None = None
-  version_code: int = -1
+    package_name: str | None = None
+    application_name: str | None = None
+    installation_status: int = -1
+    version_name: str | None = None
+    version_code: int = -1
 
 
 class AndroidKeyboardSchema(_Base):
-  package_name: str | None = None
-  before_text: str | None = None
-  current_text: str | None = None
-  is_password: int = -1
+    package_name: str | None = None
+    before_text: str | None = None
+    current_text: str | None = None
+    is_password: int = -1
 
 
 class AndroidLightSchema(_Base):
-  double_light_lux: float = 0
-  accuracy: int = 0
-  label: str | None = None
+    double_light_lux: float = 0
+    accuracy: int = 0
+    label: str | None = None
 
 
 class AndroidLinearAccelerometerSchema(_Base):
-  double_values_0: float = 0
-  double_values_1: float = 0
-  double_values_2: float = 0
-  accuracy: int = 0
-  label: str | None = None
+    double_values_0: float = 0
+    double_values_1: float = 0
+    double_values_2: float = 0
+    accuracy: int = 0
+    label: str | None = None
 
 
 class AndroidLocationsSchema(_Base):
-  double_latitude: float = 0
-  double_longitude: float = 0
-  double_bearing: float = 0
-  double_speed: float = 0
-  double_altitude: float = 0
-  provider: str | None = None
-  accuracy: float = 0
-  label: str | None = None
+    double_latitude: float = 0
+    double_longitude: float = 0
+    double_bearing: float = 0
+    double_speed: float = 0
+    double_altitude: float = 0
+    provider: str | None = None
+    accuracy: float = 0
+    label: str | None = None
 
 
 class AndroidMagnetometerSchema(_Base):
-  double_values_0: float = 0
-  double_values_1: float = 0
-  double_values_2: float = 0
-  accuracy: int = 0
-  label: str | None = None
+    double_values_0: float = 0
+    double_values_1: float = 0
+    double_values_2: float = 0
+    accuracy: int = 0
+    label: str | None = None
 
 
 class AndroidMessagesSchema(_Base):
-  message_type: int = 0
-  trace: str | None = None
+    message_type: int = 0
+    trace: str | None = None
 
 
 class AndroidNetworkSchema(_Base):
-  network_type: int = 0
-  network_subtype: str | None = None
-  network_state: int = 0
+    network_type: int = 0
+    network_subtype: str | None = None
+    network_state: int = 0
 
 
 class AndroidNetworkTrafficSchema(_Base):
-  network_type: int = 0
-  double_received_bytes: float = 0
-  double_sent_bytes: float = 0
-  double_received_packets: float = 0
-  double_sent_packets: float = 0
+    network_type: int = 0
+    double_received_bytes: float = 0
+    double_sent_bytes: float = 0
+    double_received_packets: float = 0
+    double_sent_packets: float = 0
 
 
 class AndroidNotesSchema(_Base):
-  note: str | None = None
+    note: str | None = None
 
 
 class AndroidPluginAmbientNoiseSchema(_Base):
-  double_frequency: float = 0
-  double_decibels: float = 0
-  double_rms: float = 0
-  is_silent: int = 0
-  double_silence_threshold: float = 0
+    double_frequency: float = 0
+    double_decibels: float = 0
+    double_rms: float = 0
+    is_silent: int = 0
+    double_silence_threshold: float = 0
 
 
 class AndroidPluginOpenweatherSchema(_Base):
-  city: str | None = None
-  temperature: float = 0
-  temperature_max: float = 0
-  temperature_min: float = 0
-  unit: str | None = None
-  humidity: float = 0
-  pressure: float = 0
-  wind_speed: float = 0
-  wind_degrees: float = 0
-  cloudiness: float = 0
-  rain: float = 0
-  snow: float = 0
-  sunrise: float = 0
-  sunset: float = 0
-  weather_icon_id: int = 0
-  weather_description: str | None = None
+    city: str | None = None
+    temperature: float = 0
+    temperature_max: float = 0
+    temperature_min: float = 0
+    unit: str | None = None
+    humidity: float = 0
+    pressure: float = 0
+    wind_speed: float = 0
+    wind_degrees: float = 0
+    cloudiness: float = 0
+    rain: float = 0
+    snow: float = 0
+    sunrise: float = 0
+    sunset: float = 0
+    weather_icon_id: int = 0
+    weather_description: str | None = None
 
 
 class AndroidProximitySchema(_Base):
-  double_proximity: float = 0
-  accuracy: int = 0
-  label: str | None = None
+    double_proximity: float = 0
+    accuracy: int = 0
+    label: str | None = None
 
 
 class AndroidRotationSchema(_Base):
-  double_values_0: float = 0
-  double_values_1: float = 0
-  double_values_2: float = 0
-  double_values_3: float = 0
-  accuracy: int = 0
-  label: str | None = None
+    double_values_0: float = 0
+    double_values_1: float = 0
+    double_values_2: float = 0
+    double_values_3: float = 0
+    accuracy: int = 0
+    label: str | None = None
 
 
 class AndroidScreenSchema(_Base):
-  screen_status: int = 0
+    screen_status: int = 0
 
 
 class AndroidScreentextSchema(_Base):
-  class_name: str | None = None
-  package_name: str | None = None
-  text: str | None = None
-  user_action: int = 0
-  event_type: int = 0
+    class_name: str | None = None
+    package_name: str | None = None
+    text: str | None = None
+    user_action: int = 0
+    event_type: int = 0
 
 
 class AndroidSignificantSchema(_Base):
-  is_moving: int = 0
+    is_moving: int = 0
 
 
 class AndroidTelephonySchema(_Base):
-  data_enabled: int = 0
-  imei_meid_esn: str | None = None
-  software_version: str | None = None
-  line_number: str | None = None
-  network_country_iso_mcc: str | None = None
-  network_operator_code: str | None = None
-  network_operator_name: str | None = None
-  network_type: int = 0
-  phone_type: int = 0
-  sim_state: int = 0
-  sim_operator_code: str | None = None
-  sim_operator_name: str | None = None
-  sim_serial: str | None = None
-  subscriber_id: str | None = None
+    data_enabled: int = 0
+    imei_meid_esn: str | None = None
+    software_version: str | None = None
+    line_number: str | None = None
+    network_country_iso_mcc: str | None = None
+    network_operator_code: str | None = None
+    network_operator_name: str | None = None
+    network_type: int = 0
+    phone_type: int = 0
+    sim_state: int = 0
+    sim_operator_code: str | None = None
+    sim_operator_name: str | None = None
+    sim_serial: str | None = None
+    subscriber_id: str | None = None
 
 
 class AndroidTemperatureSchema(_Base):
-  temperature_celsius: float = 0
-  accuracy: int = 0
-  label: str | None = None
+    temperature_celsius: float = 0
+    accuracy: int = 0
+    label: str | None = None
 
 
 class AndroidTimezoneSchema(_Base):
-  timezone: str | None = None
+    timezone: str | None = None
 
 
 class AndroidTouchSchema(_Base):
-  touch_app: str | None = None
-  touch_action: str | None = None
-  touch_action_text: str | None = None
-  scroll_items: int = -1
-  scroll_from_index: int = -1
-  scroll_to_index: int = -1
+    touch_app: str | None = None
+    touch_action: str | None = None
+    touch_action_text: str | None = None
+    scroll_items: int = -1
+    scroll_from_index: int = -1
+    scroll_to_index: int = -1
 
 
 class AndroidWifiSchema(_Base):
-  bssid: str = ""
-  ssid: str | None = None
-  security: str | None = None
-  frequency: int = 0
-  rssi: int = 0
-  label: str | None = None
+    bssid: str = ""
+    ssid: str | None = None
+    security: str | None = None
+    frequency: int = 0
+    rssi: int = 0
+    label: str | None = None
 
 
 # ---------------------------------------------------------------------------
@@ -314,25 +315,26 @@ class AndroidWifiSchema(_Base):
 # extra="allow" surfaces every key from the blob even if not explicitly typed.
 # ---------------------------------------------------------------------------
 
-class IosSchema(_Base):
-  model_config = ConfigDict(
-    from_attributes=True,
-    populate_by_name=True,
-    extra="allow",
-  )
 
-  @model_validator(mode="before")
-  @classmethod
-  def flatten_data(cls, v: Any) -> Any:
-    if isinstance(v, dict):
-      data = v.pop("data", None) or {}
-      v.update(data)
-      return v
-    # ORM object
-    data = getattr(v, "data", None) or {}
-    return {
-      "_id": getattr(v, "_id", None),
-      "timestamp": getattr(v, "timestamp", None),
-      "device_id": getattr(v, "device_id", None),
-      **data,
-    }
+class IosSchema(_Base):
+    model_config = ConfigDict(
+        from_attributes=True,
+        populate_by_name=True,
+        extra="allow",
+    )
+
+    @model_validator(mode="before")
+    @classmethod
+    def flatten_data(cls, v: Any) -> Any:
+        if isinstance(v, dict):
+            data = v.pop("data", None) or {}
+            v.update(data)
+            return v
+        # ORM object
+        data = getattr(v, "data", None) or {}
+        return {
+            "_id": getattr(v, "_id", None),
+            "timestamp": getattr(v, "timestamp", None),
+            "device_id": getattr(v, "device_id", None),
+            **data,
+        }

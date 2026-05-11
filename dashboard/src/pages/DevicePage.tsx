@@ -214,7 +214,9 @@ export default function DevicePage() {
       : null;
   const currentSensorState =
     sensorState.key === selectedKey ? sensorState : EMPTY_SENSOR_STATE;
-  const platformSensors = selected ? sensorsForPlatform(selected.platform) : SENSOR_CONFIGS;
+  const platformSensors = selected
+    ? sensorsForPlatform(selected.platform)
+    : SENSOR_CONFIGS;
   const pendingSensorKeys =
     currentSensorState.key === selectedKey
       ? currentSensorState.loadingKeys
@@ -439,57 +441,80 @@ export default function DevicePage() {
           loading={Boolean(selected && !currentDetail)}
         />
 
-        {selected && (() => {
-          const sharedSensors = platformSensors.filter(s => s.platform === 'shared');
-          const specificSensors = platformSensors.filter(s => s.platform !== 'shared');
-          const specificLabel = selected.platform === 'android' ? 'Android only' : 'iPhone only';
-          const networkLoading = currentSensorState.key !== selectedKey || currentSensorState.networkLoading;
-          const activityLoading = currentSensorState.key !== selectedKey || currentSensorState.activityLoading;
-          const applicationsLoading = currentSensorState.key !== selectedKey || currentSensorState.applicationsLoading;
+        {selected &&
+          (() => {
+            const sharedSensors = platformSensors.filter(
+              (s) => s.platform === "shared",
+            );
+            const specificSensors = platformSensors.filter(
+              (s) => s.platform !== "shared",
+            );
+            const specificLabel =
+              selected.platform === "android" ? "Android only" : "iPhone only";
+            const networkLoading =
+              currentSensorState.key !== selectedKey ||
+              currentSensorState.networkLoading;
+            const activityLoading =
+              currentSensorState.key !== selectedKey ||
+              currentSensorState.activityLoading;
+            const applicationsLoading =
+              currentSensorState.key !== selectedKey ||
+              currentSensorState.applicationsLoading;
 
-          return (
-            <>
-              <div className="text-[11px] font-semibold uppercase tracking-[0.6px] text-sage px-1">
-                Shared
-              </div>
-              <div className="grid grid-cols-[repeat(auto-fill,minmax(320px,1fr))] gap-4">
-                {sharedSensors.map((config) => (
-                  <SensorTimeSeriesCard
-                    key={config.key}
-                    config={config}
-                    records={currentSensorState.sensorData[config.key] ?? []}
-                    loading={pendingSensorKeys.has(config.key)}
+            return (
+              <>
+                <div className="text-[11px] font-semibold uppercase tracking-[0.6px] text-sage px-1">
+                  Shared
+                </div>
+                <div className="grid grid-cols-[repeat(auto-fill,minmax(320px,1fr))] gap-4">
+                  {sharedSensors.map((config) => (
+                    <SensorTimeSeriesCard
+                      key={config.key}
+                      config={config}
+                      records={currentSensorState.sensorData[config.key] ?? []}
+                      loading={pendingSensorKeys.has(config.key)}
+                    />
+                  ))}
+                  <NetworkTypeCard
+                    records={currentSensorState.networkData}
+                    loading={networkLoading}
                   />
-                ))}
-                <NetworkTypeCard records={currentSensorState.networkData} loading={networkLoading} />
-              </div>
+                </div>
 
-              {specificSensors.length > 0 || selected.platform === 'ios' ? (
-                <>
-                  <div className="text-[11px] font-semibold uppercase tracking-[0.6px] text-sage px-1 mt-2">
-                    {specificLabel}
-                  </div>
-                  <div className="grid grid-cols-[repeat(auto-fill,minmax(320px,1fr))] gap-4">
-                    {specificSensors.map((config) => (
-                      <SensorTimeSeriesCard
-                        key={config.key}
-                        config={config}
-                        records={currentSensorState.sensorData[config.key] ?? []}
-                        loading={pendingSensorKeys.has(config.key)}
-                      />
-                    ))}
-                    {selected.platform === 'ios' && (
-                      <ActivityCard records={currentSensorState.activityData} loading={activityLoading} />
-                    )}
-                    {selected.platform === 'android' && (
-                      <ApplicationsCard records={currentSensorState.applicationsData} loading={applicationsLoading} />
-                    )}
-                  </div>
-                </>
-              ) : null}
-            </>
-          );
-        })()}
+                {specificSensors.length > 0 || selected.platform === "ios" ? (
+                  <>
+                    <div className="text-[11px] font-semibold uppercase tracking-[0.6px] text-sage px-1 mt-2">
+                      {specificLabel}
+                    </div>
+                    <div className="grid grid-cols-[repeat(auto-fill,minmax(320px,1fr))] gap-4">
+                      {specificSensors.map((config) => (
+                        <SensorTimeSeriesCard
+                          key={config.key}
+                          config={config}
+                          records={
+                            currentSensorState.sensorData[config.key] ?? []
+                          }
+                          loading={pendingSensorKeys.has(config.key)}
+                        />
+                      ))}
+                      {selected.platform === "ios" && (
+                        <ActivityCard
+                          records={currentSensorState.activityData}
+                          loading={activityLoading}
+                        />
+                      )}
+                      {selected.platform === "android" && (
+                        <ApplicationsCard
+                          records={currentSensorState.applicationsData}
+                          loading={applicationsLoading}
+                        />
+                      )}
+                    </div>
+                  </>
+                ) : null}
+              </>
+            );
+          })()}
       </div>
     </div>
   );

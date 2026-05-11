@@ -24,10 +24,7 @@ _PASSWORD = os.environ.get("RESEARCHER_PASSWORD", "")
 def _check_credentials(username: str, password: str) -> bool:
     if not _USERNAME or not _PASSWORD:
         return False
-    return (
-        hmac.compare_digest(username, _USERNAME)
-        and hmac.compare_digest(password, _PASSWORD)
-    )
+    return hmac.compare_digest(username, _USERNAME) and hmac.compare_digest(password, _PASSWORD)
 
 
 def verify_researcher_credentials(username: str, password: str) -> bool:
@@ -46,7 +43,7 @@ def _verify_token(token: str) -> bool:
         last = token.rfind(":")
         if last == -1:
             return False
-        msg, sig = token[:last], token[last + 1:]
+        msg, sig = token[:last], token[last + 1 :]
         expected = hmac.new(_SECRET, msg.encode(), hashlib.sha256).hexdigest()
         if not hmac.compare_digest(sig, expected):
             return False

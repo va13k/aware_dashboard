@@ -6,9 +6,7 @@ from datetime import datetime, timezone
 from shared_config.runtime import build_public_base_url
 from shared_config.source_store import read_source
 
-DEFAULT_ANDROID_TEMPLATE_PATH = (
-    pathlib.Path(__file__).resolve().parent / "android_template.json"
-)
+DEFAULT_ANDROID_TEMPLATE_PATH = pathlib.Path(__file__).resolve().parent / "android_template.json"
 
 COMMON_SHARED_SENSOR_FIELDS: dict[str, tuple[str, ...]] = {
     "accelerometer": ("enabled", "frequency", "threshold", "enforce"),
@@ -33,7 +31,9 @@ COMMON_SHARED_SENSOR_FIELDS: dict[str, tuple[str, ...]] = {
 
 # Sensors that live in shared.sensors (for Android config) but have no
 # hardware equivalent on iPhone and must be excluded from the iOS config.
-ANDROID_ONLY_SHARED_SENSOR_NAMES: frozenset[str] = frozenset({"applications", "light", "telephony", "temperature"})
+ANDROID_ONLY_SHARED_SENSOR_NAMES: frozenset[str] = frozenset(
+    {"applications", "light", "telephony", "temperature"}
+)
 
 IOS_ONLY_SENSOR_NAMES = ("significant_motion", "websocket", "mqtt")
 
@@ -144,9 +144,7 @@ def ios_esm_question_payload(question: dict, trigger: str) -> dict:
     for key in ("esm_type", "esm_title"):
         if key in question:
             payload[key] = question[key]
-    payload["esm_instructions"] = question.get(
-        "esm_instructions", question.get("instructions", "")
-    )
+    payload["esm_instructions"] = question.get("esm_instructions", question.get("instructions", ""))
     payload["esm_submit"] = question.get("esm_submit") or "Submit"
     payload["esm_trigger"] = question.get("esm_trigger") or trigger
 
@@ -286,9 +284,7 @@ def upsert_ios_esm_plugin(config: dict, esm_url: str, enabled: bool) -> None:
     url_setting["value"] = esm_url
 
 
-def source_database_host(
-    database: dict[str, object], platform_key: str | None = None
-) -> str:
+def source_database_host(database: dict[str, object], platform_key: str | None = None) -> str:
     platform_host = ""
     if platform_key:
         platform_db = database.get(platform_key, {})
@@ -313,30 +309,42 @@ def resolve_database_host(
 # Android setting keys that have the same name in the iOS config.
 # Only keys for settings that exist on BOTH platforms belong here.
 # iOS-only plugin settings are stored in ios.plugin_settings and merged separately.
-_ANDROID_TO_IOS_DIRECT = frozenset({
-    # webservice / sync (iOS subset — Android-only keys removed)
-    "webservice_wifi_only", "webservice_charging", "frequency_webservice",
-    "frequency_clean_old_data",
-    "webservice_simple",
-    "status_mqtt", "mqtt_server", "mqtt_port", "mqtt_username",
-    "mqtt_password", "mqtt_keep_alive", "mqtt_qos",
-    # debug
-    "debug_flag",
-    # locations: only GPS toggle passes through unchanged; frequency and accuracy
-    # are renamed via _ANDROID_TO_IOS_RENAME; network/passive/expiry are Android-only
-    "status_location_gps",
-    # communication / network (iOS only has network events, not traffic)
-    "status_calls",
-    "status_network_events",
-    # plugin: ambient noise (shared — both Android and iOS)
-    "status_plugin_ambient_noise",
-    "frequency_plugin_ambient_noise", "plugin_ambient_noise_sample_size",
-    "plugin_ambient_noise_silence_threshold", "plugin_ambient_noise_no_raw",
-    # plugin: openweather (shared — both Android and iOS)
-    "status_plugin_openweather", "plugin_openweather_frequency",
-    # plugin: esm scheduler (shared — both Android and iOS)
-    "status_plugin_esm_scheduler",
-})
+_ANDROID_TO_IOS_DIRECT = frozenset(
+    {
+        # webservice / sync (iOS subset — Android-only keys removed)
+        "webservice_wifi_only",
+        "webservice_charging",
+        "frequency_webservice",
+        "frequency_clean_old_data",
+        "webservice_simple",
+        "status_mqtt",
+        "mqtt_server",
+        "mqtt_port",
+        "mqtt_username",
+        "mqtt_password",
+        "mqtt_keep_alive",
+        "mqtt_qos",
+        # debug
+        "debug_flag",
+        # locations: only GPS toggle passes through unchanged; frequency and accuracy
+        # are renamed via _ANDROID_TO_IOS_RENAME; network/passive/expiry are Android-only
+        "status_location_gps",
+        # communication / network (iOS only has network events, not traffic)
+        "status_calls",
+        "status_network_events",
+        # plugin: ambient noise (shared — both Android and iOS)
+        "status_plugin_ambient_noise",
+        "frequency_plugin_ambient_noise",
+        "plugin_ambient_noise_sample_size",
+        "plugin_ambient_noise_silence_threshold",
+        "plugin_ambient_noise_no_raw",
+        # plugin: openweather (shared — both Android and iOS)
+        "status_plugin_openweather",
+        "plugin_openweather_frequency",
+        # plugin: esm scheduler (shared — both Android and iOS)
+        "status_plugin_esm_scheduler",
+    }
+)
 
 # Android setting keys that appear under a different name in the iOS config.
 _ANDROID_TO_IOS_RENAME: dict[str, str] = {
@@ -518,7 +526,9 @@ def update_ios_server_config(
     server["path_key_pem"] = settings["ios_path_key_pem"]
 
 
-def apply_ios_study_config(config: dict, source: dict, existing_config: dict | None, study_key: str = "") -> dict:
+def apply_ios_study_config(
+    config: dict, source: dict, existing_config: dict | None, study_key: str = ""
+) -> dict:
     study_source = source["study"]
     researcher = source["researcher"]
     ios_source = source["ios"]

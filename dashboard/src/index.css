@@ -3,26 +3,38 @@
 @theme {
   --font-family-sans: "Avenir Next", Avenir, "Segoe UI", sans-serif;
 
-  --color-card:             rgba(255, 253, 248, 0.88);
-  --color-card-strong:      #fffdf8;
-  --color-ink:              #193229;
-  --color-sage:             #5f746b;
-  --color-wire:             rgba(48, 67, 54, 0.14);
-  --color-teal:             rgb(31, 179, 223);
-  --color-teal-soft:        rgba(31, 179, 223, 0.16);
+  --color-card: rgba(255, 253, 248, 0.88);
+  --color-card-strong: #fffdf8;
+  --color-ink: #193229;
+  --color-sage: #5f746b;
+  --color-wire: rgba(48, 67, 54, 0.14);
+  --color-teal: rgb(31, 179, 223);
+  --color-teal-soft: rgba(31, 179, 223, 0.16);
 
-  --shadow-card:            0 20px 60px rgba(25, 50, 41, 0.12);
+  --shadow-card: 0 20px 60px rgba(25, 50, 41, 0.12);
 }
 
 @keyframes shimmer {
-  0%   { background-position: 200% 0; }
-  100% { background-position: -200% 0; }
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
 }
 
 @utility bg-page {
   background:
-    radial-gradient(circle at top left,  rgba(31, 179, 223, 0.15), transparent 28%),
-    radial-gradient(circle at bottom right, rgba(182, 140, 76, 0.12), transparent 30%),
+    radial-gradient(
+      circle at top left,
+      rgba(31, 179, 223, 0.15),
+      transparent 28%
+    ),
+    radial-gradient(
+      circle at bottom right,
+      rgba(182, 140, 76, 0.12),
+      transparent 30%
+    ),
     linear-gradient(160deg, #f7f3ea 0%, #efe7da 100%);
   background-attachment: fixed;
 }

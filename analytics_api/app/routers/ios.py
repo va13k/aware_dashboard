@@ -73,7 +73,9 @@ async def get_accelerometer(
     offset: int = Query(0),
     db: AsyncSession = Depends(get_ios_db),
 ):
-    result = await db.execute(_base_query(IosAccelerometer, device_id, from_ts, to_ts, limit, offset))
+    result = await db.execute(
+        _base_query(IosAccelerometer, device_id, from_ts, to_ts, limit, offset)
+    )
     return result.scalars().all()
 
 
@@ -86,7 +88,9 @@ async def get_activity(
     offset: int = Query(0),
     db: AsyncSession = Depends(get_ios_db),
 ):
-    result = await db.execute(_base_query(IosPluginActivityRecognition, device_id, from_ts, to_ts, limit, offset))
+    result = await db.execute(
+        _base_query(IosPluginActivityRecognition, device_id, from_ts, to_ts, limit, offset)
+    )
     return result.scalars().all()
 
 
@@ -99,7 +103,9 @@ async def get_ambient_noise(
     offset: int = Query(0),
     db: AsyncSession = Depends(get_ios_db),
 ):
-    result = await db.execute(_base_query(IosPluginAmbientNoise, device_id, from_ts, to_ts, limit, offset))
+    result = await db.execute(
+        _base_query(IosPluginAmbientNoise, device_id, from_ts, to_ts, limit, offset)
+    )
     return result.scalars().all()
 
 
@@ -138,7 +144,9 @@ async def get_battery_charges(
     offset: int = Query(0),
     db: AsyncSession = Depends(get_ios_db),
 ):
-    result = await db.execute(_base_query(IosBatteryCharges, device_id, from_ts, to_ts, limit, offset))
+    result = await db.execute(
+        _base_query(IosBatteryCharges, device_id, from_ts, to_ts, limit, offset)
+    )
     return result.scalars().all()
 
 
@@ -151,7 +159,9 @@ async def get_battery_discharges(
     offset: int = Query(0),
     db: AsyncSession = Depends(get_ios_db),
 ):
-    result = await db.execute(_base_query(IosBatteryDischarges, device_id, from_ts, to_ts, limit, offset))
+    result = await db.execute(
+        _base_query(IosBatteryDischarges, device_id, from_ts, to_ts, limit, offset)
+    )
     return result.scalars().all()
 
 
@@ -164,7 +174,9 @@ async def get_ble_heartrate(
     offset: int = Query(0),
     db: AsyncSession = Depends(get_ios_db),
 ):
-    result = await db.execute(_base_query(IosPluginBleHeartrate, device_id, from_ts, to_ts, limit, offset))
+    result = await db.execute(
+        _base_query(IosPluginBleHeartrate, device_id, from_ts, to_ts, limit, offset)
+    )
     return result.scalars().all()
 
 
@@ -190,7 +202,9 @@ async def get_calendar(
     offset: int = Query(0),
     db: AsyncSession = Depends(get_ios_db),
 ):
-    result = await db.execute(_base_query(IosPluginCalendar, device_id, from_ts, to_ts, limit, offset))
+    result = await db.execute(
+        _base_query(IosPluginCalendar, device_id, from_ts, to_ts, limit, offset)
+    )
     return result.scalars().all()
 
 
@@ -203,7 +217,9 @@ async def get_calendar_esm_scheduler(
     offset: int = Query(0),
     db: AsyncSession = Depends(get_ios_db),
 ):
-    result = await db.execute(_base_query(IosPluginCalendarEsmScheduler, device_id, from_ts, to_ts, limit, offset))
+    result = await db.execute(
+        _base_query(IosPluginCalendarEsmScheduler, device_id, from_ts, to_ts, limit, offset)
+    )
     return result.scalars().all()
 
 
@@ -229,7 +245,9 @@ async def get_communication(
     offset: int = Query(0),
     db: AsyncSession = Depends(get_ios_db),
 ):
-    result = await db.execute(_base_query(IosCommunication, device_id, from_ts, to_ts, limit, offset))
+    result = await db.execute(
+        _base_query(IosCommunication, device_id, from_ts, to_ts, limit, offset)
+    )
     return result.scalars().all()
 
 
@@ -242,7 +260,9 @@ async def get_contacts(
     offset: int = Query(0),
     db: AsyncSession = Depends(get_ios_db),
 ):
-    result = await db.execute(_base_query(IosPluginContacts, device_id, from_ts, to_ts, limit, offset))
+    result = await db.execute(
+        _base_query(IosPluginContacts, device_id, from_ts, to_ts, limit, offset)
+    )
     return result.scalars().all()
 
 
@@ -255,7 +275,9 @@ async def get_device_usage(
     offset: int = Query(0),
     db: AsyncSession = Depends(get_ios_db),
 ):
-    result = await db.execute(_base_query(IosPluginDeviceUsage, device_id, from_ts, to_ts, limit, offset))
+    result = await db.execute(
+        _base_query(IosPluginDeviceUsage, device_id, from_ts, to_ts, limit, offset)
+    )
     return result.scalars().all()
 
 
@@ -281,7 +303,9 @@ async def get_esm_scheduler(
     offset: int = Query(0),
     db: AsyncSession = Depends(get_ios_db),
 ):
-    result = await db.execute(_base_query(IosPluginIosEsm, device_id, from_ts, to_ts, limit, offset))
+    result = await db.execute(
+        _base_query(IosPluginIosEsm, device_id, from_ts, to_ts, limit, offset)
+    )
     return result.scalars().all()
 
 
@@ -294,7 +318,9 @@ async def get_fitbit(
     offset: int = Query(0),
     db: AsyncSession = Depends(get_ios_db),
 ):
-    result = await db.execute(_base_query(IosPluginFitbit, device_id, from_ts, to_ts, limit, offset))
+    result = await db.execute(
+        _base_query(IosPluginFitbit, device_id, from_ts, to_ts, limit, offset)
+    )
     return result.scalars().all()
 
 
@@ -320,7 +346,9 @@ async def get_fitbit_device(
     offset: int = Query(0),
     db: AsyncSession = Depends(get_ios_db),
 ):
-    result = await db.execute(_base_query(IosFitbitDevice, device_id, from_ts, to_ts, limit, offset))
+    result = await db.execute(
+        _base_query(IosFitbitDevice, device_id, from_ts, to_ts, limit, offset)
+    )
     return result.scalars().all()
 
 
@@ -333,7 +361,9 @@ async def get_fused_location(
     offset: int = Query(0),
     db: AsyncSession = Depends(get_ios_db),
 ):
-    result = await db.execute(_base_query(IosGoogleFusedLocation, device_id, from_ts, to_ts, limit, offset))
+    result = await db.execute(
+        _base_query(IosGoogleFusedLocation, device_id, from_ts, to_ts, limit, offset)
+    )
     return result.scalars().all()
 
 
@@ -359,7 +389,9 @@ async def get_headphone_motion(
     offset: int = Query(0),
     db: AsyncSession = Depends(get_ios_db),
 ):
-    result = await db.execute(_base_query(IosPluginHeadphoneMotion, device_id, from_ts, to_ts, limit, offset))
+    result = await db.execute(
+        _base_query(IosPluginHeadphoneMotion, device_id, from_ts, to_ts, limit, offset)
+    )
     return result.scalars().all()
 
 
@@ -385,7 +417,9 @@ async def get_health_kit_category(
     offset: int = Query(0),
     db: AsyncSession = Depends(get_ios_db),
 ):
-    result = await db.execute(_base_query(IosHealthKitCategory, device_id, from_ts, to_ts, limit, offset))
+    result = await db.execute(
+        _base_query(IosHealthKitCategory, device_id, from_ts, to_ts, limit, offset)
+    )
     return result.scalars().all()
 
 
@@ -398,7 +432,9 @@ async def get_health_kit_quantity(
     offset: int = Query(0),
     db: AsyncSession = Depends(get_ios_db),
 ):
-    result = await db.execute(_base_query(IosHealthKitQuantity, device_id, from_ts, to_ts, limit, offset))
+    result = await db.execute(
+        _base_query(IosHealthKitQuantity, device_id, from_ts, to_ts, limit, offset)
+    )
     return result.scalars().all()
 
 
@@ -411,7 +447,9 @@ async def get_health_kit_workout(
     offset: int = Query(0),
     db: AsyncSession = Depends(get_ios_db),
 ):
-    result = await db.execute(_base_query(IosHealthKitWorkout, device_id, from_ts, to_ts, limit, offset))
+    result = await db.execute(
+        _base_query(IosHealthKitWorkout, device_id, from_ts, to_ts, limit, offset)
+    )
     return result.scalars().all()
 
 
@@ -424,7 +462,9 @@ async def get_linear_accelerometer(
     offset: int = Query(0),
     db: AsyncSession = Depends(get_ios_db),
 ):
-    result = await db.execute(_base_query(IosLinearAccelerometer, device_id, from_ts, to_ts, limit, offset))
+    result = await db.execute(
+        _base_query(IosLinearAccelerometer, device_id, from_ts, to_ts, limit, offset)
+    )
     return result.scalars().all()
 
 
@@ -437,7 +477,9 @@ async def get_location_visit(
     offset: int = Query(0),
     db: AsyncSession = Depends(get_ios_db),
 ):
-    result = await db.execute(_base_query(IosLocationVisit, device_id, from_ts, to_ts, limit, offset))
+    result = await db.execute(
+        _base_query(IosLocationVisit, device_id, from_ts, to_ts, limit, offset)
+    )
     return result.scalars().all()
 
 
@@ -463,7 +505,9 @@ async def get_magnetometer(
     offset: int = Query(0),
     db: AsyncSession = Depends(get_ios_db),
 ):
-    result = await db.execute(_base_query(IosMagnetometer, device_id, from_ts, to_ts, limit, offset))
+    result = await db.execute(
+        _base_query(IosMagnetometer, device_id, from_ts, to_ts, limit, offset)
+    )
     return result.scalars().all()
 
 
@@ -502,7 +546,9 @@ async def get_ntptime(
     offset: int = Query(0),
     db: AsyncSession = Depends(get_ios_db),
 ):
-    result = await db.execute(_base_query(IosPluginNtptime, device_id, from_ts, to_ts, limit, offset))
+    result = await db.execute(
+        _base_query(IosPluginNtptime, device_id, from_ts, to_ts, limit, offset)
+    )
     return result.scalars().all()
 
 
@@ -515,7 +561,9 @@ async def get_openweather(
     offset: int = Query(0),
     db: AsyncSession = Depends(get_ios_db),
 ):
-    result = await db.execute(_base_query(IosPluginOpenweather, device_id, from_ts, to_ts, limit, offset))
+    result = await db.execute(
+        _base_query(IosPluginOpenweather, device_id, from_ts, to_ts, limit, offset)
+    )
     return result.scalars().all()
 
 
@@ -554,7 +602,9 @@ async def get_push_notification(
     offset: int = Query(0),
     db: AsyncSession = Depends(get_ios_db),
 ):
-    result = await db.execute(_base_query(IosPushNotification, device_id, from_ts, to_ts, limit, offset))
+    result = await db.execute(
+        _base_query(IosPushNotification, device_id, from_ts, to_ts, limit, offset)
+    )
     return result.scalars().all()
 
 
@@ -593,7 +643,9 @@ async def get_significant_motion(
     offset: int = Query(0),
     db: AsyncSession = Depends(get_ios_db),
 ):
-    result = await db.execute(_base_query(IosSignificantMotion, device_id, from_ts, to_ts, limit, offset))
+    result = await db.execute(
+        _base_query(IosSignificantMotion, device_id, from_ts, to_ts, limit, offset)
+    )
     return result.scalars().all()
 
 
@@ -606,7 +658,9 @@ async def get_studentlife_audio(
     offset: int = Query(0),
     db: AsyncSession = Depends(get_ios_db),
 ):
-    result = await db.execute(_base_query(IosPluginStudentlifeAudio, device_id, from_ts, to_ts, limit, offset))
+    result = await db.execute(
+        _base_query(IosPluginStudentlifeAudio, device_id, from_ts, to_ts, limit, offset)
+    )
     return result.scalars().all()
 
 
@@ -641,50 +695,50 @@ async def get_wifi(
 # ---------------------------------------------------------------------------
 
 _EXPORT_MODELS: dict[str, object] = {
-    "accelerometer":            IosAccelerometer,
-    "activity":                 IosPluginActivityRecognition,
-    "ambient-noise":            IosPluginAmbientNoise,
-    "barometer":                IosBarometer,
-    "battery":                  IosBattery,
-    "battery-charges":          IosBatteryCharges,
-    "battery-discharges":       IosBatteryDischarges,
-    "ble-heartrate":            IosPluginBleHeartrate,
-    "bluetooth":                IosBluetooth,
-    "calendar":                 IosPluginCalendar,
-    "calendar-esm-scheduler":   IosPluginCalendarEsmScheduler,
-    "calls":                    IosCalls,
-    "communication":            IosCommunication,
-    "contacts":                 IosPluginContacts,
-    "device-usage":             IosPluginDeviceUsage,
-    "esm":                      IosEsm,
-    "esm-scheduler":            IosPluginIosEsm,
-    "fitbit":                   IosPluginFitbit,
-    "fitbit-data":              IosFitbitData,
-    "fitbit-device":            IosFitbitDevice,
-    "fused-location":           IosGoogleFusedLocation,
-    "gyroscope":                IosGyroscope,
-    "headphone-motion":         IosPluginHeadphoneMotion,
-    "health-kit":               IosHealthKit,
-    "health-kit/category":      IosHealthKitCategory,
-    "health-kit/quantity":      IosHealthKitQuantity,
-    "health-kit/workout":       IosHealthKitWorkout,
-    "linear-accelerometer":     IosLinearAccelerometer,
-    "location-visit":           IosLocationVisit,
-    "locations":                IosLocations,
-    "magnetometer":             IosMagnetometer,
-    "memory":                   IosMemory,
-    "network":                  IosNetwork,
-    "ntptime":                  IosPluginNtptime,
-    "openweather":              IosPluginOpenweather,
-    "pedometer":                IosPedometer,
-    "processor":                IosProcessor,
-    "push-notification":        IosPushNotification,
-    "rotation":                 IosRotation,
-    "screen":                   IosScreen,
-    "significant-motion":       IosSignificantMotion,
-    "studentlife-audio":        IosPluginStudentlifeAudio,
-    "timezone":                 IosTimezone,
-    "wifi":                     IosWifi,
+    "accelerometer": IosAccelerometer,
+    "activity": IosPluginActivityRecognition,
+    "ambient-noise": IosPluginAmbientNoise,
+    "barometer": IosBarometer,
+    "battery": IosBattery,
+    "battery-charges": IosBatteryCharges,
+    "battery-discharges": IosBatteryDischarges,
+    "ble-heartrate": IosPluginBleHeartrate,
+    "bluetooth": IosBluetooth,
+    "calendar": IosPluginCalendar,
+    "calendar-esm-scheduler": IosPluginCalendarEsmScheduler,
+    "calls": IosCalls,
+    "communication": IosCommunication,
+    "contacts": IosPluginContacts,
+    "device-usage": IosPluginDeviceUsage,
+    "esm": IosEsm,
+    "esm-scheduler": IosPluginIosEsm,
+    "fitbit": IosPluginFitbit,
+    "fitbit-data": IosFitbitData,
+    "fitbit-device": IosFitbitDevice,
+    "fused-location": IosGoogleFusedLocation,
+    "gyroscope": IosGyroscope,
+    "headphone-motion": IosPluginHeadphoneMotion,
+    "health-kit": IosHealthKit,
+    "health-kit/category": IosHealthKitCategory,
+    "health-kit/quantity": IosHealthKitQuantity,
+    "health-kit/workout": IosHealthKitWorkout,
+    "linear-accelerometer": IosLinearAccelerometer,
+    "location-visit": IosLocationVisit,
+    "locations": IosLocations,
+    "magnetometer": IosMagnetometer,
+    "memory": IosMemory,
+    "network": IosNetwork,
+    "ntptime": IosPluginNtptime,
+    "openweather": IosPluginOpenweather,
+    "pedometer": IosPedometer,
+    "processor": IosProcessor,
+    "push-notification": IosPushNotification,
+    "rotation": IosRotation,
+    "screen": IosScreen,
+    "significant-motion": IosSignificantMotion,
+    "studentlife-audio": IosPluginStudentlifeAudio,
+    "timezone": IosTimezone,
+    "wifi": IosWifi,
 }
 
 

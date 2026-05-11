@@ -30,9 +30,7 @@ def host_for_url(host: str) -> str:
 
 def build_public_base_url(protocol: str, host: str, port: int) -> str:
     formatted_host = host_for_url(host)
-    is_default_port = (protocol == "http" and port == 80) or (
-        protocol == "https" and port == 443
-    )
+    is_default_port = (protocol == "http" and port == 80) or (protocol == "https" and port == 443)
     base_url = f"{protocol}://{formatted_host}"
     if not is_default_port:
         base_url += f":{port}"
