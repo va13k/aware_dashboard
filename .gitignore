@@ -26,6 +26,7 @@ AWARE-Configurator/staticfiles/
 
 # Docker runtime cache
 aware-micro-server/cache/
+backups/
 
 # Compiled JAR - built inside Docker, no need to commit
 aware-micro-server/output/*.jar

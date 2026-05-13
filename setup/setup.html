@@ -19,7 +19,8 @@
       <p class="subtitle">Configure your deployment in a few steps</p>
 
       <div class="steps" id="steps">
-        <span class="active"></span><span></span><span></span><span></span>
+        <span class="active"></span><span></span><span></span><span></span
+        ><span></span>
       </div>
 
       <div class="card" id="s1">
@@ -127,6 +128,60 @@
       </div>
 
       <div class="card hidden" id="s4">
+        <p class="step-title">Backups</p>
+        <p class="step-desc">
+          MySQL backups are saved on the host machine, outside Docker volumes
+        </p>
+        <div class="field">
+          <label>Backup folder</label>
+          <input
+            type="text"
+            id="backupHostDir"
+            value="./backups/mysql"
+            placeholder="./backups/mysql"
+            oninput="clearFieldError('backupHostDir')"
+          />
+          <p class="field-error hidden" id="backupHostDirError"></p>
+          <p class="hint">
+            Relative paths are resolved from the project folder. Absolute paths
+            also work.
+          </p>
+        </div>
+        <div class="field-row backup-grid">
+          <div class="field">
+            <label>Backup interval</label>
+            <div class="unit-field">
+              <input
+                type="number"
+                id="backupIntervalDays"
+                min="1"
+                step="1"
+                value="1"
+                oninput="clearFieldError('backupIntervalDays')"
+              />
+              <span>days</span>
+            </div>
+            <p class="field-error hidden" id="backupIntervalDaysError"></p>
+          </div>
+          <div class="field">
+            <label>Keep backups for</label>
+            <div class="unit-field">
+              <input
+                type="number"
+                id="backupRetentionDays"
+                min="1"
+                step="1"
+                value="30"
+                oninput="clearFieldError('backupRetentionDays')"
+              />
+              <span>days</span>
+            </div>
+            <p class="field-error hidden" id="backupRetentionDaysError"></p>
+          </div>
+        </div>
+      </div>
+
+      <div class="card hidden" id="s5">
         <p class="step-title">Review</p>
         <p class="step-desc">
           This will be saved as .env and Docker will start automatically
@@ -137,7 +192,7 @@
         </div>
       </div>
 
-      <div class="card hidden" id="s5">
+      <div class="card hidden" id="s6">
         <div class="status">
           <div class="status-icon loading" id="statusIcon">
             <svg

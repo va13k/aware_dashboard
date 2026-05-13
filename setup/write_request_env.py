@@ -13,6 +13,23 @@ def parse_env_text(env_text: str) -> dict[str, str]:
     return data
 
 
+def positive_int(value: object, fallback: str) -> str:
+    try:
+        numeric = int(str(value).strip())
+    except (TypeError, ValueError):
+        return fallback
+    return str(numeric if numeric > 0 else int(fallback))
+
+
+def clean_path(value: object, fallback: str) -> str:
+    text = str(value or "").strip()
+    if not text:
+        return fallback
+    if any(ch.isspace() for ch in text):
+        raise SystemExit("Backup folder cannot contain spaces")
+    return text
+
+
 def main() -> None:
     if len(sys.argv) != 2:
         raise SystemExit("usage: write_request_env.py <output-path>")
@@ -54,6 +71,27 @@ def main() -> None:
 
     researcher_username = str(payload.get("researcher_username", "")).strip()
     researcher_password = str(payload.get("researcher_password", "")).strip()
+    backup_host_dir = clean_path(
+        payload.get(
+            "mysql_backup_host_dir",
+            env_fallback.get("MYSQL_BACKUP_HOST_DIR", "./backups/mysql"),
+        ),
+        "./backups/mysql",
+    )
+    backup_interval_seconds = positive_int(
+        payload.get(
+            "mysql_backup_interval_seconds",
+            env_fallback.get("MYSQL_BACKUP_INTERVAL_SECONDS", "86400"),
+        ),
+        "86400",
+    )
+    backup_retention_days = positive_int(
+        payload.get(
+            "mysql_backup_retention_days",
+            env_fallback.get("MYSQL_BACKUP_RETENTION_DAYS", "30"),
+        ),
+        "30",
+    )
 
     if not public_host:
         raise SystemExit("PUBLIC_HOST is required")
@@ -63,6 +101,9 @@ def main() -> None:
         f"PUBLIC_HOST={public_host}",
         f"PUBLIC_PORT={public_port}",
         f"PROTOCOL={protocol}",
+        f"MYSQL_BACKUP_HOST_DIR={backup_host_dir}",
+        f"MYSQL_BACKUP_INTERVAL_SECONDS={backup_interval_seconds}",
+        f"MYSQL_BACKUP_RETENTION_DAYS={backup_retention_days}",
     ]
 
     if researcher_username:

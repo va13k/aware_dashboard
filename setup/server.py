@@ -14,7 +14,7 @@ _HEALTH_CHECKED = frozenset({
     "aware_dashboard_api", "aware_dashboard",
 })
 # Containers without a healthcheck — just need to be running.
-_RUNNING_ONLY = frozenset({"aware_nginx"})
+_RUNNING_ONLY = frozenset({"aware_mysql_backup", "aware_nginx"})
 _REQUIRED = _HEALTH_CHECKED | _RUNNING_ONLY
 
 

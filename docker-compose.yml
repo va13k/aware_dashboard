@@ -35,6 +35,29 @@ services:
       retries: 24
       start_period: 60s
 
+  mysql-backup:
+    image: mysql:8.0
+    container_name: aware_mysql_backup
+    restart: unless-stopped
+    environment:
+      MYSQL_HOST: mysql
+      MYSQL_PORT: 3306
+      MYSQL_USER: root
+      MYSQL_PASSWORD: ${MYSQL_ROOT_PASSWORD:-CHANGE_ME}
+      BACKUP_DATABASES: "aware_android aware_ios"
+      BACKUP_DIR: /backups
+      BACKUP_INTERVAL_SECONDS: ${MYSQL_BACKUP_INTERVAL_SECONDS:-86400}
+      BACKUP_RETENTION_DAYS: ${MYSQL_BACKUP_RETENTION_DAYS:-30}
+    volumes:
+      - ${MYSQL_BACKUP_HOST_DIR:-./backups/mysql}:/backups
+      - ./setup/mysql-backup/backup.sh:/usr/local/bin/aware-db-backup:ro
+    networks:
+      - aware_network
+    depends_on:
+      mysql:
+        condition: service_healthy
+    command: ["/bin/sh", "/usr/local/bin/aware-db-backup"]
+
   micro-server:
     build: ./aware-micro-server
     container_name: aware_micro

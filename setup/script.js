@@ -90,6 +90,41 @@ function clearFieldError(id) {
   document.getElementById(id + "Error").classList.add("hidden");
 }
 
+function positiveIntegerValue(id, fallback) {
+  var value = Number((document.getElementById(id).value || "").trim());
+  if (!Number.isFinite(value) || value < 1) {
+    return fallback;
+  }
+  return Math.floor(value);
+}
+
+function validateBackups() {
+  var backupHostDir = (
+    document.getElementById("backupHostDir").value || ""
+  ).trim();
+  var valid = true;
+
+  if (!backupHostDir) {
+    showFieldError("backupHostDir", "Please enter a backup folder.");
+    valid = false;
+  } else if (/\s/.test(backupHostDir)) {
+    showFieldError("backupHostDir", "Use a path without spaces.");
+    valid = false;
+  }
+
+  if (positiveIntegerValue("backupIntervalDays", 0) < 1) {
+    showFieldError("backupIntervalDays", "Enter at least 1 day.");
+    valid = false;
+  }
+
+  if (positiveIntegerValue("backupRetentionDays", 0) < 1) {
+    showFieldError("backupRetentionDays", "Enter at least 1 day.");
+    valid = false;
+  }
+
+  return valid;
+}
+
 function suggestPassword() {
   var chars = "abcdefghjkmnpqrstuvwxyz23456789";
   var buf = new Uint8Array(16);
@@ -107,7 +142,7 @@ function suggestPassword() {
 
 function go(dir) {
   var next = step + dir;
-  if (next < 0 || next > 4) return;
+  if (next < 0 || next > 5) return;
 
   if (dir > 0) {
     if (step === 0) {
@@ -131,10 +166,13 @@ function go(dir) {
       }
       if (!valid) return;
     }
+    if (step === 3 && !validateBackups()) {
+      return;
+    }
   }
 
-  if (next === 3) buildPreview();
-  if (next === 4) deploy();
+  if (next === 4) buildPreview();
+  if (next === 5) deploy();
 
   document.getElementById("s" + (step + 1)).classList.add("hidden");
   document.getElementById("s" + (next + 1)).classList.remove("hidden");
@@ -153,9 +191,9 @@ function go(dir) {
   back.classList.toggle("hidden", step === 0);
   nb.classList.remove("hidden");
 
-  if (step === 3) {
+  if (step === 4) {
     nb.textContent = "Deploy";
-  } else if (step === 4) {
+  } else if (step === 5) {
     nav.classList.add("hidden");
   } else {
     nb.textContent = "Next";
@@ -167,7 +205,7 @@ function restart() {
     clearTimeout(redirectTimer);
     redirectTimer = null;
   }
-  document.getElementById("s5").classList.add("hidden");
+  document.getElementById("s6").classList.add("hidden");
   document.getElementById("s1").classList.remove("hidden");
   document.getElementById("statusIcon").className = "status-icon loading";
   document.getElementById("statusIcon").innerHTML =
@@ -205,6 +243,8 @@ function getPayload() {
   var host = getSelectedHost() || "localhost";
   var proto = ssl ? "https" : "http";
   var publicPort = ssl ? "443" : "80";
+  var backupIntervalDays = positiveIntegerValue("backupIntervalDays", 1);
+  var backupRetentionDays = positiveIntegerValue("backupRetentionDays", 30);
 
   return {
     mysql_root_password: mp,
@@ -213,6 +253,11 @@ function getPayload() {
     public_host: host || "localhost",
     public_port: publicPort,
     protocol: proto,
+    mysql_backup_host_dir:
+      (document.getElementById("backupHostDir").value || "").trim() ||
+      "./backups/mysql",
+    mysql_backup_interval_seconds: String(backupIntervalDays * 86400),
+    mysql_backup_retention_days: String(backupRetentionDays),
     ssl_certificate_path: ssl
       ? (document.getElementById("certPath").value || "").trim()
       : "",
@@ -235,7 +280,16 @@ function getEnv() {
     payload.public_port +
     "\n" +
     "PROTOCOL=" +
-    payload.protocol;
+    payload.protocol +
+    "\n" +
+    "MYSQL_BACKUP_HOST_DIR=" +
+    payload.mysql_backup_host_dir +
+    "\n" +
+    "MYSQL_BACKUP_INTERVAL_SECONDS=" +
+    payload.mysql_backup_interval_seconds +
+    "\n" +
+    "MYSQL_BACKUP_RETENTION_DAYS=" +
+    payload.mysql_backup_retention_days;
   if (payload.protocol === "https") {
     e += "\nSSL_CERTIFICATE_PATH=" + payload.ssl_certificate_path;
     e += "\nSSL_CERTIFICATE_KEY_PATH=" + payload.ssl_certificate_key_path;
@@ -320,6 +374,7 @@ function waitForServices() {
   var maxAttempts = 360;
   var ALL_SERVICES = [
     "aware_mysql",
+    "aware_mysql_backup",
     "aware_micro",
     "aware_configurator",
     "aware_dashboard_api",
@@ -439,6 +494,18 @@ function loadExisting() {
       updateHostPlaceholder();
       if (d.MYSQL_ROOT_PASSWORD)
         document.getElementById("mysqlPass").value = d.MYSQL_ROOT_PASSWORD;
+      document.getElementById("backupHostDir").value =
+        d.MYSQL_BACKUP_HOST_DIR || "./backups/mysql";
+      document.getElementById("backupIntervalDays").value = String(
+        Math.max(
+          1,
+          Math.floor(
+            Number(d.MYSQL_BACKUP_INTERVAL_SECONDS || "86400") / 86400,
+          ),
+        ),
+      );
+      document.getElementById("backupRetentionDays").value =
+        d.MYSQL_BACKUP_RETENTION_DAYS || "30";
 
       if (d.RESEARCHER_USERNAME) {
         document.getElementById("researcherUser").value = d.RESEARCHER_USERNAME;
