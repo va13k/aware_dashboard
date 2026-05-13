@@ -18,6 +18,7 @@ import io.vertx.core.json.JsonObject
 import io.vertx.core.net.PemKeyCertOptions
 import io.vertx.core.net.PemTrustOptions
 import io.vertx.ext.web.Router
+import io.vertx.ext.web.RoutingContext
 import io.vertx.ext.web.client.WebClient
 import io.vertx.ext.web.client.WebClientOptions
 import io.vertx.ext.web.codec.BodyCodec
@@ -33,6 +34,86 @@ class MainVerticle : AbstractVerticle() {
 
   private lateinit var parameters: JsonObject
   private lateinit var httpServer: HttpServer
+
+  private fun requestDataPayload(
+    route: RoutingContext,
+    table: String = route.request().getParam("table") ?: ""
+  ): String? {
+    val formData = route.request().getFormAttribute("data")
+    if (!formData.isNullOrBlank() && formData.trim() != "[]") {
+      return formData
+    }
+
+    val body = route.body().asString()
+    if (!body.isNullOrBlank()) {
+      try {
+        val bodyJson = JsonObject(body)
+        val data = bodyJson.getValue("data")
+        when (data) {
+          is JsonArray -> if (!data.isEmpty) return data.encode()
+          is JsonObject -> return JsonArray().add(data).encode()
+          is String -> if (data.isNotBlank() && data.trim() != "[]") return data
+        }
+        if (table == "aware_device") {
+          return JsonArray().add(bodyJson).encode()
+        }
+      } catch (_: Exception) {
+        try {
+          val bodyArray = JsonArray(body)
+          if (!bodyArray.isEmpty) return bodyArray.encode()
+        } catch (_: Exception) {
+          // Continue to form-field fallback below.
+        }
+      }
+    }
+
+    if (table == "aware_device") {
+      val device = JsonObject()
+      route.request().formAttributes().forEach { entry ->
+        if (entry.key != "data") {
+          device.put(entry.key, entry.value)
+        }
+      }
+      if (!device.isEmpty) {
+        if (!device.containsKey("timestamp")) {
+          device.put("timestamp", System.currentTimeMillis().toDouble())
+        }
+        return JsonArray().add(device).encode()
+      }
+    }
+
+    return formData
+  }
+
+  private fun requestDeviceId(route: RoutingContext, payload: String?): String? {
+    val formDeviceId = route.request().getFormAttribute("device_id")
+    if (!formDeviceId.isNullOrBlank()) return formDeviceId
+
+    val body = route.body().asString()
+    if (!body.isNullOrBlank()) {
+      try {
+        val bodyJson = JsonObject(body)
+        val bodyDeviceId = bodyJson.getString("device_id")
+        if (!bodyDeviceId.isNullOrBlank()) return bodyDeviceId
+      } catch (_: Exception) {
+        // Continue to payload fallback below.
+      }
+    }
+
+    if (!payload.isNullOrBlank()) {
+      try {
+        val payloadArray = JsonArray(payload)
+        if (!payloadArray.isEmpty()) {
+          val payloadDeviceId = payloadArray.getJsonObject(0).getString("device_id")
+          if (!payloadDeviceId.isNullOrBlank()) return payloadDeviceId
+        }
+      } catch (_: Exception) {
+        // No usable device_id in payload.
+      }
+    }
+
+    return null
+  }
 
   override fun start(startPromise: Promise<Void>) {
 
@@ -136,9 +217,39 @@ class MainVerticle : AbstractVerticle() {
             route.response().statusCode = 404
             route.response().end()
           }
-        }
+	        }
 
-        /**
+        router.route(HttpMethod.POST, "/:studyNumber/:studyKey").handler { route ->
+          val currentStudy = currentStudyInfo()
+          if (validRoute(
+              currentStudy,
+              route.request().getParam("studyNumber").toInt(),
+              route.request().getParam("studyKey")
+            )
+          ) {
+            val payload = requestDataPayload(route, "aware_device")
+            val deviceId = requestDeviceId(route, payload)
+            if (deviceId.isNullOrBlank() || payload.isNullOrBlank() || payload.trim() == "[]") {
+              route.response().statusCode = 400
+              route.response().end()
+            } else {
+              eventBus.publish(
+                "insertData",
+                JsonObject()
+                  .put("table", "aware_device")
+                  .put("device_id", deviceId)
+                  .put("data", payload)
+              )
+              route.response().statusCode = 200
+              route.response().end()
+            }
+          } else {
+            route.response().statusCode = 401
+            route.response().end()
+          }
+        }
+	
+	        /**
          * This route is called:
          * - when joining the study, returns the JSON with all the settings from the study. Can be called from apps using Aware.joinStudy(URL) or client's QRCode scanner
          * - when checking study status with the study_check=1.
@@ -207,14 +318,14 @@ class MainVerticle : AbstractVerticle() {
                 route.response().statusCode = 200
                 route.response().end()
               }
-              "insert" -> {
-                eventBus.publish(
-                  "insertData",
-                  JsonObject()
-                    .put("table", route.request().getParam("table"))
-                    .put("device_id", route.request().getFormAttribute("device_id"))
-                    .put("data", route.request().getFormAttribute("data"))
-                )
+	              "insert" -> {
+	                eventBus.publish(
+	                  "insertData",
+	                  JsonObject()
+	                    .put("table", route.request().getParam("table"))
+	                    .put("device_id", route.request().getFormAttribute("device_id"))
+	                    .put("data", requestDataPayload(route))
+	                )
                 route.response().statusCode = 200
                 route.response().end()
               }

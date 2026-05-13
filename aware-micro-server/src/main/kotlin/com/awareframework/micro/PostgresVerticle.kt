@@ -23,6 +23,21 @@ import java.util.stream.StreamSupport
 class PostgresVerticle : AbstractVerticle() {
 
   private val logger = KotlinLogging.logger {}
+  private val deviceMetadataFields = listOf(
+    "board",
+    "brand",
+    "device",
+    "build_id",
+    "hardware",
+    "manufacturer",
+    "model",
+    "product",
+    "serial",
+    "release",
+    "release_type",
+    "sdk",
+    "label"
+  )
 
   private lateinit var parameters: JsonObject
   private lateinit var sqlClient: PgPool
@@ -234,8 +249,139 @@ class PostgresVerticle : AbstractVerticle() {
   /**
    * Insert batch of data into database table
    */
+  private fun timestampFrom(entry: JsonObject): Double {
+    return when (val timestamp = entry.getValue("timestamp")) {
+      is Number -> timestamp.toDouble()
+      is String -> timestamp.toDoubleOrNull() ?: System.currentTimeMillis().toDouble()
+      else -> System.currentTimeMillis().toDouble()
+    }
+  }
+
+  private fun sqlValue(value: String): String {
+    return value.replace("'", "''")
+  }
+
+  private fun isCompleteDeviceMetadata(entry: JsonObject): Boolean {
+    return deviceMetadataFields.all { field ->
+      val value = entry.getValue(field)
+      value != null && value.toString().isNotBlank()
+    }
+  }
+
+  private fun dataJsonFrom(value: Any?): JsonObject? {
+    return when (value) {
+      is JsonObject -> value
+      is String -> try {
+        JsonObject(value)
+      } catch (_: Exception) {
+        null
+      }
+      else -> null
+    }
+  }
+
+  private fun hasCompleteAwareDeviceRow(rows: Iterable<io.vertx.sqlclient.Row>): Boolean {
+    return rows.any { row ->
+      val data = dataJsonFrom(row.getValue("data"))
+      data != null && isCompleteDeviceMetadata(data)
+    }
+  }
+
+  private fun firstAwareDeviceEntry(device_id: String, data: JsonArray): JsonObject? {
+    for (i in 0 until data.size()) {
+      val entry = data.getJsonObject(i)
+      if (isCompleteDeviceMetadata(entry)) {
+        return entry
+      }
+      logger.warn {
+        "$device_id ignored incomplete aware_device row with fields ${entry.fieldNames().sorted()}"
+      }
+      return JsonObject()
+        .put("device_id", device_id)
+        .put("timestamp", timestampFrom(entry))
+        .put("brand", "iPhone")
+        .put("device", "iPhone")
+        .put("manufacturer", "Apple")
+        .put("model", "iPhone")
+        .put("product", "iPhone")
+        .put("label", "iPhone")
+        .put("metadata_status", "pending")
+        .put("metadata_complete", false)
+    }
+    return null
+  }
+
+  private fun rowId(row: io.vertx.sqlclient.Row): String? {
+    return row.getValue("_id")?.toString()
+  }
+
+  private fun insertAwareDeviceData(device_id: String, data: JsonArray) {
+    val entry = firstAwareDeviceEntry(device_id, data)
+    if (entry == null) {
+      logger.warn { "$device_id ignored empty aware_device insert" }
+      return
+    }
+    val entryIsComplete = isCompleteDeviceMetadata(entry)
+
+    createTable("aware_device")
+      .onSuccess { _ ->
+        sqlClient.getConnection { connectionResult ->
+          if (connectionResult.succeeded()) {
+            val connection = connectionResult.result()
+            connection
+              .query("SELECT \"_id\", \"data\" FROM \"aware_device\" WHERE \"device_id\" = '${sqlValue(device_id)}'")
+              .execute()
+              .onFailure { e ->
+                logger.error(e) { "Failed to check existing aware_device metadata." }
+                connection.close()
+              }
+              .onSuccess { rows ->
+                val existingRows = rows.toList()
+                if (hasCompleteAwareDeviceRow(rows)) {
+                  logger.info { "$device_id ignored duplicate complete aware_device metadata" }
+                  connection.close()
+                  return@onSuccess
+                }
+
+                val existingRowId = existingRows.firstOrNull()?.let { rowId(it) }
+                val query = if (existingRowId != null) {
+                  if (!entryIsComplete) {
+                    logger.info { "$device_id ignored duplicate pending aware_device metadata" }
+                    connection.close()
+                    return@onSuccess
+                  }
+                  "UPDATE \"aware_device\" SET \"timestamp\" = '${timestampFrom(entry)}', \"data\" = '${sqlValue(entry.encode())}' WHERE \"_id\" = $existingRowId"
+                } else {
+                  "INSERT INTO \"aware_device\" (\"device_id\",\"timestamp\",\"data\") VALUES ('${sqlValue(device_id)}', '${timestampFrom(entry)}', '${sqlValue(entry.encode())}')"
+                }
+                connection.query(query)
+                  .execute()
+                  .onFailure { e ->
+                    logger.error(e) { "Failed to insert aware_device metadata." }
+                    connection.close()
+                  }
+                  .onSuccess { _ ->
+                    logger.info { "$device_id saved to aware_device: 1 records" }
+                    connection.close()
+                  }
+              }
+          } else {
+            logger.error(connectionResult.cause()) { "Failed to establish connection." }
+          }
+        }
+      }
+      .onFailure { e ->
+        logger.error(e) { "Failed to create aware_device table." }
+      }
+  }
+
   fun insertData(table: String, device_id: String, data: JsonArray) {
     if (data.isEmpty()) {
+      return
+    }
+
+    if (table == "aware_device") {
+      insertAwareDeviceData(device_id, data)
       return
     }
 
@@ -250,7 +396,7 @@ class PostgresVerticle : AbstractVerticle() {
               val entry = data.getJsonObject(i)
 
               // https://github.com/eclipse-vertx/vert.x/commit/ea0eddb129530ab3719c0ef86b471894876ec519#diff-07f061e092a63da24a06ab4507d15125e3377034f21eee18c6d4261f6714e709L241
-              values.add("('$device_id', '${entry.getDouble("timestamp")}', '${entry.encode()}')")
+              values.add("('$device_id', '${timestampFrom(entry)}', '${entry.encode()}')")
             }
             val insertBatch =
               "INSERT INTO \"$table\" (\"device_id\",\"timestamp\",\"data\") VALUES ${values.stream().map(Any::toString).collect(
