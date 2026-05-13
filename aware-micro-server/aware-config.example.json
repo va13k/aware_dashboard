@@ -259,19 +259,6 @@
       ]
     },
     {
-      "sensor": "proximity",
-      "title": "Proximity",
-      "icon": "ic_action_proximity.png",
-      "summary": "Proximity sensor (near/far)",
-      "settings": [
-        {
-          "setting": "status_proximity",
-          "title": "Active",
-          "defaultValue": "false"
-        }
-      ]
-    },
-    {
       "sensor": "rotation",
       "title": "Rotation",
       "icon": "ic_action_rotation.png",
@@ -567,7 +554,7 @@
           "setting": "accuracy_google_fused_location",
           "title": "Location accuracy",
           "defaultValue": "102",
-          "summary": "100=best, 101=10m, 102=100m (default), 104=1km, 105=3km"
+          "summary": "Location accuracy selection"
         }
       ]
     },

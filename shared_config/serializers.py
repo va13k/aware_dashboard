@@ -20,7 +20,6 @@ COMMON_SHARED_SENSOR_FIELDS: dict[str, tuple[str, ...]] = {
     "linear_accelerometer": ("enabled", "frequency", "threshold", "enforce"),
     "magnetometer": ("enabled", "frequency", "threshold", "enforce"),
     "processor": ("enabled", "frequency"),
-    "proximity": ("enabled", "frequency", "threshold", "enforce"),
     "rotation": ("enabled", "frequency", "threshold", "enforce"),
     "screen": ("enabled",),
     "telephony": ("enabled",),
@@ -38,6 +37,8 @@ ANDROID_ONLY_SHARED_SENSOR_NAMES: frozenset[str] = frozenset(
 IOS_ONLY_SENSOR_NAMES = ("significant_motion", "websocket", "mqtt")
 
 IOS_ESM_CONFIG_FILENAME = "ios-esm-config.json"
+FUSED_LOCATION_ACCURACY_VALUES = frozenset({100, 101, 102, 104, 105})
+FUSED_LOCATION_DEFAULT_ACCURACY = 102
 
 
 def load_json(path: pathlib.Path) -> dict:
@@ -78,6 +79,16 @@ def seconds_to_microseconds(value: object) -> object:
         microseconds = int(parsed * 1_000_000)
         return microseconds
     return value
+
+
+def normalize_fused_location_accuracy(value: object) -> int:
+    if isinstance(value, bool):
+        return FUSED_LOCATION_DEFAULT_ACCURACY
+    try:
+        numeric = int(value)  # type: ignore[arg-type]
+    except (TypeError, ValueError):
+        return FUSED_LOCATION_DEFAULT_ACCURACY
+    return numeric if numeric in FUSED_LOCATION_ACCURACY_VALUES else FUSED_LOCATION_DEFAULT_ACCURACY
 
 
 def build_sensor_setting_name(sensor_name: str, field_name: str) -> str:
@@ -399,6 +410,15 @@ _ANDROID_TO_IOS_RENAME: dict[str, str] = {
     "min_location_gps_accuracy": "min_gps_accuracy",
 }
 
+_ANDROID_TO_IOS_PLUGIN_SETTINGS = frozenset(
+    {
+        "frequency_google_fused_location",
+        "max_frequency_google_fused_location",
+        "fallback_location_timeout",
+        "accuracy_google_fused_location",
+    }
+)
+
 
 def build_ios_sensor_settings(source: dict) -> dict[str, object]:
     ios_sensors = source.get("ios", {}).get("sensors", {})
@@ -442,6 +462,25 @@ def build_ios_sensor_settings(source: dict) -> dict[str, object]:
             sensor_settings["frequency_processor"]
         )
     return sensor_settings
+
+
+def build_ios_plugin_settings(
+    source: dict, ios_sensor_settings: dict[str, object] | None = None
+) -> dict[str, object]:
+    android_settings = source.get("android", {}).get("settings", {})
+    plugin_settings = dict(ios_sensor_settings or {})
+    plugin_settings.update(source.get("ios", {}).get("plugin_settings", {}))
+
+    for key in _ANDROID_TO_IOS_PLUGIN_SETTINGS:
+        if key in android_settings:
+            plugin_settings[key] = android_settings[key]
+
+    if "accuracy_google_fused_location" in plugin_settings:
+        plugin_settings["accuracy_google_fused_location"] = normalize_fused_location_accuracy(
+            plugin_settings["accuracy_google_fused_location"]
+        )
+
+    return plugin_settings
 
 
 def update_sensor_settings(sensor_items: list[dict], values: dict[str, object]) -> None:
@@ -633,9 +672,9 @@ def serialize_ios_config(
     study = apply_ios_study_config(config, source, existing_config, study_key)
     ios_sensor_settings = build_ios_sensor_settings(source)
     update_ios_sensor_defaults(config.get("sensors", []), ios_sensor_settings)
-    # Merge iOS-only plugin sub-settings (not in android.settings)
-    ios_plugin_settings = dict(ios_sensor_settings)
-    ios_plugin_settings.update(source.get("ios", {}).get("plugin_settings", {}))
+    # Merge iOS-only plugin sub-settings and shared plugin settings controlled
+    # through the Android-compatible Configurator fields.
+    ios_plugin_settings = build_ios_plugin_settings(source, ios_sensor_settings)
     update_ios_plugin_defaults(config.get("plugins", []), source["ios"].get("plugins", {}))
     update_ios_plugin_settings(config.get("plugins", []), ios_plugin_settings)
     update_ios_webservice_url(config, settings)

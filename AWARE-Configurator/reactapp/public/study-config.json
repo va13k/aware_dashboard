@@ -550,12 +550,8 @@
       "value": 20
     },
     {
-      "setting": "location_sensitivity",
-      "value": 3
-    },
-    {
       "setting": "accuracy_google_fused_location",
-      "value": 0
+      "value": 102
     },
     {
       "setting": "status_plugin_device_usage",

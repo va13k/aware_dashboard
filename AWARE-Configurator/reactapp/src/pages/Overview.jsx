@@ -62,6 +62,13 @@ const TYPE_MAP = {
   7: "Numeric",
 };
 
+const FUSED_LOCATION_ACCURACY_VALUES = [100, 101, 102, 104, 105];
+
+function normalizeFusedLocationAccuracy(value) {
+  const numeric = Number(value);
+  return FUSED_LOCATION_ACCURACY_VALUES.includes(numeric) ? numeric : 102;
+}
+
 export default function Main() {
   const navigateTo = useNavigate();
 
@@ -1028,18 +1035,10 @@ export default function Main() {
             : 20,
         },
         {
-          setting: "location_sensitivity",
-          value:
-            pluginData.location_sensitivity !== undefined
-              ? pluginData.location_sensitivity
-              : 3,
-        },
-        {
           setting: "accuracy_google_fused_location",
-          value:
-            pluginData.accuracy_google_fused_location !== undefined
-              ? pluginData.accuracy_google_fused_location
-              : 0,
+          value: normalizeFusedLocationAccuracy(
+            pluginData.accuracy_google_fused_location
+          ),
         },
         // plugin: device usage
         {

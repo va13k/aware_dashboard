@@ -45,6 +45,23 @@ import Field from "../components/Field/Field";
 import InputField from "../components/InputField/InputField";
 import PluginAPIField from "../components/PluginAPIField/PluginAPIField";
 
+const FUSED_LOCATION_ACCURACY_OPTIONS = [
+  { value: 100, label: "Max Precise Accuracy" },
+  { value: 101, label: "Location Accuracy Nearest 10 Meters" },
+  { value: 102, label: "Location Accuracy 100 Meters" },
+  { value: 104, label: "Location Accuracy Kilometer" },
+  { value: 105, label: "Location Accuracy 3 Kilometers" },
+];
+
+function normalizeFusedLocationAccuracy(value) {
+  const numeric = Number(value);
+  return FUSED_LOCATION_ACCURACY_OPTIONS.some(
+    (option) => option.value === numeric
+  )
+    ? numeric
+    : 102;
+}
+
 export default function SensorData() {
   const navigateTo = useNavigate();
   const [sensorData, setsensorData] = useRecoilState(sensorDataState);
@@ -1364,22 +1381,30 @@ export default function SensorData() {
           />
           <Grid>
             <p className="field_name" mb={10}>
-              Location sensitivity
+              Location Accuracy
             </p>
           </Grid>
           <RadioGroup
-            aria-labelledby="Location sensitivity"
-            name="location sensitivity"
-            value={String(pluginData.location_sensitivity ?? 3)}
-            row
+            aria-labelledby="Location Accuracy"
+            name="location accuracy"
+            value={String(
+              normalizeFusedLocationAccuracy(
+                pluginData.accuracy_google_fused_location
+              )
+            )}
           >
-            {[0, 1, 2, 3].map((v) => (
+            {FUSED_LOCATION_ACCURACY_OPTIONS.map((option) => (
               <FormControlLabel
-                key={v}
-                value={String(v)}
+                key={option.value}
+                value={String(option.value)}
                 control={<Radio />}
-                label={["No power", "Low", "Balanced", "High"][v]}
-                onClick={() => updatePluginData("location_sensitivity", v)}
+                label={option.label}
+                onClick={() =>
+                  updatePluginData(
+                    "accuracy_google_fused_location",
+                    option.value
+                  )
+                }
               />
             ))}
           </RadioGroup>
@@ -1862,16 +1887,6 @@ export default function SensorData() {
           {sensorData.sensor_rotation ? SensorRotationSubContent() : <div />}
 
           <SensorComponent
-            sensorName="Proximity"
-            sensorDescription="Proximity sensor (near/far) — present on both Android and iPhone."
-            stateField={sensorData.sensor_proximity}
-            field="sensor_proximity"
-            modeState="sensor"
-          />
-
-          {sensorData.sensor_proximity ? SensorProximitySubContent() : <div />}
-
-          <SensorComponent
             sensorName="Significant Motion"
             sensorDescription="Motion co-processor signal for significant movement changes."
             stateField={sensorData.ios_significant_motion}
@@ -1911,6 +1926,16 @@ export default function SensorData() {
           />
 
           {sensorData.sensor_light ? SensorLightSubContent() : <div />}
+
+          <SensorComponent
+            sensorName="Proximity"
+            sensorDescription="Android-only proximity sensor (near/far)."
+            stateField={sensorData.sensor_proximity}
+            field="sensor_proximity"
+            modeState="sensor"
+          />
+
+          {sensorData.sensor_proximity ? SensorProximitySubContent() : <div />}
 
           <SensorComponent
             sensorName="Temperature"

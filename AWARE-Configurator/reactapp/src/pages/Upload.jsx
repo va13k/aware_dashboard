@@ -39,6 +39,12 @@ import { SET_SCHEDULES } from "../components/ScheduleComponent/ScheduleComponent
 import { padding } from "../functions/utils";
 
 const STUDY_CONFIG_URL = "/studies/files/studyConfig.json";
+const FUSED_LOCATION_ACCURACY_VALUES = [100, 101, 102, 104, 105];
+
+function normalizeFusedLocationAccuracy(value) {
+  const numeric = Number(value);
+  return FUSED_LOCATION_ACCURACY_VALUES.includes(numeric) ? numeric : 102;
+}
 
 export default function Upload() {
   Axios({
@@ -574,11 +580,9 @@ export default function Upload() {
         case "fallback_location_timeout":
           pluginData.fallback_location_timeout = value;
           break;
-        case "location_sensitivity":
-          pluginData.location_sensitivity = value;
-          break;
         case "accuracy_google_fused_location":
-          pluginData.accuracy_google_fused_location = value;
+          pluginData.accuracy_google_fused_location =
+            normalizeFusedLocationAccuracy(value);
           break;
         case "status_plugin_device_usage":
           sensorData.status_plugin_device_usage = value;

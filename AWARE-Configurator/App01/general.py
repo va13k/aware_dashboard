@@ -25,6 +25,7 @@ from shared_config.serializers import (
     IOS_ESM_CONFIG_FILENAME,
     IOS_ONLY_SENSOR_NAMES,
     build_ios_esm_config,
+    build_ios_plugin_settings,
     build_sensor_setting_name,
     serialize_android_config,
     serialize_ios_config,
@@ -188,6 +189,7 @@ def update_source_from_android_config(source, content):
         if item.get("setting")
     }
     sync_shared_sensors_from_android_settings(source, android_settings)
+    sync_ios_plugin_settings_from_android_settings(source, android_settings)
     source["android"]["settings"] = android_settings
     sync_ios_only_sensors_from_config(source, content.get("ios_sensors", {}))
     sync_ios_plugins_from_config(source, content.get("ios_plugins", {}))
@@ -208,6 +210,14 @@ def sync_ios_plugin_settings_from_config(source, ios_plugin_settings):
         return
     plugin_settings = source.setdefault("ios", {}).setdefault("plugin_settings", {})
     plugin_settings.update(ios_plugin_settings)
+
+
+def sync_ios_plugin_settings_from_android_settings(source, android_settings):
+    plugin_settings = source.setdefault("ios", {}).setdefault("plugin_settings", {})
+    synced_settings = build_ios_plugin_settings(
+        {"android": {"settings": android_settings}, "ios": {"plugin_settings": plugin_settings}}
+    )
+    plugin_settings.update(synced_settings)
 
 
 def sync_ios_only_sensors_from_config(source, ios_sensor_settings):

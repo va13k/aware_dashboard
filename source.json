@@ -37,7 +37,7 @@
   },
   "android": {
     "created_at": "",
-    "updated_at": "2026-05-13T01:49:25.336Z",
+    "updated_at": "2026-05-13T10:15:47.242Z",
     "settings": {
       "webservice_wifi_only": false,
       "webservice_charging": false,
@@ -84,6 +84,10 @@
       "status_network_events": false,
       "status_network_traffic": false,
       "frequency_network_traffic": 30,
+      "status_proximity": false,
+      "frequency_proximity": 20000,
+      "threshold_proximity": 10,
+      "frequency_proximity_enforce": false,
       "status_screenshot": false,
       "capture_time_interval": 5,
       "compress_rate": 80,
@@ -92,9 +96,9 @@
       "screenshot_package_specification": "2",
       "status_notes": false,
       "status_plugin_ambient_noise": false,
-      "frequency_plugin_ambient_noise": 1,
-      "plugin_ambient_noise_sample_size": 10,
-      "plugin_ambient_noise_silence_threshold": 50,
+      "frequency_plugin_ambient_noise": 5,
+      "plugin_ambient_noise_sample_size": 60,
+      "plugin_ambient_noise_silence_threshold": 40,
       "status_plugin_openweather": false,
       "plugin_openweather_frequency": 60,
       "plugin_openweather_api_key": "",
@@ -116,8 +120,7 @@
       "frequency_google_fused_location": 300,
       "max_frequency_google_fused_location": 60,
       "fallback_location_timeout": 20,
-      "location_sensitivity": 2,
-      "accuracy_google_fused_location": 0,
+      "accuracy_google_fused_location": 102,
       "status_plugin_device_usage": false,
       "status_plugin_studentlife_audio": false,
       "plugin_conversations_delay": 5,
@@ -152,7 +155,6 @@
       "magnetometer": false,
       "processor": false,
       "timezone": false,
-      "proximity": false,
       "rotation": false,
       "screen": false,
       "significant_motion": false,
@@ -195,8 +197,7 @@
       "frequency_google_fused_location": 300,
       "max_frequency_google_fused_location": 60,
       "fallback_location_timeout": 20,
-      "location_sensitivity": 3,
-      "accuracy_google_fused_location": 0,
+      "accuracy_google_fused_location": 102,
       "plugin_conversations_delay": 5,
       "plugin_conversations_off_duty": 30,
       "plugin_conversations_length": 60,
@@ -319,12 +320,6 @@
       "processor": {
         "enabled": false,
         "frequency": 20
-      },
-      "proximity": {
-        "enabled": false,
-        "frequency": 20000,
-        "threshold": 10,
-        "enforce": false
       },
       "rotation": {
         "enabled": false,

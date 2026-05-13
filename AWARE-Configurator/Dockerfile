@@ -14,7 +14,7 @@ ARG SERVER_BASE_PATH=/configurator
 RUN printf "REACT_APP_SERVER_PROTOCOL=%s\nREACT_APP_SERVER_IP=%s\nREACT_APP_SERVER_PORT=%s\nREACT_APP_SERVER_BASE_PATH=%s\n" \
     "${SERVER_PROTOCOL}" "${SERVER_IP}" "${SERVER_PORT}" "${SERVER_BASE_PATH}" > .env.production
 
-RUN PUBLIC_URL=/configurator npm run build
+RUN DISABLE_ESLINT_PLUGIN=true PUBLIC_URL=/configurator npm run build
 
 
 

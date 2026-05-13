@@ -108,6 +108,11 @@ SOURCE = {
             "status_calls": True,
             "status_messages": False,
             "status_plugin_esm_scheduler": True,
+            "status_google_fused_location": True,
+            "frequency_google_fused_location": 300,
+            "max_frequency_google_fused_location": 60,
+            "fallback_location_timeout": 20,
+            "accuracy_google_fused_location": 0,
             "status_plugin_ambient_noise": False,
             "frequency_plugin_ambient_noise": 5,
             "plugin_ambient_noise_sample_size": 30,
@@ -147,6 +152,10 @@ SOURCE = {
             "plugin_ambient_noise": False,
             "plugin_esm_scheduler": True,
             "plugin_ios_esm": True,
+            "plugin_google_fused_location": True,
+        },
+        "plugin_settings": {
+            "accuracy_google_fused_location": 105,
         },
     },
     "shared": {
@@ -245,6 +254,10 @@ def android_template(tmp_path):
             {"setting": "frequency_network_traffic", "value": 30},
             {"setting": "status_processor", "value": False},
             {"setting": "frequency_processor", "value": 10},
+            {"setting": "status_proximity", "value": False},
+            {"setting": "frequency_proximity", "value": 20000},
+            {"setting": "threshold_proximity", "value": 0},
+            {"setting": "frequency_proximity_enforce", "value": False},
             {"setting": "status_significant_motion", "value": False},
             {"setting": "status_calls", "value": False},
             {"setting": "status_messages", "value": False},
@@ -342,6 +355,17 @@ def ios_example(tmp_path):
                 "plugin": "plugin_esm_scheduler",
                 "settings": [
                     {"setting": "status_plugin_esm_scheduler", "defaultValue": "false"},
+                ],
+            },
+            {
+                "package_name": "com.aware.plugin.google.fused_location",
+                "plugin": "plugin_google_fused_location",
+                "settings": [
+                    {"setting": "status_google_fused_location", "defaultValue": "false"},
+                    {"setting": "frequency_google_fused_location", "defaultValue": "300"},
+                    {"setting": "max_frequency_google_fused_location", "defaultValue": "60"},
+                    {"setting": "fallback_location_timeout", "defaultValue": "20"},
+                    {"setting": "accuracy_google_fused_location", "defaultValue": "102"},
                 ],
             },
         ],
@@ -580,6 +604,33 @@ class TestSerializeIosConfig:
         assert (
             ios_plugin_default(config, "plugin_ambient_noise", "plugin_ambient_noise_sample_size")
             == "30"
+        )
+
+    def test_fused_location_accuracy_normalizes_android_zero_to_100m(
+        self, source, settings, ios_example, ios_existing
+    ):
+        config, _ = serialize_ios_config(source, settings, ios_example, ios_existing)
+        assert (
+            ios_plugin_default(
+                config,
+                "plugin_google_fused_location",
+                "accuracy_google_fused_location",
+            )
+            == "102"
+        )
+
+    def test_fused_location_accuracy_uses_android_selection_for_ios_plugin(
+        self, source, settings, ios_example, ios_existing
+    ):
+        source["android"]["settings"]["accuracy_google_fused_location"] = 100
+        config, _ = serialize_ios_config(source, settings, ios_example, ios_existing)
+        assert (
+            ios_plugin_default(
+                config,
+                "plugin_google_fused_location",
+                "accuracy_google_fused_location",
+            )
+            == "100"
         )
 
     def test_ios_esm_plugin_upserted(self, source, settings, ios_example, ios_existing):
@@ -1353,11 +1404,68 @@ class TestAccelerometerIos:
 
     def test_all_enforce_keys_stripped_from_ios(self, source):
         # Plant enforce values across multiple shared sensors and verify none reach iOS.
-        for sensor_name in ("barometer", "gyroscope", "magnetometer", "proximity", "rotation"):
+        for sensor_name in ("barometer", "gyroscope", "magnetometer", "rotation"):
             source["shared"]["sensors"].setdefault(sensor_name, {})["enforce"] = True
         result = build_ios_sensor_settings(source)
         enforce_keys = [k for k in result if k.endswith("_enforce")]
         assert enforce_keys == [], f"Unexpected _enforce keys in iOS settings: {enforce_keys}"
+
+
+# ===========================================================================
+# Proximity sensor — Android-only
+# ===========================================================================
+
+
+class TestProximitySensor:
+    """Proximity is Android-only in this deployment; iPhone has no DB table."""
+
+    def test_proximity_not_in_common_shared_sensor_fields(self):
+        assert "proximity" not in COMMON_SHARED_SENSOR_FIELDS
+
+    def test_proximity_android_settings_do_not_flow_to_ios(self, source):
+        source["android"]["settings"].update(
+            {
+                "status_proximity": True,
+                "frequency_proximity": 20000,
+                "threshold_proximity": 10,
+                "frequency_proximity_enforce": True,
+            }
+        )
+        result = build_ios_sensor_settings(source)
+        assert "status_proximity" not in result
+        assert "frequency_proximity" not in result
+        assert "threshold_proximity" not in result
+        assert "frequency_proximity_enforce" not in result
+
+    def test_proximity_android_settings_flow_to_android(self, source, settings, android_template):
+        source["android"]["settings"].update(
+            {
+                "status_proximity": True,
+                "frequency_proximity": 20000,
+                "threshold_proximity": 10,
+                "frequency_proximity_enforce": True,
+            }
+        )
+        config = serialize_android_config(source, settings, android_template)
+        assert sensor_value(config, "status_proximity") is True
+        assert sensor_value(config, "frequency_proximity") == 20000
+        assert sensor_value(config, "threshold_proximity") == 10
+        assert sensor_value(config, "frequency_proximity_enforce") is True
+
+    def test_proximity_absent_from_source_json_ios_and_shared(self):
+        source_path = pathlib.Path(__file__).resolve().parent.parent / "source.json"
+        real_source = json.loads(source_path.read_text(encoding="utf-8"))
+        assert "proximity" not in real_source["ios"]["sensors"]
+        assert "proximity" not in real_source["shared"]["sensors"]
+
+    def test_proximity_present_in_source_json_android_settings(self):
+        source_path = pathlib.Path(__file__).resolve().parent.parent / "source.json"
+        real_source = json.loads(source_path.read_text(encoding="utf-8"))
+        android_settings = real_source["android"]["settings"]
+        assert "status_proximity" in android_settings
+        assert "frequency_proximity" in android_settings
+        assert "threshold_proximity" in android_settings
+        assert "frequency_proximity_enforce" in android_settings
 
 
 # ===========================================================================
