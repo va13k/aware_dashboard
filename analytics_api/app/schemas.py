@@ -19,8 +19,14 @@ class AndroidDeviceSchema(_Base):
     board: str | None = None
     brand: str | None = None
     device: str | None = None
+    build_id: str | None = None
+    hardware: str | None = None
     manufacturer: str | None = None
     model: str | None = None
+    product: str | None = None
+    serial: str | None = None
+    release: str | None = None
+    release_type: str | None = None
     sdk: str | None = None
     label: str | None = None
 

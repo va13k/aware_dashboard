@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select, func
-from sqlalchemy.exc import ProgrammingError, OperationalError
+from sqlalchemy.exc import ProgrammingError, OperationalError, SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import get_android_db, get_ios_db
 from app.models import (
@@ -17,20 +17,70 @@ from app.models import (
     AndroidScreen,
     AndroidWifi,
     IosAccelerometer,
+    IosBarometer,
     IosBattery,
+    IosBatteryCharges,
+    IosBatteryDischarges,
     IosBluetooth,
     IosCalls,
     IosDevice,
+    IosEsm,
+    IosFitbitData,
+    IosFitbitDevice,
+    IosGoogleFusedLocation,
     IosGyroscope,
+    IosHealthKit,
+    IosHealthKitCategory,
+    IosHealthKitQuantity,
+    IosHealthKitWorkout,
+    IosLinearAccelerometer,
     IosLocations,
+    IosLocationVisit,
+    IosMagnetometer,
+    IosMemory,
     IosNetwork,
     IosPedometer,
     IosPluginActivityRecognition,
+    IosPluginAmbientNoise,
+    IosPluginBleHeartrate,
+    IosPluginCalendar,
+    IosPluginCalendarEsmScheduler,
+    IosPluginContacts,
+    IosPluginDeviceUsage,
+    IosPluginFitbit,
+    IosPluginHeadphoneMotion,
+    IosPluginIosEsm,
+    IosPluginNtptime,
+    IosPluginOpenweather,
+    IosPluginStudentlifeAudio,
+    IosProcessor,
+    IosProximity,
+    IosPushNotification,
+    IosRotation,
     IosScreen,
+    IosSensorWifi,
+    IosSignificantMotion,
+    IosTimezone,
     IosWifi,
 )
 
 router = APIRouter(prefix="/devices", tags=["devices"])
+
+DEVICE_METADATA_FIELDS = (
+    "board",
+    "brand",
+    "device",
+    "build_id",
+    "hardware",
+    "manufacturer",
+    "model",
+    "product",
+    "serial",
+    "release",
+    "release_type",
+    "sdk",
+    "label",
+)
 
 ANDROID_STREAMS = {
     "accelerometer": AndroidAccelerometer,
@@ -49,14 +99,48 @@ ANDROID_STREAMS = {
 IOS_STREAMS = {
     "accelerometer": IosAccelerometer,
     "activity": IosPluginActivityRecognition,
+    "ambient-noise": IosPluginAmbientNoise,
+    "barometer": IosBarometer,
     "battery": IosBattery,
+    "battery-charges": IosBatteryCharges,
+    "battery-discharges": IosBatteryDischarges,
+    "ble-heartrate": IosPluginBleHeartrate,
     "bluetooth": IosBluetooth,
+    "calendar": IosPluginCalendar,
+    "calendar-esm-scheduler": IosPluginCalendarEsmScheduler,
     "calls": IosCalls,
+    "contacts": IosPluginContacts,
+    "device-usage": IosPluginDeviceUsage,
+    "esm": IosEsm,
+    "esm-scheduler": IosPluginIosEsm,
+    "fitbit": IosPluginFitbit,
+    "fitbit-data": IosFitbitData,
+    "fitbit-device": IosFitbitDevice,
+    "fused-location": IosGoogleFusedLocation,
     "gyroscope": IosGyroscope,
+    "headphone-motion": IosPluginHeadphoneMotion,
+    "health-kit": IosHealthKit,
+    "health-kit/category": IosHealthKitCategory,
+    "health-kit/quantity": IosHealthKitQuantity,
+    "health-kit/workout": IosHealthKitWorkout,
+    "linear-accelerometer": IosLinearAccelerometer,
+    "location-visit": IosLocationVisit,
     "locations": IosLocations,
+    "magnetometer": IosMagnetometer,
+    "memory": IosMemory,
     "network": IosNetwork,
+    "ntptime": IosPluginNtptime,
+    "openweather": IosPluginOpenweather,
     "pedometer": IosPedometer,
+    "processor": IosProcessor,
+    "proximity": IosProximity,
+    "push-notification": IosPushNotification,
+    "rotation": IosRotation,
     "screen": IosScreen,
+    "sensor_wifi": IosSensorWifi,
+    "significant-motion": IosSignificantMotion,
+    "studentlife-audio": IosPluginStudentlifeAudio,
+    "timezone": IosTimezone,
     "wifi": IosWifi,
 }
 
@@ -67,8 +151,40 @@ def _row_to_dict(row):
     return {column.name.lstrip("_"): getattr(row, column.name) for column in row.__table__.columns}
 
 
+def _flatten_device_row(row):
+    row_dict = _row_to_dict(row)
+    if row_dict is None:
+        return None
+
+    data = row_dict.pop("data", None)
+    if isinstance(data, dict):
+        return {**row_dict, **data}
+
+    return row_dict
+
+
+def _metadata_score(row_dict):
+    if not row_dict:
+        return 0
+    return sum(1 for field in DEVICE_METADATA_FIELDS if row_dict.get(field) not in (None, ""))
+
+
+def _timestamp_score(value):
+    if isinstance(value, (int, float)):
+        return float(value)
+    if isinstance(value, str):
+        try:
+            return float(value)
+        except ValueError:
+            return 0
+    return 0
+
+
 async def _rollback_after_table_error(db: AsyncSession):
-    await db.rollback()
+    try:
+        await db.rollback()
+    except SQLAlchemyError:
+        pass
 
 
 async def _latest_row(db: AsyncSession, model, device_id: str):
@@ -76,6 +192,22 @@ async def _latest_row(db: AsyncSession, model, device_id: str):
         select(model).where(model.device_id == device_id).order_by(model.timestamp.desc()).limit(1)
     )
     return result.scalars().first()
+
+
+async def _best_device_row(db: AsyncSession, model, device_id: str):
+    result = await db.execute(
+        select(model).where(model.device_id == device_id).order_by(model.timestamp.desc())
+    )
+    rows = result.scalars().all()
+    if not rows:
+        return None
+    return max(
+        rows,
+        key=lambda row: (
+            _metadata_score(_flatten_device_row(row)),
+            _timestamp_score(_flatten_device_row(row).get("timestamp")),
+        ),
+    )
 
 
 async def _max_timestamps_by_device(db: AsyncSession, model):
@@ -86,7 +218,7 @@ async def _max_timestamps_by_device(db: AsyncSession, model):
                 func.max(model.timestamp).label("last_seen"),
             ).group_by(model.device_id)
         )
-    except (ProgrammingError, OperationalError):
+    except (ProgrammingError, OperationalError, SQLAlchemyError):
         await _rollback_after_table_error(db)
         return {}
 
@@ -110,39 +242,35 @@ async def _combined_last_seen_by_device(db: AsyncSession, models):
     return last_seen_by_device
 
 
-async def _latest_android_metadata_by_device(db: AsyncSession):
+async def _device_metadata_by_device(db: AsyncSession, model):
     try:
-        subq = (
-            select(
-                AndroidDevice.device_id,
-                func.max(AndroidDevice.timestamp).label("max_ts"),
-            )
-            .group_by(AndroidDevice.device_id)
-            .subquery()
-        )
-        result = await db.execute(
-            select(
-                AndroidDevice.device_id,
-                AndroidDevice.manufacturer,
-                AndroidDevice.model,
-            )
-            .join(
-                subq,
-                (AndroidDevice.device_id == subq.c.device_id)
-                & (AndroidDevice.timestamp == subq.c.max_ts),
-            )
-        )
-    except (ProgrammingError, OperationalError):
+        result = await db.execute(select(model).order_by(model.timestamp.desc()))
+    except (ProgrammingError, OperationalError, SQLAlchemyError):
         await _rollback_after_table_error(db)
         return {}
 
-    return {
-        str(row.device_id): {
-            "manufacturer": row.manufacturer,
-            "model": row.model,
-        }
-        for row in result.all()
-    }
+    metadata_by_device = {}
+    for row in result.scalars().all():
+        row_dict = _flatten_device_row(row)
+        if not row_dict:
+            continue
+
+        device_id = row_dict.get("device_id")
+        if device_id is None:
+            continue
+
+        device_id = str(device_id)
+        current = metadata_by_device.get(device_id)
+        if current is None or (
+            _metadata_score(row_dict),
+            _timestamp_score(row_dict.get("timestamp")),
+        ) > (
+            _metadata_score(current),
+            _timestamp_score(current.get("timestamp")),
+        ):
+            metadata_by_device[device_id] = row_dict
+
+    return metadata_by_device
 
 
 async def _stream_summary(db: AsyncSession, key: str, model, device_id: str):
@@ -162,13 +290,14 @@ async def _stream_summary(db: AsyncSession, key: str, model, device_id: str):
 async def _device_detail(platform: str, device_id: str, db: AsyncSession):
     device_model = AndroidDevice if platform == "android" else IosDevice
     streams = ANDROID_STREAMS if platform == "android" else IOS_STREAMS
-    device = await _latest_row(db, device_model, device_id)
+    device = await _best_device_row(db, device_model, device_id)
+    device_dict = _flatten_device_row(device)
     stream_details = []
 
     for key, model in streams.items():
         try:
             stream_details.append(await _stream_summary(db, key, model, device_id))
-        except (ProgrammingError, OperationalError):
+        except (ProgrammingError, OperationalError, SQLAlchemyError):
             await _rollback_after_table_error(db)
             stream_details.append(
                 {
@@ -182,7 +311,7 @@ async def _device_detail(platform: str, device_id: str, db: AsyncSession):
     return {
         "platform": platform,
         "device_id": device_id,
-        "device": _row_to_dict(device),
+        "device": device_dict,
         "streams": stream_details,
     }
 
@@ -193,7 +322,7 @@ async def list_android_devices(db: AsyncSession = Depends(get_android_db)):
         db,
         [AndroidDevice, *ANDROID_STREAMS.values()],
     )
-    metadata_by_device = await _latest_android_metadata_by_device(db)
+    metadata_by_device = await _device_metadata_by_device(db, AndroidDevice)
 
     devices = []
     for device_id, last_seen in last_seen_by_device.items():
@@ -201,6 +330,11 @@ async def list_android_devices(db: AsyncSession = Depends(get_android_db)):
         devices.append(
             {
                 "device_id": device_id,
+                **{
+                    field: metadata.get(field)
+                    for field in DEVICE_METADATA_FIELDS
+                    if metadata.get(field) not in (None, "")
+                },
                 "manufacturer": metadata.get("manufacturer"),
                 "model": metadata.get("model"),
                 "last_seen": last_seen,
@@ -218,14 +352,23 @@ async def list_ios_devices(db: AsyncSession = Depends(get_ios_db)):
         [IosDevice, *IOS_STREAMS.values()],
     )
 
-    devices = [
-        {
-            "device_id": device_id,
-            "last_seen": last_seen,
-            "platform": "ios",
-        }
-        for device_id, last_seen in last_seen_by_device.items()
-    ]
+    metadata_by_device = await _device_metadata_by_device(db, IosDevice)
+
+    devices = []
+    for device_id, last_seen in last_seen_by_device.items():
+        metadata = metadata_by_device.get(device_id, {})
+        devices.append(
+            {
+                "device_id": device_id,
+                **{
+                    field: metadata.get(field)
+                    for field in DEVICE_METADATA_FIELDS
+                    if metadata.get(field) not in (None, "")
+                },
+                "last_seen": last_seen,
+                "platform": "ios",
+            }
+        )
 
     return sorted(devices, key=lambda d: d["last_seen"], reverse=True)
 
@@ -237,11 +380,11 @@ async def list_all_devices(
 ):
     try:
         android = await list_android_devices(android_db)
-    except (ProgrammingError, OperationalError):
+    except (ProgrammingError, OperationalError, SQLAlchemyError):
         android = []
     try:
         ios = await list_ios_devices(ios_db)
-    except (ProgrammingError, OperationalError):
+    except (ProgrammingError, OperationalError, SQLAlchemyError):
         ios = []
     return {"android": android, "ios": ios}
 
@@ -259,5 +402,5 @@ async def get_device_detail(
     db = android_db if platform == "android" else ios_db
     try:
         return await _device_detail(platform, device_id, db)
-    except (ProgrammingError, OperationalError):
+    except (ProgrammingError, OperationalError, SQLAlchemyError):
         raise HTTPException(status_code=404, detail="Device data is unavailable")

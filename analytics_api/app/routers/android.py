@@ -684,18 +684,17 @@ async def export_csv(
 
     result = await db.execute(q)
     rows = result.scalars().all()
+    if not rows:
+        raise HTTPException(
+            status_code=404,
+            detail=f"No data found for sensor: {sensor}",
+        )
 
     buf = io.StringIO()
-    if rows:
-        records = [schema.model_validate(r).model_dump() for r in rows]
-        writer = csv.DictWriter(buf, fieldnames=records[0].keys())
-        writer.writeheader()
-        writer.writerows(records)
-    else:
-        # Empty file with just schema headers
-        sample = schema.model_fields.keys()
-        writer = csv.DictWriter(buf, fieldnames=["id", "timestamp", "device_id", *sample])
-        writer.writeheader()
+    records = [schema.model_validate(r).model_dump() for r in rows]
+    writer = csv.DictWriter(buf, fieldnames=records[0].keys())
+    writer.writeheader()
+    writer.writerows(records)
 
     filename = f"{device_id}_{sensor}.csv"
     return Response(

@@ -2,6 +2,7 @@ import csv
 import io
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from sqlalchemy import select
+from sqlalchemy.exc import OperationalError, ProgrammingError
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import get_ios_db
 from app.models import (
@@ -12,7 +13,6 @@ from app.models import (
     IosBatteryDischarges,
     IosBluetooth,
     IosCalls,
-    IosCommunication,
     IosEsm,
     IosFitbitData,
     IosFitbitDevice,
@@ -43,9 +43,11 @@ from app.models import (
     IosPluginOpenweather,
     IosPluginStudentlifeAudio,
     IosProcessor,
+    IosProximity,
     IosPushNotification,
     IosRotation,
     IosScreen,
+    IosSensorWifi,
     IosSignificantMotion,
     IosTimezone,
     IosWifi,
@@ -62,6 +64,20 @@ def _base_query(model, device_id, from_ts, to_ts, limit, offset):
     if to_ts is not None:
         q = q.where(model.timestamp <= to_ts)
     return q.order_by(model.timestamp.desc()).limit(limit).offset(offset)
+
+
+async def _sensor_rows(db: AsyncSession, models, device_id, from_ts, to_ts, limit, offset):
+    rows = []
+    for model in models:
+        try:
+            result = await db.execute(_base_query(model, device_id, from_ts, to_ts, limit, offset))
+            rows.extend(
+                IosSchema.model_validate(row).model_dump()
+                for row in result.scalars().all()
+            )
+        except (OperationalError, ProgrammingError):
+            await db.rollback()
+    return sorted(rows, key=lambda row: row["timestamp"], reverse=True)[:limit]
 
 
 @router.get("/accelerometer", response_model=list[IosSchema])
@@ -233,21 +249,6 @@ async def get_calls(
     db: AsyncSession = Depends(get_ios_db),
 ):
     result = await db.execute(_base_query(IosCalls, device_id, from_ts, to_ts, limit, offset))
-    return result.scalars().all()
-
-
-@router.get("/communication", response_model=list[IosSchema])
-async def get_communication(
-    device_id: str,
-    from_ts: float | None = Query(None),
-    to_ts: float | None = Query(None),
-    limit: int = Query(100, le=1000),
-    offset: int = Query(0),
-    db: AsyncSession = Depends(get_ios_db),
-):
-    result = await db.execute(
-        _base_query(IosCommunication, device_id, from_ts, to_ts, limit, offset)
-    )
     return result.scalars().all()
 
 
@@ -593,6 +594,19 @@ async def get_processor(
     return result.scalars().all()
 
 
+@router.get("/proximity", response_model=list[IosSchema])
+async def get_proximity(
+    device_id: str,
+    from_ts: float | None = Query(None),
+    to_ts: float | None = Query(None),
+    limit: int = Query(100, le=1000),
+    offset: int = Query(0),
+    db: AsyncSession = Depends(get_ios_db),
+):
+    result = await db.execute(_base_query(IosProximity, device_id, from_ts, to_ts, limit, offset))
+    return result.scalars().all()
+
+
 @router.get("/push-notification", response_model=list[IosSchema])
 async def get_push_notification(
     device_id: str,
@@ -686,8 +700,9 @@ async def get_wifi(
     offset: int = Query(0),
     db: AsyncSession = Depends(get_ios_db),
 ):
-    result = await db.execute(_base_query(IosWifi, device_id, from_ts, to_ts, limit, offset))
-    return result.scalars().all()
+    return await _sensor_rows(
+        db, (IosSensorWifi, IosWifi), device_id, from_ts, to_ts, limit, offset
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -707,7 +722,6 @@ _EXPORT_MODELS: dict[str, object] = {
     "calendar": IosPluginCalendar,
     "calendar-esm-scheduler": IosPluginCalendarEsmScheduler,
     "calls": IosCalls,
-    "communication": IosCommunication,
     "contacts": IosPluginContacts,
     "device-usage": IosPluginDeviceUsage,
     "esm": IosEsm,
@@ -732,13 +746,14 @@ _EXPORT_MODELS: dict[str, object] = {
     "openweather": IosPluginOpenweather,
     "pedometer": IosPedometer,
     "processor": IosProcessor,
+    "proximity": IosProximity,
     "push-notification": IosPushNotification,
     "rotation": IosRotation,
     "screen": IosScreen,
     "significant-motion": IosSignificantMotion,
     "studentlife-audio": IosPluginStudentlifeAudio,
     "timezone": IosTimezone,
-    "wifi": IosWifi,
+    "wifi": (IosSensorWifi, IosWifi),
 }
 
 
@@ -754,27 +769,37 @@ async def export_csv(
     if not model:
         raise HTTPException(status_code=404, detail=f"Unknown sensor: {sensor}")
 
-    q = select(model).where(model.device_id == device_id)
-    if from_ts is not None:
-        q = q.where(model.timestamp >= from_ts)
-    if to_ts is not None:
-        q = q.where(model.timestamp <= to_ts)
-    q = q.order_by(model.timestamp.asc())
-
-    result = await db.execute(q)
-    rows = result.scalars().all()
+    models = model if isinstance(model, tuple) else (model,)
+    rows = []
+    for m in models:
+        try:
+            q = select(m).where(m.device_id == device_id)
+            if from_ts is not None:
+                q = q.where(m.timestamp >= from_ts)
+            if to_ts is not None:
+                q = q.where(m.timestamp <= to_ts)
+            q = q.order_by(m.timestamp.asc())
+            result = await db.execute(q)
+            rows.extend(
+                IosSchema.model_validate(row).model_dump()
+                for row in result.scalars().all()
+            )
+        except (OperationalError, ProgrammingError):
+            await db.rollback()
+    rows = sorted(rows, key=lambda row: row["timestamp"])
+    if not rows:
+        raise HTTPException(
+            status_code=404,
+            detail=f"No data found for sensor: {sensor}",
+        )
 
     buf = io.StringIO()
-    if rows:
-        records = [IosSchema.model_validate(r).model_dump() for r in rows]
-        # Union all keys so every row has the same columns
-        all_keys: list[str] = list(dict.fromkeys(k for rec in records for k in rec))
-        writer = csv.DictWriter(buf, fieldnames=all_keys, extrasaction="ignore", restval="")
-        writer.writeheader()
-        writer.writerows(records)
-    else:
-        writer = csv.DictWriter(buf, fieldnames=["id", "timestamp", "device_id"])
-        writer.writeheader()
+    records = rows
+    # Union all keys so every row has the same columns
+    all_keys: list[str] = list(dict.fromkeys(k for rec in records for k in rec))
+    writer = csv.DictWriter(buf, fieldnames=all_keys, extrasaction="ignore", restval="")
+    writer.writeheader()
+    writer.writerows(records)
 
     filename = f"{device_id}_{sensor.replace('/', '_')}.csv"
     return Response(
