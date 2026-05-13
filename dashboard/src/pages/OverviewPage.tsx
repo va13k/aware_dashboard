@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { fetchDevices, fetchSensor } from "../api/client";
 import { SENSOR_CONFIGS } from "../config/sensors";
 import SensorStatCard from "../components/SensorStatCard";
+import WifiRecordsCard from "../components/WifiRecordsCard";
 import type { Device, DevicesResponse, SensorRecord } from "../types";
 
 type SensorData = Record<
@@ -48,7 +49,7 @@ export default function OverviewPage() {
     new Set(SENSOR_CONFIGS.map((s) => s.key)),
   );
   const [error, setError] = useState<string | null>(null);
-  const [now, setNow] = useState<number | null>(null);
+  const [now, setNow] = useState(() => Date.now());
 
   useEffect(() => {
     let cancelled = false;
@@ -138,9 +139,6 @@ export default function OverviewPage() {
     if (devices) return "No uploads yet";
     return "Checking uploads...";
   })();
-  const labelNow =
-    now ?? (latestUpload ? normalizeTimestamp(latestUpload.last_seen) : 0);
-
   if (error)
     return (
       <div className="mt-4 p-4 text-red-700 bg-red-50 border border-red-200 rounded-2xl">
@@ -163,7 +161,7 @@ export default function OverviewPage() {
           {latestUpload && (
             <div className="rounded-xl bg-teal-soft px-3 py-2 text-right">
               <p className="text-[12px] font-semibold text-teal">
-                {uploadAgeLabel(latestUpload.last_seen, labelNow)}
+                {uploadAgeLabel(latestUpload.last_seen, now)}
               </p>
               <p className="mt-0.5 text-[11px] text-sage">
                 {latestUpload.platform} - {deviceLabel(latestUpload)}
@@ -173,15 +171,35 @@ export default function OverviewPage() {
         </div>
       </section>
 
-      <div className="grid grid-cols-[repeat(auto-fill,minmax(340px,1fr))] gap-4 mt-4">
+      <div className="grid auto-rows-[220px] grid-cols-[repeat(auto-fill,minmax(340px,1fr))] gap-4 mt-4">
         {SENSOR_CONFIGS.map((config) => (
-          <SensorStatCard
-            key={config.key}
-            config={config}
-            androidRecords={sensorData[config.key]?.android ?? []}
-            iosRecords={sensorData[config.key]?.ios ?? []}
-            loading={loadingKeys.has(config.key)}
-          />
+          config.key === "wifi" ? (
+            <WifiRecordsCard
+              key={config.key}
+              groups={[
+                {
+                  label: "Android",
+                  records: sensorData[config.key]?.android ?? [],
+                },
+                {
+                  label: "iOS",
+                  records: sensorData[config.key]?.ios ?? [],
+                },
+              ]}
+              loading={loadingKeys.has(config.key)}
+              className="h-full overflow-hidden"
+              tableClassName="max-h-[138px]"
+            />
+          ) : (
+            <SensorStatCard
+              key={config.key}
+              config={config}
+              androidRecords={sensorData[config.key]?.android ?? []}
+              iosRecords={sensorData[config.key]?.ios ?? []}
+              loading={loadingKeys.has(config.key)}
+              className="h-full overflow-hidden"
+            />
+          )
         ))}
       </div>
     </div>

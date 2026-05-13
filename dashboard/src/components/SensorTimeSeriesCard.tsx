@@ -56,6 +56,11 @@ export default function SensorTimeSeriesCard({
         .map(Number)
         .sort((a, b) => a - b)
     : [];
+  const latestRecord = records.reduce<SensorRecord | null>(
+    (latest, record) =>
+      latest == null || record.timestamp > latest.timestamp ? record : latest,
+    null,
+  );
 
   return (
     <div className="bg-card backdrop-blur-xl border border-wire rounded-3xl shadow-card p-5">
@@ -100,8 +105,37 @@ export default function SensorTimeSeriesCard({
         </div>
       )}
 
+      {config.note && (
+        <div className="mb-3 rounded-lg border border-wire bg-card-strong/70 px-3 py-2 text-[11px] leading-snug text-sage">
+          {config.note}
+        </div>
+      )}
+
       {loading ? (
         <div className="h-40 rounded-xl shimmer" />
+      ) : config.countOnly ? (
+        records.length ? (
+          <div className="h-40 flex flex-col justify-center rounded-xl border border-wire bg-card-strong/70 px-4">
+            <div className="text-[10px] uppercase tracking-[0.5px] text-sage">
+              Records
+            </div>
+            <div className="mt-1 text-[32px] font-bold leading-none text-ink">
+              {records.length.toLocaleString()}
+            </div>
+            {latestRecord && (
+              <div className="mt-3 text-[11px] text-sage">
+                Last received{" "}
+                <span className="font-semibold text-ink">
+                  {new Date(latestRecord.timestamp).toLocaleString()}
+                </span>
+              </div>
+            )}
+          </div>
+        ) : (
+          <div className="h-40 flex items-center justify-center text-sage text-[13px]">
+            No data
+          </div>
+        )
       ) : !data.length ? (
         <div className="h-40 flex items-center justify-center text-sage text-[13px]">
           No data

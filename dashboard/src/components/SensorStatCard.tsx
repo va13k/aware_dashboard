@@ -7,6 +7,7 @@ interface Props {
   androidRecords: SensorRecord[];
   iosRecords: SensorRecord[];
   loading: boolean;
+  className?: string;
 }
 
 interface PlatformStats {
@@ -20,6 +21,17 @@ function platformStats(
   config: SensorConfig,
   records: SensorRecord[],
 ): PlatformStats | null {
+  if (config.countOnly) {
+    if (!records.length) return null;
+    const latest = records.reduce((a, b) => (b.timestamp > a.timestamp ? b : a));
+    return {
+      count: records.length,
+      last: latest.timestamp,
+      min: latest.timestamp,
+      max: latest.timestamp,
+    };
+  }
+
   const pairs = records
     .map((r) => ({ ts: r.timestamp, v: config.extract(r) }))
     .filter((x): x is { ts: number; v: number } => x.v !== null);
@@ -52,18 +64,26 @@ function StatItem({ label, children }: StatItemProps) {
   );
 }
 
+function formatStatValue(config: SensorConfig, value: number): string {
+  if (config.countOnly) return new Date(value).toLocaleDateString();
+  return config.enumLabels?.[value] ?? fmt(value);
+}
+
 export default function SensorStatCard({
   config,
   androidRecords,
   iosRecords,
   loading,
+  className = "",
 }: Props) {
   const android = platformStats(config, androidRecords);
   const ios = platformStats(config, iosRecords);
   const hasData = android || ios;
 
   return (
-    <div className="bg-card backdrop-blur-xl border border-wire rounded-3xl shadow-card p-5">
+    <div
+      className={`bg-card backdrop-blur-xl border border-wire rounded-3xl shadow-card p-5 ${className}`}
+    >
       <div className="flex items-center gap-2 mb-4">
         <span
           className="w-2 h-2 rounded-full shrink-0"
@@ -96,13 +116,27 @@ export default function SensorStatCard({
                 <StatItem label="records">
                   {android.count.toLocaleString()}
                 </StatItem>
-                <StatItem label="last">
-                  <span style={{ color: config.color }}>
-                    {fmt(android.last)}
-                  </span>
-                </StatItem>
-                <StatItem label="min">{fmt(android.min)}</StatItem>
-                <StatItem label="max">{fmt(android.max)}</StatItem>
+                {config.countOnly ? (
+                  <StatItem label="last">
+                    <span style={{ color: config.color }}>
+                      {formatStatValue(config, android.last)}
+                    </span>
+                  </StatItem>
+                ) : (
+                  <>
+                    <StatItem label="last">
+                      <span style={{ color: config.color }}>
+                        {formatStatValue(config, android.last)}
+                      </span>
+                    </StatItem>
+                    <StatItem label="min">
+                      {formatStatValue(config, android.min)}
+                    </StatItem>
+                    <StatItem label="max">
+                      {formatStatValue(config, android.max)}
+                    </StatItem>
+                  </>
+                )}
               </div>
             </div>
           )}
@@ -116,11 +150,27 @@ export default function SensorStatCard({
                 <StatItem label="records">
                   {ios.count.toLocaleString()}
                 </StatItem>
-                <StatItem label="last">
-                  <span style={{ color: config.color }}>{fmt(ios.last)}</span>
-                </StatItem>
-                <StatItem label="min">{fmt(ios.min)}</StatItem>
-                <StatItem label="max">{fmt(ios.max)}</StatItem>
+                {config.countOnly ? (
+                  <StatItem label="last">
+                    <span style={{ color: config.color }}>
+                      {formatStatValue(config, ios.last)}
+                    </span>
+                  </StatItem>
+                ) : (
+                  <>
+                    <StatItem label="last">
+                      <span style={{ color: config.color }}>
+                        {formatStatValue(config, ios.last)}
+                      </span>
+                    </StatItem>
+                    <StatItem label="min">
+                      {formatStatValue(config, ios.min)}
+                    </StatItem>
+                    <StatItem label="max">
+                      {formatStatValue(config, ios.max)}
+                    </StatItem>
+                  </>
+                )}
               </div>
             </div>
           )}
