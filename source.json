@@ -37,7 +37,7 @@
   },
   "android": {
     "created_at": "",
-    "updated_at": "2026-05-11T18:10:39.190Z",
+    "updated_at": "2026-05-13T01:49:25.336Z",
     "settings": {
       "webservice_wifi_only": false,
       "webservice_charging": false,
@@ -92,8 +92,8 @@
       "screenshot_package_specification": "2",
       "status_notes": false,
       "status_plugin_ambient_noise": false,
-      "frequency_plugin_ambient_noise": 2,
-      "plugin_ambient_noise_sample_size": 1024,
+      "frequency_plugin_ambient_noise": 1,
+      "plugin_ambient_noise_sample_size": 10,
       "plugin_ambient_noise_silence_threshold": 50,
       "status_plugin_openweather": false,
       "plugin_openweather_frequency": 60,
@@ -269,7 +269,7 @@
       "accelerometer": {
         "enabled": false,
         "frequency": 20000,
-        "threshold": 10,
+        "threshold": 120,
         "enforce": false
       },
       "applications": {
@@ -312,13 +312,13 @@
       },
       "magnetometer": {
         "enabled": false,
-        "frequency": 20000,
-        "threshold": 10,
+        "frequency": 2000000,
+        "threshold": 1000000,
         "enforce": false
       },
       "processor": {
         "enabled": false,
-        "frequency": 120
+        "frequency": 20
       },
       "proximity": {
         "enabled": false,
@@ -346,7 +346,7 @@
       },
       "timezone": {
         "enabled": false,
-        "frequency": 20000
+        "frequency": 2000
       },
       "wifi": {
         "enabled": false,
