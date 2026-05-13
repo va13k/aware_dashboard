@@ -8,16 +8,18 @@ import {
   Cell,
 } from "recharts";
 import type { SensorRecord } from "../types";
+import ExportLink from "./ExportLink";
 
 interface Props {
   records: SensorRecord[];
   loading: boolean;
+  exportHref?: string;
 }
 
 const USER_APP_COLOR = "#10b981";
 const SYSTEM_APP_COLOR = "#94a3b8";
 
-export default function ApplicationsCard({ records, loading }: Props) {
+export default function ApplicationsCard({ records, loading, exportHref }: Props) {
   const counts: Record<string, { count: number; isSystem: boolean }> = {};
 
   for (const r of records) {
@@ -43,6 +45,7 @@ export default function ApplicationsCard({ records, loading }: Props) {
         {records.length > 0 && (
           <span className="text-[11px] text-sage">{records.length} events</span>
         )}
+        {exportHref && <ExportLink href={exportHref} />}
       </div>
 
       {records.length > 0 && (

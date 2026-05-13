@@ -1,6 +1,6 @@
 import type { DeviceDetail, DevicesResponse, SensorRecord } from "../types";
 
-const BASE = "/api";
+export const BASE = "/api";
 
 async function get<T>(path: string): Promise<T> {
   const res = await fetch(`${BASE}${path}`, { cache: "no-store" });
@@ -27,3 +27,19 @@ export const fetchSensor = (
   limit = 500,
 ): Promise<SensorRecord[]> =>
   get(`/${platform}/${encodeURIComponent(deviceId)}/${sensor}?limit=${limit}`);
+
+export const exportAllHref = (): string => `${BASE}/export/all.zip`;
+
+export const exportDeviceHref = (
+  platform: "android" | "ios",
+  deviceId: string,
+): string => `${BASE}/export/device/${platform}/${encodeURIComponent(deviceId)}.zip`;
+
+export const exportSensorHref = (
+  platform: "android" | "ios",
+  deviceId: string,
+  sensor: string,
+): string => {
+  const params = new URLSearchParams({ sensor });
+  return `${BASE}/${platform}/${encodeURIComponent(deviceId)}/export?${params.toString()}`;
+};

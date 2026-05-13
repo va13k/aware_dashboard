@@ -9,10 +9,12 @@ import {
 } from "recharts";
 import type { SensorRecord } from "../types";
 import { fmt, max, min } from "../utils/stats";
+import ExportLink from "./ExportLink";
 
 interface Props {
   records: SensorRecord[];
   loading: boolean;
+  exportHref?: string;
 }
 
 function numberValue(value: unknown): number | null {
@@ -40,7 +42,7 @@ function chartData(records: SensorRecord[]) {
     .sort((a, b) => a.time - b.time);
 }
 
-export default function CallsRecordsCard({ records, loading }: Props) {
+export default function CallsRecordsCard({ records, loading, exportHref }: Props) {
   const sessionCount = new Set(
     records.map((record) => record.trace).filter((trace) => trace != null && trace !== ""),
   ).size;
@@ -58,6 +60,7 @@ export default function CallsRecordsCard({ records, loading }: Props) {
             {records.length.toLocaleString()} records
           </span>
         )}
+        {exportHref && <ExportLink href={exportHref} />}
       </div>
 
       {loading ? (

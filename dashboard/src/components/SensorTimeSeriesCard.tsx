@@ -10,11 +10,13 @@ import {
 import type { SensorConfig } from "../config/sensors";
 import type { SensorRecord } from "../types";
 import { min, max, fmt } from "../utils/stats";
+import ExportLink from "./ExportLink";
 
 interface Props {
   config: SensorConfig;
   records: SensorRecord[];
   loading: boolean;
+  exportHref?: string;
 }
 
 function makeTickFormatter(spanMs: number) {
@@ -36,6 +38,7 @@ export default function SensorTimeSeriesCard({
   config,
   records,
   loading,
+  exportHref,
 }: Props) {
   const { enumLabels } = config;
   const isEnum = enumLabels != null;
@@ -77,6 +80,7 @@ export default function SensorTimeSeriesCard({
             {config.unit}
           </span>
         )}
+        {exportHref && <ExportLink href={exportHref} />}
       </div>
 
       {values.length > 0 && (

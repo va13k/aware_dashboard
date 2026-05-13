@@ -1,4 +1,5 @@
 import type { SensorRecord } from "../types";
+import ExportLink from "./ExportLink";
 
 interface WifiRecordGroup {
   label: string;
@@ -10,6 +11,7 @@ interface Props {
   loading: boolean;
   className?: string;
   tableClassName?: string;
+  exportHref?: string;
 }
 
 type WifiTableRow = SensorRecord & { source: string };
@@ -32,6 +34,7 @@ export default function WifiRecordsCard({
   loading,
   className = "",
   tableClassName = "max-h-56",
+  exportHref,
 }: Props) {
   const rows = groups
     .flatMap((group) =>
@@ -56,6 +59,7 @@ export default function WifiRecordsCard({
             {total.toLocaleString()} records
           </span>
         )}
+        {exportHref && <ExportLink href={exportHref} />}
       </div>
 
       {loading ? (

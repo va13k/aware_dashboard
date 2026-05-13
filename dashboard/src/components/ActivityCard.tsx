@@ -8,10 +8,12 @@ import {
   Cell,
 } from "recharts";
 import type { SensorRecord } from "../types";
+import ExportLink from "./ExportLink";
 
 interface Props {
   records: SensorRecord[];
   loading: boolean;
+  exportHref?: string;
 }
 
 const ACTIVITY_COLORS: Record<string, string> = {
@@ -23,7 +25,7 @@ const ACTIVITY_COLORS: Record<string, string> = {
   unknown: "#d1d5db",
 };
 
-export default function ActivityCard({ records, loading }: Props) {
+export default function ActivityCard({ records, loading, exportHref }: Props) {
   const counts: Record<string, number> = {};
   for (const r of records) {
     const type = (
@@ -44,6 +46,7 @@ export default function ActivityCard({ records, loading }: Props) {
         {records.length > 0 && (
           <span className="text-[11px] text-sage">{records.length} events</span>
         )}
+        {exportHref && <ExportLink href={exportHref} />}
       </div>
 
       {loading ? (

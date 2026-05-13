@@ -149,6 +149,15 @@ export const SENSOR_CONFIGS: SensorConfig[] = [
     // Android: double_light_lux column
     extract: (r) => (r.double_light_lux as number | null) ?? null,
   },
+  {
+    key: "proximity",
+    label: "Proximity",
+    unit: "",
+    color: "#0f766e",
+    platform: "android",
+    // Android-only proximity table; iPhone config has no matching DB table.
+    extract: (r) => firstNumber(r, ["distance", "near", "value"]) ?? eventPresence(r),
+  },
 
   // ── iOS only ─────────────────────────────────────────────────────────────
   {
@@ -353,14 +362,6 @@ const IOS_DEVICE_SENSOR_CONFIGS: SensorConfig[] = [
     platform: "shared",
     extract: (r) =>
       magnitude(r, "x", "y", "z") ?? magnitude(r, "roll", "pitch", "yaw"),
-  },
-  {
-    key: "proximity",
-    label: "Proximity",
-    unit: "",
-    color: "#0f766e",
-    platform: "shared",
-    extract: (r) => firstNumber(r, ["distance", "near", "value"]) ?? eventPresence(r),
   },
   {
     key: "significant-motion",

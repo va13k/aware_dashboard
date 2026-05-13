@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
-import { fetchDevices, fetchSensor } from "../api/client";
+import { exportAllHref, fetchDevices, fetchSensor } from "../api/client";
 import { SENSOR_CONFIGS } from "../config/sensors";
 import SensorStatCard from "../components/SensorStatCard";
 import WifiRecordsCard from "../components/WifiRecordsCard";
+import ExportLink from "../components/ExportLink";
 import type { Device, DevicesResponse, SensorRecord } from "../types";
 
 type SensorData = Record<
@@ -159,14 +160,30 @@ export default function OverviewPage() {
             </p>
           </div>
           {latestUpload && (
-            <div className="rounded-xl bg-teal-soft px-3 py-2 text-right">
-              <p className="text-[12px] font-semibold text-teal">
-                {uploadAgeLabel(latestUpload.last_seen, now)}
-              </p>
-              <p className="mt-0.5 text-[11px] text-sage">
-                {latestUpload.platform} - {deviceLabel(latestUpload)}
-              </p>
+            <div className="flex items-center gap-2">
+              <ExportLink
+                href={exportAllHref()}
+                label="Export all"
+                title="Export all CSVs"
+                className="h-9 px-3"
+              />
+              <div className="rounded-xl bg-teal-soft px-3 py-2 text-right">
+                <p className="text-[12px] font-semibold text-teal">
+                  {uploadAgeLabel(latestUpload.last_seen, now)}
+                </p>
+                <p className="mt-0.5 text-[11px] text-sage">
+                  {latestUpload.platform} - {deviceLabel(latestUpload)}
+                </p>
+              </div>
             </div>
+          )}
+          {!latestUpload && devices && (
+            <ExportLink
+              href={exportAllHref()}
+              label="Export all"
+              title="Export all CSVs"
+              className="h-9 px-3 self-start sm:self-center"
+            />
           )}
         </div>
       </section>

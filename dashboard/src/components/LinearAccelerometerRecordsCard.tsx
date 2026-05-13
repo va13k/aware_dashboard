@@ -9,10 +9,12 @@ import {
 } from "recharts";
 import type { SensorRecord } from "../types";
 import { fmt } from "../utils/stats";
+import ExportLink from "./ExportLink";
 
 interface Props {
   records: SensorRecord[];
   loading: boolean;
+  exportHref?: string;
 }
 
 interface AxisPoint {
@@ -74,6 +76,7 @@ function uniqueLabels(points: AxisPoint[]): string[] {
 export default function LinearAccelerometerRecordsCard({
   records,
   loading,
+  exportHref,
 }: Props) {
   const data = records
     .map((record): AxisPoint | null => {
@@ -110,6 +113,7 @@ export default function LinearAccelerometerRecordsCard({
         <span className="text-[11px] text-sage bg-[rgba(48,67,54,0.07)] px-1.5 py-0.5 rounded-md">
           g
         </span>
+        {exportHref && <ExportLink href={exportHref} />}
       </div>
 
       {data.length > 0 && last && (

@@ -9,11 +9,15 @@ import {
 } from "recharts";
 import type { SensorRecord } from "../types";
 import { fmt, max, min } from "../utils/stats";
+import ExportLink from "./ExportLink";
 
 interface Props {
   records: SensorRecord[];
   loading: boolean;
   className?: string;
+  title?: string;
+  color?: string;
+  exportHref?: string;
 }
 
 interface LocationMetric {
@@ -182,22 +186,30 @@ export default function LocationRecordsCard({
   records,
   loading,
   className = "",
+  title = "Location",
+  color = "#10b981",
+  exportHref,
 }: Props) {
   const sorted = [...records].sort((a, b) => b.timestamp - a.timestamp);
   const latest = sorted[0] ?? null;
+  const showLocationAccuracyNote = title === "Location";
 
   return (
     <div
       className={`bg-card backdrop-blur-xl border border-wire rounded-3xl shadow-card p-5 ${className}`}
     >
       <div className="flex items-center gap-2 mb-3">
-        <span className="w-2 h-2 rounded-full shrink-0 bg-[#10b981]" />
-        <h3 className="text-[13px] font-semibold text-ink">Location</h3>
+        <span
+          className="w-2 h-2 rounded-full shrink-0"
+          style={{ background: color }}
+        />
+        <h3 className="text-[13px] font-semibold text-ink">{title}</h3>
         {records.length > 0 && (
           <span className="text-[11px] text-sage ml-auto">
             {records.length.toLocaleString()} records
           </span>
         )}
+        {exportHref && <ExportLink href={exportHref} />}
       </div>
 
       {loading ? (
@@ -207,14 +219,35 @@ export default function LocationRecordsCard({
           No data
         </div>
       ) : (
-        <div className="grid grid-cols-1 gap-3 min-[760px]:grid-cols-2">
-          {LOCATION_METRICS.map((metric) => (
-            <LocationMetricChart
-              key={metric.key}
-              metric={metric}
-              records={records}
-            />
-          ))}
+        <div className="space-y-3">
+          <div className="grid grid-cols-1 gap-3 min-[760px]:grid-cols-2">
+            {LOCATION_METRICS.map((metric) => (
+              <LocationMetricChart
+                key={metric.key}
+                metric={metric}
+                records={records}
+              />
+            ))}
+          </div>
+
+          <div className="rounded-lg border border-wire bg-card-strong/70 px-3 py-2 text-[11px] leading-snug text-sage">
+            Bearing is the device course over ground from the iOS location fix,
+            saved from location.course. It is movement direction, not compass
+            heading or phone orientation: 0 deg is north, 90 deg east, 180 deg
+            south, and 270 deg west. Values greater than or equal to 0 are valid
+            course degrees; negative values, commonly -1, mean unknown or
+            invalid course when the user is still, moving slowly, or course
+            cannot be determined.
+          </div>
+
+          {showLocationAccuracyNote && (
+            <div className="rounded-lg border border-wire bg-card-strong/70 px-3 py-2 text-[11px] leading-snug text-sage">
+              Accuracy is the estimated position radius in meters for the
+              location fix. For example, 10 means the position is estimated
+              within about 10 m, 150 within about 150 m, and 1000 within about
+              1 km. Negative accuracy means invalid or unavailable accuracy.
+            </div>
+          )}
         </div>
       )}
     </div>

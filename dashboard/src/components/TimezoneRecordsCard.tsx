@@ -1,8 +1,10 @@
 import type { SensorRecord } from "../types";
+import ExportLink from "./ExportLink";
 
 interface Props {
   records: SensorRecord[];
   loading: boolean;
+  exportHref?: string;
 }
 
 function valueText(value: unknown): string {
@@ -14,7 +16,11 @@ function timeText(timestamp: number): string {
   return new Date(timestamp).toLocaleString();
 }
 
-export default function TimezoneRecordsCard({ records, loading }: Props) {
+export default function TimezoneRecordsCard({
+  records,
+  loading,
+  exportHref,
+}: Props) {
   const rows = [...records].sort((a, b) => b.timestamp - a.timestamp);
   const latest = rows[0] ?? null;
   const uniqueTimezones = Array.from(
@@ -35,6 +41,7 @@ export default function TimezoneRecordsCard({ records, loading }: Props) {
             {records.length.toLocaleString()} records
           </span>
         )}
+        {exportHref && <ExportLink href={exportHref} />}
       </div>
 
       {loading ? (

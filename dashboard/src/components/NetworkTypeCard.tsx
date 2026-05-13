@@ -1,4 +1,5 @@
 import type { SensorRecord } from "../types";
+import ExportLink from "./ExportLink";
 
 const NETWORK_TYPES: Record<number, string> = {
   0: "Mobile",
@@ -46,6 +47,7 @@ interface Props {
   records: SensorRecord[];
   loading: boolean;
   platform?: "android" | "ios";
+  exportHref?: string;
 }
 
 function numberValue(value: unknown): number | null {
@@ -85,7 +87,12 @@ function stateColor(state: number | null, platform?: "android" | "ios") {
   return STATE_COLORS[state] ?? "text-sage";
 }
 
-export default function NetworkTypeCard({ records, loading, platform }: Props) {
+export default function NetworkTypeCard({
+  records,
+  loading,
+  platform,
+  exportHref,
+}: Props) {
   const rows = [...records]
     .sort((a, b) => b.timestamp - a.timestamp)
     .slice(0, 30);
@@ -106,6 +113,7 @@ export default function NetworkTypeCard({ records, loading, platform }: Props) {
             {records.length} events
           </span>
         )}
+        {exportHref && <ExportLink href={exportHref} />}
       </div>
 
       {latest && (
