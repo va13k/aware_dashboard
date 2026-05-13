@@ -31,6 +31,7 @@ import type {
 } from "../types";
 
 const POLL_INTERVAL_MS = 60_000;
+const SENSOR_FILTER_STORAGE_KEY = "aware-dashboard-hide-empty-sensors";
 
 function timeSince(ts: number): string {
   const s = Math.floor((Date.now() - ts) / 1000);
@@ -42,26 +43,18 @@ function timeSince(ts: number): string {
 interface DeviceSensorState {
   key: string | null;
   sensorData: Record<string, SensorRecord[]>;
-  networkData: SensorRecord[];
-  activityData: SensorRecord[];
-  applicationsData: SensorRecord[];
   loadingKeys: Set<string>;
-  networkLoading: boolean;
-  activityLoading: boolean;
-  applicationsLoading: boolean;
 }
 
 const EMPTY_SENSOR_STATE: DeviceSensorState = {
   key: null,
   sensorData: {},
-  networkData: [],
-  activityData: [],
-  applicationsData: [],
   loadingKeys: new Set(),
-  networkLoading: false,
-  activityLoading: false,
-  applicationsLoading: false,
 };
+
+function readHideEmptySensors(): boolean {
+  return window.localStorage.getItem(SENSOR_FILTER_STORAGE_KEY) === "true";
+}
 
 function deviceLabel(d: Device): string {
   if (d.platform === "android") {
@@ -208,6 +201,9 @@ export default function DevicePage() {
     useState<DeviceSensorState>(EMPTY_SENSOR_STATE);
   const [error, setError] = useState<string | null>(null);
   const [lastUpdated, setLastUpdated] = useState<number | null>(null);
+  const [hideEmptySensors, setHideEmptySensors] = useState(
+    readHideEmptySensors,
+  );
   // Ticks every 10 s so the "X ago" label stays fresh without re-fetching.
   const [, setTick] = useState(0);
 
@@ -257,25 +253,24 @@ export default function DevicePage() {
   }, []);
 
   useEffect(() => {
+    window.localStorage.setItem(
+      SENSOR_FILTER_STORAGE_KEY,
+      String(hideEmptySensors),
+    );
+  }, [hideEmptySensors]);
+
+  useEffect(() => {
     if (!selected) return;
     let cancelled = false;
     const isFirstRun = { value: true };
 
     const sensors = deviceSensorsForPlatform(selected.platform);
     const initialLoadingKeys = new Set(sensors.map((s) => s.key));
-    const isIos = selected.platform === "ios";
-    const isAndroid = selected.platform === "android";
 
     const makeEmpty = (): DeviceSensorState => ({
       key: selectedKey,
       sensorData: {},
-      networkData: [],
-      activityData: [],
-      applicationsData: [],
       loadingKeys: initialLoadingKeys,
-      networkLoading: true,
-      activityLoading: isIos,
-      applicationsLoading: isAndroid,
     });
 
     const fetchAll = () => {
@@ -326,64 +321,6 @@ export default function DevicePage() {
               }
               return updated;
             });
-          });
-      }
-
-      fetchSensor(selected.platform, selected.device_id, "network")
-        .then((records) => {
-          if (!cancelled)
-            setSensorState((prev) => ({
-              ...(prev.key === selectedKey ? prev : makeEmpty()),
-              networkData: records,
-              networkLoading: false,
-            }));
-        })
-        .catch(() => {
-          if (!cancelled)
-            setSensorState((prev) => ({
-              ...(prev.key === selectedKey ? prev : makeEmpty()),
-              networkData: [],
-              networkLoading: false,
-            }));
-        });
-
-      if (isIos) {
-        fetchSensor(selected.platform, selected.device_id, "activity")
-          .then((records) => {
-            if (!cancelled)
-              setSensorState((prev) => ({
-                ...(prev.key === selectedKey ? prev : makeEmpty()),
-                activityData: records,
-                activityLoading: false,
-              }));
-          })
-          .catch(() => {
-            if (!cancelled)
-              setSensorState((prev) => ({
-                ...(prev.key === selectedKey ? prev : makeEmpty()),
-                activityData: [],
-                activityLoading: false,
-              }));
-          });
-      }
-
-      if (isAndroid) {
-        fetchSensor(selected.platform, selected.device_id, "applications")
-          .then((records) => {
-            if (!cancelled)
-              setSensorState((prev) => ({
-                ...(prev.key === selectedKey ? prev : makeEmpty()),
-                applicationsData: records,
-                applicationsLoading: false,
-              }));
-          })
-          .catch(() => {
-            if (!cancelled)
-              setSensorState((prev) => ({
-                ...(prev.key === selectedKey ? prev : makeEmpty()),
-                applicationsData: [],
-                applicationsLoading: false,
-              }));
           });
       }
 
@@ -489,41 +426,70 @@ export default function DevicePage() {
             const sharedSensors = platformSensors.filter(
               (s) => s.platform === "shared",
             );
-            const locationSensor = sharedSensors.find(
+            const sensorRecords = (key: string) =>
+              currentSensorState.sensorData[key] ?? [];
+            const sensorLoading = (key: string) => pendingSensorKeys.has(key);
+            const shouldShowSensor = (key: string) =>
+              !hideEmptySensors ||
+              sensorLoading(key) ||
+              sensorRecords(key).length > 0;
+            const visibleSharedSensors = sharedSensors.filter((sensor) =>
+              shouldShowSensor(sensor.key),
+            );
+            const locationSensor = visibleSharedSensors.find(
               (s) => s.key === "locations",
             );
-            const sharedChartSensors = sharedSensors.filter(
-              (s) => s.key !== "locations",
+            const sharedChartSensors = visibleSharedSensors.filter(
+              (s) => !["locations", "network"].includes(s.key),
             );
+            const showNetwork = shouldShowSensor("network");
             const specificSensors = platformSensors.filter(
-              (s) => s.platform !== "shared",
+              (s) => s.platform !== "shared" && shouldShowSensor(s.key),
             );
             const specificLabel =
               selected.platform === "android" ? "Android only" : "iPhone only";
-            const networkLoading =
-              currentSensorState.key !== selectedKey ||
-              currentSensorState.networkLoading;
-            const activityLoading =
-              currentSensorState.key !== selectedKey ||
-              currentSensorState.activityLoading;
-            const applicationsLoading =
-              currentSensorState.key !== selectedKey ||
-              currentSensorState.applicationsLoading;
+            const showSharedSection =
+              sharedChartSensors.length > 0 || locationSensor || showNetwork;
+            const visibleSensorCount =
+              sharedChartSensors.length +
+              (locationSensor ? 1 : 0) +
+              (showNetwork ? 1 : 0) +
+              specificSensors.length;
 
             return (
               <>
-                <div className="flex items-center justify-between px-1">
-                  <div className="text-[11px] font-semibold uppercase tracking-[0.6px] text-sage">
-                    Shared
-                  </div>
+                <div className="flex flex-col gap-2 px-1 sm:flex-row sm:items-center sm:justify-between">
                   <div className="flex items-center gap-1.5 text-[11px] text-sage">
                     <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" />
                     {lastUpdated
                       ? `Updated ${timeSince(lastUpdated)}`
                       : "Loading…"}
                   </div>
+                  <label className="flex cursor-pointer items-center gap-2 self-start rounded-xl border border-wire bg-card px-3 py-2 text-[12px] font-semibold text-ink shadow-card sm:self-auto">
+                    <input
+                      type="checkbox"
+                      checked={hideEmptySensors}
+                      onChange={(event) =>
+                        setHideEmptySensors(event.target.checked)
+                      }
+                      className="h-4 w-4 accent-teal"
+                    />
+                    Only sensors with records
+                  </label>
                 </div>
-                <div className="grid grid-cols-[repeat(auto-fill,minmax(320px,1fr))] gap-4">
+
+                {visibleSensorCount === 0 && hideEmptySensors ? (
+                  <div className="rounded-2xl border border-wire bg-card p-6 text-center text-[13px] text-sage shadow-card">
+                    No sensors have records for this device yet.
+                  </div>
+                ) : null}
+
+                {showSharedSection ? (
+                  <>
+                    <div className="text-[11px] font-semibold uppercase tracking-[0.6px] text-sage px-1">
+                      Shared
+                    </div>
+                    <div className="grid grid-cols-[repeat(auto-fill,minmax(320px,1fr))] gap-4">
                   {sharedChartSensors.map((config) =>
                     config.key === "calls" ? (
                       <CallsRecordsCard
@@ -604,12 +570,14 @@ export default function DevicePage() {
                       />
                     ),
                   )}
-                  <NetworkTypeCard
-                    records={currentSensorState.networkData}
-                    loading={networkLoading}
-                    platform={selected.platform}
-                    exportHref={selectedSensorExportHref("network")}
-                  />
+                  {showNetwork ? (
+                    <NetworkTypeCard
+                      records={sensorRecords("network")}
+                      loading={sensorLoading("network")}
+                      platform={selected.platform}
+                      exportHref={selectedSensorExportHref("network")}
+                    />
+                  ) : null}
                 </div>
 
                 {locationSensor ? (
@@ -621,8 +589,10 @@ export default function DevicePage() {
                     exportHref={selectedSensorExportHref(locationSensor.key)}
                   />
                 ) : null}
+                  </>
+                ) : null}
 
-                {specificSensors.length > 0 || selected.platform === "ios" ? (
+                {specificSensors.length > 0 ? (
                   <>
                     <div className="text-[11px] font-semibold uppercase tracking-[0.6px] text-sage px-1 mt-2">
                       {specificLabel}
@@ -658,6 +628,24 @@ export default function DevicePage() {
                             loading={pendingSensorKeys.has(config.key)}
                             exportHref={selectedSensorExportHref(config.key)}
                           />
+                        ) : config.key === "activity" ? (
+                          <ActivityCard
+                            key={config.key}
+                            records={
+                              currentSensorState.sensorData[config.key] ?? []
+                            }
+                            loading={pendingSensorKeys.has(config.key)}
+                            exportHref={selectedSensorExportHref(config.key)}
+                          />
+                        ) : config.key === "applications" ? (
+                          <ApplicationsCard
+                            key={config.key}
+                            records={
+                              currentSensorState.sensorData[config.key] ?? []
+                            }
+                            loading={pendingSensorKeys.has(config.key)}
+                            exportHref={selectedSensorExportHref(config.key)}
+                          />
                         ) : (
                           <SensorTimeSeriesCard
                             key={config.key}
@@ -669,20 +657,6 @@ export default function DevicePage() {
                             exportHref={selectedSensorExportHref(config.key)}
                           />
                         ),
-                      )}
-                      {selected.platform === "ios" && (
-                        <ActivityCard
-                          records={currentSensorState.activityData}
-                          loading={activityLoading}
-                          exportHref={selectedSensorExportHref("activity")}
-                        />
-                      )}
-                      {selected.platform === "android" && (
-                        <ApplicationsCard
-                          records={currentSensorState.applicationsData}
-                          loading={applicationsLoading}
-                          exportHref={selectedSensorExportHref("applications")}
-                        />
                       )}
                     </div>
                   </>

@@ -48,76 +48,59 @@ function eventPresence(r: SensorRecord): number | null {
   return r.timestamp == null ? null : 1;
 }
 
-export const SENSOR_CONFIGS: SensorConfig[] = [
-  // ── Shared ──────────────────────────────────────────────────────────────
-  {
-    key: "battery",
-    label: "Battery Level",
-    unit: "%",
-    color: "#22c55e",
-    platform: "shared",
-    // Android: battery_level column; iOS JSON: level
-    extract: (r) =>
-      (r.battery_level as number | null) ?? (r.level as number | null) ?? null,
-    note: "iPhone battery values are approximate and are usually reported in 5% increments.",
-  },
-  {
-    key: "screen",
-    label: "Screen Status",
-    unit: "",
-    color: "#3b82f6",
-    platform: "shared",
-    // Android: screen_status column; iOS JSON: status
-    extract: (r) =>
-      (r.screen_status as number | null) ?? (r.status as number | null) ?? null,
-    enumLabels: {
-      0: "Screen off",
-      1: "Screen on",
-      2: "Screen locked",
-      3: "Screen unlocked",
-    },
-    note: "Received values can differ across iOS and iPhone versions.",
-  },
+function motionState(r: SensorRecord): number | null {
+  const value = r.is_moving;
+  if (typeof value === "boolean") return value ? 1 : 0;
+  return firstNumber(r, ["is_moving"]);
+}
+
+const vectorMagnitude = (r: SensorRecord) =>
+  magnitude(r, "double_values_0", "double_values_1", "double_values_2") ??
+  magnitude(r, "x", "y", "z");
+
+export const SHARED_SENSOR_CONFIGS: SensorConfig[] = [
   {
     key: "accelerometer",
     label: "Accelerometer",
     unit: "g",
     color: "#f59e0b",
     platform: "shared",
-    // Android: double_values_0/1/2 columns; iOS JSON: x/y/z
-    extract: (r) =>
-      magnitude(r, "double_values_0", "double_values_1", "double_values_2") ??
-      magnitude(r, "x", "y", "z"),
+    extract: vectorMagnitude,
   },
   {
-    key: "gyroscope",
-    label: "Gyroscope",
-    unit: "rad/s",
-    color: "#ef4444",
+    key: "barometer",
+    label: "Barometer",
+    unit: "hPa",
+    color: "#64748b",
     platform: "shared",
-    // Android: double_values_0/1/2 columns; iOS JSON: x/y/z
-    extract: (r) =>
-      magnitude(r, "double_values_0", "double_values_1", "double_values_2") ??
-      magnitude(r, "x", "y", "z"),
+    extract: (r) => firstNumber(r, ["pressure", "double_values_0"]),
   },
   {
-    key: "locations",
-    label: "GPS Speed",
-    unit: "m/s",
-    color: "#10b981",
+    key: "battery",
+    label: "Battery Level",
+    unit: "%",
+    color: "#22c55e",
     platform: "shared",
-    // Android: double_speed column; iOS JSON: speed
-    extract: (r) =>
-      (r.double_speed as number | null) ?? (r.speed as number | null) ?? null,
+    extract: (r) => firstNumber(r, ["battery_level", "level", "batteryLevel"]),
+    note: "iPhone battery values are approximate and are usually reported in 5% increments.",
   },
   {
-    key: "wifi",
-    label: "WiFi",
-    unit: "",
-    color: "#8b5cf6",
+    key: "battery-charges",
+    label: "Battery Charges",
+    unit: "event",
+    color: "#16a34a",
     platform: "shared",
-    // Used only for fallback stat/chart paths; Wi-Fi rows render in WifiRecordsCard.
-    extract: (r) => (r.rssi as number | null) ?? null,
+    extract: eventPresence,
+    countOnly: true,
+  },
+  {
+    key: "battery-discharges",
+    label: "Battery Discharges",
+    unit: "event",
+    color: "#65a30d",
+    platform: "shared",
+    extract: eventPresence,
+    countOnly: true,
   },
   {
     key: "bluetooth",
@@ -125,132 +108,7 @@ export const SENSOR_CONFIGS: SensorConfig[] = [
     unit: "dBm",
     color: "#06b6d4",
     platform: "shared",
-    // Android: bt_rssi column; iOS JSON: rssi
-    extract: (r) =>
-      (r.bt_rssi as number | null) ?? (r.rssi as number | null) ?? null,
-  },
-  {
-    key: "calls",
-    label: "Call Duration",
-    unit: "s",
-    color: "#f97316",
-    platform: "shared",
-    // Android: call_duration column; iOS JSON: call_duration
-    extract: (r) => (r.call_duration as number | null) ?? null,
-  },
-
-  // ── Android only ─────────────────────────────────────────────────────────
-  {
-    key: "light",
-    label: "Light",
-    unit: "lux",
-    color: "#fbbf24",
-    platform: "android",
-    // Android: double_light_lux column
-    extract: (r) => (r.double_light_lux as number | null) ?? null,
-  },
-  {
-    key: "proximity",
-    label: "Proximity",
-    unit: "",
-    color: "#0f766e",
-    platform: "android",
-    // Android-only proximity table; iPhone config has no matching DB table.
-    extract: (r) => firstNumber(r, ["distance", "near", "value"]) ?? eventPresence(r),
-  },
-
-  // ── iOS only ─────────────────────────────────────────────────────────────
-  {
-    key: "barometer",
-    label: "Barometer",
-    unit: "hPa",
-    color: "#64748b",
-    platform: "ios",
-    // iOS JSON: pressure (kPa from CoreMotion, displayed as hPa)
-    extract: (r) => (r.pressure as number | null) ?? null,
-  },
-  {
-    key: "magnetometer",
-    label: "Magnetometer",
-    unit: "µT",
-    color: "#a855f7",
-    platform: "ios",
-    // iOS JSON: x/y/z (µT from CoreMotion CMMagneticField)
-    extract: (r) => magnitude(r, "x", "y", "z"),
-  },
-  {
-    key: "rotation",
-    label: "Rotation",
-    unit: "rad/s",
-    color: "#f43f5e",
-    platform: "ios",
-    // iOS JSON: x/y/z (CMRotationRate) or roll/pitch/yaw (CMAttitude)
-    extract: (r) =>
-      magnitude(r, "x", "y", "z") ?? magnitude(r, "roll", "pitch", "yaw"),
-  },
-  {
-    key: "ambient-noise",
-    label: "Ambient Noise",
-    unit: "",
-    color: "#0ea5e9",
-    platform: "ios",
-    // iOS JSON: is_silent uses 0 = noisy, 1 = silent.
-    extract: (r) => firstNumber(r, ["is_silent", "silent"]),
-    enumLabels: {
-      0: "Noisy",
-      1: "Silent",
-    },
-  },
-  {
-    key: "health-kit",
-    label: "HealthKit",
-    unit: "",
-    color: "#e11d48",
-    platform: "ios",
-    // iOS JSON: value (generic health_kit quantity)
-    extract: (r) => (r.value as number | null) ?? null,
-  },
-  {
-    key: "health-kit/quantity",
-    label: "HealthKit Quantity",
-    unit: "",
-    color: "#be123c",
-    platform: "ios",
-    // iOS JSON: quantity or value (health_kit_quantity table)
-    extract: (r) =>
-      (r.quantity as number | null) ?? (r.value as number | null) ?? null,
-  },
-  {
-    key: "pedometer",
-    label: "Step Count",
-    unit: "steps",
-    color: "#ec4899",
-    platform: "ios",
-    // iOS JSON: step_count (plugin_ios_pedometer table)
-    extract: (r) =>
-      (r.step_count as number | null) ?? (r.steps as number | null) ?? null,
-  },
-];
-
-export function sensorsForPlatform(
-  platform: "android" | "ios",
-): SensorConfig[] {
-  return SENSOR_CONFIGS.filter(
-    (s) => s.platform === "shared" || s.platform === platform,
-  );
-}
-
-const IOS_DEVICE_SENSOR_CONFIGS: SensorConfig[] = [
-  // Shared sensors as exposed in the configurator for iPhone studies.
-  {
-    key: "battery",
-    label: "Battery Level",
-    unit: "%",
-    color: "#22c55e",
-    platform: "shared",
-    extract: (r) =>
-      firstNumber(r, ["battery_level", "level", "batteryLevel"]),
-    note: "iPhone battery values are approximate and are usually reported in 5% increments.",
+    extract: (r) => firstNumber(r, ["bt_rssi", "rssi"]),
   },
   {
     key: "calls",
@@ -258,7 +116,59 @@ const IOS_DEVICE_SENSOR_CONFIGS: SensorConfig[] = [
     unit: "event",
     color: "#f97316",
     platform: "shared",
+    extract: (r) => firstNumber(r, ["call_duration"]) ?? eventPresence(r),
+  },
+  {
+    key: "gyroscope",
+    label: "Gyroscope",
+    unit: "rad/s",
+    color: "#ef4444",
+    platform: "shared",
+    extract: vectorMagnitude,
+  },
+  {
+    key: "linear-accelerometer",
+    label: "Linear Accelerometer",
+    unit: "g",
+    color: "#84cc16",
+    platform: "shared",
+    extract: vectorMagnitude,
+    note: "Movement-only acceleration with gravity removed. Values are approximate G-force units, so a still phone should be near 0 on all axes.",
+  },
+  {
+    key: "locations",
+    label: "Location Speed",
+    unit: "m/s",
+    color: "#10b981",
+    platform: "shared",
+    extract: (r) =>
+      firstNumber(r, ["double_speed", "speed", "horizontal_accuracy"]),
+  },
+  {
+    key: "magnetometer",
+    label: "Magnetometer",
+    unit: "uT",
+    color: "#a855f7",
+    platform: "shared",
+    extract: vectorMagnitude,
+  },
+  {
+    key: "network",
+    label: "Network",
+    unit: "event",
+    color: "#0891b2",
+    platform: "shared",
     extract: eventPresence,
+    countOnly: true,
+  },
+  {
+    key: "rotation",
+    label: "Rotation",
+    unit: "rad/s",
+    color: "#f43f5e",
+    platform: "shared",
+    extract: (r) =>
+      vectorMagnitude(r) ?? magnitude(r, "roll", "pitch", "yaw"),
   },
   {
     key: "screen",
@@ -276,100 +186,26 @@ const IOS_DEVICE_SENSOR_CONFIGS: SensorConfig[] = [
     note: "Received values can differ across iOS and iPhone versions.",
   },
   {
+    key: "significant-motion",
+    label: "Significant Motion",
+    unit: "",
+    color: "#2563eb",
+    platform: "shared",
+    extract: motionState,
+    enumLabels: {
+      0: "Not moving",
+      1: "Moving",
+    },
+    note: "The chart marks state changes: moving starts at 1 and ends at 0.",
+  },
+  {
     key: "timezone",
     label: "Timezone",
     unit: "event",
     color: "#14b8a6",
     platform: "shared",
     extract: eventPresence,
-  },
-  {
-    key: "accelerometer",
-    label: "Accelerometer",
-    unit: "g",
-    color: "#f59e0b",
-    platform: "shared",
-    extract: (r) =>
-      magnitude(r, "double_values_0", "double_values_1", "double_values_2") ??
-      magnitude(r, "x", "y", "z"),
-  },
-  {
-    key: "barometer",
-    label: "Barometer",
-    unit: "hPa",
-    color: "#64748b",
-    platform: "shared",
-    extract: (r) => firstNumber(r, ["pressure", "double_values_0"]),
-  },
-  {
-    key: "bluetooth",
-    label: "Bluetooth RSSI",
-    unit: "dBm",
-    color: "#06b6d4",
-    platform: "shared",
-    extract: (r) => firstNumber(r, ["bt_rssi", "rssi"]),
-  },
-  {
-    key: "gyroscope",
-    label: "Gyroscope",
-    unit: "rad/s",
-    color: "#ef4444",
-    platform: "shared",
-    extract: (r) =>
-      magnitude(r, "double_values_0", "double_values_1", "double_values_2") ??
-      magnitude(r, "x", "y", "z"),
-  },
-  {
-    key: "linear-accelerometer",
-    label: "Linear Accelerometer",
-    unit: "g",
-    color: "#84cc16",
-    platform: "shared",
-    extract: (r) =>
-      magnitude(r, "double_values_0", "double_values_1", "double_values_2") ??
-      magnitude(r, "x", "y", "z"),
-    note: "Movement-only acceleration with gravity removed. Values are approximate G-force units, so a still phone should be near 0 on all axes.",
-  },
-  {
-    key: "locations",
-    label: "Location Speed",
-    unit: "m/s",
-    color: "#10b981",
-    platform: "shared",
-    extract: (r) => firstNumber(r, ["double_speed", "speed", "horizontal_accuracy"]),
-  },
-  {
-    key: "magnetometer",
-    label: "Magnetometer",
-    unit: "µT",
-    color: "#a855f7",
-    platform: "shared",
-    extract: (r) => magnitude(r, "x", "y", "z"),
-  },
-  {
-    key: "processor",
-    label: "Processor",
-    unit: "%",
-    color: "#475569",
-    platform: "shared",
-    extract: (r) => firstNumber(r, ["load", "processor_load", "usage", "value"]),
-  },
-  {
-    key: "rotation",
-    label: "Rotation",
-    unit: "rad/s",
-    color: "#f43f5e",
-    platform: "shared",
-    extract: (r) =>
-      magnitude(r, "x", "y", "z") ?? magnitude(r, "roll", "pitch", "yaw"),
-  },
-  {
-    key: "significant-motion",
-    label: "Significant Motion",
-    unit: "event",
-    color: "#2563eb",
-    platform: "shared",
-    extract: eventPresence,
+    countOnly: true,
   },
   {
     key: "wifi",
@@ -379,63 +215,210 @@ const IOS_DEVICE_SENSOR_CONFIGS: SensorConfig[] = [
     platform: "shared",
     extract: (r) => firstNumber(r, ["rssi", "wifi_rssi"]),
   },
+];
 
-  // iOS-only sensors and plugins as exposed in SensorData.jsx.
+export const ANDROID_SENSOR_CONFIGS: SensorConfig[] = [
   {
-    key: "contacts",
-    label: "Contacts",
-    unit: "event",
-    color: "#0891b2",
-    platform: "ios",
-    extract: eventPresence,
-  },
-  {
-    key: "fitbit",
-    label: "Fitbit",
-    unit: "event",
-    color: "#0d9488",
-    platform: "ios",
-    extract: eventPresence,
-  },
-  {
-    key: "fitbit-data",
-    label: "Fitbit Data",
-    unit: "",
-    color: "#0f766e",
-    platform: "ios",
-    extract: (r) => firstNumber(r, ["value", "steps", "heart_rate"]) ?? eventPresence(r),
-  },
-  {
-    key: "fitbit-device",
-    label: "Fitbit Device",
-    unit: "event",
-    color: "#115e59",
-    platform: "ios",
-    extract: eventPresence,
-  },
-  {
-    key: "studentlife-audio",
-    label: "Conversation",
-    unit: "event",
-    color: "#7c3aed",
-    platform: "ios",
-    extract: eventPresence,
-  },
-  {
-    key: "fused-location",
-    label: "Fused Location",
-    unit: "m",
-    color: "#16a34a",
-    platform: "ios",
-    extract: (r) => firstNumber(r, ["accuracy", "horizontal_accuracy", "speed"]) ?? eventPresence(r),
-  },
-  {
-    key: "device-usage",
-    label: "Device Usage",
+    key: "applications",
+    label: "Applications",
     unit: "event",
     color: "#9333ea",
+    platform: "android",
+    extract: eventPresence,
+    countOnly: true,
+  },
+  {
+    key: "applications-crashes",
+    label: "Application Crashes",
+    unit: "event",
+    color: "#dc2626",
+    platform: "android",
+    extract: eventPresence,
+    countOnly: true,
+  },
+  {
+    key: "applications-history",
+    label: "Application History",
+    unit: "event",
+    color: "#7c3aed",
+    platform: "android",
+    extract: eventPresence,
+    countOnly: true,
+  },
+  {
+    key: "applications-notifications",
+    label: "Application Notifications",
+    unit: "event",
+    color: "#a855f7",
+    platform: "android",
+    extract: eventPresence,
+    countOnly: true,
+  },
+  {
+    key: "esms",
+    label: "ESM/EMA",
+    unit: "event",
+    color: "#7c2d12",
+    platform: "android",
+    extract: eventPresence,
+    countOnly: true,
+  },
+  {
+    key: "gravity",
+    label: "Gravity",
+    unit: "g",
+    color: "#84cc16",
+    platform: "android",
+    extract: vectorMagnitude,
+  },
+  {
+    key: "installations",
+    label: "Installations",
+    unit: "event",
+    color: "#0284c7",
+    platform: "android",
+    extract: eventPresence,
+    countOnly: true,
+  },
+  {
+    key: "keyboard",
+    label: "Keyboard",
+    unit: "event",
+    color: "#334155",
+    platform: "android",
+    extract: eventPresence,
+    countOnly: true,
+  },
+  {
+    key: "light",
+    label: "Light",
+    unit: "lux",
+    color: "#fbbf24",
+    platform: "android",
+    extract: (r) => firstNumber(r, ["double_light_lux", "light_lux", "value"]),
+  },
+  {
+    key: "messages",
+    label: "Messages",
+    unit: "event",
+    color: "#fb923c",
+    platform: "android",
+    extract: eventPresence,
+    countOnly: true,
+  },
+  {
+    key: "network-traffic",
+    label: "Network Traffic",
+    unit: "bytes",
+    color: "#0e7490",
+    platform: "android",
+    extract: (r) =>
+      firstNumber(r, ["tx_bytes", "rx_bytes", "double_tx", "double_rx"]) ??
+      eventPresence(r),
+  },
+  {
+    key: "notes",
+    label: "Notes",
+    unit: "event",
+    color: "#ca8a04",
+    platform: "android",
+    extract: eventPresence,
+    countOnly: true,
+  },
+  {
+    key: "plugin-ambient-noise",
+    label: "Ambient Noise",
+    unit: "",
+    color: "#0ea5e9",
+    platform: "android",
+    extract: (r) =>
+      firstNumber(r, ["double_decibels", "decibels", "is_silent", "silent"]) ??
+      eventPresence(r),
+  },
+  {
+    key: "plugin-openweather",
+    label: "OpenWeather",
+    unit: "degC",
+    color: "#ca8a04",
+    platform: "android",
+    extract: (r) => firstNumber(r, ["temperature", "temp", "value"]) ?? eventPresence(r),
+  },
+  {
+    key: "proximity",
+    label: "Proximity",
+    unit: "",
+    color: "#0f766e",
+    platform: "android",
+    extract: (r) => firstNumber(r, ["distance", "near", "value"]) ?? eventPresence(r),
+  },
+  {
+    key: "screentext",
+    label: "Screen Text",
+    unit: "event",
+    color: "#1d4ed8",
+    platform: "android",
+    extract: eventPresence,
+    countOnly: true,
+  },
+  {
+    key: "telephony",
+    label: "Telephony",
+    unit: "event",
+    color: "#0f766e",
+    platform: "android",
+    extract: eventPresence,
+    countOnly: true,
+  },
+  {
+    key: "temperature",
+    label: "Temperature",
+    unit: "degC",
+    color: "#ea580c",
+    platform: "android",
+    extract: (r) => firstNumber(r, ["double_temperature", "temperature", "value"]),
+  },
+  {
+    key: "touch",
+    label: "Touch",
+    unit: "event",
+    color: "#475569",
+    platform: "android",
+    extract: eventPresence,
+    countOnly: true,
+  },
+];
+
+export const IOS_SENSOR_CONFIGS: SensorConfig[] = [
+  {
+    key: "activity",
+    label: "Activity Recognition",
+    unit: "event",
+    color: "#2563eb",
     platform: "ios",
     extract: eventPresence,
+    countOnly: true,
+  },
+  {
+    key: "ambient-noise",
+    label: "Ambient Noise",
+    unit: "",
+    color: "#0ea5e9",
+    platform: "ios",
+    extract: (r) => firstNumber(r, ["is_silent", "silent"]),
+    enumLabels: {
+      0: "Noisy",
+      1: "Silent",
+    },
+  },
+  {
+    key: "ble-heartrate",
+    label: "Heart Rate (BLE)",
+    unit: "bpm",
+    color: "#dc2626",
+    platform: "ios",
+    extract: (r) =>
+      firstNumber(r, ["heart_rate", "heartrate", "bpm", "value"]) ??
+      eventPresence(r),
   },
   {
     key: "calendar",
@@ -444,6 +427,7 @@ const IOS_DEVICE_SENSOR_CONFIGS: SensorConfig[] = [
     color: "#0284c7",
     platform: "ios",
     extract: eventPresence,
+    countOnly: true,
   },
   {
     key: "calendar-esm-scheduler",
@@ -452,15 +436,89 @@ const IOS_DEVICE_SENSOR_CONFIGS: SensorConfig[] = [
     color: "#0369a1",
     platform: "ios",
     extract: eventPresence,
+    countOnly: true,
+  },
+  {
+    key: "contacts",
+    label: "Contacts",
+    unit: "event",
+    color: "#0891b2",
+    platform: "ios",
+    extract: eventPresence,
+    countOnly: true,
+  },
+  {
+    key: "device-usage",
+    label: "Device Usage",
+    unit: "event",
+    color: "#9333ea",
+    platform: "ios",
+    extract: eventPresence,
+    countOnly: true,
+  },
+  {
+    key: "esm",
+    label: "Mobile ESM/EMA",
+    unit: "event",
+    color: "#7c2d12",
+    platform: "ios",
+    extract: eventPresence,
+    countOnly: true,
+  },
+  {
+    key: "esm-scheduler",
+    label: "ESM Scheduler",
+    unit: "event",
+    color: "#9a3412",
+    platform: "ios",
+    extract: eventPresence,
+    countOnly: true,
+  },
+  {
+    key: "fitbit",
+    label: "Fitbit",
+    unit: "event",
+    color: "#0d9488",
+    platform: "ios",
+    extract: eventPresence,
+    countOnly: true,
+  },
+  {
+    key: "fitbit-data",
+    label: "Fitbit Data",
+    unit: "",
+    color: "#0f766e",
+    platform: "ios",
+    extract: (r) =>
+      firstNumber(r, ["value", "steps", "heart_rate"]) ?? eventPresence(r),
+  },
+  {
+    key: "fitbit-device",
+    label: "Fitbit Device",
+    unit: "event",
+    color: "#115e59",
+    platform: "ios",
+    extract: eventPresence,
+    countOnly: true,
+  },
+  {
+    key: "fused-location",
+    label: "Fused Location",
+    unit: "m",
+    color: "#16a34a",
+    platform: "ios",
+    extract: (r) =>
+      firstNumber(r, ["accuracy", "horizontal_accuracy", "speed"]) ??
+      eventPresence(r),
   },
   {
     key: "headphone-motion",
     label: "Headphone Motion",
-    unit: "m/s²",
+    unit: "m/s^2",
     color: "#db2777",
     platform: "ios",
     extract: (r) =>
-      magnitude(r, "x", "y", "z") ??
+      vectorMagnitude(r) ??
       magnitude(r, "acceleration_x", "acceleration_y", "acceleration_z") ??
       eventPresence(r),
   },
@@ -479,6 +537,7 @@ const IOS_DEVICE_SENSOR_CONFIGS: SensorConfig[] = [
     color: "#fb7185",
     platform: "ios",
     extract: eventPresence,
+    countOnly: true,
   },
   {
     key: "health-kit/quantity",
@@ -494,15 +553,25 @@ const IOS_DEVICE_SENSOR_CONFIGS: SensorConfig[] = [
     unit: "event",
     color: "#9f1239",
     platform: "ios",
-    extract: (r) => firstNumber(r, ["duration", "distance", "energy"]) ?? eventPresence(r),
+    extract: (r) =>
+      firstNumber(r, ["duration", "distance", "energy"]) ?? eventPresence(r),
   },
   {
-    key: "ble-heartrate",
-    label: "Heart Rate (BLE)",
-    unit: "bpm",
-    color: "#dc2626",
+    key: "location-visit",
+    label: "Location Visit",
+    unit: "event",
+    color: "#15803d",
     platform: "ios",
-    extract: (r) => firstNumber(r, ["heart_rate", "heartrate", "bpm", "value"]) ?? eventPresence(r),
+    extract: eventPresence,
+    countOnly: true,
+  },
+  {
+    key: "memory",
+    label: "Memory",
+    unit: "",
+    color: "#475569",
+    platform: "ios",
+    extract: (r) => firstNumber(r, ["used", "free", "total", "value"]) ?? eventPresence(r),
   },
   {
     key: "ntptime",
@@ -510,7 +579,17 @@ const IOS_DEVICE_SENSOR_CONFIGS: SensorConfig[] = [
     unit: "ms",
     color: "#4f46e5",
     platform: "ios",
-    extract: (r) => firstNumber(r, ["offset", "delay", "latency", "value"]) ?? eventPresence(r),
+    extract: (r) =>
+      firstNumber(r, ["offset", "delay", "latency", "value"]) ??
+      eventPresence(r),
+  },
+  {
+    key: "openweather",
+    label: "OpenWeather",
+    unit: "degC",
+    color: "#ca8a04",
+    platform: "ios",
+    extract: (r) => firstNumber(r, ["temperature", "temp", "value"]) ?? eventPresence(r),
   },
   {
     key: "pedometer",
@@ -523,55 +602,49 @@ const IOS_DEVICE_SENSOR_CONFIGS: SensorConfig[] = [
       eventPresence(r),
   },
   {
+    key: "processor",
+    label: "Processor",
+    unit: "%",
+    color: "#475569",
+    platform: "ios",
+    extract: (r) => firstNumber(r, ["load", "processor_load", "usage", "value"]),
+  },
+  {
     key: "push-notification",
     label: "Push Notification",
-    unit: "",
+    unit: "event",
     color: "#ea580c",
     platform: "ios",
     extract: eventPresence,
     countOnly: true,
   },
   {
-    key: "ambient-noise",
-    label: "Ambient Noise",
-    unit: "",
-    color: "#0ea5e9",
-    platform: "ios",
-    extract: (r) => firstNumber(r, ["is_silent", "silent"]),
-    enumLabels: {
-      0: "Noisy",
-      1: "Silent",
-    },
-  },
-  {
-    key: "openweather",
-    label: "OpenWeather",
-    unit: "°C",
-    color: "#ca8a04",
-    platform: "ios",
-    extract: (r) => firstNumber(r, ["temperature", "temp", "value"]) ?? eventPresence(r),
-  },
-  {
-    key: "esm",
-    label: "Mobile ESM/EMA",
+    key: "studentlife-audio",
+    label: "Conversation",
     unit: "event",
-    color: "#7c2d12",
+    color: "#7c3aed",
     platform: "ios",
     extract: eventPresence,
-  },
-  {
-    key: "esm-scheduler",
-    label: "ESM Scheduler",
-    unit: "event",
-    color: "#9a3412",
-    platform: "ios",
-    extract: eventPresence,
+    countOnly: true,
   },
 ];
+
+export const SENSOR_CONFIGS: SensorConfig[] = [
+  ...SHARED_SENSOR_CONFIGS,
+  ...ANDROID_SENSOR_CONFIGS,
+  ...IOS_SENSOR_CONFIGS,
+];
+
+export function sensorsForPlatform(
+  platform: "android" | "ios",
+): SensorConfig[] {
+  return SENSOR_CONFIGS.filter(
+    (s) => s.platform === "shared" || s.platform === platform,
+  );
+}
 
 export function deviceSensorsForPlatform(
   platform: "android" | "ios",
 ): SensorConfig[] {
-  if (platform === "ios") return IOS_DEVICE_SENSOR_CONFIGS;
   return sensorsForPlatform(platform);
 }

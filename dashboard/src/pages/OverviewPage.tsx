@@ -1,6 +1,11 @@
 import { useEffect, useState } from "react";
 import { exportAllHref, fetchDevices, fetchSensor } from "../api/client";
-import { SENSOR_CONFIGS } from "../config/sensors";
+import {
+  ANDROID_SENSOR_CONFIGS,
+  IOS_SENSOR_CONFIGS,
+  SENSOR_CONFIGS,
+  SHARED_SENSOR_CONFIGS,
+} from "../config/sensors";
 import SensorStatCard from "../components/SensorStatCard";
 import WifiRecordsCard from "../components/WifiRecordsCard";
 import ExportLink from "../components/ExportLink";
@@ -13,6 +18,7 @@ type SensorData = Record<
 
 const REFRESH_INTERVAL_MS = 60000;
 const CLOCK_INTERVAL_MS = 10000;
+const SENSOR_FILTER_STORAGE_KEY = "aware-dashboard-hide-empty-sensors";
 
 function deviceLabel(device: Device): string {
   if (device.platform === "android") {
@@ -43,11 +49,25 @@ function uploadAgeLabel(timestamp: number, now: number): string {
   return `${Math.floor(diff / 86400)}d ago`;
 }
 
+function readHideEmptySensors(): boolean {
+  return window.localStorage.getItem(SENSOR_FILTER_STORAGE_KEY) === "true";
+}
+
+function recordsForSensor(
+  sensorData: SensorData,
+  key: string,
+): { android: SensorRecord[]; ios: SensorRecord[] } {
+  return sensorData[key] ?? { android: [], ios: [] };
+}
+
 export default function OverviewPage() {
   const [devices, setDevices] = useState<DevicesResponse | null>(null);
   const [sensorData, setSensorData] = useState<SensorData>({});
   const [loadingKeys, setLoadingKeys] = useState<Set<string>>(
     new Set(SENSOR_CONFIGS.map((s) => s.key)),
+  );
+  const [hideEmptySensors, setHideEmptySensors] = useState(
+    readHideEmptySensors,
   );
   const [error, setError] = useState<string | null>(null);
   const [now, setNow] = useState(() => Date.now());
@@ -69,21 +89,29 @@ export default function OverviewPage() {
         setError(null);
 
         for (const sensor of SENSOR_CONFIGS) {
+          const fetchAndroid =
+            sensor.platform === "shared" || sensor.platform === "android";
+          const fetchIos =
+            sensor.platform === "shared" || sensor.platform === "ios";
           const [androidResults, iosResults] = await Promise.all([
-            Promise.all(
-              loadedDevices.android.map((d) =>
-                fetchSensor("android", d.device_id, sensor.key).catch(
-                  () => [] as SensorRecord[],
-                ),
-              ),
-            ),
-            Promise.all(
-              loadedDevices.ios.map((d) =>
-                fetchSensor("ios", d.device_id, sensor.key).catch(
-                  () => [] as SensorRecord[],
-                ),
-              ),
-            ),
+            fetchAndroid
+              ? Promise.all(
+                  loadedDevices.android.map((d) =>
+                    fetchSensor("android", d.device_id, sensor.key).catch(
+                      () => [] as SensorRecord[],
+                    ),
+                  ),
+                )
+              : Promise.resolve([] as SensorRecord[][]),
+            fetchIos
+              ? Promise.all(
+                  loadedDevices.ios.map((d) =>
+                    fetchSensor("ios", d.device_id, sensor.key).catch(
+                      () => [] as SensorRecord[],
+                    ),
+                  ),
+                )
+              : Promise.resolve([] as SensorRecord[][]),
           ]);
 
           if (cancelled) return;
@@ -127,6 +155,13 @@ export default function OverviewPage() {
     };
   }, []);
 
+  useEffect(() => {
+    window.localStorage.setItem(
+      SENSOR_FILTER_STORAGE_KEY,
+      String(hideEmptySensors),
+    );
+  }, [hideEmptySensors]);
+
   const allDevices = devices ? [...devices.android, ...devices.ios] : [];
   const latestUpload = allDevices.reduce<Device | null>((latest, device) => {
     if (!latest) return device;
@@ -140,6 +175,26 @@ export default function OverviewPage() {
     if (devices) return "No uploads yet";
     return "Checking uploads...";
   })();
+  const hasSensorRecords = (key: string) => {
+    const records = recordsForSensor(sensorData, key);
+    return records.android.length + records.ios.length > 0;
+  };
+  const shouldShowSensor = (key: string) =>
+    !hideEmptySensors || loadingKeys.has(key) || hasSensorRecords(key);
+  const visibleSections = [
+    { title: "Shared", sensors: SHARED_SENSOR_CONFIGS },
+    { title: "Android only", sensors: ANDROID_SENSOR_CONFIGS },
+    { title: "iPhone only", sensors: IOS_SENSOR_CONFIGS },
+  ]
+    .map((section) => ({
+      ...section,
+      sensors: section.sensors.filter((sensor) => shouldShowSensor(sensor.key)),
+    }))
+    .filter((section) => !hideEmptySensors || section.sensors.length > 0);
+  const visibleSensorCount = visibleSections.reduce(
+    (sum, section) => sum + section.sensors.length,
+    0,
+  );
   if (error)
     return (
       <div className="mt-4 p-4 text-red-700 bg-red-50 border border-red-200 rounded-2xl">
@@ -188,37 +243,65 @@ export default function OverviewPage() {
         </div>
       </section>
 
-      <div className="grid auto-rows-[220px] grid-cols-[repeat(auto-fill,minmax(340px,1fr))] gap-4 mt-4">
-        {SENSOR_CONFIGS.map((config) => (
-          config.key === "wifi" ? (
-            <WifiRecordsCard
-              key={config.key}
-              groups={[
-                {
-                  label: "Android",
-                  records: sensorData[config.key]?.android ?? [],
-                },
-                {
-                  label: "iOS",
-                  records: sensorData[config.key]?.ios ?? [],
-                },
-              ]}
-              loading={loadingKeys.has(config.key)}
-              className="h-full overflow-hidden"
-              tableClassName="max-h-[138px]"
-            />
-          ) : (
-            <SensorStatCard
-              key={config.key}
-              config={config}
-              androidRecords={sensorData[config.key]?.android ?? []}
-              iosRecords={sensorData[config.key]?.ios ?? []}
-              loading={loadingKeys.has(config.key)}
-              className="h-full overflow-hidden"
-            />
-          )
-        ))}
+      <div className="mb-3 flex flex-col gap-2 px-1 sm:flex-row sm:items-center sm:justify-between">
+        <div className="text-[11px] font-semibold uppercase tracking-[0.6px] text-sage">
+          Sensors
+        </div>
+        <label className="flex cursor-pointer items-center gap-2 self-start rounded-xl border border-wire bg-card px-3 py-2 text-[12px] font-semibold text-ink shadow-card sm:self-auto">
+          <input
+            type="checkbox"
+            checked={hideEmptySensors}
+            onChange={(event) => setHideEmptySensors(event.target.checked)}
+            className="h-4 w-4 accent-teal"
+          />
+          Only sensors with records
+        </label>
       </div>
+
+      {visibleSensorCount === 0 && hideEmptySensors ? (
+        <div className="rounded-2xl border border-wire bg-card p-6 text-center text-[13px] text-sage shadow-card">
+          No sensors have records yet.
+        </div>
+      ) : null}
+
+      {visibleSections.map((section) => (
+        <section key={section.title} className="mt-5">
+          <div className="mb-2 px-1 text-[11px] font-semibold uppercase tracking-[0.6px] text-sage">
+            {section.title}
+          </div>
+          <div className="grid auto-rows-[220px] grid-cols-[repeat(auto-fill,minmax(340px,1fr))] gap-4">
+            {section.sensors.map((config) =>
+              config.key === "wifi" ? (
+                <WifiRecordsCard
+                  key={config.key}
+                  groups={[
+                    {
+                      label: "Android",
+                      records: sensorData[config.key]?.android ?? [],
+                    },
+                    {
+                      label: "iOS",
+                      records: sensorData[config.key]?.ios ?? [],
+                    },
+                  ]}
+                  loading={loadingKeys.has(config.key)}
+                  className="h-full overflow-hidden"
+                  tableClassName="max-h-[138px]"
+                />
+              ) : (
+                <SensorStatCard
+                  key={config.key}
+                  config={config}
+                  androidRecords={sensorData[config.key]?.android ?? []}
+                  iosRecords={sensorData[config.key]?.ios ?? []}
+                  loading={loadingKeys.has(config.key)}
+                  className="h-full overflow-hidden"
+                />
+              ),
+            )}
+          </div>
+        </section>
+      ))}
     </div>
   );
 }
