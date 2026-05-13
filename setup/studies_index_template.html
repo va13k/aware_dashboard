@@ -75,11 +75,13 @@
         display: flex;
         flex-wrap: nowrap;
         justify-content: center;
-        align-items: center;
+        align-items: stretch;
         gap: 18px;
       }
 
       .card {
+        flex: 1 1 0;
+        min-width: 0;
         padding: 24px;
         border-radius: 24px;
         background: var(--surface);
@@ -97,6 +99,29 @@
         margin: 0 0 16px;
         color: var(--muted);
         line-height: 1.65;
+      }
+
+      .steps-list {
+        margin: 0 0 18px;
+        padding-left: 20px;
+        color: var(--muted);
+        line-height: 1.65;
+      }
+
+      .steps-list li {
+        margin-bottom: 10px;
+      }
+
+      .steps-list strong {
+        color: var(--text);
+      }
+
+      .steps-list a {
+        overflow-wrap: anywhere;
+      }
+
+      .final-note {
+        margin-top: 22px;
       }
 
       .actions {
@@ -245,7 +270,7 @@
         border: 1px solid var(--border);
       }
 
-      @media (max-width: 600px) {
+      @media (max-width: 760px) {
         .grid {
           flex-direction: column;
           align-items: stretch;
@@ -259,37 +284,61 @@
         <p class="eyebrow">AWARE Dashboard</p>
         <h1>Studies</h1>
         <p class="subtitle">
-          Share the Android join URL with Android participants and the iOS join
-          URL with iOS participants.
+          Install the AWARE Client, name the device exactly as the study
+          instructor says, then join with the platform-specific URL below.
         </p>
       </section>
 
       <section class="grid">
         <article class="card">
-          <h2>Android join URL</h2>
-          <p>
-            Copy this URL and paste it into the AWARE Android app to enrol
-            participants in the study.
-          </p>
+          <h2>Android participants</h2>
+          <ol class="steps-list">
+            <li>
+              Download the AWARE Android client:
+              <a
+                href="https://github.com/awareframework/aware-client/releases/download/4.2.1.light.bundle/aware-phone-armeabi-v7a-release.apk"
+                >aware-phone-armeabi-v7a-release.apk</a
+              >.
+            </li>
+            <li>
+              Copy the Android join URL below and paste it into the AWARE app.
+            </li>
+            <li>
+              Name the device exactly as the study instructor tells you.
+            </li>
+          </ol>
           <div class="copy-box" data-copy-id="android-join-url">
             <code id="android-join-url" data-path="{{ANDROID_JOIN_URL}}"
               >{{ANDROID_JOIN_URL}}</code
             >
-            <span class="copy-hint">Click to copy</span>
+            <span class="copy-hint">Android join URL - click to copy</span>
           </div>
         </article>
 
         <article class="card">
-          <h2>iOS join URL</h2>
-          <p>
-            Share this URL with iOS participants or let them scan the QR code
-            below with the AWARE iOS app.
-          </p>
+          <h2>iPhone participants</h2>
+          <ol class="steps-list">
+            <li>
+              Install AWARE Client V2 from the App Store:
+              <a href="https://apps.apple.com/us/app/aware-client-v2/id1455986181"
+                >AWARE Client V2</a
+              >.
+            </li>
+            <li>
+              Before joining, enter the device name in the app's
+              <strong>Device Field</strong> exactly as the study instructor
+              tells you.
+            </li>
+            <li>
+              Join the study by scanning the QR code or copying the iOS join URL
+              below into the app's <strong>Study URL</strong> field.
+            </li>
+          </ol>
           <div class="copy-box" data-copy-id="ios-join-url">
             <code id="ios-join-url" data-path="{{STUDY_JOIN_PATH}}"
               >{{STUDY_JOIN_PATH}}</code
             >
-            <span class="copy-hint">Click to copy</span>
+            <span class="copy-hint">iOS join URL - click to copy</span>
           </div>
           <img
             id="ios-qrcode"
@@ -300,6 +349,10 @@
           />
         </article>
       </section>
+
+      <p class="subtitle final-note">
+        After joining the study, follow the study instructor's next steps.
+      </p>
 
       <div class="actions page-actions">
         <a class="button button-secondary" href="/">Back to main page</a>
