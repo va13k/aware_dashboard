@@ -6,6 +6,7 @@
 .htpasswd
 nginx/auth/.htpasswd
 setup/.wizard_url
+deployment-urls.json
 
 # Studies - generated at runtime, not source code
 studies/

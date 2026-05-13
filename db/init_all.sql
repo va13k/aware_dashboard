@@ -104,6 +104,8 @@ CREATE TABLE IF NOT EXISTS `aware_device` (
   KEY `time_device` (`timestamp`,`device_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+GRANT SELECT, UPDATE ON aware_android.aware_device TO 'aware_android_participant'@'%';
+
 CREATE TABLE IF NOT EXISTS `aware_log` (
   `_id` bigint unsigned NOT NULL AUTO_INCREMENT,
   `timestamp` double DEFAULT '0',
@@ -804,11 +806,12 @@ CREATE TABLE IF NOT EXISTS `processor` (`_id` INT UNSIGNED AUTO_INCREMENT PRIMAR
 CREATE TABLE IF NOT EXISTS `rotation` (`_id` INT UNSIGNED AUTO_INCREMENT PRIMARY KEY, `timestamp` DOUBLE NOT NULL, `device_id` VARCHAR(128) NOT NULL, `data` JSON NOT NULL, INDEX `timestamp_device` (`timestamp`, `device_id`));
 CREATE TABLE IF NOT EXISTS `screen` (`_id` INT UNSIGNED AUTO_INCREMENT PRIMARY KEY, `timestamp` DOUBLE NOT NULL, `device_id` VARCHAR(128) NOT NULL, `data` JSON NOT NULL, INDEX `timestamp_device` (`timestamp`, `device_id`));
 CREATE TABLE IF NOT EXISTS `significant_motion` (`_id` INT UNSIGNED AUTO_INCREMENT PRIMARY KEY, `timestamp` DOUBLE NOT NULL, `device_id` VARCHAR(128) NOT NULL, `data` JSON NOT NULL, INDEX `timestamp_device` (`timestamp`, `device_id`));
+CREATE TABLE IF NOT EXISTS `sensor_wifi` (`_id` INT UNSIGNED AUTO_INCREMENT PRIMARY KEY, `timestamp` DOUBLE NOT NULL, `device_id` VARCHAR(128) NOT NULL, `data` JSON NOT NULL, INDEX `timestamp_device` (`timestamp`, `device_id`));
 CREATE TABLE IF NOT EXISTS `timezone` (`_id` INT UNSIGNED AUTO_INCREMENT PRIMARY KEY, `timestamp` DOUBLE NOT NULL, `device_id` VARCHAR(128) NOT NULL, `data` JSON NOT NULL, INDEX `timestamp_device` (`timestamp`, `device_id`));
-CREATE TABLE IF NOT EXISTS `wifi` (`_id` INT UNSIGNED AUTO_INCREMENT PRIMARY KEY, `timestamp` DOUBLE NOT NULL, `device_id` VARCHAR(128) NOT NULL, `data` JSON NOT NULL, INDEX `timestamp_device` (`timestamp`, `device_id`));
 
 -- System / device tables
 CREATE TABLE IF NOT EXISTS `aware_device` (`_id` INT UNSIGNED AUTO_INCREMENT PRIMARY KEY, `timestamp` DOUBLE NOT NULL, `device_id` VARCHAR(128) NOT NULL, `data` JSON NOT NULL, INDEX `timestamp_device` (`timestamp`, `device_id`));
+GRANT SELECT, UPDATE ON aware_ios.aware_device TO 'aware_ios_participant'@'%';
 CREATE TABLE IF NOT EXISTS `aware_debug` (`_id` INT UNSIGNED AUTO_INCREMENT PRIMARY KEY, `timestamp` DOUBLE NOT NULL, `device_id` VARCHAR(128) NOT NULL, `data` JSON NOT NULL, INDEX `timestamp_device` (`timestamp`, `device_id`));
 CREATE TABLE IF NOT EXISTS `basic_settings` (`_id` INT UNSIGNED AUTO_INCREMENT PRIMARY KEY, `timestamp` DOUBLE NOT NULL, `device_id` VARCHAR(128) NOT NULL, `data` JSON NOT NULL, INDEX `timestamp_device` (`timestamp`, `device_id`));
 CREATE TABLE IF NOT EXISTS `labels` (`_id` INT UNSIGNED AUTO_INCREMENT PRIMARY KEY, `timestamp` DOUBLE NOT NULL, `device_id` VARCHAR(128) NOT NULL, `data` JSON NOT NULL, INDEX `timestamp_device` (`timestamp`, `device_id`));

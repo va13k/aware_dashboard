@@ -27,6 +27,36 @@ deploy_stack() {
     python3 setup/init_android_tables.py --docker-prefix sudo
 }
 
+print_deployment_links() {
+    if [ ! -f deployment-urls.json ]; then
+        return 0
+    fi
+
+    python3 - <<'PY'
+import json
+from pathlib import Path
+
+labels = [
+    ("App", "app_url"),
+    ("Dashboard", "dashboard_url"),
+    ("Configurator", "configurator_url"),
+    ("Study links", "studies_url"),
+]
+
+try:
+    urls = json.loads(Path("deployment-urls.json").read_text(encoding="utf-8"))
+except Exception:
+    urls = {}
+
+if urls:
+    print("  Access links:")
+    for label, key in labels:
+        value = urls.get(key)
+        if value:
+            print(f"    {label}: {value}")
+PY
+}
+
 start_stack_only() {
     sudo docker compose up --build -d
     python3 setup/init_android_tables.py --docker-prefix sudo
@@ -87,6 +117,7 @@ if [ "$HAS_ENV" -eq 1 ] && [ "$HAS_MICRO_CONFIG" -eq 1 ]; then
         deploy_stack
         echo ""
         echo "  All services are starting."
+        print_deployment_links
         echo "  Run 'sudo docker compose ps' to check status."
         echo "  Run 'sudo docker compose logs -f' to see logs."
         echo ""
@@ -168,6 +199,7 @@ fi
 
 echo ""
 echo "  All services are starting."
+print_deployment_links
 echo "  Run 'sudo docker compose ps' to check status."
 echo "  Run 'sudo docker compose logs -f' to see logs."
 echo ""

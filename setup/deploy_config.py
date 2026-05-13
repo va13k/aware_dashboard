@@ -139,6 +139,17 @@ def build_study_join_urls(
     return base_url, study_join_path, study_join_url
 
 
+def build_deployment_urls(base_url: str, study_join_url: str, android_join_url: str) -> dict[str, str]:
+    return {
+        "app_url": base_url,
+        "dashboard_url": f"{base_url}/dashboard/",
+        "configurator_url": f"{base_url}/configurator/",
+        "studies_url": f"{base_url}/studies/",
+        "android_join_url": android_join_url,
+        "ios_join_url": study_join_url,
+    }
+
+
 def render_android_study_link() -> str:
     if not STUDY_CONFIG_PATH.exists():
         return '<p class="note">The Android study config has not been generated yet.</p>'
@@ -172,6 +183,13 @@ def write_studies_index(
 ) -> None:
     STUDIES_INDEX_PATH.write_text(
         build_studies_index(base_url, study_join_path, study_join_url, android_join_url),
+        encoding="utf-8",
+    )
+
+
+def write_deployment_urls(urls: dict[str, str]) -> None:
+    (PROJECT / "deployment-urls.json").write_text(
+        json.dumps(urls, indent=2) + "\n",
         encoding="utf-8",
     )
 
@@ -224,6 +242,7 @@ def main() -> None:
     study_join_path = f"/{study['study_number']}/{study['study_key']}"
     study_join_url = f"{base_url}{study_join_path}"
     write_studies_index(base_url, study_join_path, study_join_url, android_study_url)
+    write_deployment_urls(build_deployment_urls(base_url, study_join_url, android_study_url))
 
 
 if __name__ == "__main__":

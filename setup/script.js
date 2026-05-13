@@ -4,7 +4,8 @@ var step = 0,
   suggestedPublicHost = "",
   customPublicHost = "",
   hasExistingResearcherAuth = false,
-  researcherCredentials = null;
+  researcherCredentials = null,
+  deploymentUrls = null;
 
 function getSelectedHost() {
   return (document.getElementById("publicHost").value || "").trim();
@@ -176,6 +177,7 @@ function restart() {
     "Writing configuration and starting containers.";
   document.getElementById("errorDetail").classList.add("hidden");
   document.getElementById("editBtn").classList.add("hidden");
+  document.getElementById("credentialsBox").classList.add("hidden");
 
   var bars = document.querySelectorAll(".steps span");
   for (var i = 0; i < bars.length; i++) {
@@ -288,7 +290,8 @@ function getReachabilityBaseUrl() {
 
 function finishDeployment() {
   var baseUrl = getBaseUrl();
-  var mainPageUrl = baseUrl + "/";
+  var urls = deploymentUrls || {};
+  var mainPageUrl = urls.app_url || baseUrl + "/";
   document.getElementById("statusIcon").className = "status-icon success";
   document.getElementById("statusIcon").innerHTML =
     '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#33B5E5" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>';
@@ -302,7 +305,7 @@ function finishDeployment() {
       "\nPassword: " +
       researcherCredentials.password;
     document.getElementById("statusDesc").textContent =
-      "Services are ready. Save the credentials above, then visit the main page.";
+      "Services are ready. Save the credentials above. Redirecting to the main page.";
   } else {
     document.getElementById("statusDesc").textContent =
       "Services are ready. Redirecting to the main page.";
@@ -391,6 +394,7 @@ function deploy() {
           username: d.researcher_username || "",
           password: d.researcher_password || "",
         };
+        deploymentUrls = d.urls || null;
         document.getElementById("statusTitle").textContent =
           "Starting services...";
         document.getElementById("statusDesc").textContent =

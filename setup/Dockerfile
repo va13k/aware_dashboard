@@ -6,6 +6,7 @@ COPY script.js /wizard/script.js
 COPY style.css /wizard/style.css
 COPY server.py /wizard/server.py
 COPY deploy.sh /wizard/cgi-bin/deploy
+COPY deploy_response.py /wizard/deploy_response.py
 COPY deploy_config.py /wizard/deploy_config.py
 COPY write_request_env.py /wizard/write_request_env.py
 COPY studies_index_template.html /wizard/studies_index_template.html

@@ -66,6 +66,7 @@ if "%HAS_ENV%"=="1" if "%HAS_MICRO_CONFIG%"=="1" (
         call :deploy_stack
         echo.
         echo   All services are starting.
+        call :print_deployment_links
         echo   Run 'docker compose ps' to check status.
         echo   Run 'docker compose logs -f' to see logs.
         echo.
@@ -164,6 +165,7 @@ if not errorlevel 1 (
 
 echo.
 echo   All services are starting.
+call :print_deployment_links
 echo   Run 'docker compose ps' to check status.
 echo   Run 'docker compose logs -f' to see logs.
 echo.
@@ -173,12 +175,19 @@ exit /b 0
 
 :deploy_stack
 if not exist studies mkdir studies
-if not exist aware-micro-server\cache mkdir aware-micro-server\cache aware-micro-server\esm
+if not exist aware-micro-server\cache mkdir aware-micro-server\cache
+if not exist aware-micro-server\esm mkdir aware-micro-server\esm
 %PYTHON% setup\deploy_config.py
 if errorlevel 1 exit /b 1
 docker compose up --build -d
 if errorlevel 1 exit /b 1
 %PYTHON% setup\init_android_tables.py
+exit /b 0
+
+
+:print_deployment_links
+if not exist deployment-urls.json exit /b 0
+%PYTHON% -c "import json,pathlib; p=pathlib.Path('deployment-urls.json'); urls=json.loads(p.read_text(encoding='utf-8')) if p.exists() else {}; labels=[('App','app_url'),('Dashboard','dashboard_url'),('Configurator','configurator_url'),('Study links','studies_url')]; print('  Access links:') if urls else None; [print(f'    {label}: {urls[key]}') for label,key in labels if urls.get(key)]"
 exit /b 0
 
 
@@ -193,7 +202,7 @@ if not errorlevel 1 (
     exit /b 0
 )
 set /a _hi+=1
-if !_hi! geq 90 (
+if !_hi! geq 180 (
     echo   Services are still starting. The setup wizard will remain open.
     echo   Run 'docker compose ps' to check status.
     exit /b 1

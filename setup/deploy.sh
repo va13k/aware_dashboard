@@ -92,5 +92,6 @@ if [ -f /project/.env ]; then
 fi
 
 printf "Content-Type: application/json\r\n\r\n"
-printf '{"success":true,"researcher_username":"%s","researcher_password":"%s"}' \
-    "$RESEARCHER_USERNAME" "$RESEARCHER_PASSWORD"
+RESEARCHER_USERNAME="$RESEARCHER_USERNAME" \
+RESEARCHER_PASSWORD="$RESEARCHER_PASSWORD" \
+python3 /wizard/deploy_response.py
