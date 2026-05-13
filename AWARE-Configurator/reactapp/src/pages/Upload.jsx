@@ -266,6 +266,9 @@ export default function Upload() {
           break;
         case "status_calls":
           communicationData.calls = value;
+          if (value) {
+            sensorData.sensor_communication = true;
+          }
           break;
         case "status_messages":
           communicationData.messages = value;

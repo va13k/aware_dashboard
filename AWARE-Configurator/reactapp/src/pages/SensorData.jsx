@@ -126,6 +126,14 @@ export default function SensorData() {
     });
   };
 
+  function AndroidOnlyNote() {
+    return (
+      <p className="explanation">
+        Android only feature.
+      </p>
+    );
+  }
+
   // eslint-disable-next-line react/no-unstable-nested-components
   function TextReader() {
     return (
@@ -276,15 +284,6 @@ export default function SensorData() {
       <Grid container rowSpacing={1} columnSpacing={{ xs: 1, sm: 2, md: 3 }}>
         <Grid width="10%" />
         <Grid width="70%">
-          <p style={{ fontSize: "0.7rem", fontWeight: 700, color: "#666", textTransform: "uppercase", letterSpacing: "0.08em", margin: "8px 0 2px", borderBottom: "1px solid #e0e0e0", paddingBottom: 2 }}>Android &amp; iPhone</p>
-          <SensorComponent
-            sensorName="Calls sensor"
-            sensorDescription="Activate or deactivate calls sensor."
-            stateField={communicationData.calls}
-            field="calls"
-            modeState="communication"
-          />
-
           <p style={{ fontSize: "0.7rem", fontWeight: 700, color: "#666", textTransform: "uppercase", letterSpacing: "0.08em", margin: "12px 0 2px", borderBottom: "1px solid #e0e0e0", paddingBottom: 2 }}>Android only</p>
           <SensorComponent
             sensorName="Communication events"
@@ -295,7 +294,7 @@ export default function SensorData() {
           />
 
           <SensorComponent
-            sensorName="Text messages sensor"
+            sensorName="Status messages sensor"
             sensorDescription="Activate or deactivate messages sensor."
             stateField={communicationData.messages}
             field="messages"
@@ -355,6 +354,7 @@ export default function SensorData() {
             modeState="accelerometer"
           />
 
+          <AndroidOnlyNote />
           <SensorComponent
             sensorName="Frequency accelerometer enforce"
             sensorDescription="Enforce sampling rate"
@@ -395,6 +395,7 @@ export default function SensorData() {
             modeState="barometer"
           />
 
+          <AndroidOnlyNote />
           <SensorComponent
             sensorName="Frequency barometer enforce"
             sensorDescription="Enforce the frequency"
@@ -456,6 +457,7 @@ export default function SensorData() {
             modeState="gravity"
           />
 
+          <AndroidOnlyNote />
           <SensorComponent
             sensorName="Frequency gravity enforce"
             sensorDescription="Enforce the frequency"
@@ -496,6 +498,7 @@ export default function SensorData() {
             modeState="gyroscope"
           />
 
+          <AndroidOnlyNote />
           <SensorComponent
             sensorName="Frequency gyroscope enforce"
             sensorDescription="Enforce the frequency"
@@ -536,6 +539,7 @@ export default function SensorData() {
             modeState="light"
           />
 
+          <AndroidOnlyNote />
           <SensorComponent
             sensorName="Frequency light enforce"
             sensorDescription="Enforce the frequency"
@@ -576,6 +580,7 @@ export default function SensorData() {
             modeState="linearAccelerometer"
           />
 
+          <AndroidOnlyNote />
           <SensorComponent
             sensorName="Frequency linear accelerometer enforce"
             sensorDescription="Enforce the frequency"
@@ -715,6 +720,7 @@ export default function SensorData() {
             modeState="magnetometer"
           />
 
+          <AndroidOnlyNote />
           <SensorComponent
             sensorName="Frequency magnetometer enforce"
             sensorDescription="Enforce the frequency"
@@ -777,7 +783,7 @@ export default function SensorData() {
             title="Frequency processor"
             inputLabel="frequency in seconds"
             defaultNum={10}
-            description="Frequency in seconds to update the processor load, by default is 10 seconds."
+            description="Frequency in seconds to update the processor load. Android receives this value in seconds; iPhone config receives the same interval converted to microseconds."
             field="frequency_processor"
             studyField={processorData.frequency_processor}
             modeState="processor"
@@ -816,6 +822,7 @@ export default function SensorData() {
             modeState="proximity"
           />
 
+          <AndroidOnlyNote />
           <SensorComponent
             sensorName="Frequency proximity enforce"
             sensorDescription="Enforce the frequency"
@@ -856,6 +863,7 @@ export default function SensorData() {
             modeState="rotation"
           />
 
+          <AndroidOnlyNote />
           <SensorComponent
             sensorName="Frequency rotation enforce"
             sensorDescription="Enforce the frequency"
@@ -896,6 +904,7 @@ export default function SensorData() {
             modeState="temperature"
           />
 
+          <AndroidOnlyNote />
           <SensorComponent
             sensorName="Frequency temperature enforce"
             sensorDescription="Enforce the frequency"
@@ -916,10 +925,10 @@ export default function SensorData() {
         <Grid width="70%">
           <FrequencyField
             id="frequency_wifi"
-            title="Frequency wi-fi"
-            inputLabel="frequency in microseconds"
+            title="Frequency Wi-Fi (seconds)"
+            inputLabel="frequency in seconds"
             defaultNum={60}
-            description="How often to scan for devices, in seconds (default = 60 seconds)."
+            description=""
             field="frequency_wifi"
             studyField={wifiData.frequency_wifi}
             modeState="wifi"
@@ -1709,8 +1718,8 @@ export default function SensorData() {
             modeState="sensor"
           />
           <SensorComponent
-            sensorName="Communication"
-            sensorDescription="Communication events such as calls and messages, performed by or received by the user."
+            sensorName="Communication (Calls)"
+            sensorDescription="Call events on iPhone and Android. Android-only communication events and text messages can be controlled below."
             stateField={sensorData.sensor_communication}
             field="sensor_communication"
             modeState="sensor"

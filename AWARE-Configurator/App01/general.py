@@ -264,7 +264,10 @@ def sync_shared_sensors_from_android_settings(source, android_settings):
         ["status_network_events", "status_network_traffic"],
     )
     _sync_ios_compound_sensor(
-        ios_sensors, android_settings, "communication", ["status_calls", "status_messages"]
+        ios_sensors,
+        android_settings,
+        "communication",
+        ["communication", "status_calls", "status_messages"],
     )
     _sync_ios_compound_sensor(ios_sensors, android_settings, "locations", ["status_location_gps"])
 

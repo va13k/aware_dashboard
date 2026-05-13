@@ -456,7 +456,9 @@ export default function Main() {
         },
         {
           setting: "status_calls",
-          value: communicationData.calls ? communicationData.calls : false,
+          value: sensorData.sensor_communication
+            ? sensorData.sensor_communication
+            : false,
         },
         {
           setting: "status_messages",
@@ -1303,7 +1305,7 @@ export default function Main() {
             {displaySensors("sensor_timezone", "Timezone")}
             {displaySensors("ios_significant_motion", "Significant Motion")}
             {displaySensors("sensor_network", "Network")}
-            {displaySensors("sensor_communication", "Communication")}
+            {displaySensors("sensor_communication", "Communication (Calls)")}
 
             <Grid width={250} ml={5} mt={3}>
               <p className="title">Shared plugins</p>

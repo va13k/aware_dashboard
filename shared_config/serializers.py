@@ -60,6 +60,26 @@ def to_bool_string(value: object) -> str:
     return "true" if bool(value) else "false"
 
 
+def seconds_to_microseconds(value: object) -> object:
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, int):
+        return value * 1_000_000
+    if isinstance(value, float):
+        return int(value * 1_000_000)
+    if isinstance(value, str):
+        stripped = value.strip()
+        if not stripped:
+            return value
+        try:
+            parsed = float(stripped)
+        except ValueError:
+            return value
+        microseconds = int(parsed * 1_000_000)
+        return microseconds
+    return value
+
+
 def build_sensor_setting_name(sensor_name: str, field_name: str) -> str:
     if field_name == "enabled":
         return f"status_{sensor_name}"
@@ -417,6 +437,10 @@ def build_ios_sensor_settings(source: dict) -> dict[str, object]:
             shared.pop(build_sensor_setting_name(sensor_name, field_name), None)
     shared = {k: v for k, v in shared.items() if not k.endswith("_enforce")}
     sensor_settings.update(shared)
+    if "frequency_processor" in sensor_settings:
+        sensor_settings["frequency_processor"] = seconds_to_microseconds(
+            sensor_settings["frequency_processor"]
+        )
     return sensor_settings
 
 
@@ -608,11 +632,12 @@ def serialize_ios_config(
     update_ios_server_config(config, source["database"], settings)
     study = apply_ios_study_config(config, source, existing_config, study_key)
     ios_sensor_settings = build_ios_sensor_settings(source)
-    # Merge iOS-only plugin sub-settings (not in android.settings)
-    ios_sensor_settings.update(source.get("ios", {}).get("plugin_settings", {}))
     update_ios_sensor_defaults(config.get("sensors", []), ios_sensor_settings)
+    # Merge iOS-only plugin sub-settings (not in android.settings)
+    ios_plugin_settings = dict(ios_sensor_settings)
+    ios_plugin_settings.update(source.get("ios", {}).get("plugin_settings", {}))
     update_ios_plugin_defaults(config.get("plugins", []), source["ios"].get("plugins", {}))
-    update_ios_plugin_settings(config.get("plugins", []), ios_sensor_settings)
+    update_ios_plugin_settings(config.get("plugins", []), ios_plugin_settings)
     update_ios_webservice_url(config, settings)
     upsert_ios_esm_plugin(
         config,

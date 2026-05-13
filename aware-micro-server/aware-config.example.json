@@ -102,7 +102,7 @@
     },
     {
       "sensor": "communication",
-      "title": "Communication",
+      "title": "Communication (Calls)",
       "icon": "ic_action_communication.png",
       "summary": "Communication usage (calls)",
       "settings": [
@@ -241,7 +241,7 @@
           "setting": "frequency_processor",
           "title": "Update frequency",
           "defaultValue": "10",
-          "summary": "Every X seconds"
+          "summary": "Every X microseconds"
         }
       ]
     },

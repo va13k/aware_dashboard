@@ -243,6 +243,8 @@ def android_template(tmp_path):
             {"setting": "status_network_events", "value": False},
             {"setting": "status_network_traffic", "value": False},
             {"setting": "frequency_network_traffic", "value": 30},
+            {"setting": "status_processor", "value": False},
+            {"setting": "frequency_processor", "value": 10},
             {"setting": "status_significant_motion", "value": False},
             {"setting": "status_calls", "value": False},
             {"setting": "status_messages", "value": False},
@@ -315,6 +317,13 @@ def ios_example(tmp_path):
                         "defaultValue": "http://placeholder/index.php/",
                     },
                     {"setting": "frequency_webservice", "defaultValue": "30"},
+                ],
+            },
+            {
+                "sensor": "processor",
+                "settings": [
+                    {"setting": "status_processor", "defaultValue": "false"},
+                    {"setting": "frequency_processor", "defaultValue": "10"},
                 ],
             },
         ],
@@ -525,6 +534,22 @@ class TestSerializeIosConfig:
         config, _ = serialize_ios_config(source, settings, ios_example, ios_existing)
         assert ios_setting_default(config, "accelerometer", "frequency_accelerometer") == "20000"
 
+    def test_processor_frequency_defaultvalue_converted_to_microseconds(
+        self, source, settings, ios_example, ios_existing
+    ):
+        source["shared"]["sensors"]["processor"] = {"enabled": True, "frequency": 20}
+        config, _ = serialize_ios_config(source, settings, ios_example, ios_existing)
+        assert ios_setting_default(config, "processor", "frequency_processor") == "20000000"
+
+    def test_ios_sensor_settings_are_not_flattened_into_micro_config(
+        self, source, settings, ios_example, ios_existing
+    ):
+        source["shared"]["sensors"]["wifi"] = {"enabled": True, "frequency": 60}
+        config, _ = serialize_ios_config(source, settings, ios_example, ios_existing)
+
+        assert all("settings" in sensor for sensor in config["sensors"])
+        assert not any("setting" in sensor and "sensor" not in sensor for sensor in config["sensors"])
+
     def test_location_gps_defaultvalue(self, source, settings, ios_example, ios_existing):
         config, _ = serialize_ios_config(source, settings, ios_example, ios_existing)
         assert ios_setting_default(config, "locations", "status_location_gps") == "true"
@@ -622,6 +647,16 @@ class TestBuildIosSensorSettings:
         source["shared"]["sensors"]["accelerometer"]["frequency"] = 20000
         result = build_ios_sensor_settings(source)
         assert result["frequency_accelerometer"] == 20000
+
+    def test_processor_frequency_converts_seconds_to_microseconds_for_ios(self, source):
+        source["shared"]["sensors"]["processor"] = {"enabled": True, "frequency": 20}
+        result = build_ios_sensor_settings(source)
+        assert result["frequency_processor"] == 20_000_000
+
+    def test_processor_frequency_converts_string_seconds_to_microseconds_for_ios(self, source):
+        source["shared"]["sensors"]["processor"] = {"enabled": True, "frequency": "0.5"}
+        result = build_ios_sensor_settings(source)
+        assert result["frequency_processor"] == 500_000
 
     def test_ios_only_sensors_from_ios_sensors_block(self, source):
         result = build_ios_sensor_settings(source)

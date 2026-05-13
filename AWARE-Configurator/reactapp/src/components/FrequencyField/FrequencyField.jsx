@@ -277,7 +277,11 @@ function FrequencyField(inputs) {
           onChange={handleChange}
           onBlur={handleBlur}
         />
-        <p className="schedule-description">{description}</p>
+        {description ? (
+          <p className="schedule-description">{description}</p>
+        ) : (
+          <div />
+        )}
       </Grid>
     </div>
   );
