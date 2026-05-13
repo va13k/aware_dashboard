@@ -1,11 +1,19 @@
 import { useEffect, useMemo, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { fetchDeviceDetail, fetchDevices, fetchSensor } from "../api/client";
-import { SENSOR_CONFIGS, sensorsForPlatform } from "../config/sensors";
+import { SENSOR_CONFIGS, deviceSensorsForPlatform } from "../config/sensors";
 import SensorTimeSeriesCard from "../components/SensorTimeSeriesCard";
 import NetworkTypeCard from "../components/NetworkTypeCard";
 import ActivityCard from "../components/ActivityCard";
 import ApplicationsCard from "../components/ApplicationsCard";
+import WifiRecordsCard from "../components/WifiRecordsCard";
+import LocationRecordsCard from "../components/LocationRecordsCard";
+import CallsRecordsCard from "../components/CallsRecordsCard";
+import TimezoneRecordsCard from "../components/TimezoneRecordsCard";
+import AccelerometerRecordsCard from "../components/AccelerometerRecordsCard";
+import BluetoothRecordsCard from "../components/BluetoothRecordsCard";
+import GyroscopeRecordsCard from "../components/GyroscopeRecordsCard";
+import LinearAccelerometerRecordsCard from "../components/LinearAccelerometerRecordsCard";
 import type {
   Device,
   DeviceDetail,
@@ -51,7 +59,9 @@ function deviceLabel(d: Device): string {
     const name = [d.manufacturer, d.model].filter(Boolean).join(" ");
     return name || d.device_id.slice(0, 12);
   }
-  return d.device_id.slice(0, 16);
+  return (
+    d.label || d.device || d.model || d.product || d.device_id.slice(0, 16)
+  );
 }
 
 function lastSeenLabel(ts: number | null | undefined): string {
@@ -63,8 +73,24 @@ function lastSeenLabel(ts: number | null | undefined): string {
   return `${Math.floor(diff / 86400)}d ago`;
 }
 
-function formatValue(value: unknown): string {
+function timestampValue(value: unknown): number | null {
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  if (typeof value === "string" && value.trim() !== "") {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+  return null;
+}
+
+function formatValue(label: string, value: unknown): string {
   if (value == null || value === "") return "-";
+  if (label.toLowerCase().includes("timestamp")) {
+    const ts = timestampValue(value);
+    if (ts != null) {
+      const normalized = ts < 100_000_000_000 ? ts * 1000 : ts;
+      return new Date(normalized).toLocaleString();
+    }
+  }
   if (typeof value === "number") {
     return Number.isInteger(value) ? value.toLocaleString() : value.toFixed(3);
   }
@@ -79,7 +105,7 @@ function DetailField({ label, value }: { label: string; value: unknown }) {
         {label}
       </div>
       <div className="mt-1 text-[12px] font-semibold text-ink wrap-break-word">
-        {formatValue(value)}
+        {formatValue(label, value)}
       </div>
     </div>
   );
@@ -95,9 +121,9 @@ function DeviceDetailPanel({
   const activeStreams = detail?.streams.filter((s) => s.count > 0) ?? [];
   const latest = activeStreams[0]?.latest ?? detail?.device ?? null;
   const latestEntries = latest
-    ? Object.entries(latest)
-        .filter(([key]) => !["id", "device_id"].includes(key))
-        .slice(0, 8)
+    ? Object.entries(latest).filter(
+        ([key]) => !["id", "device_id"].includes(key),
+      )
     : [];
 
   return (
@@ -105,11 +131,6 @@ function DeviceDetailPanel({
       <div className="flex items-start justify-between gap-4 mb-4">
         <div>
           <h2 className="text-[15px] font-bold text-ink">Device info</h2>
-          <p className="text-[12px] text-sage mt-0.5">
-            {detail
-              ? `/api/devices/${detail.platform}/${detail.device_id}`
-              : "Select a device"}
-          </p>
         </div>
         {detail && (
           <span className="text-[11px] uppercase tracking-[0.5px] text-teal bg-teal-soft px-2 py-1 rounded-lg">
@@ -134,7 +155,7 @@ function DeviceDetailPanel({
                 Math.max(0, ...activeStreams.map((s) => s.last_seen ?? 0)),
               )}
             />
-            <DetailField label="streams" value={activeStreams.length} />
+            <DetailField label="sensors" value={activeStreams.length} />
             <DetailField
               label="records"
               value={activeStreams.reduce((sum, s) => sum + s.count, 0)}
@@ -153,32 +174,6 @@ function DeviceDetailPanel({
               </div>
             </div>
           )}
-
-          <div>
-            <div className="text-[10px] uppercase tracking-[0.5px] text-sage mb-2">
-              Data streams
-            </div>
-            <div className="grid grid-cols-[repeat(auto-fit,minmax(150px,1fr))] gap-2">
-              {detail.streams.map((stream) => (
-                <div
-                  key={stream.key}
-                  className="rounded-xl border border-wire bg-card-strong/70 px-3 py-2"
-                >
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="text-[12px] font-semibold text-ink">
-                      {stream.key}
-                    </span>
-                    <span className="text-[11px] text-sage">
-                      {stream.count.toLocaleString()}
-                    </span>
-                  </div>
-                  <div className="text-[11px] text-sage mt-1">
-                    {lastSeenLabel(stream.last_seen)}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
         </div>
       )}
     </section>
@@ -227,7 +222,7 @@ export default function DevicePage() {
   const currentSensorState =
     sensorState.key === selectedKey ? sensorState : EMPTY_SENSOR_STATE;
   const platformSensors = selected
-    ? sensorsForPlatform(selected.platform)
+    ? deviceSensorsForPlatform(selected.platform)
     : SENSOR_CONFIGS;
   const pendingSensorKeys =
     currentSensorState.key === selectedKey
@@ -245,7 +240,7 @@ export default function DevicePage() {
     let cancelled = false;
     const isFirstRun = { value: true };
 
-    const sensors = sensorsForPlatform(selected.platform);
+    const sensors = deviceSensorsForPlatform(selected.platform);
     const initialLoadingKeys = new Set(sensors.map((s) => s.key));
     const isIos = selected.platform === "ios";
     const isAndroid = selected.platform === "android";
@@ -472,6 +467,12 @@ export default function DevicePage() {
             const sharedSensors = platformSensors.filter(
               (s) => s.platform === "shared",
             );
+            const locationSensor = sharedSensors.find(
+              (s) => s.key === "locations",
+            );
+            const sharedChartSensors = sharedSensors.filter(
+              (s) => s.key !== "locations",
+            );
             const specificSensors = platformSensors.filter(
               (s) => s.platform !== "shared",
             );
@@ -501,19 +502,93 @@ export default function DevicePage() {
                   </div>
                 </div>
                 <div className="grid grid-cols-[repeat(auto-fill,minmax(320px,1fr))] gap-4">
-                  {sharedSensors.map((config) => (
-                    <SensorTimeSeriesCard
-                      key={config.key}
-                      config={config}
-                      records={currentSensorState.sensorData[config.key] ?? []}
-                      loading={pendingSensorKeys.has(config.key)}
-                    />
-                  ))}
+                  {sharedChartSensors.map((config) =>
+                    config.key === "calls" ? (
+                      <CallsRecordsCard
+                        key={config.key}
+                        records={
+                          currentSensorState.sensorData[config.key] ?? []
+                        }
+                        loading={pendingSensorKeys.has(config.key)}
+                      />
+                    ) : config.key === "accelerometer" ? (
+                      <AccelerometerRecordsCard
+                        key={config.key}
+                        records={
+                          currentSensorState.sensorData[config.key] ?? []
+                        }
+                        loading={pendingSensorKeys.has(config.key)}
+                      />
+                    ) : config.key === "bluetooth" ? (
+                      <BluetoothRecordsCard
+                        key={config.key}
+                        records={
+                          currentSensorState.sensorData[config.key] ?? []
+                        }
+                        loading={pendingSensorKeys.has(config.key)}
+                      />
+                    ) : config.key === "gyroscope" ? (
+                      <GyroscopeRecordsCard
+                        key={config.key}
+                        records={
+                          currentSensorState.sensorData[config.key] ?? []
+                        }
+                        loading={pendingSensorKeys.has(config.key)}
+                      />
+                    ) : config.key === "linear-accelerometer" ? (
+                      <LinearAccelerometerRecordsCard
+                        key={config.key}
+                        records={
+                          currentSensorState.sensorData[config.key] ?? []
+                        }
+                        loading={pendingSensorKeys.has(config.key)}
+                      />
+                    ) : config.key === "timezone" ? (
+                      <TimezoneRecordsCard
+                        key={config.key}
+                        records={
+                          currentSensorState.sensorData[config.key] ?? []
+                        }
+                        loading={pendingSensorKeys.has(config.key)}
+                      />
+                    ) : config.key === "wifi" ? (
+                      <WifiRecordsCard
+                        key={config.key}
+                        groups={[
+                          {
+                            label: selected.platform,
+                            records:
+                              currentSensorState.sensorData[config.key] ?? [],
+                          },
+                        ]}
+                        loading={pendingSensorKeys.has(config.key)}
+                      />
+                    ) : (
+                      <SensorTimeSeriesCard
+                        key={config.key}
+                        config={config}
+                        records={
+                          currentSensorState.sensorData[config.key] ?? []
+                        }
+                        loading={pendingSensorKeys.has(config.key)}
+                      />
+                    ),
+                  )}
                   <NetworkTypeCard
                     records={currentSensorState.networkData}
                     loading={networkLoading}
+                    platform={selected.platform}
                   />
                 </div>
+
+                {locationSensor ? (
+                  <LocationRecordsCard
+                    records={
+                      currentSensorState.sensorData[locationSensor.key] ?? []
+                    }
+                    loading={pendingSensorKeys.has(locationSensor.key)}
+                  />
+                ) : null}
 
                 {specificSensors.length > 0 || selected.platform === "ios" ? (
                   <>
