@@ -255,3 +255,4 @@ The configurator now derives Django allowed hosts from `PUBLIC_HOST`, so `.env` 
 **iOS data is not appearing in the database**
 
 The `aware_ios_participant` MySQL user must keep `CREATE` and `INSERT` privileges on `aware_ios`.
+ 
