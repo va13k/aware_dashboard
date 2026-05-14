@@ -1,9 +1,9 @@
 <!doctype html>
-<html lang="en">
+<html lang="ro">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Studies</title>
+    <title>Studii</title>
     <style>
       :root {
         --accent: rgb(31, 179, 223);
@@ -101,6 +101,14 @@
         line-height: 1.65;
       }
 
+      .device-icon {
+        display: block;
+        width: 48px;
+        height: 48px;
+        margin-bottom: 14px;
+        object-fit: contain;
+      }
+
       .steps-list {
         margin: 0 0 18px;
         padding-left: 20px;
@@ -118,6 +126,98 @@
 
       .steps-list a {
         overflow-wrap: anywhere;
+      }
+
+      .apk-links {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        margin-bottom: 18px;
+      }
+
+      .apk-button {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 10px 16px;
+        border-radius: 12px;
+        background: var(--accent);
+        color: white;
+        text-decoration: none;
+        font-weight: 600;
+        font-size: 0.9rem;
+        transition: opacity 0.15s;
+      }
+
+      .apk-button:hover {
+        opacity: 0.85;
+      }
+
+      .warning-box {
+        margin-bottom: 18px;
+        padding: 14px 16px;
+        border-radius: 14px;
+        background: rgba(255, 200, 50, 0.12);
+        border: 1px solid rgba(200, 150, 0, 0.25);
+      }
+
+      .warning-box strong {
+        display: block;
+        margin-bottom: 8px;
+        color: #7a5500;
+        font-size: 0.92rem;
+      }
+
+      .warning-box ol {
+        margin: 8px 0 0;
+        padding-left: 18px;
+        color: var(--muted);
+        font-size: 0.9rem;
+        line-height: 1.6;
+      }
+
+      .warning-box ol li {
+        margin-bottom: 4px;
+      }
+
+      .warning-screenshots {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        margin-top: 12px;
+      }
+
+      .warning-screenshots img {
+        width: 100%;
+        height: auto;
+        border-radius: 10px;
+        border: 1px solid var(--border);
+      }
+
+      .screenshots-caption {
+        margin: 18px 0 10px;
+        font-size: 0.9rem;
+        color: var(--muted);
+        font-style: italic;
+      }
+
+      .screenshots-row {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+      }
+
+      .screenshots-row img {
+        flex: 1 1 0;
+        min-width: 0;
+        max-width: calc(33.33% - 7px);
+        height: auto;
+        border-radius: 12px;
+        border: 1px solid var(--border);
+      }
+
+      .screenshots-row.two-col img {
+        max-width: calc(50% - 5px);
       }
 
       .final-note {
@@ -159,48 +259,6 @@
         color: var(--text);
         background: white;
         border: 1px solid var(--border);
-      }
-
-      .join-url {
-        padding: 12px 14px;
-        margin-bottom: 18px;
-        border-radius: 14px;
-        background: rgba(24, 48, 40, 0.05);
-        border: 1px solid var(--border);
-      }
-
-      .join-url span {
-        display: block;
-        margin-bottom: 6px;
-        font-weight: 700;
-      }
-
-      .join-url code {
-        font-family: "SFMono-Regular", Consolas, monospace;
-        font-size: 0.92rem;
-        word-break: break-all;
-      }
-
-      .study-link {
-        display: block;
-        padding: 12px 14px;
-        margin-bottom: 18px;
-        border-radius: 14px;
-        background: rgba(24, 48, 40, 0.05);
-        border: 1px solid var(--border);
-        text-decoration: none;
-        color: var(--text);
-      }
-
-      .study-link span {
-        display: block;
-        margin-bottom: 6px;
-        font-weight: 700;
-      }
-
-      .study-link code {
-        font-size: 0.9rem;
-        word-break: break-all;
       }
 
       .copy-box {
@@ -265,7 +323,7 @@
         display: block;
         width: 200px;
         height: 200px;
-        margin: 0 auto;
+        margin: 0 auto 18px;
         border-radius: 10px;
         border: 1px solid var(--border);
       }
@@ -275,6 +333,18 @@
           flex-direction: column;
           align-items: stretch;
         }
+
+        .screenshots-row img {
+          max-width: calc(50% - 5px);
+        }
+
+        .screenshots-row.two-col img {
+          max-width: 100%;
+        }
+
+        .warning-screenshots img {
+          max-width: 100%;
+        }
       }
     </style>
   </head>
@@ -282,88 +352,188 @@
     <main>
       <section class="hero">
         <p class="eyebrow">AWARE Dashboard</p>
-        <h1>Studies</h1>
+        <h1>Studii</h1>
         <p class="subtitle">
-          Install the AWARE Client, name the device exactly as the study
-          instructor says, then join with the platform-specific URL below.
+          Bună ziua! Iată informațiile de care aveți nevoie pentru a participa
+          la studiul privind detectarea smartphone-urilor, atât pentru
+          dispozitivele Android, cât și pentru cele iPhone.
         </p>
       </section>
 
       <section class="grid">
         <article class="card">
-          <h2>Android participants</h2>
+          <img
+            class="device-icon"
+            src="https://school1.sensingstudy.info/android.png"
+            alt="Android"
+          />
+          <h2>Telefoane Android</h2>
+
           <ol class="steps-list">
             <li>
-              Download the AWARE Android client:
-              <a
-                href="https://github.com/awareframework/aware-client/releases/download/4.2.1.light.bundle/aware-phone-armeabi-v7a-release.apk"
-                >aware-phone-armeabi-v7a-release.apk</a
-              >.
+              În funcție de tipul de telefon, faceți clic pe unul dintre
+              următoarele două linkuri de descărcare pentru a instala AWARE
+              (dacă nu știți pe care să îl utilizați, vă sugerăm să încercați
+              mai întâi armeabi):
+              <div class="apk-links" style="margin-top:12px;">
+                <a
+                  class="apk-button"
+                  href="https://school1.sensingstudy.info/install_aware_armeabi.apk"
+                  download
+                >
+                  &#8595; install_aware_armeabi.apk (4.2.1)
+                </a>
+                <a
+                  class="apk-button"
+                  href="https://school1.sensingstudy.info/install_aware_arm64.apk"
+                  download
+                >
+                  &#8595; install_aware_arm64.apk (4.2.1)
+                </a>
+              </div>
+              <div class="warning-box" style="margin-top:14px;">
+                <strong
+                  >&#9888; Deoarece AWARE nu se descarcă prin Google Play, este
+                  posibil să apară următorul mesaj:</strong
+                >
+                <p style="margin:8px 0 10px;color:var(--muted);font-size:0.9rem;">
+                  Fiți siguri că AWARE este sigur și că acesta este doar un
+                  avertisment generic. Pentru a întrerupe Google Play Protect
+                  pentru a instala AWARE, urmați aceste instrucțiuni:
+                </p>
+                <ol>
+                  <li>Deschide aplicația <strong>Magazin Google Play</strong>.</li>
+                  <li>În dreapta sus, atinge <strong>pictograma profilului</strong>.</li>
+                  <li>Atinge <strong>Play Protect &gt; Setări</strong>.</li>
+                  <li>Activarea sau dezactivarea aplicațiilor de scanare cu Play Protect.</li>
+                </ol>
+                <div class="warning-screenshots">
+                  <img
+                    src="https://school1.sensingstudy.info/google_play_protect.jpg"
+                    alt="Google Play Protect"
+                  />
+                  <img
+                    src="https://school1.sensingstudy.info/play_protect_pause_instructions.jpg"
+                    alt="Instrucțiuni dezactivare Play Protect"
+                  />
+                </div>
+              </div>
             </li>
+            <li>Acordați permisiuni AWARE pentru accesarea senzorilor.</li>
             <li>
-              Copy the Android join URL below and paste it into the AWARE app.
-            </li>
-            <li>
-              Name the device exactly as the study instructor tells you.
+              Faceți clic pe <strong>ALĂTURAȚI-VĂ UNUI STUDIU</strong>. Vi se
+              va solicita să introduceți o adresă URL pentru studiu. Introduceți
+              linkul fișierului de configurare furnizat de echipa studiului:
+              <div class="copy-box" style="margin-top:12px;" data-copy-id="android-join-url">
+                <code id="android-join-url" data-path="{{ANDROID_JOIN_URL}}"
+                  >{{ANDROID_JOIN_URL}}</code
+                >
+                <span class="copy-hint"
+                  >URL configurare Android &mdash; apăsați pentru a copia</span
+                >
+              </div>
             </li>
           </ol>
-          <div class="copy-box" data-copy-id="android-join-url">
-            <code id="android-join-url" data-path="{{ANDROID_JOIN_URL}}"
-              >{{ANDROID_JOIN_URL}}</code
-            >
-            <span class="copy-hint">Android join URL - click to copy</span>
+
+          <p class="screenshots-caption">
+            Acestea sunt doar câteva imagini exemplificative despre cum va
+            arăta procesul dumneavoastră:
+          </p>
+          <div class="screenshots-row">
+            <img
+              src="https://school1.sensingstudy.info/aware_image_1.png"
+              alt="Captură AWARE 1"
+            />
+            <img
+              src="https://school1.sensingstudy.info/aware_image_2.png"
+              alt="Captură AWARE 2"
+            />
+            <img
+              src="https://school1.sensingstudy.info/aware_image_3.png"
+              alt="Captură AWARE 3"
+            />
           </div>
         </article>
 
         <article class="card">
-          <h2>iPhone participants</h2>
+          <img
+            class="device-icon"
+            src="https://school1.sensingstudy.info/iphone.png"
+            alt="iPhone"
+          />
+          <h2>iPhones</h2>
+
           <ol class="steps-list">
             <li>
-              Install AWARE Client V2 from the App Store:
-              <a href="https://apps.apple.com/us/app/aware-client-v2/id1455986181"
+              Descărcați și instalați
+              <a
+                href="https://itunes.apple.com/us/app/aware-client-v2/id1455986181"
                 >AWARE Client V2</a
-              >.
+              >
+              din Apple App Store.
             </li>
+            <li>Acordați permisiuni AWARE pentru accesarea senzorilor.</li>
             <li>
-              Before joining, enter the device name in the app's
-              <strong>Device Field</strong> exactly as the study instructor
-              tells you.
-            </li>
-            <li>
-              Join the study by scanning the QR code or copying the iOS join URL
-              below into the app's <strong>Study URL</strong> field.
+              Fie:
+              <ul style="margin-top:8px;">
+                <li>
+                  Introduceți manual următoarea adresă URL pentru a vă alătura
+                  studiului:
+                  <div class="copy-box" style="margin-top:10px;" data-copy-id="ios-join-url">
+                    <code id="ios-join-url" data-path="{{STUDY_JOIN_PATH}}"
+                      >{{STUDY_JOIN_PATH}}</code
+                    >
+                    <span class="copy-hint"
+                      >URL studiu iOS &mdash; apăsați pentru a copia</span
+                    >
+                  </div>
+                </li>
+                <li>
+                  Scanați codul QR de mai jos făcând clic pe butonul de scanare
+                  QR din colțul din dreapta sus al aplicației AWARE.
+                </li>
+              </ul>
             </li>
           </ol>
-          <div class="copy-box" data-copy-id="ios-join-url">
-            <code id="ios-join-url" data-path="{{STUDY_JOIN_PATH}}"
-              >{{STUDY_JOIN_PATH}}</code
-            >
-            <span class="copy-hint">iOS join URL - click to copy</span>
-          </div>
+
           <img
             id="ios-qrcode"
             class="qr-img"
             src=""
-            alt="iOS QR Code"
+            alt="Cod QR iOS"
             style="display: none"
           />
+
+          <p class="screenshots-caption">
+            Acestea sunt doar câteva imagini exemplificative despre cum va
+            arăta procesul dumneavoastră:
+          </p>
+          <div class="screenshots-row two-col">
+            <img
+              src="https://school1.sensingstudy.info/aware_image_4.png"
+              alt="Captură iPhone 1"
+            />
+            <img
+              src="https://school1.sensingstudy.info/aware_image_5.png"
+              alt="Captură iPhone 2"
+            />
+          </div>
         </article>
       </section>
 
       <p class="subtitle final-note">
-        After joining the study, follow the study instructor's next steps.
+        Dupa ce va-ti alaturat studiului, urmati instructiunile coordonatorului.
       </p>
 
       <div class="actions page-actions">
-        <a class="button button-secondary" href="/">Back to main page</a>
+        <a class="button button-secondary" href="/">Inapoi la pagina principala</a>
       </div>
     </main>
-    <div class="copy-toast" id="copy-toast">Copied!</div>
+    <div class="copy-toast" id="copy-toast">Copiat!</div>
     <script>
       (function () {
         var origin = window.location.origin;
 
-        // Resolve Android and iOS join URLs to absolute URLs
         ["android-join-url", "ios-join-url"].forEach(function (id) {
           var el = document.getElementById(id);
           if (el) {
@@ -372,7 +542,6 @@
           }
         });
 
-        // Clickable copy boxes
         var toast = document.getElementById("copy-toast");
         var toastTimer;
         function showToast() {
@@ -411,7 +580,6 @@
           })(copyBoxes[j]);
         }
 
-        // Trigger QR code generation via the micro-server and display it
         var iosEl = document.getElementById("ios-join-url");
         var iosPath = iosEl && iosEl.getAttribute("data-path");
         if (iosPath) {
