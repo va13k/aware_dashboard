@@ -23,6 +23,8 @@ import LinearAccelerometerRecordsCard from "../components/LinearAccelerometerRec
 import ConversationRecordsCard from "../components/ConversationRecordsCard";
 import DeviceUsageRecordsCard from "../components/DeviceUsageRecordsCard";
 import ProcessorCard from "../components/ProcessorCard";
+import BatteryEventsCard from "../components/BatteryEventsCard";
+import AmbientNoiseCard from "../components/AmbientNoiseCard";
 import ExportLink from "../components/ExportLink";
 import type {
   Device,
@@ -140,7 +142,11 @@ function DeviceDetailPanel({
         {detail && (
           <div className="flex items-center gap-2">
             {exportHref && (
-              <ExportLink href={exportHref} label="ZIP" title="Export device CSVs" />
+              <ExportLink
+                href={exportHref}
+                label="ZIP"
+                title="Export device CSVs"
+              />
             )}
             <span className="text-[11px] uppercase tracking-[0.5px] text-teal bg-teal-soft px-2 py-1 rounded-lg">
               {detail.platform}
@@ -202,9 +208,8 @@ export default function DevicePage() {
     useState<DeviceSensorState>(EMPTY_SENSOR_STATE);
   const [error, setError] = useState<string | null>(null);
   const [lastUpdated, setLastUpdated] = useState<number | null>(null);
-  const [hideEmptySensors, setHideEmptySensors] = useState(
-    readHideEmptySensors,
-  );
+  const [hideEmptySensors, setHideEmptySensors] =
+    useState(readHideEmptySensors);
   // Ticks every 10 s so the "X ago" label stays fresh without re-fetching.
   const [, setTick] = useState(0);
 
@@ -229,7 +234,9 @@ export default function DevicePage() {
     ? exportDeviceHref(selected.platform, selected.device_id)
     : undefined;
   const selectedSensorExportHref = (sensor: string) =>
-    selected ? exportSensorHref(selected.platform, selected.device_id, sensor) : undefined;
+    selected
+      ? exportSensorHref(selected.platform, selected.device_id, sensor)
+      : undefined;
   const currentDetail =
     detail &&
     selected &&
@@ -440,21 +447,57 @@ export default function DevicePage() {
             const locationSensor = visibleSharedSensors.find(
               (s) => s.key === "locations",
             );
+            const BATTERY_KEYS = [
+              "battery",
+              "battery-charges",
+              "battery-discharges",
+            ];
+            const shouldShowBatteryCard =
+              !hideEmptySensors ||
+              BATTERY_KEYS.some(
+                (k) => sensorLoading(k) || sensorRecords(k).length > 0,
+              );
             const sharedChartSensors = visibleSharedSensors.filter(
-              (s) => !["locations", "network"].includes(s.key),
+              (s) =>
+                !["locations", "network", ...BATTERY_KEYS].includes(s.key),
             );
             const showNetwork = shouldShowSensor("network");
+            const APP_SUB_KEYS = new Set([
+              "applications-crashes",
+              "applications-history",
+              "applications-notifications",
+            ]);
+            const ALL_APP_KEYS = [
+              "applications",
+              "applications-crashes",
+              "applications-history",
+              "applications-notifications",
+            ];
+            const shouldShowApplications =
+              !hideEmptySensors ||
+              ALL_APP_KEYS.some(
+                (k) => sensorLoading(k) || sensorRecords(k).length > 0,
+              );
             const specificSensors = platformSensors.filter(
-              (s) => s.platform !== "shared" && shouldShowSensor(s.key),
+              (s) =>
+                s.platform !== "shared" &&
+                !APP_SUB_KEYS.has(s.key) &&
+                (s.key === "applications"
+                  ? shouldShowApplications
+                  : shouldShowSensor(s.key)),
             );
             const specificLabel =
               selected.platform === "android" ? "Android only" : "iPhone only";
             const showSharedSection =
-              sharedChartSensors.length > 0 || locationSensor || showNetwork;
+              sharedChartSensors.length > 0 ||
+              locationSensor != null ||
+              showNetwork ||
+              shouldShowBatteryCard;
             const visibleSensorCount =
               sharedChartSensors.length +
               (locationSensor ? 1 : 0) +
               (showNetwork ? 1 : 0) +
+              (shouldShowBatteryCard ? 1 : 0) +
               specificSensors.length;
 
             return (
@@ -491,114 +534,152 @@ export default function DevicePage() {
                       Shared
                     </div>
                     <div className="grid grid-cols-[repeat(auto-fill,minmax(320px,1fr))] gap-4">
-                  {sharedChartSensors.map((config) =>
-                    config.key === "calls" ? (
-                      <CallsRecordsCard
-                        key={config.key}
-                        records={
-                          currentSensorState.sensorData[config.key] ?? []
-                        }
-                        loading={pendingSensorKeys.has(config.key)}
-                        exportHref={selectedSensorExportHref(config.key)}
-                      />
-                    ) : config.key === "accelerometer" ? (
-                      <AccelerometerRecordsCard
-                        key={config.key}
-                        records={
-                          currentSensorState.sensorData[config.key] ?? []
-                        }
-                        loading={pendingSensorKeys.has(config.key)}
-                        exportHref={selectedSensorExportHref(config.key)}
-                      />
-                    ) : config.key === "bluetooth" ? (
-                      <BluetoothRecordsCard
-                        key={config.key}
-                        records={
-                          currentSensorState.sensorData[config.key] ?? []
-                        }
-                        loading={pendingSensorKeys.has(config.key)}
-                        exportHref={selectedSensorExportHref(config.key)}
-                      />
-                    ) : config.key === "gyroscope" ? (
-                      <GyroscopeRecordsCard
-                        key={config.key}
-                        records={
-                          currentSensorState.sensorData[config.key] ?? []
-                        }
-                        loading={pendingSensorKeys.has(config.key)}
-                        exportHref={selectedSensorExportHref(config.key)}
-                      />
-                    ) : config.key === "linear-accelerometer" ? (
-                      <LinearAccelerometerRecordsCard
-                        key={config.key}
-                        records={
-                          currentSensorState.sensorData[config.key] ?? []
-                        }
-                        loading={pendingSensorKeys.has(config.key)}
-                        exportHref={selectedSensorExportHref(config.key)}
-                      />
-                    ) : config.key === "timezone" ? (
-                      <TimezoneRecordsCard
-                        key={config.key}
-                        records={
-                          currentSensorState.sensorData[config.key] ?? []
-                        }
-                        loading={pendingSensorKeys.has(config.key)}
-                        exportHref={selectedSensorExportHref(config.key)}
-                      />
-                    ) : config.key === "wifi" ? (
-                      <WifiRecordsCard
-                        key={config.key}
-                        groups={[
-                          {
-                            label: selected.platform,
-                            records:
-                              currentSensorState.sensorData[config.key] ?? [],
-                          },
-                        ]}
-                        loading={pendingSensorKeys.has(config.key)}
-                        exportHref={selectedSensorExportHref(config.key)}
-                      />
-                    ) : config.key === "processor" ? (
-                      <ProcessorCard
-                        key={config.key}
-                        records={
-                          currentSensorState.sensorData[config.key] ?? []
-                        }
-                        loading={pendingSensorKeys.has(config.key)}
-                        exportHref={selectedSensorExportHref(config.key)}
-                      />
-                    ) : (
-                      <SensorTimeSeriesCard
-                        key={config.key}
-                        config={config}
-                        records={
-                          currentSensorState.sensorData[config.key] ?? []
-                        }
-                        loading={pendingSensorKeys.has(config.key)}
-                        exportHref={selectedSensorExportHref(config.key)}
-                      />
-                    ),
-                  )}
-                  {showNetwork ? (
-                    <NetworkTypeCard
-                      records={sensorRecords("network")}
-                      loading={sensorLoading("network")}
-                      platform={selected.platform}
-                      exportHref={selectedSensorExportHref("network")}
-                    />
-                  ) : null}
-                </div>
+                      {sharedChartSensors.map((config) =>
+                        config.key === "calls" ? (
+                          <CallsRecordsCard
+                            key={config.key}
+                            records={
+                              currentSensorState.sensorData[config.key] ?? []
+                            }
+                            loading={pendingSensorKeys.has(config.key)}
+                            exportHref={selectedSensorExportHref(config.key)}
+                          />
+                        ) : config.key === "accelerometer" ? (
+                          <AccelerometerRecordsCard
+                            key={config.key}
+                            records={
+                              currentSensorState.sensorData[config.key] ?? []
+                            }
+                            loading={pendingSensorKeys.has(config.key)}
+                            exportHref={selectedSensorExportHref(config.key)}
+                          />
+                        ) : config.key === "bluetooth" ? (
+                          <BluetoothRecordsCard
+                            key={config.key}
+                            records={
+                              currentSensorState.sensorData[config.key] ?? []
+                            }
+                            loading={pendingSensorKeys.has(config.key)}
+                            exportHref={selectedSensorExportHref(config.key)}
+                          />
+                        ) : config.key === "gyroscope" ? (
+                          <GyroscopeRecordsCard
+                            key={config.key}
+                            records={
+                              currentSensorState.sensorData[config.key] ?? []
+                            }
+                            loading={pendingSensorKeys.has(config.key)}
+                            exportHref={selectedSensorExportHref(config.key)}
+                          />
+                        ) : config.key === "linear-accelerometer" ? (
+                          <LinearAccelerometerRecordsCard
+                            key={config.key}
+                            records={
+                              currentSensorState.sensorData[config.key] ?? []
+                            }
+                            loading={pendingSensorKeys.has(config.key)}
+                            exportHref={selectedSensorExportHref(config.key)}
+                          />
+                        ) : config.key === "timezone" ? (
+                          <TimezoneRecordsCard
+                            key={config.key}
+                            records={
+                              currentSensorState.sensorData[config.key] ?? []
+                            }
+                            loading={pendingSensorKeys.has(config.key)}
+                            exportHref={selectedSensorExportHref(config.key)}
+                          />
+                        ) : config.key === "wifi" ? (
+                          <WifiRecordsCard
+                            key={config.key}
+                            groups={[
+                              {
+                                label: selected.platform,
+                                records:
+                                  currentSensorState.sensorData[config.key] ??
+                                  [],
+                              },
+                            ]}
+                            loading={pendingSensorKeys.has(config.key)}
+                            exportHref={selectedSensorExportHref(config.key)}
+                          />
+                        ) : config.key === "processor" ? (
+                          <ProcessorCard
+                            key={config.key}
+                            records={
+                              currentSensorState.sensorData[config.key] ?? []
+                            }
+                            loading={pendingSensorKeys.has(config.key)}
+                            exportHref={selectedSensorExportHref(config.key)}
+                          />
+                        ) : config.key === "plugin-ambient-noise" ? (
+                          <AmbientNoiseCard
+                            key={config.key}
+                            records={
+                              currentSensorState.sensorData[config.key] ?? []
+                            }
+                            loading={pendingSensorKeys.has(config.key)}
+                            exportHref={selectedSensorExportHref(config.key)}
+                          />
+                        ) : (
+                          <SensorTimeSeriesCard
+                            key={config.key}
+                            config={config}
+                            records={
+                              currentSensorState.sensorData[config.key] ?? []
+                            }
+                            loading={pendingSensorKeys.has(config.key)}
+                            exportHref={selectedSensorExportHref(config.key)}
+                          />
+                        ),
+                      )}
+                      {showNetwork ? (
+                        <NetworkTypeCard
+                          records={sensorRecords("network")}
+                          loading={sensorLoading("network")}
+                          platform={selected.platform}
+                          exportHref={selectedSensorExportHref("network")}
+                        />
+                      ) : null}
+                      {shouldShowBatteryCard ? (
+                        <div className="col-span-full">
+                          <BatteryEventsCard
+                            batteryRecords={sensorRecords("battery")}
+                            batteryLoading={sensorLoading("battery")}
+                            batteryExportHref={selectedSensorExportHref(
+                              "battery",
+                            )}
+                            chargesRecords={sensorRecords("battery-charges")}
+                            dischargesRecords={sensorRecords(
+                              "battery-discharges",
+                            )}
+                            chargesLoading={sensorLoading("battery-charges")}
+                            dischargesLoading={sensorLoading(
+                              "battery-discharges",
+                            )}
+                            chargesExportHref={selectedSensorExportHref(
+                              "battery-charges",
+                            )}
+                            dischargesExportHref={selectedSensorExportHref(
+                              "battery-discharges",
+                            )}
+                          />
+                        </div>
+                      ) : null}
+                    </div>
 
-                {locationSensor ? (
-                  <LocationRecordsCard
-                    records={
-                      currentSensorState.sensorData[locationSensor.key] ?? []
-                    }
-                    loading={pendingSensorKeys.has(locationSensor.key)}
-                    exportHref={selectedSensorExportHref(locationSensor.key)}
-                  />
-                ) : null}
+                    {locationSensor ? (
+                      <LocationRecordsCard
+                        records={
+                          currentSensorState.sensorData[locationSensor.key] ??
+                          []
+                        }
+                        loading={pendingSensorKeys.has(locationSensor.key)}
+                        exportHref={selectedSensorExportHref(
+                          locationSensor.key,
+                        )}
+                      />
+                    ) : null}
                   </>
                 ) : null}
 
@@ -648,14 +729,31 @@ export default function DevicePage() {
                             exportHref={selectedSensorExportHref(config.key)}
                           />
                         ) : config.key === "applications" ? (
-                          <ApplicationsCard
-                            key={config.key}
-                            records={
-                              currentSensorState.sensorData[config.key] ?? []
-                            }
-                            loading={pendingSensorKeys.has(config.key)}
-                            exportHref={selectedSensorExportHref(config.key)}
-                          />
+                          <div key={config.key} className="col-span-full">
+                            <ApplicationsCard
+                              foregroundRecords={sensorRecords("applications")}
+                              crashRecords={sensorRecords(
+                                "applications-crashes",
+                              )}
+                              historyRecords={sensorRecords(
+                                "applications-history",
+                              )}
+                              notificationRecords={sensorRecords(
+                                "applications-notifications",
+                              )}
+                              foregroundLoading={sensorLoading("applications")}
+                              crashLoading={sensorLoading(
+                                "applications-crashes",
+                              )}
+                              historyLoading={sensorLoading(
+                                "applications-history",
+                              )}
+                              notificationLoading={sensorLoading(
+                                "applications-notifications",
+                              )}
+                              exportHref={selectedSensorExportHref(config.key)}
+                            />
+                          </div>
                         ) : (
                           <SensorTimeSeriesCard
                             key={config.key}
