@@ -77,26 +77,61 @@ If you want HTTPS, obtain a certificate for your domain before running setup —
 
 ## How to perform the deployment
 
-### 1. Clone the repository
+### 1. Open a terminal
+
+You will type all the commands below into a terminal (command-line) window. Here is how to open one:
+
+| OS          | How to open a terminal                                                                                         |
+| ----------- | -------------------------------------------------------------------------------------------------------------- |
+| **macOS**   | Press **⌘ + Space**, type **Terminal**, press Enter                                                            |
+| **Windows** | Press **Win + S**, type **PowerShell**, right-click **Windows PowerShell** and choose **Run as administrator** |
+| **Linux**   | Press **Ctrl + Alt + T**, or search for **Terminal** in your application menu                                  |
+
+Once the terminal is open, you can copy each command below and paste it in, then press **Enter** to run it. Do this one command at a time and wait for each one to finish before moving to the next.
+
+### 2. Clone the repository
+
+When a terminal opens, it places you in a default location on your computer — usually your home folder (something like `C:\Users\yourname` on Windows or `/Users/yourname` on macOS). You can clone the project anywhere you like, but it is a good idea to keep code in a dedicated folder so it is easy to find later.
+
+For example, to create a `dev` folder and clone into it:
 
 ```bash
+mkdir dev
+cd dev
 git clone https://github.com/va13k/aware_dashboard.git
 cd aware_dashboard
 ```
 
-### 2. Run the setup script
+What each command does:
 
-macOS / Linux:
+- `mkdir dev` — creates a new folder called `dev` in your current location
+- `cd dev` — moves you into that folder
+- `git clone ...` — downloads the project into a new subfolder called `aware_dashboard`
+- `cd aware_dashboard` — moves you into the project folder
+
+All following commands must be run from inside the `aware_dashboard` folder. You can confirm you are in the right place by checking that your terminal prompt shows `aware_dashboard` at the end of the path.
+
+### 3. Run the setup script
+
+Before running the script, **make sure Docker Desktop is open and fully started**. You should see the Docker whale icon in your taskbar (Windows) or menu bar (macOS) and it should not be showing a loading spinner — if it is still starting up, wait until it settles before continuing.
+
+> On Linux, Docker runs as a background service and does not need a Desktop app — you can skip this step.
+
+Once Docker is running, start the guided setup wizard with the command that matches your operating system:
+
+**macOS / Linux:**
 
 ```bash
 ./setup.sh
 ```
 
-Windows:
+**Windows (PowerShell):**
 
 ```bat
-setup.bat
+./setup.bat
 ```
+
+> **Windows note:** If you get a message saying the script is not recognised, make sure you are in the `aware_dashboard` folder (you should see it in the prompt) and that Docker Desktop is running before you try again.
 
 The script checks that Docker and Python 3 are available, then does the following automatically:
 
@@ -391,64 +426,64 @@ A research-grade inventory of the complete dataset — useful for understanding 
 
 The table below lists every sensor the dashboard can display, as configured in the Analytics Dashboard. For full documentation on each sensor visit the [official AWARE sensor reference](https://awareframework.com/sensors/).
 
-| Sensor | Android | iOS | Unit |
-|---|:---:|:---:|---|
-| Accelerometer | ✓ | ✓ | g |
-| Ambient Noise | ✓ | ✓ | dB |
-| Barometer | ✓ | ✓ | hPa |
-| Battery Level | ✓ | ✓ | % |
-| Battery Charges | ✓ | ✓ | event |
-| Battery Discharges | ✓ | ✓ | event |
-| Bluetooth RSSI | ✓ | ✓ | dBm |
-| Calls | ✓ | ✓ | event |
-| Gyroscope | ✓ | ✓ | rad/s |
-| Linear Accelerometer | ✓ | ✓ | g |
-| Location | ✓ | ✓ | m/s |
-| Magnetometer | ✓ | ✓ | μT |
-| Network | ✓ | ✓ | event |
-| OpenWeather | ✓ | ✓ | °C |
-| Processor | ✓ | ✓ | % |
-| Rotation | ✓ | ✓ | rad/s |
-| Screen Status | ✓ | ✓ | |
-| Significant Motion | ✓ | ✓ | |
-| Timezone | ✓ | ✓ | event |
-| ESM/EMA | ✓ | ✓ | event |
-| WiFi | ✓ | ✓ | |
-| Application Crashes | ✓ | — | event |
-| Application History | ✓ | — | event |
-| Application Notifications | ✓ | — | event |
-| Applications | ✓ | — | event |
-| Gravity | ✓ | — | g |
-| Installations | ✓ | — | event |
-| Keyboard | ✓ | — | event |
-| Light | ✓ | — | lux |
-| Messages | ✓ | — | event |
-| Network Traffic | ✓ | — | bytes |
-| Notes | ✓ | — | event |
-| Proximity | ✓ | — | |
-| Screen Text | ✓ | — | event |
-| Telephony | ✓ | — | event |
-| Temperature | ✓ | — | °C |
-| Touch | ✓ | — | event |
-| Activity Recognition | — | ✓ | event |
-| Calendar | — | ✓ | event |
-| Contacts | — | ✓ | event |
-| Conversation | — | ✓ | event |
-| Device Usage | — | ✓ | event |
-| ESM Scheduler | — | ✓ | event |
-| Fitbit | — | ✓ | event |
-| Fitbit Data | — | ✓ | |
-| Fitbit Device | — | ✓ | event |
-| Fused Location | — | ✓ | m |
-| Google Calendar ESM | — | ✓ | event |
-| Headphone Motion | — | ✓ | m/s² |
-| Heart Rate (BLE) | — | ✓ | bpm |
-| HealthKit | — | ✓ | |
-| HealthKit Category | — | ✓ | event |
-| HealthKit Quantity | — | ✓ | |
-| HealthKit Workout | — | ✓ | event |
-| Location Visit | — | ✓ | event |
-| Memory | — | ✓ | |
-| NTP | — | ✓ | ms |
-| Pedometer | — | ✓ | steps |
-| Push Notification | — | ✓ | event |
+| Sensor                    | Android | iOS | Unit  |
+| ------------------------- | :-----: | :-: | ----- |
+| Accelerometer             |    ✓    |  ✓  | g     |
+| Ambient Noise             |    ✓    |  ✓  | dB    |
+| Barometer                 |    ✓    |  ✓  | hPa   |
+| Battery Level             |    ✓    |  ✓  | %     |
+| Battery Charges           |    ✓    |  ✓  | event |
+| Battery Discharges        |    ✓    |  ✓  | event |
+| Bluetooth RSSI            |    ✓    |  ✓  | dBm   |
+| Calls                     |    ✓    |  ✓  | event |
+| Gyroscope                 |    ✓    |  ✓  | rad/s |
+| Linear Accelerometer      |    ✓    |  ✓  | g     |
+| Location                  |    ✓    |  ✓  | m/s   |
+| Magnetometer              |    ✓    |  ✓  | μT    |
+| Network                   |    ✓    |  ✓  | event |
+| OpenWeather               |    ✓    |  ✓  | °C    |
+| Processor                 |    ✓    |  ✓  | %     |
+| Rotation                  |    ✓    |  ✓  | rad/s |
+| Screen Status             |    ✓    |  ✓  |       |
+| Significant Motion        |    ✓    |  ✓  |       |
+| Timezone                  |    ✓    |  ✓  | event |
+| ESM/EMA                   |    ✓    |  ✓  | event |
+| WiFi                      |    ✓    |  ✓  |       |
+| Application Crashes       |    ✓    |  —  | event |
+| Application History       |    ✓    |  —  | event |
+| Application Notifications |    ✓    |  —  | event |
+| Applications              |    ✓    |  —  | event |
+| Gravity                   |    ✓    |  —  | g     |
+| Installations             |    ✓    |  —  | event |
+| Keyboard                  |    ✓    |  —  | event |
+| Light                     |    ✓    |  —  | lux   |
+| Messages                  |    ✓    |  —  | event |
+| Network Traffic           |    ✓    |  —  | bytes |
+| Notes                     |    ✓    |  —  | event |
+| Proximity                 |    ✓    |  —  |       |
+| Screen Text               |    ✓    |  —  | event |
+| Telephony                 |    ✓    |  —  | event |
+| Temperature               |    ✓    |  —  | °C    |
+| Touch                     |    ✓    |  —  | event |
+| Activity Recognition      |    —    |  ✓  | event |
+| Calendar                  |    —    |  ✓  | event |
+| Contacts                  |    —    |  ✓  | event |
+| Conversation              |    —    |  ✓  | event |
+| Device Usage              |    —    |  ✓  | event |
+| ESM Scheduler             |    —    |  ✓  | event |
+| Fitbit                    |    —    |  ✓  | event |
+| Fitbit Data               |    —    |  ✓  |       |
+| Fitbit Device             |    —    |  ✓  | event |
+| Fused Location            |    —    |  ✓  | m     |
+| Google Calendar ESM       |    —    |  ✓  | event |
+| Headphone Motion          |    —    |  ✓  | m/s²  |
+| Heart Rate (BLE)          |    —    |  ✓  | bpm   |
+| HealthKit                 |    —    |  ✓  |       |
+| HealthKit Category        |    —    |  ✓  | event |
+| HealthKit Quantity        |    —    |  ✓  |       |
+| HealthKit Workout         |    —    |  ✓  | event |
+| Location Visit            |    —    |  ✓  | event |
+| Memory                    |    —    |  ✓  |       |
+| NTP                       |    —    |  ✓  | ms    |
+| Pedometer                 |    —    |  ✓  | steps |
+| Push Notification         |    —    |  ✓  | event |
