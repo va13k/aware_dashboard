@@ -144,6 +144,8 @@ The script checks that Docker and Python 3 are available, then does the followin
    The path contains a one-time random token that is valid for this session only.
 4. **Tries to open the URL in your browser** automatically (macOS and Linux with a desktop). On a headless server, this step does nothing — see [Remote server deployment](#remote-server-deployment) below.
 
+Once the setup page opens in your browser — either automatically or after you copied the URL from the terminal — you are ready to continue. **Proceed to [Step 3 — Complete the setup wizard](#3-complete-the-setup-wizard).**
+
 ### Re-running setup
 
 If `.env` and `aware-micro-server/aware-config.json` already exist, the script detects them and offers a choice:
