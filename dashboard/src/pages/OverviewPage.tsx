@@ -1,6 +1,11 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { exportAllHref, exportSensorZipHref, fetchDevices, fetchSensor } from "../api/client";
+import {
+  exportAllHref,
+  exportSensorZipHref,
+  fetchDevices,
+  fetchSensor,
+} from "../api/client";
 import {
   ANDROID_SENSOR_CONFIGS,
   IOS_SENSOR_CONFIGS,
@@ -67,9 +72,8 @@ export default function OverviewPage() {
   const [loadingKeys, setLoadingKeys] = useState<Set<string>>(
     new Set(SENSOR_CONFIGS.map((s) => s.key)),
   );
-  const [hideEmptySensors, setHideEmptySensors] = useState(
-    readHideEmptySensors,
-  );
+  const [hideEmptySensors, setHideEmptySensors] =
+    useState(readHideEmptySensors);
   const [error, setError] = useState<string | null>(null);
   const [now, setNow] = useState(() => Date.now());
 
@@ -312,7 +316,8 @@ export default function OverviewPage() {
                   loading={loadingKeys.has(config.key)}
                   className="h-full overflow-hidden"
                   androidExportHref={
-                    config.platform === "shared" || config.platform === "android"
+                    config.platform === "shared" ||
+                    config.platform === "android"
                       ? exportSensorZipHref("android", config.key)
                       : undefined
                   }

@@ -1,4 +1,9 @@
-import type { DeviceDetail, DevicesResponse, Manifest, SensorRecord } from "../types";
+import type {
+  DeviceDetail,
+  DevicesResponse,
+  Manifest,
+  SensorRecord,
+} from "../types";
 
 export const BASE = "/api";
 

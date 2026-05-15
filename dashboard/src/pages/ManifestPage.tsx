@@ -23,15 +23,24 @@ function fmtDateTime(iso: string): string {
   });
 }
 
-function studySpan(manifest: Manifest): { first: number | null; last: number | null } {
+function studySpan(manifest: Manifest): {
+  first: number | null;
+  last: number | null;
+} {
   let first: number | null = null;
   let last: number | null = null;
   for (const platform of Object.values(manifest.platforms)) {
     for (const entry of Object.values(platform.sensors)) {
       if (entry.first_timestamp != null)
-        first = first == null ? entry.first_timestamp : Math.min(first, entry.first_timestamp);
+        first =
+          first == null
+            ? entry.first_timestamp
+            : Math.min(first, entry.first_timestamp);
       if (entry.last_timestamp != null)
-        last = last == null ? entry.last_timestamp : Math.max(last, entry.last_timestamp);
+        last =
+          last == null
+            ? entry.last_timestamp
+            : Math.max(last, entry.last_timestamp);
     }
   }
   return { first, last };
@@ -59,7 +68,9 @@ function downloadJson(manifest: Manifest) {
   URL.revokeObjectURL(url);
 }
 
-const sensorConfigMap = Object.fromEntries(SENSOR_CONFIGS.map((s) => [s.key, s]));
+const sensorConfigMap = Object.fromEntries(
+  SENSOR_CONFIGS.map((s) => [s.key, s]),
+);
 
 interface SensorRowProps {
   name: string;
@@ -75,9 +86,7 @@ function SensorRow({ name, entry, deviceCount }: SensorRowProps) {
   return (
     <div
       className={`rounded-2xl border px-4 py-3 transition-colors ${
-        hasData
-          ? "border-wire bg-card"
-          : "border-wire/50 bg-card/40"
+        hasData ? "border-wire bg-card" : "border-wire/50 bg-card/40"
       }`}
     >
       <div className="flex flex-wrap items-start gap-x-4 gap-y-2">
@@ -85,9 +94,13 @@ function SensorRow({ name, entry, deviceCount }: SensorRowProps) {
         <div className="flex min-w-[160px] flex-1 items-center gap-2">
           <span
             className="h-2 w-2 shrink-0 rounded-full"
-            style={{ background: config?.color ?? (hasData ? "#5f746b" : "#c4cfc8") }}
+            style={{
+              background: config?.color ?? (hasData ? "#5f746b" : "#c4cfc8"),
+            }}
           />
-          <span className={`text-[13px] font-semibold ${hasData ? "text-ink" : "text-sage/60"}`}>
+          <span
+            className={`text-[13px] font-semibold ${hasData ? "text-ink" : "text-sage/60"}`}
+          >
             {config?.label ?? name}
           </span>
           {!hasData && (
@@ -100,36 +113,57 @@ function SensorRow({ name, entry, deviceCount }: SensorRowProps) {
         {/* Stats */}
         <div className="flex flex-wrap items-center gap-x-5 gap-y-1">
           <div className="text-right">
-            <div className="text-[10px] uppercase tracking-[0.5px] text-sage">Records</div>
-            <div className={`text-[13px] font-bold ${hasData ? "text-ink" : "text-sage/40"}`}>
+            <div className="text-[10px] uppercase tracking-[0.5px] text-sage">
+              Records
+            </div>
+            <div
+              className={`text-[13px] font-bold ${hasData ? "text-ink" : "text-sage/40"}`}
+            >
               {entry.row_count.toLocaleString()}
             </div>
           </div>
 
           <div className="text-right">
-            <div className="text-[10px] uppercase tracking-[0.5px] text-sage">Devices</div>
-            <div className={`text-[13px] font-bold ${hasData ? "text-ink" : "text-sage/40"}`}>
+            <div className="text-[10px] uppercase tracking-[0.5px] text-sage">
+              Devices
+            </div>
+            <div
+              className={`text-[13px] font-bold ${hasData ? "text-ink" : "text-sage/40"}`}
+            >
               {entry.devices_with_data}
-              <span className="text-[11px] font-normal text-sage"> / {deviceCount}</span>
+              <span className="text-[11px] font-normal text-sage">
+                {" "}
+                / {deviceCount}
+              </span>
             </div>
           </div>
 
           <div className="text-right">
-            <div className="text-[10px] uppercase tracking-[0.5px] text-sage">First sample</div>
-            <div className={`text-[13px] font-bold ${hasData ? "text-ink" : "text-sage/40"}`}>
+            <div className="text-[10px] uppercase tracking-[0.5px] text-sage">
+              First sample
+            </div>
+            <div
+              className={`text-[13px] font-bold ${hasData ? "text-ink" : "text-sage/40"}`}
+            >
               {fmtDate(entry.first_timestamp)}
             </div>
           </div>
 
           <div className="text-right">
-            <div className="text-[10px] uppercase tracking-[0.5px] text-sage">Last sample</div>
-            <div className={`text-[13px] font-bold ${hasData ? "text-ink" : "text-sage/40"}`}>
+            <div className="text-[10px] uppercase tracking-[0.5px] text-sage">
+              Last sample
+            </div>
+            <div
+              className={`text-[13px] font-bold ${hasData ? "text-ink" : "text-sage/40"}`}
+            >
               {fmtDate(entry.last_timestamp)}
             </div>
           </div>
 
           <div className="text-right">
-            <div className="text-[10px] uppercase tracking-[0.5px] text-sage">Fields</div>
+            <div className="text-[10px] uppercase tracking-[0.5px] text-sage">
+              Fields
+            </div>
             <button
               onClick={() => setFieldsOpen((o) => !o)}
               className="text-[13px] font-bold text-teal hover:underline cursor-pointer"
@@ -165,13 +199,18 @@ function PlatformSection({ platform, manifest }: PlatformSectionProps) {
   const data = manifest.platforms[platform];
   const label = platform === "android" ? "Android" : "iOS";
   const dotColor = platform === "android" ? "#22c55e" : "#3b82f6";
-  const sensors = Object.entries(data.sensors).sort(([, a], [, b]) => b.row_count - a.row_count);
+  const sensors = Object.entries(data.sensors).sort(
+    ([, a], [, b]) => b.row_count - a.row_count,
+  );
   const sensorsWithData = sensors.filter(([, e]) => e.row_count > 0).length;
 
   return (
     <section>
       <div className="mb-3 flex items-center gap-3 px-1">
-        <span className="h-2.5 w-2.5 rounded-full" style={{ background: dotColor }} />
+        <span
+          className="h-2.5 w-2.5 rounded-full"
+          style={{ background: dotColor }}
+        />
         <h2 className="text-[15px] font-bold text-ink">{label}</h2>
         <span className="text-[12px] text-sage">
           {data.device_count} {data.device_count === 1 ? "device" : "devices"} ·{" "}
@@ -220,7 +259,8 @@ export default function ManifestPage() {
   const span = manifest ? studySpan(manifest) : null;
   const total = manifest ? totalRecords(manifest) : null;
   const allDevices = manifest
-    ? manifest.platforms.android.device_count + manifest.platforms.ios.device_count
+    ? manifest.platforms.android.device_count +
+      manifest.platforms.ios.device_count
     : null;
 
   return (
@@ -282,7 +322,9 @@ export default function ManifestPage() {
               key={label}
               className="rounded-xl border border-wire bg-card-strong/70 px-4 py-3"
             >
-              <div className="text-[10px] uppercase tracking-[0.5px] text-sage">{label}</div>
+              <div className="text-[10px] uppercase tracking-[0.5px] text-sage">
+                {label}
+              </div>
               <div className="mt-1 text-[15px] font-bold text-ink">{value}</div>
             </div>
           ))}

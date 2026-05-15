@@ -102,7 +102,8 @@ function buildConversationEvents(records: SensorRecord[]): ConversationEvent[] {
         time: record.timestamp,
         start,
         end,
-        durationMs: start != null && end != null && end >= start ? end - start : null,
+        durationMs:
+          start != null && end != null && end >= start ? end - start : null,
       };
     })
     .filter((event): event is ConversationEvent => event != null)
@@ -123,7 +124,9 @@ export default function ConversationRecordsCard({
 }: Props) {
   const inferenceData = buildInferenceData(records);
   const conversationEvents = buildConversationEvents(records);
-  const featureRows = records.filter((record) => numberValue(record.datatype) === 1).length;
+  const featureRows = records.filter(
+    (record) => numberValue(record.datatype) === 1,
+  ).length;
   const latestInference = inferenceData.length
     ? inferenceData[inferenceData.length - 1]
     : null;
@@ -131,8 +134,13 @@ export default function ConversationRecordsCard({
   const durations = conversationEvents
     .map((event) => event.durationMs)
     .filter((duration): duration is number => duration != null);
-  const totalDurationMs = durations.reduce((sum, duration) => sum + duration, 0);
-  const averageDurationMs = durations.length ? totalDurationMs / durations.length : null;
+  const totalDurationMs = durations.reduce(
+    (sum, duration) => sum + duration,
+    0,
+  );
+  const averageDurationMs = durations.length
+    ? totalDurationMs / durations.length
+    : null;
   const recentEvents = conversationEvents.slice(-3).reverse();
   const spanMs =
     inferenceData.length > 1
@@ -156,13 +164,18 @@ export default function ConversationRecordsCard({
       {records.length > 0 && (
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mb-3 text-[11px] text-sage">
           <span>
-            <b className="text-ink">{records.length.toLocaleString()}</b> records
+            <b className="text-ink">{records.length.toLocaleString()}</b>{" "}
+            records
           </span>
           <span>
-            samples <b className="text-ink">{inferenceData.length.toLocaleString()}</b>
+            samples{" "}
+            <b className="text-ink">{inferenceData.length.toLocaleString()}</b>
           </span>
           <span>
-            events <b className="text-ink">{conversationEvents.length.toLocaleString()}</b>
+            events{" "}
+            <b className="text-ink">
+              {conversationEvents.length.toLocaleString()}
+            </b>
           </span>
           {latestInference && (
             <>
@@ -170,7 +183,8 @@ export default function ConversationRecordsCard({
                 latest <b className="text-ink">{latestInference.label}</b>
               </span>
               <span>
-                energy <b className="text-ink">{fmt(latestInference.energy, 3)}</b>
+                energy{" "}
+                <b className="text-ink">{fmt(latestInference.energy, 3)}</b>
               </span>
             </>
           )}
@@ -180,10 +194,10 @@ export default function ConversationRecordsCard({
       <div className="mb-3 rounded-lg border border-wire bg-card-strong/70 px-3 py-2 text-[11px] leading-snug text-sage">
         StudentLife audio classifies ambient microphone input into Silence,
         Voice, Noise, or Unknown and stores derived metadata only. Raw audio is
-        not uploaded. The sensor needs microphone permission. Rows with
-        datatype 0 are audio classification samples; datatype 2 rows are
-        conversation start/end events; datatype 1 feature rows are effectively
-        unused in this implementation.
+        not uploaded. The sensor needs microphone permission. Rows with datatype
+        0 are audio classification samples; datatype 2 rows are conversation
+        start/end events; datatype 1 feature rows are effectively unused in this
+        implementation.
       </div>
 
       {loading ? (
@@ -200,7 +214,10 @@ export default function ConversationRecordsCard({
                 data={inferenceData}
                 margin={{ top: 4, right: 8, left: 0, bottom: 0 }}
               >
-                <CartesianGrid strokeDasharray="3 3" stroke="rgba(48,67,54,0.12)" />
+                <CartesianGrid
+                  strokeDasharray="3 3"
+                  stroke="rgba(48,67,54,0.12)"
+                />
                 <XAxis
                   dataKey="time"
                   tickFormatter={tickFormatter}
@@ -225,7 +242,9 @@ export default function ConversationRecordsCard({
                   tickFormatter={(value) => fmt(Number(value), 1)}
                 />
                 <Tooltip
-                  labelFormatter={(value) => new Date(value as number).toLocaleString()}
+                  labelFormatter={(value) =>
+                    new Date(value as number).toLocaleString()
+                  }
                   formatter={(value: unknown, name: unknown) =>
                     name === "inference"
                       ? [
@@ -326,8 +345,8 @@ export default function ConversationRecordsCard({
 
           {featureRows > 0 && (
             <div className="rounded-lg border border-wire bg-card-strong/70 px-3 py-2 text-[11px] leading-snug text-sage">
-              {featureRows.toLocaleString()} datatype 1 feature rows are present.
-              Feature payload saving is not expected in the current iOS
+              {featureRows.toLocaleString()} datatype 1 feature rows are
+              present. Feature payload saving is not expected in the current iOS
               implementation, so inspect blob_feature only if the app was
               modified.
             </div>

@@ -138,8 +138,14 @@ function LocationMetricChart({
             </span>
           </div>
           <ResponsiveContainer width="100%" height={120}>
-            <LineChart data={data} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="rgba(48,67,54,0.12)" />
+            <LineChart
+              data={data}
+              margin={{ top: 4, right: 8, left: 0, bottom: 0 }}
+            >
+              <CartesianGrid
+                strokeDasharray="3 3"
+                stroke="rgba(48,67,54,0.12)"
+              />
               <XAxis
                 dataKey="time"
                 tickFormatter={(v) =>
@@ -244,8 +250,8 @@ export default function LocationRecordsCard({
             <div className="rounded-lg border border-wire bg-card-strong/70 px-3 py-2 text-[11px] leading-snug text-sage">
               Accuracy is the estimated position radius in meters for the
               location fix. For example, 10 means the position is estimated
-              within about 10 m, 150 within about 150 m, and 1000 within about
-              1 km. Negative accuracy means invalid or unavailable accuracy.
+              within about 10 m, 150 within about 150 m, and 1000 within about 1
+              km. Negative accuracy means invalid or unavailable accuracy.
             </div>
           )}
         </div>

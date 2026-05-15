@@ -34,7 +34,11 @@ function numberValue(value: unknown): number | null {
   return null;
 }
 
-function axisValue(record: SensorRecord, rawKey: string, iosKey: string): number | null {
+function axisValue(
+  record: SensorRecord,
+  rawKey: string,
+  iosKey: string,
+): number | null {
   return numberValue(record[rawKey]) ?? numberValue(record[iosKey]);
 }
 
@@ -147,7 +151,9 @@ export default function AccelerometerRecordsCard({
               tickFormatter={(value) => fmt(Number(value), 1)}
             />
             <Tooltip
-              labelFormatter={(value) => new Date(value as number).toLocaleString()}
+              labelFormatter={(value) =>
+                new Date(value as number).toLocaleString()
+              }
               formatter={(value: unknown, name: unknown) => [
                 `${fmt(Number(value), 3)} g`,
                 String(name).toUpperCase(),
@@ -160,9 +166,27 @@ export default function AccelerometerRecordsCard({
               labelStyle={{ color: "#5f746b" }}
               itemStyle={{ color: "#193229" }}
             />
-            <Line type="monotone" dataKey="x" stroke="#f97316" dot={false} strokeWidth={2} />
-            <Line type="monotone" dataKey="y" stroke="#2563eb" dot={false} strokeWidth={2} />
-            <Line type="monotone" dataKey="z" stroke="#16a34a" dot={false} strokeWidth={2} />
+            <Line
+              type="monotone"
+              dataKey="x"
+              stroke="#f97316"
+              dot={false}
+              strokeWidth={2}
+            />
+            <Line
+              type="monotone"
+              dataKey="y"
+              stroke="#2563eb"
+              dot={false}
+              strokeWidth={2}
+            />
+            <Line
+              type="monotone"
+              dataKey="z"
+              stroke="#16a34a"
+              dot={false}
+              strokeWidth={2}
+            />
           </LineChart>
         </ResponsiveContainer>
       )}

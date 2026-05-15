@@ -87,7 +87,8 @@ export default function DeviceUsageRecordsCard({
   const totalOnMs = data.reduce((sum, point) => sum + point.onMs, 0);
   const totalOffMs = data.reduce((sum, point) => sum + point.offMs, 0);
   const last = data.length ? data[data.length - 1] : null;
-  const spanMs = data.length > 1 ? data[data.length - 1].time - data[0].time : 0;
+  const spanMs =
+    data.length > 1 ? data[data.length - 1].time - data[0].time : 0;
   const tickFormatter = makeTickFormatter(spanMs);
 
   return (
@@ -106,13 +107,15 @@ export default function DeviceUsageRecordsCard({
       {records.length > 0 && (
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mb-3 text-[11px] text-sage">
           <span>
-            <b className="text-ink">{records.length.toLocaleString()}</b> records
+            <b className="text-ink">{records.length.toLocaleString()}</b>{" "}
+            records
           </span>
           <span>
             on intervals <b className="text-ink">{onEvents.toLocaleString()}</b>
           </span>
           <span>
-            off intervals <b className="text-ink">{offEvents.toLocaleString()}</b>
+            off intervals{" "}
+            <b className="text-ink">{offEvents.toLocaleString()}</b>
           </span>
           {last && (
             <span>
@@ -148,7 +151,10 @@ export default function DeviceUsageRecordsCard({
               data={data}
               margin={{ top: 4, right: 8, left: 0, bottom: 0 }}
             >
-              <CartesianGrid strokeDasharray="3 3" stroke="rgba(48,67,54,0.12)" />
+              <CartesianGrid
+                strokeDasharray="3 3"
+                stroke="rgba(48,67,54,0.12)"
+              />
               <XAxis
                 dataKey="time"
                 tickFormatter={tickFormatter}
@@ -161,11 +167,15 @@ export default function DeviceUsageRecordsCard({
                 tickFormatter={(value) => fmt(Number(value), 1)}
               />
               <Tooltip
-                labelFormatter={(value) => new Date(value as number).toLocaleString()}
+                labelFormatter={(value) =>
+                  new Date(value as number).toLocaleString()
+                }
                 formatter={(value: unknown, name: unknown, item: unknown) => {
                   const payload = (item as { payload?: UsagePoint }).payload;
                   const ms =
-                    name === "onMinutes" ? payload?.onMs ?? 0 : payload?.offMs ?? 0;
+                    name === "onMinutes"
+                      ? (payload?.onMs ?? 0)
+                      : (payload?.offMs ?? 0);
                   return [
                     `${formatDuration(ms)} (${fmt(Number(value), 2)} min)`,
                     name === "onMinutes" ? "Device on" : "Device off",

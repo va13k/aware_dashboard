@@ -42,13 +42,21 @@ function chartData(records: SensorRecord[]) {
     .sort((a, b) => a.time - b.time);
 }
 
-export default function CallsRecordsCard({ records, loading, exportHref }: Props) {
+export default function CallsRecordsCard({
+  records,
+  loading,
+  exportHref,
+}: Props) {
   const sessionCount = new Set(
-    records.map((record) => record.trace).filter((trace) => trace != null && trace !== ""),
+    records
+      .map((record) => record.trace)
+      .filter((trace) => trace != null && trace !== ""),
   ).size;
   const data = chartData(records);
   const durations = data.map((row) => row.duration);
-  const lastDuration = durations.length ? durations[durations.length - 1] : null;
+  const lastDuration = durations.length
+    ? durations[durations.length - 1]
+    : null;
 
   return (
     <div className="bg-card backdrop-blur-xl border border-wire rounded-3xl shadow-card p-5">
@@ -87,8 +95,14 @@ export default function CallsRecordsCard({ records, loading, exportHref }: Props
 
           {data.length ? (
             <ResponsiveContainer width="100%" height={160}>
-              <LineChart data={data} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="rgba(48,67,54,0.12)" />
+              <LineChart
+                data={data}
+                margin={{ top: 4, right: 8, left: 0, bottom: 0 }}
+              >
+                <CartesianGrid
+                  strokeDasharray="3 3"
+                  stroke="rgba(48,67,54,0.12)"
+                />
                 <XAxis
                   dataKey="time"
                   tickFormatter={(v) =>
@@ -103,7 +117,10 @@ export default function CallsRecordsCard({ records, loading, exportHref }: Props
                 <YAxis tick={{ fill: "#5f746b", fontSize: 11 }} width={45} />
                 <Tooltip
                   labelFormatter={(v) => timeText(v as number)}
-                  formatter={(v: unknown) => [`${fmt(Number(v))} s`, "Duration"]}
+                  formatter={(v: unknown) => [
+                    `${fmt(Number(v))} s`,
+                    "Duration",
+                  ]}
                   contentStyle={{
                     background: "#fffdf8",
                     border: "1px solid rgba(48,67,54,0.14)",
@@ -137,7 +154,8 @@ export default function CallsRecordsCard({ records, loading, exportHref }: Props
           </div>
 
           <div className="rounded-lg border border-wire bg-card-strong/70 px-3 py-2 text-[11px] leading-snug text-sage">
-            Trace is a CallKit UUID for the call event/session, not a phone number.
+            Trace is a CallKit UUID for the call event/session, not a phone
+            number.
           </div>
         </div>
       )}

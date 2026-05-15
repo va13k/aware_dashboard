@@ -34,7 +34,11 @@ function numberValue(value: unknown): number | null {
   return null;
 }
 
-function axisValue(record: SensorRecord, rawKey: string, iosKey: string): number | null {
+function axisValue(
+  record: SensorRecord,
+  rawKey: string,
+  iosKey: string,
+): number | null {
   return numberValue(record[rawKey]) ?? numberValue(record[iosKey]);
 }
 
@@ -84,9 +88,7 @@ export default function GyroscopeRecordsCard({
     <div className="bg-card backdrop-blur-xl border border-wire rounded-3xl shadow-card p-5">
       <div className="flex items-center gap-2 mb-1">
         <span className="w-2 h-2 rounded-full shrink-0 bg-[#ef4444]" />
-        <h3 className="text-[13px] font-semibold flex-1 text-ink">
-          Gyroscope
-        </h3>
+        <h3 className="text-[13px] font-semibold flex-1 text-ink">Gyroscope</h3>
         <span className="text-[11px] text-sage bg-[rgba(48,67,54,0.07)] px-1.5 py-0.5 rounded-md">
           rad/s
         </span>
@@ -145,7 +147,9 @@ export default function GyroscopeRecordsCard({
               tickFormatter={(value) => fmt(Number(value), 1)}
             />
             <Tooltip
-              labelFormatter={(value) => new Date(value as number).toLocaleString()}
+              labelFormatter={(value) =>
+                new Date(value as number).toLocaleString()
+              }
               formatter={(value: unknown, name: unknown) => [
                 `${fmt(Number(value), 3)} rad/s`,
                 String(name).toUpperCase(),
@@ -158,9 +162,27 @@ export default function GyroscopeRecordsCard({
               labelStyle={{ color: "#5f746b" }}
               itemStyle={{ color: "#193229" }}
             />
-            <Line type="monotone" dataKey="x" stroke="#f97316" dot={false} strokeWidth={2} />
-            <Line type="monotone" dataKey="y" stroke="#2563eb" dot={false} strokeWidth={2} />
-            <Line type="monotone" dataKey="z" stroke="#16a34a" dot={false} strokeWidth={2} />
+            <Line
+              type="monotone"
+              dataKey="x"
+              stroke="#f97316"
+              dot={false}
+              strokeWidth={2}
+            />
+            <Line
+              type="monotone"
+              dataKey="y"
+              stroke="#2563eb"
+              dot={false}
+              strokeWidth={2}
+            />
+            <Line
+              type="monotone"
+              dataKey="z"
+              stroke="#16a34a"
+              dot={false}
+              strokeWidth={2}
+            />
           </LineChart>
         </ResponsiveContainer>
       )}

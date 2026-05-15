@@ -65,7 +65,9 @@ export default function BluetoothRecordsCard({
   loading,
   exportHref,
 }: Props) {
-  const rows = [...records].sort((a, b) => b.timestamp - a.timestamp).slice(0, 30);
+  const rows = [...records]
+    .sort((a, b) => b.timestamp - a.timestamp)
+    .slice(0, 30);
   const data = records
     .map((record): SignalPoint | null => {
       const rssi = numberValue(record.bt_rssi ?? record.rssi);
@@ -125,9 +127,9 @@ export default function BluetoothRecordsCard({
       )}
 
       <div className="mb-3 rounded-lg border border-wire bg-card-strong/70 px-3 py-2 text-[11px] leading-snug text-sage">
-        RSSI closer to 0 is stronger: about -40 is strong, -70 is medium,
-        and -90 is weak. On iPhone, the identifier is a CoreBluetooth
-        peripheral UUID, not the real Bluetooth MAC address. iOS scans BLE
+        RSSI closer to 0 is stronger: about -40 is strong, -70 is medium, and
+        -90 is weak. On iPhone, the identifier is a CoreBluetooth peripheral
+        UUID, not the real Bluetooth MAC address. iOS scans BLE
         advertisements/services, not classic paired-device history, and filters
         may miss nearby devices.
       </div>
@@ -145,7 +147,10 @@ export default function BluetoothRecordsCard({
               data={data}
               margin={{ top: 4, right: 8, left: 0, bottom: 0 }}
             >
-              <CartesianGrid strokeDasharray="3 3" stroke="rgba(48,67,54,0.12)" />
+              <CartesianGrid
+                strokeDasharray="3 3"
+                stroke="rgba(48,67,54,0.12)"
+              />
               <XAxis
                 dataKey="time"
                 tickFormatter={tickFormatter}
@@ -158,7 +163,9 @@ export default function BluetoothRecordsCard({
                 domain={["dataMin - 5", "dataMax + 5"]}
               />
               <Tooltip
-                labelFormatter={(value) => new Date(value as number).toLocaleString()}
+                labelFormatter={(value) =>
+                  new Date(value as number).toLocaleString()
+                }
                 formatter={(value: unknown) => [
                   `${Number(value).toFixed(0)} dBm (${rssiLabel(Number(value))})`,
                   "RSSI",

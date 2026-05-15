@@ -70,7 +70,9 @@ function latestPoint(points: AxisPoint[]): AxisPoint | null {
 }
 
 function uniqueLabels(points: AxisPoint[]): string[] {
-  return Array.from(new Set(points.map((point) => point.label).filter(Boolean)));
+  return Array.from(
+    new Set(points.map((point) => point.label).filter(Boolean)),
+  );
 }
 
 export default function LinearAccelerometerRecordsCard({
@@ -148,9 +150,9 @@ export default function LinearAccelerometerRecordsCard({
 
       <div className="mb-3 rounded-lg border border-wire bg-card-strong/70 px-3 py-2 text-[11px] leading-snug text-sage">
         Linear accelerometer shows phone movement only, with gravity removed.
-        When the phone is still, all three axes should stay close to 0 g.
-        X is left-right movement, Y is up-down movement, and Z is
-        forward-backward movement.
+        When the phone is still, all three axes should stay close to 0 g. X is
+        left-right movement, Y is up-down movement, and Z is forward-backward
+        movement.
       </div>
 
       {loading ? (
