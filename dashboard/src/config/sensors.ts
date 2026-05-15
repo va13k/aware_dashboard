@@ -606,8 +606,18 @@ export const IOS_SENSOR_CONFIGS: SensorConfig[] = [
     label: "Processor",
     unit: "%",
     color: "#475569",
-    platform: "ios",
-    extract: (r) => firstNumber(r, ["load", "processor_load", "usage", "value"]),
+    platform: "shared",
+    extract: (r) =>
+      firstNumber(r, [
+        "double_last_user",
+        "double_user_load",
+        "double_last_system",
+        "double_system_load",
+        "load",
+        "processor_load",
+        "usage",
+        "value",
+      ]),
   },
   {
     key: "push-notification",

@@ -22,6 +22,7 @@ import GyroscopeRecordsCard from "../components/GyroscopeRecordsCard";
 import LinearAccelerometerRecordsCard from "../components/LinearAccelerometerRecordsCard";
 import ConversationRecordsCard from "../components/ConversationRecordsCard";
 import DeviceUsageRecordsCard from "../components/DeviceUsageRecordsCard";
+import ProcessorCard from "../components/ProcessorCard";
 import ExportLink from "../components/ExportLink";
 import type {
   Device,
@@ -555,6 +556,15 @@ export default function DevicePage() {
                               currentSensorState.sensorData[config.key] ?? [],
                           },
                         ]}
+                        loading={pendingSensorKeys.has(config.key)}
+                        exportHref={selectedSensorExportHref(config.key)}
+                      />
+                    ) : config.key === "processor" ? (
+                      <ProcessorCard
+                        key={config.key}
+                        records={
+                          currentSensorState.sensorData[config.key] ?? []
+                        }
                         loading={pendingSensorKeys.has(config.key)}
                         exportHref={selectedSensorExportHref(config.key)}
                       />
