@@ -62,3 +62,24 @@ export type SensorRecord = Record<string, unknown> & {
   timestamp: number;
   device_id: string;
 };
+
+export interface SensorManifestEntry {
+  row_count: number;
+  devices_with_data: number;
+  first_timestamp: number | null;
+  last_timestamp: number | null;
+  fields: string[];
+}
+
+export interface PlatformManifest {
+  device_count: number;
+  sensors: Record<string, SensorManifestEntry>;
+}
+
+export interface Manifest {
+  generated_at: string;
+  platforms: {
+    android: PlatformManifest;
+    ios: PlatformManifest;
+  };
+}

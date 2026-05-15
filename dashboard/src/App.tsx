@@ -7,6 +7,7 @@ import {
 } from "react-router-dom";
 import OverviewPage from "./pages/OverviewPage";
 import DevicePage from "./pages/DevicePage";
+import ManifestPage from "./pages/ManifestPage";
 
 function Layout() {
   return (
@@ -59,6 +60,7 @@ function Layout() {
           <Route path="devices" element={<DevicePage />} />
           <Route path="devices/:platform/:deviceId" element={<DevicePage />} />
           <Route path="devices/:deviceId" element={<DevicePage />} />
+          <Route path="manifest" element={<ManifestPage />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </main>

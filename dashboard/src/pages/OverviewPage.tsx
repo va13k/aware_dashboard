@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
-import { exportAllHref, fetchDevices, fetchSensor } from "../api/client";
+import { Link } from "react-router-dom";
+import { exportAllHref, exportSensorZipHref, fetchDevices, fetchSensor } from "../api/client";
 import {
   ANDROID_SENSOR_CONFIGS,
   IOS_SENSOR_CONFIGS,
@@ -216,6 +217,12 @@ export default function OverviewPage() {
           </div>
           {latestUpload && (
             <div className="flex items-center gap-2">
+              <Link
+                to="/manifest"
+                className="inline-flex h-9 items-center justify-center rounded-lg border border-wire bg-card-strong px-3 text-[10px] font-semibold uppercase tracking-[0.4px] text-sage transition-colors hover:border-teal hover:text-teal"
+              >
+                Manifest
+              </Link>
               <ExportLink
                 href={exportAllHref()}
                 label="Export all"
@@ -233,12 +240,20 @@ export default function OverviewPage() {
             </div>
           )}
           {!latestUpload && devices && (
-            <ExportLink
-              href={exportAllHref()}
-              label="Export all"
-              title="Export all CSVs"
-              className="h-9 px-3 self-start sm:self-center"
-            />
+            <div className="flex items-center gap-2 self-start sm:self-center">
+              <Link
+                to="/manifest"
+                className="inline-flex h-9 items-center justify-center rounded-lg border border-wire bg-card-strong px-3 text-[10px] font-semibold uppercase tracking-[0.4px] text-sage transition-colors hover:border-teal hover:text-teal"
+              >
+                Manifest
+              </Link>
+              <ExportLink
+                href={exportAllHref()}
+                label="Export all"
+                title="Export all CSVs"
+                className="h-9 px-3"
+              />
+            </div>
           )}
         </div>
       </section>
@@ -296,6 +311,16 @@ export default function OverviewPage() {
                   iosRecords={sensorData[config.key]?.ios ?? []}
                   loading={loadingKeys.has(config.key)}
                   className="h-full overflow-hidden"
+                  androidExportHref={
+                    config.platform === "shared" || config.platform === "android"
+                      ? exportSensorZipHref("android", config.key)
+                      : undefined
+                  }
+                  iosExportHref={
+                    config.platform === "shared" || config.platform === "ios"
+                      ? exportSensorZipHref("ios", config.key)
+                      : undefined
+                  }
                 />
               ),
             )}

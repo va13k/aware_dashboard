@@ -1,4 +1,4 @@
-import type { DeviceDetail, DevicesResponse, SensorRecord } from "../types";
+import type { DeviceDetail, DevicesResponse, Manifest, SensorRecord } from "../types";
 
 export const BASE = "/api";
 
@@ -30,10 +30,21 @@ export const fetchSensor = (
 
 export const exportAllHref = (): string => `${BASE}/export/all.zip`;
 
+export const fetchManifest = (): Promise<Manifest> => get("/export/manifest");
+
+export const exportManifestHref = (): string => `${BASE}/export/manifest`;
+
 export const exportDeviceHref = (
   platform: "android" | "ios",
   deviceId: string,
-): string => `${BASE}/export/device/${platform}/${encodeURIComponent(deviceId)}.zip`;
+): string =>
+  `${BASE}/export/device/${platform}/${encodeURIComponent(deviceId)}.zip`;
+
+export const exportSensorZipHref = (
+  platform: "android" | "ios",
+  sensor: string,
+): string =>
+  `${BASE}/export/sensor/${platform}/${encodeURIComponent(sensor)}.zip`;
 
 export const exportSensorHref = (
   platform: "android" | "ios",
