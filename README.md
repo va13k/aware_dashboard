@@ -1,34 +1,81 @@
 # AWARE Dashboard
 
-A Docker-based research framework for collecting sensor and survey data from Android and iOS devices. It combines a study configurator, a mobile data server, a shared MySQL database, and an Nginx reverse proxy into a single setup flow.
+A self-hosted research platform for collecting and visualising sensor data from Android and iOS devices. The entire stack is bundled into a single Docker Compose project that you can deploy with one command.
 
-## Endpoints
+## What it is
 
-The user-facing endpoints are exposed by **Nginx** on ports `80` and `443`.
+Study participants install the **AWARE client app** on their phone (Android or iOS). The app continuously collects sensor data — accelerometer, GPS, screen events, ambient noise, and [many more](#sensor-support). Due to security restrictions on both Android and iOS, participants must **manually trigger a data upload** from inside the app. Once they do, the data is sent to your server and becomes immediately available in the analytics dashboard for browsing, filtering, and export.
 
-### User-facing endpoints
+The full stack comprises six services:
 
-| Public path               | Purpose                                                | Backing service                                     |
-| ------------------------- | ------------------------------------------------------ | --------------------------------------------------- |
-| `/`                       | Main page with links to the available services         | Nginx landing page                                  |
-| `/configurator/`          | Android study builder UI                               | Django + React configurator                         |
-| `/studies/`               | Studies page with Android files and iOS QR/join access | Generated page served by Nginx                      |
-| `/studies/files/`         | Raw Android study JSON file listing                    | Files saved by the configurator and served by Nginx |
-| `/:studyNumber/:studyKey` | Join page for a specific iOS study                     | AWARE Micro Server                                  |
+| Service                                                                        | Role                                                                                        |
+| ------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------- |
+| **Nginx**                                                                      | Reverse proxy — routes all public traffic, terminates TLS, enforces authentication          |
+| **Analytics API**                                                              | FastAPI backend for the dashboard — queries the database and serves sensor data and exports |
+| **Analytics Dashboard**                                                        | React frontend — visualises collected data per device and sensor; exports CSVs and ZIPs     |
+| [**AWARE Configurator**](https://github.com/awareframework/AWARE-Configurator) | Django + React app for building and publishing study configurations for Android and iOS     |
+| [**AWARE Micro Server**](https://github.com/awareframework/aware-micro-server) | Kotlin / Vert.x server that receives data uploads from iOS clients and writes them to MySQL |
+| **MySQL + backup**                                                             | Shared database for all collected data, with a configurable automated backup job            |
 
-### Notes
+A browser-based **setup wizard** is included for the initial deployment — it writes your configuration and launches the stack without any manual file editing.
 
-- Open `http://localhost/` locally, or `http://your-hostname/` on your server, to reach the main page.
-- `/studies/` now combines Android study access with the iOS QR/join page.
-- `/studies/files/` keeps the raw Android JSON file browser.
-- The AWARE iOS client sends `POST` requests to `/index.php/...`; this is an API path, not a standalone user-facing page.
+### Client apps
+
+Study participants need the AWARE mobile app installed on their device:
+
+- **Android** and **iOS** clients are available at [awareframework.com/downloads](https://awareframework.com/downloads/)
+
+Once a participant joins a study (by scanning a QR code or entering a study URL), the app begins collecting sensor data locally and waits for the participant to manually sync it to the server.
 
 ## Prerequisites
 
-- [Docker](https://docs.docker.com/get-docker/) with Compose v2
-- [Git](https://git-scm.com/)
+### Docker with Compose v2
 
-## Deployment
+The entire stack runs in Docker. No other runtime (Node, Java, etc.) needs to be installed on the host.
+
+| Platform | What to install                                                                                                             |
+| -------- | --------------------------------------------------------------------------------------------------------------------------- |
+| macOS    | [Docker Desktop](https://www.docker.com/products/docker-desktop/) — Compose v2 is included                                  |
+| Windows  | [Docker Desktop](https://www.docker.com/products/docker-desktop/) — Compose v2 is included                                  |
+| Linux    | [Docker Engine](https://docs.docker.com/engine/install/) + [Compose plugin](https://docs.docker.com/compose/install/linux/) |
+
+### Python 3
+
+The setup scripts (`setup.sh` / `setup.bat`) run several Python 3 helper scripts directly on the host to generate config files and initialise the database. No third-party packages are required — only the Python standard library.
+
+| Platform | How to get it                                                                                                         |
+| -------- | --------------------------------------------------------------------------------------------------------------------- |
+| macOS    | Pre-installed on most systems, or install via [Homebrew](https://brew.sh/): `brew install python3`                    |
+| Windows  | Download from [python.org](https://www.python.org/downloads/) — tick **"Add Python to PATH"** during installation     |
+| Linux    | Usually pre-installed. If not: `sudo apt install python3` (Debian/Ubuntu) or `sudo dnf install python3` (RHEL/Fedora) |
+
+Verify with: `python3 --version` (Linux/macOS) or `python --version` (Windows).
+
+### Git
+
+| Platform | How to get it                                                                                                                 |
+| -------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| macOS    | Pre-installed via Xcode Command Line Tools: `xcode-select --install`, or via [Homebrew](https://brew.sh/): `brew install git` |
+| Windows  | Download from [git-scm.com](https://git-scm.com/download/win) — use the default options during installation                   |
+| Linux    | `sudo apt install git` (Debian/Ubuntu) or `sudo dnf install git` (RHEL/Fedora)                                                |
+
+Verify with: `git --version`.
+
+### Network ports
+
+| Port   | Purpose                                                          |
+| ------ | ---------------------------------------------------------------- |
+| `80`   | Main HTTP access — required                                      |
+| `443`  | HTTPS — required only if you enable TLS                          |
+| `9999` | Setup wizard — only needed temporarily during initial deployment |
+
+If you are deploying on a remote server, open ports `80` and `443` in your firewall before running setup. Port `9999` only needs to be reachable from your own machine during the setup step and can be closed afterwards.
+
+### SSL certificate (optional, recommended for remote servers)
+
+If you want HTTPS, obtain a certificate for your domain before running setup — for example with [Let's Encrypt / Certbot](https://certbot.eff.org/). The setup wizard will ask for the paths to the certificate and private key files.
+
+## How to perform the deployment
 
 ### 1. Clone the repository
 
@@ -37,7 +84,7 @@ git clone https://github.com/va13k/aware_dashboard.git
 cd aware_dashboard
 ```
 
-### 2. Run the one-command setup flow
+### 2. Run the setup script
 
 macOS / Linux:
 
@@ -51,207 +98,357 @@ Windows:
 setup.bat
 ```
 
-This opens a setup wizard at `http://localhost:9999`.
+The script checks that Docker and Python 3 are available, then does the following automatically:
 
-When you click **Deploy**, the setup flow will:
+1. **Detects your machine's IP address** — it inspects your network interfaces and picks the best non-loopback, non-virtual address (e.g. `192.168.1.42`). It avoids Docker bridge interfaces, VPN adapters, and loopback.
+2. **Starts the setup wizard** as a temporary Docker container on port `9999`.
+3. **Prints the wizard URL** in the terminal — it looks like:
+   ```
+   http://192.168.1.42:9999/KL0XF9tXQVC4LRY-gCTRDWEQhO6II3IOLxU4/
+   ```
+   The path contains a one-time random token that is valid for this session only.
+4. **Tries to open the URL in your browser** automatically (macOS and Linux with a desktop). On a headless server, this step does nothing — see [Remote server deployment](#remote-server-deployment) below.
 
-1. write `.env`
-2. create or update `aware-micro-server/aware-config.json`
-3. create or update `studies/studyConfig.json`
-4. create or update `studies/index.html`
-5. build the Docker images
-6. start MySQL, the configurator, the micro-server, and Nginx
+### Re-running setup
 
-The runtime stack in `docker-compose.yml` only contains the long-running services. File generation happens inside `setup.sh` and `setup.bat` before the containers are started.
+If `.env` and `aware-micro-server/aware-config.json` already exist, the script detects them and offers a choice:
 
-The intended local prerequisites are only Git and Docker.
+```
+  Existing configuration found (.env)
 
-### Headless Linux server deployment
+  1) Deploy with current config
+  2) Edit configuration first
 
-If you deploy on a Linux server without a graphical desktop, the setup still works, but the browser step happens from another machine.
-
-Step by step:
-
-1. SSH into the server.
-2. Run `./setup.sh`.
-3. The script starts the setup wizard on port `9999`.
-4. Because the server has no GUI, the automatic browser open may do nothing. That is expected.
-5. Open the setup wizard from your own computer using one of these methods:
-
-Option 1: SSH tunnel
-
-```bash
-ssh -L 9999:localhost:9999 your-user@your-server
+  Choose [1/2]:
 ```
 
-Then open `http://localhost:9999` on your local machine.
+- **Option 1** — skips the wizard and redeploys immediately with the saved config.
+- **Option 2** — opens the wizard again so you can change any settings before deploying.
 
-Option 2: Temporary public access
+### Remote server deployment
 
-Temporarily expose port `9999` on the server firewall, open `http://your-server-ip:9999` from your own computer, finish setup, and then close that port again.
+On a Linux server without a graphical desktop, the browser cannot open automatically. The URL is still printed in the terminal — copy it and open it from your own computer.
 
-Once you click **Deploy** in the wizard, the server-side `./setup.sh` process continues automatically, writes the configuration files, and starts the full stack.
+For the wizard to be reachable from your computer, the server's port `9999` must be accessible. Two ways to do this:
 
-### 3. Adjust the micro-server study config if needed
+**Option A — SSH tunnel (recommended, no firewall changes needed)**
 
-The setup flow generates `aware-micro-server/aware-config.json` from `aware-micro-server/aware-config.example.json`, using the public host and protocol you entered in the wizard. By default, it writes `server.database_host` as the internal Docker MySQL service name `mysql`, `server.database_user` as `aware_ios_participant`, and `server.external_server_host` from the public URL. It also generates a Django secret key automatically when one is missing.
+```bash
+ssh -L 9999:localhost:9999 your-user@your-server-ip
+```
 
-After deployment, you can edit `aware-micro-server/aware-config.json` to change:
+Then open `http://localhost:9999/<token>/` on your local machine.
 
-- study metadata
-- researcher details
-- enabled sensors and plugins
-- iOS study key and study number
+**Option B — Temporarily open port 9999**
 
-Changes to `aware-config.json` are reloaded by AWARE Micro automatically.
+Open port `9999` in your firewall, copy the full URL the script printed, open it in your browser, complete setup, then close the port again.
 
-### Micro-server `server` fields
+### 3. Complete the setup wizard
 
-These fields in `aware-micro-server/aware-config.json` are the ones that matter in this Docker deployment:
+The wizard has five steps. A progress bar at the top tracks where you are. You can go back to any previous step before deploying.
 
-- `database_engine`, `database_host`, `database_name`, `database_user`, `database_pwd`, `database_port`: required. The micro-server uses them to connect to MySQL and write iOS study data into `aware_ios`.
-- `external_server_host`, `external_server_port`: required for participant-facing study URLs, QR codes, and websocket URLs that the mobile client sees. These should match the public address participants actually use.
-- `server_host`, `server_port`, `websocket_port`: required internally. They control which address and ports the micro-server listens on inside the container stack. In this project they should normally stay `0.0.0.0`, `8080`, and `8081`.
-- `path_fullchain_pem`, `path_key_pem`: optional here. They are only needed if the micro-server itself terminates TLS. In this setup, Nginx handles HTTPS in front of the micro-server, so these can stay empty.
+---
 
-If your public host and database host are different, you can override the micro-server database target in `.env` with `MICRO_DATABASE_HOST` before redeploying. Public study URLs always come from `PUBLIC_HOST`, `PUBLIC_PORT`, and `PROTOCOL`. If Android clients need a different DB endpoint than `PUBLIC_HOST`, you can also set `ANDROID_DATABASE_HOST`.
+**Step 1 — Database**
 
-### 4. Access the services
+Set the **MySQL root password**. All services (Configurator, Micro Server, Analytics API) use this password internally to connect to the database. Choose a strong password and keep it somewhere safe — you will need it if you ever need to access MySQL directly.
 
-| Service                        | URL                                             |
-| ------------------------------ | ----------------------------------------------- |
-| Main page                      | `http://localhost/` or `http://your-hostname/`  |
-| Configurator (Android)         | `http://your-server/configurator/`              |
-| Android study files            | `http://your-server/studies/`                   |
-| Raw Android study file listing | `http://your-server/studies/files/`             |
-| iOS join page                  | `http://your-server/<study_number>/<study_key>` |
+---
 
-## Setting Up A Study
+**Step 2 — Researcher access**
 
-### Android
+Set the **username and password** for the researcher login. These credentials protect the dashboard, configurator, and backup pages from being accessed by study participants.
 
-1. Open the main page at `/`, then choose **Configurator**, or go directly to `/configurator/`.
-2. Fill in study info, database connection, sensors, and questions.
-3. On the Overview page, click **Download Study Config**.
-4. The study file is saved into `studies/` and exposed at `/studies/files/<study-id>.json`.
-5. Share that URL with Android participants.
+- The username defaults to `researcher` on a fresh install.
+- Use the **Generate** button to create a random secure password.
+- On a re-run, the username is pre-filled from the existing config. Leave the password field blank to keep the current password unchanged.
 
-### iOS
+Save these credentials — you will need them every time you log in to the protected pages.
 
-1. Open the main page at `/`, then choose **Studies**, or go directly to `/studies/`.
-2. Edit `aware-micro-server/aware-config.json` if needed.
-3. In the AWARE iOS app, use the QR code shown on `/studies/`, or enter `http://your-server/index.php/<study_number>/<study_key>` manually. The iOS client then communicates with `/index.php/...` using `POST` requests.
+---
 
-## Sensor Support
+**Step 3 — Network**
 
-Not all sensors are available on both platforms. The table below shows what each platform collects.
+Configure how the platform is reached from the outside.
 
-| Sensor | Android | iOS | Notes |
+**Public host or IP** — a dropdown with three options:
+
+| Option                      | When to use                                                                                       |
+| --------------------------- | ------------------------------------------------------------------------------------------------- |
+| Use detected local IP       | Default. Use this for local or LAN deployments where the auto-detected IP is correct.             |
+| Use localhost               | Use only if everything (server and browser) runs on the same machine.                             |
+| Enter another host manually | Use this when you have a domain name (e.g. `study.example.com`) or when the detected IP is wrong. |
+
+**Enable HTTPS** — toggle this on if you have SSL certificates. Two additional fields appear:
+
+- **Certificate path** — path to your `fullchain.pem` file (default: `./certs/fullchain.pem`)
+- **Key path** — path to your `privkey.pem` file (default: `./certs/privkey.pem`)
+
+Both paths can be relative to the project folder or absolute.
+
+---
+
+**Step 4 — Backups**
+
+Configure automated MySQL backups. Backups are saved directly on the host machine (outside Docker volumes) so they survive a `docker compose down -v`.
+
+- **Backup folder** — where to save the backup files. Relative paths are resolved from the project folder. The path must not contain spaces.
+- **Backup interval** — how often a backup runs, in days (default: 1).
+- **Keep backups for** — how many days to retain backups before they are deleted (default: 30).
+
+---
+
+**Step 5 — Review**
+
+Shows a preview of the `.env` file that will be written. Review the values and click **Deploy** when ready.
+
+---
+
+**Deploying**
+
+After you click Deploy, the wizard:
+
+1. Writes `.env`, `aware-micro-server/aware-config.json`, and `studies/index.html`
+2. Builds all Docker images
+3. Starts all seven services and polls their health checks every 1.5 seconds
+4. Shows which services are still starting (e.g. `Waiting for: mysql, configurator`)
+5. On success — displays the researcher credentials one final time and redirects your browser to the main page after 2.5 seconds
+
+If deployment fails, an error message is shown and an **Edit configuration** button lets you go back and fix the settings.
+
+### 4. What you can access
+
+Once deployment is complete, open the main page at `http://your-host/` (or `https://` if you enabled TLS).
+
+The main page links to all four sections of the platform:
+
+| Page                    | URL              | Access                     |
+| ----------------------- | ---------------- | -------------------------- |
+| **Studies**             | `/studies/`      | Public — no login required |
+| **Configurator**        | `/configurator/` | Researcher login required  |
+| **Analytics Dashboard** | `/dashboard/`    | Researcher login required  |
+| **Backup & Restore**    | `/backup/`       | Researcher login required  |
+
+**Studies** is intentionally public so that study participants can reach it without credentials. It shows the available study configurations and QR codes that participants use to join a study with the AWARE app.
+
+All other pages are protected. When you navigate to any of them without being logged in, you are redirected to the researcher login page. Enter the username and password you set in step 2 of the wizard to gain access. The session lasts 8 hours; after that you will be asked to log in again.
+
+### 5. Configure the study in the Configurator
+
+The Configurator (`/configurator/`) is the central control panel for your study. It determines what data is collected and when participants are asked questions — for both Android and iOS devices. Open it, log in with your researcher credentials, and work through its four pages.
+
+---
+
+**Page 1 — Study Information**
+
+Fill in the basic details that participants see when they join the study:
+
+- **Study title** — displayed in the AWARE app after joining
+- **Study description** — explains the study purpose to participants
+- **Researcher's first and last name**
+- **Researcher's contact email** — participants can use this to reach you
+
+All five fields are required before you can proceed.
+
+---
+
+**Page 2 — Study Questions (ESM)**
+
+ESM stands for Experience Sampling Method — timed in-app questionnaires pushed to participants' phones. Add as many questions as you need; each question can be independently configured.
+
+Each question requires:
+
+- **Type** — choose from: Free Text, Single Choice (radio), Multiple Choice (checkbox), Likert Scale, Quick Answer, Scale, or Numeric
+- **Title** — the question text shown to the participant
+- **Submit button label** — defaults to "Submit"
+- **Answer options** — for choice-based types, add one option per line
+
+Questions can be reordered and deleted. They are only sent to participants when assigned to a schedule (next page).
+
+---
+
+**Page 3 — Schedule Configuration**
+
+Schedules control when ESM questions are delivered. Add one or more schedules and configure each one:
+
+- **Hours** — tick the hours of the day when questions should be triggered (e.g. 09:00, 12:00, 18:00). At each selected hour the app will show the assigned questions.
+- **Questions** — select which questions from page 2 belong to this schedule. Each schedule can contain any subset of questions.
+
+Multiple schedules can run in parallel with different questions and different delivery times.
+
+---
+
+**Page 4 — Sensors**
+
+This is the most detailed page. It controls which device sensors are active during the study and how they behave. Changes here affect both Android and iOS participants.
+
+**Upload settings** (apply to all sensors on all platforms):
+
+| Setting                 | Description                                                                               |
+| ----------------------- | ----------------------------------------------------------------------------------------- |
+| Wi-Fi only              | Upload data only when connected to Wi-Fi                                                  |
+| Charging only           | Upload only while the device is charging                                                  |
+| Offload frequency       | How often to sync data to the server (minutes)                                            |
+| Clean data frequency    | How often to delete already-synced local data (Never / Monthly / Weekly / Daily / Always) |
+| Fallback network        | Hours of failed Wi-Fi sync before falling back to mobile data                             |
+| Config update frequency | How often the app checks for study config changes (minutes)                               |
+| Silent                  | Suppress sync notifications on the device                                                 |
+| Foreground priority     | Keep AWARE running continuously as a foreground service                                   |
+
+**Shared sensors** (available on both Android and iOS):
+
+Battery, Screen, Timezone, Accelerometer, Barometer, Bluetooth, Communication (calls), Gyroscope, Linear Accelerometer, Locations (GPS + network), Magnetometer, Network, Processor, Rotation, Significant Motion, Wi-Fi.
+
+Each sensor can be toggled on or off individually. Many expose additional sub-settings when enabled — for example:
+
+- **Accelerometer / Gyroscope / Barometer / etc.** — sampling frequency (in microseconds) and a change threshold to reduce noise
+- **Locations** — separate GPS and network provider toggles, frequency, and minimum accuracy in metres
+- **Bluetooth / Wi-Fi** — scan frequency in seconds
+- **Communication** — Android-only sub-sensors for message logging and communication events
+
+**Android-only sensors**: Gravity, Light, Proximity, Temperature, Applications (with sub-options: notifications, crashes, keyboard logging, on-screen text tracking, app package filter), App Installations, Telephony, MQTT, Screenshot (interval, compression, app filter), Taking Note.
+
+**iOS-only sensors**: Activity Recognition, Contacts sync, Fitbit (steps, heart rate, sleep — requires API key), Google Login, Conversation detection, Fused Location, Device Usage, Calendar, Google Calendar ESM Scheduler, Headphone Motion, HealthKit (sync frequency + historical pre-period), Heart Rate via BLE, NTP clock offset, Pedometer, Push Notification.
+
+**Shared plugins** (Android and iOS):
+
+| Plugin        | Key settings                                                                    |
+| ------------- | ------------------------------------------------------------------------------- |
+| ESM Scheduler | Enables the question/schedule system from pages 2–3                             |
+| Ambient Noise | Sampling frequency (minutes), sample duration (seconds), silence threshold (dB) |
+| OpenWeather   | Update frequency (minutes), API key, metric or imperial units                   |
+
+---
+
+**Page 5 — Overview**
+
+Shows a summary of the complete study configuration. When everything looks correct, click **Download Study Config** to save the file. The configuration is written to `studies/` and immediately served at `/studies/` for participants to use.
+
+---
+
+> **Important — participants must manually apply config updates.**
+>
+> Every time you change anything in the Configurator and download a new study config, participants will not pick up the changes automatically. They need to refresh the study config from inside the AWARE app:
+>
+> - **Android** — open the AWARE app and tap the **CHECK FOR STUDY UPDATES** button.
+>
+> ![The android configuration update button](docs/images/android-check-study-updates.png)
+>
+> - **iPhone** — open the AWARE app and tap the **update button** in the top-right corner, to the left of the QR-code button.
+>
+> ![The iphone configuration update button](docs/images/ios-update-button.png)
+>
+> Until participants do this, their app continues running the old configuration.
+
+### 6. Browse collected data in the Analytics Dashboard
+
+The Analytics Dashboard (`/dashboard/`) is the researcher's main window into the collected sensor data. It has two main views — **Overview** and **Per Device** — plus a **Manifest** page.
+
+---
+
+**Overview** (`/dashboard/`)
+
+The default view gives a cross-device snapshot of the entire dataset.
+
+- **Last upload banner** — shows the date and a live "X ago" label (refreshed every 10 seconds) of the most recent data upload across all enrolled devices. If no data has arrived yet it shows "No uploads yet".
+- **Export all** button — downloads a single ZIP file containing all sensor data as CSVs, across all devices and both platforms, for offline analysis.
+- **Manifest** button — opens the Manifest page (see below).
+- **Sensor cards grid** — one card per sensor type, organised into three sections: Shared (available on both platforms), Android only, and iPhone only. Each card shows the record count for Android and iOS and a small visual indicator of the data. Sensors with no data are shown in a muted style.
+- **"Only sensors with records" toggle** — hides sensor cards that have received no data yet, letting you focus on what's actually been collected. The preference is saved in the browser and persists across sessions and page refreshes.
+- The entire page **auto-refreshes every 60 seconds** without any user action.
+
+---
+
+**Per Device** (`/dashboard/devices/`)
+
+Drill down into an individual participant's data.
+
+- **Device list** (left sidebar) — every enrolled device across both platforms is listed, showing the platform label (Android / iOS), device name (manufacturer + model for Android; label or model for iOS), truncated device ID, and time since the last upload.
+- **Click any device** to load it. The URL updates so you can bookmark or share a direct link to a specific device (`/dashboard/devices/android/<id>` or `/dashboard/devices/ios/<id>`).
+- **Device info panel** — shows device ID, last seen time, number of active sensors, total record count, and the field values from the most recent upload payload.
+- **ZIP export** button — downloads all sensor CSVs for that device in one archive.
+- **Sensor cards** — the same sensor card grid as the Overview, but scoped to this device only. Cards are split into Shared and platform-specific sections. Each card has its own individual CSV export button.
+- The **"Only sensors with records" toggle** is shared with the Overview page.
+- Data **polls every 60 seconds** while a device is selected.
+
+---
+
+**Manifest** (`/dashboard/manifest`)
+
+A research-grade inventory of the complete dataset — useful for understanding what has been collected before exporting or archiving.
+
+- **Summary stats** at the top: Android device count, iOS device count, total record count across all sensors, and the overall study date span (date of first sample to date of last sample).
+- **Per-platform breakdown** — for each sensor on Android and iOS, a row shows:
+  - Total record count
+  - Number of devices that have contributed data for that sensor / total device count
+  - Date of the first sample
+  - Date of the last sample
+  - Number of database fields, expandable to show the full field name list
+- Sensors are **sorted by record count** (most data first). Sensors with no data are listed dimmed at the bottom.
+- **Download JSON** button — exports the full manifest as a structured JSON file, useful for archiving dataset metadata alongside the raw CSVs.
+
+## Sensor support
+
+The table below lists every sensor the dashboard can display, as configured in the Analytics Dashboard. For full documentation on each sensor visit the [official AWARE sensor reference](https://awareframework.com/sensors/).
+
+| Sensor | Android | iOS | Unit |
 |---|:---:|:---:|---|
-| Accelerometer | ✓ | ✓ | |
-| Gyroscope | ✓ | ✓ | |
-| Light | ✓ | ✓ | |
-| Barometer | ✓ | ✓ | |
-| Magnetometer | ✓ | ✓ | |
-| Gravity | ✓ | ✓ | |
-| Linear accelerometer | ✓ | ✓ | |
-| Rotation | ✓ | ✓ | |
-| Proximity | ✓ | ✓ | |
-| Temperature | ✓ | ✓ | |
-| Battery | ✓ | ✓ | |
-| Screen | ✓ | ✓ | |
+| Accelerometer | ✓ | ✓ | g |
+| Ambient Noise | ✓ | ✓ | dB |
+| Barometer | ✓ | ✓ | hPa |
+| Battery Level | ✓ | ✓ | % |
+| Battery Charges | ✓ | ✓ | event |
+| Battery Discharges | ✓ | ✓ | event |
+| Bluetooth RSSI | ✓ | ✓ | dBm |
+| Calls | ✓ | ✓ | event |
+| Gyroscope | ✓ | ✓ | rad/s |
+| Linear Accelerometer | ✓ | ✓ | g |
+| Location | ✓ | ✓ | m/s |
+| Magnetometer | ✓ | ✓ | μT |
+| Network | ✓ | ✓ | event |
+| OpenWeather | ✓ | ✓ | °C |
+| Processor | ✓ | ✓ | % |
+| Rotation | ✓ | ✓ | rad/s |
+| Screen Status | ✓ | ✓ | |
+| Significant Motion | ✓ | ✓ | |
+| Timezone | ✓ | ✓ | event |
+| ESM/EMA | ✓ | ✓ | event |
 | WiFi | ✓ | ✓ | |
-| Bluetooth | ✓ | ✓ | |
-| Processor | ✓ | ✓ | |
-| Telephony | ✓ | ✓ | |
-| Applications | ✓ | ✓ | |
-| Timezone | ✓ | ✓ | |
-| ESM | ✓ | ✓ | |
-| Location | ✓ | ✓ | Android splits into GPS / network / passive; iOS uses a single location sensor |
-| Network | ✓ | ✓ | Android splits into events and traffic tables; iOS records reachability events only |
-| Calls & messages | ✓ | ✓ | Android exposes `calls` and `messages` separately; iOS bundles them as `communication` |
-| Significant motion | — | ✓ | iOS motion coprocessor only |
-| Keyboard | ✓ | — | |
-| Touch | ✓ | — | |
-| Notifications | ✓ | — | |
-| Screenshots | ✓ | — | |
-| App installations | ✓ | — | |
-| Crashes | ✓ | — | |
-
-### Key differences
-
-- **Location** — Android has three separate providers (`status_location_gps`, `status_location_network`, `status_location_passive`). iOS uses one unified location sensor (`locations`).
-- **Network** — Android writes connection events to the `network` table and traffic bytes/packets to `network_traffic`. iOS only collects reachability state changes in a single `network` table.
-- **Calls and messages** — Android records these in separate tables (`calls`, `messages`). iOS stores both under `communication`.
-- **System sensors** — keyboard input, touch events, notifications, screenshots, and app installs are Android-only. iOS restricts access to these at the OS level.
-
-## HTTPS
-
-1. Obtain certificates, for example with Let's Encrypt.
-2. Place them in a readable location such as `./certs/fullchain.pem` and `./certs/privkey.pem`.
-3. Re-run `./setup.sh` or `setup.bat` and enable HTTPS in the wizard.
-
-Nginx will terminate TLS and redirect HTTP traffic to HTTPS.
-
-## Common Operations
-
-```bash
-# View logs
-sudo docker compose logs -f
-sudo docker compose logs -f configurator
-sudo docker compose logs -f micro-server
-
-# Restart one service
-sudo docker compose restart configurator
-
-# Stop everything
-sudo docker compose down
-
-# Stop and wipe all data (irreversible)
-sudo docker compose down -v
-```
-
-## Project Structure
-
-```text
-aware_dashboard/
-|- setup.sh / setup.bat          # One-command setup entry points
-|- docker-compose.yml
-|- .env                          # Generated by the setup wizard
-|- env.example                   # Example environment variables
-|- nginx/
-|  |- http.conf
-|  `- https.conf
-|- db/
-|  `- create_dbs.sql            # Creates aware_android and aware_ios databases and service users
-|- studies/                     # Saved Android study JSON files, served at /studies/
-|- AWARE-Configurator/          # Django + React study configurator
-|- aware-micro-server/          # Kotlin/Vert.x iOS data server
-|  |- aware-config.json         # Generated live server config
-|  `- aware-config.example.json # Setup template
-`- setup/                       # Setup wizard container
-```
-
-## Troubleshooting
-
-**Services take a while to start**
-
-MySQL can take 30-60 seconds to initialize on first run.
-
-```bash
-sudo docker compose logs mysql
-```
-
-**Cannot reach the server from outside**
-
-Make sure ports `80` and `443` are open in your firewall.
-
-**Configurator shows a blank page after changing domain or protocol**
-
-Rerun `./setup.sh` so the generated files and the configurator build pick up the updated public host and protocol.
-
-The configurator now derives Django allowed hosts from `PUBLIC_HOST`, so `.env` only needs the public host once unless you want to override `DJANGO_ALLOWED_HOSTS` manually.
-
-**iOS data is not appearing in the database**
-
-The `aware_ios_participant` MySQL user must keep `CREATE` and `INSERT` privileges on `aware_ios`.
+| Application Crashes | ✓ | — | event |
+| Application History | ✓ | — | event |
+| Application Notifications | ✓ | — | event |
+| Applications | ✓ | — | event |
+| Gravity | ✓ | — | g |
+| Installations | ✓ | — | event |
+| Keyboard | ✓ | — | event |
+| Light | ✓ | — | lux |
+| Messages | ✓ | — | event |
+| Network Traffic | ✓ | — | bytes |
+| Notes | ✓ | — | event |
+| Proximity | ✓ | — | |
+| Screen Text | ✓ | — | event |
+| Telephony | ✓ | — | event |
+| Temperature | ✓ | — | °C |
+| Touch | ✓ | — | event |
+| Activity Recognition | — | ✓ | event |
+| Calendar | — | ✓ | event |
+| Contacts | — | ✓ | event |
+| Conversation | — | ✓ | event |
+| Device Usage | — | ✓ | event |
+| ESM Scheduler | — | ✓ | event |
+| Fitbit | — | ✓ | event |
+| Fitbit Data | — | ✓ | |
+| Fitbit Device | — | ✓ | event |
+| Fused Location | — | ✓ | m |
+| Google Calendar ESM | — | ✓ | event |
+| Headphone Motion | — | ✓ | m/s² |
+| Heart Rate (BLE) | — | ✓ | bpm |
+| HealthKit | — | ✓ | |
+| HealthKit Category | — | ✓ | event |
+| HealthKit Quantity | — | ✓ | |
+| HealthKit Workout | — | ✓ | event |
+| Location Visit | — | ✓ | event |
+| Memory | — | ✓ | |
+| NTP | — | ✓ | ms |
+| Pedometer | — | ✓ | steps |
+| Push Notification | — | ✓ | event |
