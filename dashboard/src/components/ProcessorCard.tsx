@@ -61,19 +61,24 @@ export default function ProcessorCard({ records, loading, exportHref }: Props) {
 
   const userValues = data.map((d) => d.user);
   const last = data.length ? data[data.length - 1] : null;
-  const spanMs = data.length > 1 ? data[data.length - 1].time - data[0].time : 0;
+  const spanMs =
+    data.length > 1 ? data[data.length - 1].time - data[0].time : 0;
   const tickFormatter = makeTickFormatter(spanMs);
-  const avg =
-    userValues.length
-      ? userValues.reduce((a, b) => a + b, 0) / userValues.length
-      : null;
+  const avg = userValues.length
+    ? userValues.reduce((a, b) => a + b, 0) / userValues.length
+    : null;
 
   return (
     <div className="bg-card backdrop-blur-xl border border-wire rounded-3xl shadow-card p-5">
       <div className="flex items-center gap-2 mb-1">
-        <span className="w-2 h-2 rounded-full shrink-0" style={{ background: COLOR }} />
+        <span
+          className="w-2 h-2 rounded-full shrink-0"
+          style={{ background: COLOR }}
+        />
         <h3 className="text-[13px] font-semibold flex-1 text-ink">Processor</h3>
-        <span className="text-[11px] text-sage bg-[rgba(48,67,54,0.07)] px-1.5 py-0.5 rounded-md">%</span>
+        <span className="text-[11px] text-sage bg-[rgba(48,67,54,0.07)] px-1.5 py-0.5 rounded-md">
+          %
+        </span>
         {exportHref && <ExportLink href={exportHref} />}
       </div>
 
@@ -102,10 +107,19 @@ export default function ProcessorCard({ records, loading, exportHref }: Props) {
         </div>
       )}
 
-      <div className="mb-3 rounded-lg border border-wire bg-card-strong/70 px-3 py-2 text-[11px] leading-snug text-sage">
-        App CPU usage via Mach thread APIs — sum of non-idle thread time as a
-        percentage. Only <code className="font-mono">double_last_user</code> is
-        meaningful; system/load fields are always 0 in this implementation.
+      <div className="mb-3 rounded-lg border border-wire bg-card-strong/70 px-3 py-2 text-[11px] leading-snug text-sage space-y-1">
+        <p>
+          App CPU usage via Mach thread APIs — sum of non-idle thread time as a
+          percentage. Only{" "}
+          <code className="font-mono">double_last_user</code> is meaningful;
+          system/load fields are always 0 in this implementation.
+        </p>
+        <p>
+          Disabled on Android 7.0+ — the client stops the sensor on{" "}
+          <code className="font-mono">Build.VERSION.SDK_INT &gt;= N</code>{" "}
+          because Android restricted access to{" "}
+          <code className="font-mono">/proc/stat</code>.
+        </p>
       </div>
 
       {loading ? (
@@ -116,7 +130,10 @@ export default function ProcessorCard({ records, loading, exportHref }: Props) {
         </div>
       ) : (
         <ResponsiveContainer width="100%" height={180}>
-          <AreaChart data={data} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
+          <AreaChart
+            data={data}
+            margin={{ top: 4, right: 8, left: 0, bottom: 0 }}
+          >
             <defs>
               <linearGradient id="proc-user-grad" x1="0" y1="0" x2="0" y2="1">
                 <stop offset="5%" stopColor={COLOR} stopOpacity={0.3} />
