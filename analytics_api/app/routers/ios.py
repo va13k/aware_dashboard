@@ -1,5 +1,6 @@
 import csv
 import io
+from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from sqlalchemy import select
 from sqlalchemy.exc import OperationalError, ProgrammingError
@@ -786,7 +787,7 @@ async def export_csv(
             )
         except (OperationalError, ProgrammingError):
             await db.rollback()
-    rows = sorted(rows, key=lambda row: row["timestamp"])
+    rows = sorted(rows, key=lambda row: row["id"])
     if not rows:
         raise HTTPException(
             status_code=404,
@@ -795,6 +796,12 @@ async def export_csv(
 
     buf = io.StringIO()
     records = rows
+    for r in records:
+        ts = r["timestamp"]
+        r["timestamp"] = datetime.fromtimestamp(
+            ts / 1000 if ts >= 1e11 else ts, tz=timezone.utc
+        ).strftime("%Y-%m-%d %H:%M:%S UTC")
+        r.pop("device_id", None)
     # Union all keys so every row has the same columns
     all_keys: list[str] = list(dict.fromkeys(k for rec in records for k in rec))
     writer = csv.DictWriter(buf, fieldnames=all_keys, extrasaction="ignore", restval="")

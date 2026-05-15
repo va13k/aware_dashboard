@@ -1,5 +1,6 @@
 import csv
 import io
+from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -692,6 +693,13 @@ async def export_csv(
 
     buf = io.StringIO()
     records = [schema.model_validate(r).model_dump() for r in rows]
+    for r in records:
+        ts = r["timestamp"]
+        r["timestamp"] = datetime.fromtimestamp(
+            ts / 1000 if ts >= 1e11 else ts, tz=timezone.utc
+        ).strftime("%Y-%m-%d %H:%M:%S UTC")
+        del r["device_id"]
+    records.sort(key=lambda r: r["id"])
     writer = csv.DictWriter(buf, fieldnames=records[0].keys())
     writer.writeheader()
     writer.writerows(records)
