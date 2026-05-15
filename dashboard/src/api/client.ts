@@ -10,7 +10,8 @@ export const BASE = "/api";
 async function get<T>(path: string): Promise<T> {
   const res = await fetch(`${BASE}${path}`, { cache: "no-store" });
   if (res.redirected && res.url.includes("/auth/")) {
-    window.location.assign(res.url);
+    const next = encodeURIComponent(window.location.pathname);
+    window.location.assign(`/auth/login?next=${next}`);
     return new Promise<T>(() => {});
   }
   if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
