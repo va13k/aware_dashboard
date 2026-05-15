@@ -336,34 +336,27 @@ async def export_sensor_csv_zip(
         raise HTTPException(status_code=404, detail=f"Unknown sensor: {sensor}")
 
     db = android_db if platform == "android" else ios_db
-    zip_buf = io.BytesIO()
-    files_written = 0
 
-    with zipfile.ZipFile(zip_buf, "w", compression=zipfile.ZIP_DEFLATED) as archive:
-        if platform == "android":
-            model, schema = model_entry
-            records = await _android_records_for_sensor(db, model, schema)
-        else:
-            records = await _ios_records_for_sensor(db, _ios_models(model_entry))
+    if platform == "android":
+        model, schema = model_entry
+        records = await _android_records_for_sensor(db, model, schema)
+    else:
+        records = await _ios_records_for_sensor(db, _ios_models(model_entry))
 
-        records_by_device: dict[str, list[dict]] = {}
-        for record in records:
-            records_by_device.setdefault(str(record["device_id"]), []).append(record)
-
-        for device_id, device_records in sorted(records_by_device.items()):
-            archive.writestr(
-                f"{platform}/{_safe_path_part(device_id)}/{_safe_path_part(sensor)}.csv",
-                _csv_response(device_records),
-            )
-            files_written += 1
-
-    if files_written == 0:
+    if not records:
         raise HTTPException(
             status_code=404,
             detail=f"No data found for {platform} sensor: {sensor}",
         )
 
-    return _zip_response(zip_buf, f"{platform}_{_safe_path_part(sensor)}.zip")
+    safe_sensor = _safe_path_part(sensor)
+    csv_name = f"{platform}_{safe_sensor}.csv"
+    zip_buf = io.BytesIO()
+
+    with zipfile.ZipFile(zip_buf, "w", compression=zipfile.ZIP_DEFLATED) as archive:
+        archive.writestr(csv_name, _csv_response(records))
+
+    return _zip_response(zip_buf, f"{platform}_{safe_sensor}.zip")
 
 
 @router.get("/all.zip")
