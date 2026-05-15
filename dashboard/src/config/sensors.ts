@@ -167,8 +167,7 @@ export const SHARED_SENSOR_CONFIGS: SensorConfig[] = [
     unit: "rad/s",
     color: "#f43f5e",
     platform: "shared",
-    extract: (r) =>
-      vectorMagnitude(r) ?? magnitude(r, "roll", "pitch", "yaw"),
+    extract: (r) => vectorMagnitude(r) ?? magnitude(r, "roll", "pitch", "yaw"),
   },
   {
     key: "screen",
@@ -328,12 +327,10 @@ export const ANDROID_SENSOR_CONFIGS: SensorConfig[] = [
   {
     key: "plugin-ambient-noise",
     label: "Ambient Noise",
-    unit: "",
+    unit: "dB",
     color: "#0ea5e9",
-    platform: "android",
-    extract: (r) =>
-      firstNumber(r, ["double_decibels", "decibels", "is_silent", "silent"]) ??
-      eventPresence(r),
+    platform: "shared",
+    extract: (r) => firstNumber(r, ["double_decibels", "decibels"]),
   },
   {
     key: "plugin-openweather",
@@ -341,7 +338,8 @@ export const ANDROID_SENSOR_CONFIGS: SensorConfig[] = [
     unit: "degC",
     color: "#ca8a04",
     platform: "android",
-    extract: (r) => firstNumber(r, ["temperature", "temp", "value"]) ?? eventPresence(r),
+    extract: (r) =>
+      firstNumber(r, ["temperature", "temp", "value"]) ?? eventPresence(r),
   },
   {
     key: "proximity",
@@ -349,7 +347,8 @@ export const ANDROID_SENSOR_CONFIGS: SensorConfig[] = [
     unit: "",
     color: "#0f766e",
     platform: "android",
-    extract: (r) => firstNumber(r, ["distance", "near", "value"]) ?? eventPresence(r),
+    extract: (r) =>
+      firstNumber(r, ["distance", "near", "value"]) ?? eventPresence(r),
   },
   {
     key: "screentext",
@@ -375,7 +374,8 @@ export const ANDROID_SENSOR_CONFIGS: SensorConfig[] = [
     unit: "degC",
     color: "#ea580c",
     platform: "android",
-    extract: (r) => firstNumber(r, ["double_temperature", "temperature", "value"]),
+    extract: (r) =>
+      firstNumber(r, ["double_temperature", "temperature", "value"]),
   },
   {
     key: "touch",
@@ -397,18 +397,6 @@ export const IOS_SENSOR_CONFIGS: SensorConfig[] = [
     platform: "ios",
     extract: eventPresence,
     countOnly: true,
-  },
-  {
-    key: "ambient-noise",
-    label: "Ambient Noise",
-    unit: "",
-    color: "#0ea5e9",
-    platform: "ios",
-    extract: (r) => firstNumber(r, ["is_silent", "silent"]),
-    enumLabels: {
-      0: "Noisy",
-      1: "Silent",
-    },
   },
   {
     key: "ble-heartrate",
@@ -571,7 +559,8 @@ export const IOS_SENSOR_CONFIGS: SensorConfig[] = [
     unit: "",
     color: "#475569",
     platform: "ios",
-    extract: (r) => firstNumber(r, ["used", "free", "total", "value"]) ?? eventPresence(r),
+    extract: (r) =>
+      firstNumber(r, ["used", "free", "total", "value"]) ?? eventPresence(r),
   },
   {
     key: "ntptime",
@@ -589,7 +578,8 @@ export const IOS_SENSOR_CONFIGS: SensorConfig[] = [
     unit: "degC",
     color: "#ca8a04",
     platform: "ios",
-    extract: (r) => firstNumber(r, ["temperature", "temp", "value"]) ?? eventPresence(r),
+    extract: (r) =>
+      firstNumber(r, ["temperature", "temp", "value"]) ?? eventPresence(r),
   },
   {
     key: "pedometer",

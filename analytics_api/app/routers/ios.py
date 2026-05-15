@@ -126,6 +126,21 @@ async def get_ambient_noise(
     return result.scalars().all()
 
 
+@router.get("/plugin-ambient-noise", response_model=list[IosSchema])
+async def get_plugin_ambient_noise(
+    device_id: str,
+    from_ts: float | None = Query(None),
+    to_ts: float | None = Query(None),
+    limit: int = Query(100, le=1000),
+    offset: int = Query(0),
+    db: AsyncSession = Depends(get_ios_db),
+):
+    result = await db.execute(
+        _base_query(IosPluginAmbientNoise, device_id, from_ts, to_ts, limit, offset)
+    )
+    return result.scalars().all()
+
+
 @router.get("/barometer", response_model=list[IosSchema])
 async def get_barometer(
     device_id: str,
@@ -714,6 +729,7 @@ _EXPORT_MODELS: dict[str, object] = {
     "accelerometer": IosAccelerometer,
     "activity": IosPluginActivityRecognition,
     "ambient-noise": IosPluginAmbientNoise,
+    "plugin-ambient-noise": IosPluginAmbientNoise,
     "barometer": IosBarometer,
     "battery": IosBattery,
     "battery-charges": IosBatteryCharges,
