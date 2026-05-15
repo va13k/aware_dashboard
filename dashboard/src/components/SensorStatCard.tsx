@@ -1,6 +1,7 @@
 import type { SensorConfig } from "../config/sensors";
 import type { SensorRecord } from "../types";
 import { min, max, fmt } from "../utils/stats";
+import ExportLink from "./ExportLink";
 
 interface Props {
   config: SensorConfig;
@@ -8,6 +9,8 @@ interface Props {
   iosRecords: SensorRecord[];
   loading: boolean;
   className?: string;
+  androidExportHref?: string;
+  iosExportHref?: string;
 }
 
 interface PlatformStats {
@@ -23,7 +26,9 @@ function platformStats(
 ): PlatformStats | null {
   if (config.countOnly) {
     if (!records.length) return null;
-    const latest = records.reduce((a, b) => (b.timestamp > a.timestamp ? b : a));
+    const latest = records.reduce((a, b) =>
+      b.timestamp > a.timestamp ? b : a,
+    );
     return {
       count: records.length,
       last: latest.timestamp,
@@ -75,10 +80,14 @@ export default function SensorStatCard({
   iosRecords,
   loading,
   className = "",
+  androidExportHref,
+  iosExportHref,
 }: Props) {
   const android = platformStats(config, androidRecords);
   const ios = platformStats(config, iosRecords);
   const hasData = android || ios;
+  const androidEmpty = !loading && androidRecords.length === 0;
+  const iosEmpty = !loading && iosRecords.length === 0;
 
   return (
     <div
@@ -97,6 +106,36 @@ export default function SensorStatCard({
             {config.unit}
           </span>
         )}
+        {androidExportHref && iosExportHref ? (
+          <>
+            <ExportLink
+              href={androidExportHref}
+              label="↓ Android"
+              title="Download Android records as CSV ZIP"
+              disabled={androidEmpty}
+            />
+            <ExportLink
+              href={iosExportHref}
+              label="↓ iOS"
+              title="Download iOS records as CSV ZIP"
+              disabled={iosEmpty}
+            />
+          </>
+        ) : androidExportHref ? (
+          <ExportLink
+            href={androidExportHref}
+            label="↓ Export"
+            title="Download records as CSV ZIP"
+            disabled={androidEmpty}
+          />
+        ) : iosExportHref ? (
+          <ExportLink
+            href={iosExportHref}
+            label="↓ Export"
+            title="Download records as CSV ZIP"
+            disabled={iosEmpty}
+          />
+        ) : null}
       </div>
 
       {loading ? (
