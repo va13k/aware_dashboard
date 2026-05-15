@@ -63,6 +63,7 @@ from app.models import (
     IosTimezone,
     IosWifi,
 )
+from app.schemas import strip_ios_data_metadata
 
 router = APIRouter(prefix="/devices", tags=["devices"])
 
@@ -158,7 +159,7 @@ def _flatten_device_row(row):
 
     data = row_dict.pop("data", None)
     if isinstance(data, dict):
-        return {**row_dict, **data}
+        return {**row_dict, **strip_ios_data_metadata(data)}
 
     return row_dict
 

@@ -321,6 +321,14 @@ class AndroidWifiSchema(_Base):
 # extra="allow" surfaces every key from the blob even if not explicitly typed.
 # ---------------------------------------------------------------------------
 
+IOS_DATA_METADATA_KEYS = frozenset({"_id", "id", "timestamp", "device_id"})
+
+
+def strip_ios_data_metadata(data: Any) -> dict:
+    if not isinstance(data, dict):
+        return {}
+    return {key: value for key, value in data.items() if key not in IOS_DATA_METADATA_KEYS}
+
 
 class IosSchema(_Base):
     model_config = ConfigDict(
@@ -333,11 +341,10 @@ class IosSchema(_Base):
     @classmethod
     def flatten_data(cls, v: Any) -> Any:
         if isinstance(v, dict):
-            data = v.pop("data", None) or {}
-            v.update(data)
-            return v
+            data = strip_ios_data_metadata(v.pop("data", None))
+            return {**v, **data}
         # ORM object
-        data = getattr(v, "data", None) or {}
+        data = strip_ios_data_metadata(getattr(v, "data", None))
         return {
             "_id": getattr(v, "_id", None),
             "timestamp": getattr(v, "timestamp", None),
