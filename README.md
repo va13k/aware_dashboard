@@ -27,6 +27,20 @@ Study participants need the AWARE mobile app installed on their device:
 
 Once a participant joins a study (by scanning a QR code or entering a study URL), the app begins collecting sensor data locally and waits for the participant to manually sync it to the server.
 
+> **Important — data is not uploaded automatically.**
+>
+> The AWARE app stores all collected sensor data on the phone and only sends it to the server when the participant triggers a sync manually. Data will not appear in the dashboard until they do this.
+>
+> - **Android** — open the AWARE app and tap the **SYNC DATA** button.
+>
+> ![Android SYNC DATA button](docs/images/android-upload-data.png)
+>
+> - **iPhone** — open the AWARE app and tap the **upload button** (cloud with arrow) in the top-left corner of the screen.
+>
+> ![iPhone upload button](docs/images/iphone-upload-data.png)
+>
+> Remind participants to sync regularly — especially before any scheduled data collection session ends.
+
 ## Prerequisites
 
 ### Docker with Compose v2
@@ -148,7 +162,7 @@ Once the setup page opens in your browser — either automatically or after you 
 
 ### Re-running setup
 
-If `.env` and `aware-micro-server/aware-config.json` already exist, the script detects them and offers a choice:
+If `.env` already exists, the script detects them and offers a choice:
 
 ```
   Existing configuration found (.env)
@@ -206,22 +220,106 @@ Save these credentials — you will need them every time you log in to the prote
 
 **Step 3 — Network**
 
-Configure how the platform is reached from the outside.
+This step decides how participant devices reach your server. Choose the option that matches where you are deploying.
 
-**Public host or IP** — a dropdown with three options:
+---
 
-| Option                      | When to use                                                                                       |
-| --------------------------- | ------------------------------------------------------------------------------------------------- |
-| Use detected local IP       | Default. Use this for local or LAN deployments where the auto-detected IP is correct.             |
-| Use localhost               | Use only if everything (server and browser) runs on the same machine.                             |
-| Enter another host manually | Use this when you have a domain name (e.g. `study.example.com`) or when the detected IP is wrong. |
+**Use detected local IP** *(default)*
 
-**Enable HTTPS** — toggle this on if you have SSL certificates. Two additional fields appear:
+The setup script automatically detects your computer's local network IP address (e.g. `192.168.1.42`). This is the right choice when:
+
+- The server runs on your laptop or desktop
+- Participant phones are on **the same Wi-Fi network** as the server
+
+With this setup, phones and the server talk directly over your local network — no internet connection required. It is ideal for lab studies or pilot testing where you control the network.
+
+> **If the detected IP looks wrong** — for example it shows a Docker internal address like `172.x.x.x`, or `localhost` — switch to **Enter another host manually** and type your actual LAN IP.
+> To find it: **Windows** — open Command Prompt and run `ipconfig`, look for "IPv4 Address" under your Wi-Fi or Ethernet adapter. **Mac** — open System Settings → Network → click your active connection.
+
+---
+
+**Use localhost**
+
+`localhost` (also reachable as `127.0.0.1`) is a completely isolated environment — it exists only inside the machine where the server is running and is not reachable from any other device, including phones on the same Wi-Fi.
+
+This option is only useful when you are testing with software emulators running on the same machine as the server:
+
+- **Android emulator** — [Android Studio](https://developer.android.com/studio) includes an Android emulator. Inside the emulator, use `10.0.2.2` to reach the host machine's `localhost`.
+- **iOS simulator** — [Xcode](https://developer.apple.com/xcode/) includes an iPhone simulator. It shares the host network, so `localhost` works directly inside the simulator.
+
+> Real phones on Wi-Fi **cannot** reach `localhost`. Use the local IP option for physical devices.
+
+---
+
+**Enter another host manually**
+
+Use this when deploying on a **remote server** accessible over the internet, or when the detected IP is incorrect. Enter either:
+
+- A **domain name** (e.g. `study.example.com`) — the cleanest option for a real deployment. You need a domain registered and pointing to your server's public IP.
+- A **public IP address** — possible but less reliable; IP addresses can change.
+
+Popular cloud providers for hosting a study server:
+
+| Provider | Notes |
+| --- | --- |
+| [DigitalOcean Droplet](https://www.digitalocean.com/products/droplets) | Simple, affordable, good starting point |
+| [Hetzner Cloud](https://www.hetzner.com/cloud/) | Very affordable European option |
+| [AWS EC2](https://aws.amazon.com/ec2/) | Widely used, more configuration required |
+| [Google Cloud Compute Engine](https://cloud.google.com/compute) | Similar to AWS |
+| [Azure Virtual Machines](https://azure.microsoft.com/en-us/products/virtual-machines) | Microsoft's offering |
+
+Any Linux VPS (Ubuntu 22.04 or later recommended) with Docker installed will work.
+
+---
+
+**Enable HTTPS**
+
+> **If your server is accessible over the internet, enable HTTPS.** Without it, all data sent from participant phones — sensor readings, locations, and everything else — travels as plain text that anyone on the network path can read. HTTPS encrypts the connection end-to-end.
+
+Toggle HTTPS on if you have SSL certificates. Two additional fields appear:
 
 - **Certificate path** — path to your `fullchain.pem` file (default: `./certs/fullchain.pem`)
 - **Key path** — path to your `privkey.pem` file (default: `./certs/privkey.pem`)
 
 Both paths can be relative to the project folder or absolute.
+
+HTTPS is **not required** for local network deployments (same Wi-Fi) or localhost testing.
+
+#### How to get a free SSL certificate with Let's Encrypt
+
+[Let's Encrypt](https://letsencrypt.org/) issues free, trusted certificates automatically. The official tool for obtaining them is [Certbot](https://certbot.eff.org/). You need:
+
+- A **domain name** pointing at your server's public IP (e.g. `study.example.com` with an A record set in your DNS provider)
+- **Port 80 open** on the server (for the domain-ownership challenge)
+
+For a full walkthrough, follow the **[DigitalOcean guide: How To Secure Nginx with Let's Encrypt on Ubuntu 22.04](https://www.digitalocean.com/community/tutorials/how-to-secure-nginx-with-let-s-encrypt-on-ubuntu-22-04)** — it is the most widely used step-by-step reference and covers everything from installation to auto-renewal.
+
+**Summary of the key steps on Ubuntu/Debian:**
+
+```bash
+# 1. Install Certbot via snap (recommended by the official Certbot site)
+sudo snap install --classic certbot
+sudo ln -s /snap/bin/certbot /usr/local/bin/certbot
+
+# 2. Obtain the certificate (certonly — because Nginx runs inside Docker,
+#    not as a system service, so Certbot should not auto-edit its config)
+sudo certbot certonly --standalone -d your-domain.com
+
+# 3. Test that automatic renewal works (certificates expire every 90 days;
+#    Certbot schedules renewal automatically via a systemd timer)
+sudo certbot renew --dry-run
+```
+
+After step 2, your certificate files are at:
+
+```
+/etc/letsencrypt/live/your-domain.com/fullchain.pem
+/etc/letsencrypt/live/your-domain.com/privkey.pem
+```
+
+Enter these absolute paths in the wizard's **Certificate path** and **Key path** fields (or copy them into the `certs/` folder inside the project and use the relative defaults).
+
+> **`--standalone` vs `--nginx`:** The `--standalone` flag tells Certbot to spin up its own temporary web server on port 80 to prove domain ownership — this works even when your Docker containers are not yet running. If your containers are already running and occupying port 80, stop them first with `sudo docker compose stop`, run certbot, then start them again. The `--nginx` flag would try to configure the system-level Nginx, which is not what you want here since Nginx runs inside Docker.
 
 ---
 
