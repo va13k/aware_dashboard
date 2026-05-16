@@ -4,6 +4,7 @@ import re
 import socket
 import shutil
 import subprocess
+from pathlib import Path
 
 
 def is_usable_address(value: str) -> bool:
@@ -144,6 +145,48 @@ def detect_via_commands() -> str | None:
     return None
 
 
+def _is_wsl() -> bool:
+    try:
+        return "microsoft" in Path("/proc/version").read_text(errors="ignore").lower()
+    except OSError:
+        return False
+
+
+def detect_via_wsl_powershell() -> str | None:
+    """In WSL, call the Windows PowerShell binary directly via the interop mount."""
+    ps_paths = [
+        "/mnt/c/Windows/System32/WindowsPowerShell/v1.0/powershell.exe",
+        "/mnt/c/Windows/SysWOW64/WindowsPowerShell/v1.0/powershell.exe",
+    ]
+    ps_path = next((p for p in ps_paths if Path(p).exists()), None)
+    if ps_path is None:
+        return None
+
+    try:
+        result = subprocess.run(
+            [
+                ps_path,
+                "-NoProfile",
+                "-Command",
+                (
+                    "Get-NetIPConfiguration | "
+                    "Where-Object { $_.NetAdapter.Status -eq 'Up' -and $_.IPv4Address -and $_.IPv4DefaultGateway } | "
+                    "ForEach-Object { $_.IPv4Address | Select-Object -ExpandProperty IPAddress } | "
+                    "Select-Object -First 1"
+                ),
+            ],
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+
+    candidate = result.stdout.strip()
+    return candidate if is_preferred_ipv4(candidate) else None
+
+
 def detect_via_windows_netipconfiguration() -> str | None:
     if shutil.which("powershell") is None:
         return None
@@ -262,14 +305,27 @@ def detect_via_windows_ipconfig() -> str | None:
 
 
 def main() -> None:
-    detected = (
-        detect_via_windows_netipconfiguration()
-        or detect_via_windows_ipconfig()
-        or detect_via_udp()
-        or detect_via_commands()
-        or detect_via_hostname()
-        or "localhost"
-    )
+    if _is_wsl():
+        # In WSL, detect_via_udp returns the WSL bridge IP (172.x.x.x), not the
+        # Windows LAN IP. Try Windows PowerShell via the interop mount first.
+        detected = (
+            detect_via_wsl_powershell()
+            or detect_via_windows_netipconfiguration()
+            or detect_via_windows_ipconfig()
+            or detect_via_commands()
+            or detect_via_hostname()
+            or detect_via_udp()
+            or "localhost"
+        )
+    else:
+        detected = (
+            detect_via_windows_netipconfiguration()
+            or detect_via_windows_ipconfig()
+            or detect_via_udp()
+            or detect_via_commands()
+            or detect_via_hostname()
+            or "localhost"
+        )
     print(detected)
 
 

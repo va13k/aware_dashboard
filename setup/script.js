@@ -524,7 +524,8 @@ function loadExisting() {
       } else {
         var hostMode = document.getElementById("publicHostMode");
         var hostInput = document.getElementById("publicHost");
-        if (suggestedPublicHost) {
+        var detectedLanIp = suggestedPublicHost && suggestedPublicHost !== "localhost";
+        if (detectedLanIp) {
           hostMode.value = "detected";
           hostInput.value = suggestedPublicHost;
           hostInput.disabled = true;
