@@ -2,8 +2,8 @@ import type { DeviceDetail, DevicesResponse, OverviewResponse, SensorRecord } fr
 
 export const BASE = "/api";
 
-async function get<T>(path: string): Promise<T> {
-  const res = await fetch(`${BASE}${path}`, { cache: "no-store" });
+async function get<T>(path: string, signal?: AbortSignal): Promise<T> {
+  const res = await fetch(`${BASE}${path}`, { cache: "no-store", signal });
   if (res.redirected && res.url.includes("/auth/")) {
     window.location.assign(res.url);
     return new Promise<T>(() => {});
@@ -27,8 +27,9 @@ export const fetchSensor = (
   deviceId: string,
   sensor: string,
   limit = 500,
+  signal?: AbortSignal,
 ): Promise<SensorRecord[]> =>
-  get(`/${platform}/${encodeURIComponent(deviceId)}/${sensor}?limit=${limit}`);
+  get(`/${platform}/${encodeURIComponent(deviceId)}/${sensor}?limit=${limit}`, signal);
 
 export const exportAllHref = (): string => `${BASE}/export/all.zip`;
 

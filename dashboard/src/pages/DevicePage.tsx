@@ -273,6 +273,8 @@ export default function DevicePage() {
       loadingKeys: initialLoadingKeys,
     });
 
+    const controller = new AbortController();
+
     const fetchAll = () => {
       const initial = isFirstRun.value;
       isFirstRun.value = false;
@@ -289,7 +291,7 @@ export default function DevicePage() {
         .catch(() => {});
 
       for (const sensor of sensors) {
-        fetchSensor(selected.platform, selected.device_id, sensor.key)
+        fetchSensor(selected.platform, selected.device_id, sensor.key, 500, controller.signal)
           .then((records) => {
             if (cancelled) return;
             setSensorState((prev) => {
@@ -332,6 +334,7 @@ export default function DevicePage() {
 
     return () => {
       cancelled = true;
+      controller.abort();
       clearInterval(pollId);
     };
   }, [selected, selectedKey]);
