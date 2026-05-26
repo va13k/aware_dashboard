@@ -158,6 +158,8 @@ services:
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-CHANGE_ME}
       RESEARCHER_USERNAME: ${RESEARCHER_USERNAME:-}
       RESEARCHER_PASSWORD: ${RESEARCHER_PASSWORD:-}
+    volumes:
+      - dashboard_api_cache:/app/cache
     expose:
       - "8000"
     depends_on:
@@ -200,3 +202,4 @@ networks:
 volumes:
   mysql_data:
   configurator_static:
+  dashboard_api_cache:

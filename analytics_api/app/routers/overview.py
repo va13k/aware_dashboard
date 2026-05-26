@@ -1,5 +1,7 @@
 import asyncio
+import json
 import logging
+import os
 from fastapi import APIRouter
 from sqlalchemy import text
 from sqlalchemy.exc import OperationalError, ProgrammingError
@@ -92,7 +94,27 @@ from app.models import (
 router = APIRouter(prefix="/overview", tags=["overview"])
 logger = logging.getLogger(__name__)
 
-_overview_cache: dict | None = None
+_CACHE_FILE = "/app/cache/overview_cache.json"
+
+
+def _load_overview_from_disk() -> dict | None:
+    try:
+        with open(_CACHE_FILE) as f:
+            return json.load(f)
+    except Exception:
+        return None
+
+
+def _save_overview_to_disk(cache: dict) -> None:
+    try:
+        os.makedirs(os.path.dirname(_CACHE_FILE), exist_ok=True)
+        with open(_CACHE_FILE, "w") as f:
+            json.dump(cache, f)
+    except Exception as e:
+        logger.error(f"Failed to save overview cache to disk: {e}")
+
+
+_overview_cache: dict | None = _load_overview_from_disk()
 
 ANDROID_SENSOR_MAP: dict[str, object] = {
     "accelerometer": AndroidAccelerometer,
@@ -252,6 +274,7 @@ async def _refresh_overview_cache() -> None:
                     _platform_stats(idb, IOS_SENSOR_MAP, "aware_ios"),
                 )
         _overview_cache = {"android": android_result, "ios": ios_result}
+        _save_overview_to_disk(_overview_cache)
         logger.info("Overview cache updated")
     except Exception as e:
         logger.error(f"Overview cache refresh failed: {e}")

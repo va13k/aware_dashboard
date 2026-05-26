@@ -1,5 +1,7 @@
 import asyncio
+import json
 import logging
+import os
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select, func
 from sqlalchemy.exc import ProgrammingError, OperationalError, SQLAlchemyError
@@ -8,9 +10,27 @@ from app.database import get_android_db, get_ios_db, AndroidSessionLocal, IosSes
 
 logger = logging.getLogger(__name__)
 
-# Cached result of the slow devices query — served instantly on every request.
-# Refreshed in the background every 5 minutes by background_refresh_loop().
-_devices_cache: dict = {"android": [], "ios": []}
+_CACHE_FILE = "/app/cache/devices_cache.json"
+
+
+def _load_cache_from_disk() -> dict:
+    try:
+        with open(_CACHE_FILE) as f:
+            return json.load(f)
+    except Exception:
+        return {"android": [], "ios": []}
+
+
+def _save_cache_to_disk(cache: dict) -> None:
+    try:
+        os.makedirs(os.path.dirname(_CACHE_FILE), exist_ok=True)
+        with open(_CACHE_FILE, "w") as f:
+            json.dump(cache, f)
+    except Exception as e:
+        logger.error(f"Failed to save devices cache to disk: {e}")
+
+
+_devices_cache: dict = _load_cache_from_disk()
 
 
 async def _refresh_cache() -> None:
@@ -30,6 +50,7 @@ async def _refresh_cache() -> None:
         logger.error(f"Devices cache (ios) refresh failed: {e}")
         ios = _devices_cache["ios"]
     _devices_cache = {"android": android, "ios": ios}
+    _save_cache_to_disk(_devices_cache)
     logger.info(f"Devices cache updated: {len(android)} android, {len(ios)} ios")
 
 
