@@ -1,4 +1,4 @@
-import type { DeviceDetail, DevicesResponse, SensorRecord } from "../types";
+import type { DeviceDetail, DevicesResponse, OverviewResponse, SensorRecord } from "../types";
 
 export const BASE = "/api";
 
@@ -13,6 +13,8 @@ async function get<T>(path: string): Promise<T> {
 }
 
 export const fetchDevices = (): Promise<DevicesResponse> => get("/devices");
+
+export const fetchOverview = (): Promise<OverviewResponse> => get("/overview");
 
 export const fetchDeviceDetail = (
   platform: "android" | "ios",

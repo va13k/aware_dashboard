@@ -1,20 +1,13 @@
 import { useEffect, useState } from "react";
-import { exportAllHref, fetchDevices, fetchSensor } from "../api/client";
+import { exportAllHref, fetchDevices, fetchOverview } from "../api/client";
 import {
   ANDROID_SENSOR_CONFIGS,
   IOS_SENSOR_CONFIGS,
-  SENSOR_CONFIGS,
   SHARED_SENSOR_CONFIGS,
 } from "../config/sensors";
 import SensorStatCard from "../components/SensorStatCard";
-import WifiRecordsCard from "../components/WifiRecordsCard";
 import ExportLink from "../components/ExportLink";
-import type { Device, DevicesResponse, SensorRecord } from "../types";
-
-type SensorData = Record<
-  string,
-  { android: SensorRecord[]; ios: SensorRecord[] }
->;
+import type { Device, DevicesResponse, OverviewResponse } from "../types";
 
 const REFRESH_INTERVAL_MS = 60000;
 const CLOCK_INTERVAL_MS = 10000;
@@ -53,19 +46,11 @@ function readHideEmptySensors(): boolean {
   return window.localStorage.getItem(SENSOR_FILTER_STORAGE_KEY) === "true";
 }
 
-function recordsForSensor(
-  sensorData: SensorData,
-  key: string,
-): { android: SensorRecord[]; ios: SensorRecord[] } {
-  return sensorData[key] ?? { android: [], ios: [] };
-}
 
 export default function OverviewPage() {
   const [devices, setDevices] = useState<DevicesResponse | null>(null);
-  const [sensorData, setSensorData] = useState<SensorData>({});
-  const [loadingKeys, setLoadingKeys] = useState<Set<string>>(
-    new Set(SENSOR_CONFIGS.map((s) => s.key)),
-  );
+  const [overview, setOverview] = useState<OverviewResponse | null>(null);
+  const [overviewLoading, setOverviewLoading] = useState(true);
   const [hideEmptySensors, setHideEmptySensors] = useState(
     readHideEmptySensors,
   );
@@ -78,57 +63,17 @@ export default function OverviewPage() {
 
     async function load() {
       if (loading) return;
-
       loading = true;
       try {
-        const loadedDevices = await fetchDevices();
-
+        const [loadedDevices, loadedOverview] = await Promise.all([
+          fetchDevices(),
+          fetchOverview(),
+        ]);
         if (cancelled) return;
-
         setDevices(loadedDevices);
+        setOverview(loadedOverview);
+        setOverviewLoading(false);
         setError(null);
-
-        for (const sensor of SENSOR_CONFIGS) {
-          const fetchAndroid =
-            sensor.platform === "shared" || sensor.platform === "android";
-          const fetchIos =
-            sensor.platform === "shared" || sensor.platform === "ios";
-          const [androidResults, iosResults] = await Promise.all([
-            fetchAndroid
-              ? Promise.all(
-                  loadedDevices.android.map((d) =>
-                    fetchSensor("android", d.device_id, sensor.key).catch(
-                      () => [] as SensorRecord[],
-                    ),
-                  ),
-                )
-              : Promise.resolve([] as SensorRecord[][]),
-            fetchIos
-              ? Promise.all(
-                  loadedDevices.ios.map((d) =>
-                    fetchSensor("ios", d.device_id, sensor.key).catch(
-                      () => [] as SensorRecord[],
-                    ),
-                  ),
-                )
-              : Promise.resolve([] as SensorRecord[][]),
-          ]);
-
-          if (cancelled) return;
-
-          setSensorData((prev) => ({
-            ...prev,
-            [sensor.key]: {
-              android: androidResults.flat(),
-              ios: iosResults.flat(),
-            },
-          }));
-          setLoadingKeys((prev) => {
-            const next = new Set(prev);
-            next.delete(sensor.key);
-            return next;
-          });
-        }
       } catch (e) {
         if (!cancelled) setError(String(e));
       } finally {
@@ -175,12 +120,10 @@ export default function OverviewPage() {
     if (devices) return "No uploads yet";
     return "Checking uploads...";
   })();
-  const hasSensorRecords = (key: string) => {
-    const records = recordsForSensor(sensorData, key);
-    return records.android.length + records.ios.length > 0;
-  };
+  const hasSensorRecords = (key: string) =>
+    !!(overview?.android[key] || overview?.ios[key]);
   const shouldShowSensor = (key: string) =>
-    !hideEmptySensors || loadingKeys.has(key) || hasSensorRecords(key);
+    !hideEmptySensors || overviewLoading || hasSensorRecords(key);
   const visibleSections = [
     { title: "Shared", sensors: SHARED_SENSOR_CONFIGS },
     { title: "Android only", sensors: ANDROID_SENSOR_CONFIGS },
@@ -270,35 +213,16 @@ export default function OverviewPage() {
             {section.title}
           </div>
           <div className="grid auto-rows-[220px] grid-cols-[repeat(auto-fill,minmax(340px,1fr))] gap-4">
-            {section.sensors.map((config) =>
-              config.key === "wifi" ? (
-                <WifiRecordsCard
-                  key={config.key}
-                  groups={[
-                    {
-                      label: "Android",
-                      records: sensorData[config.key]?.android ?? [],
-                    },
-                    {
-                      label: "iOS",
-                      records: sensorData[config.key]?.ios ?? [],
-                    },
-                  ]}
-                  loading={loadingKeys.has(config.key)}
-                  className="h-full overflow-hidden"
-                  tableClassName="max-h-[138px]"
-                />
-              ) : (
-                <SensorStatCard
-                  key={config.key}
-                  config={config}
-                  androidRecords={sensorData[config.key]?.android ?? []}
-                  iosRecords={sensorData[config.key]?.ios ?? []}
-                  loading={loadingKeys.has(config.key)}
-                  className="h-full overflow-hidden"
-                />
-              ),
-            )}
+            {section.sensors.map((config) => (
+              <SensorStatCard
+                key={config.key}
+                config={config}
+                androidStats={overview?.android[config.key] ?? null}
+                iosStats={overview?.ios[config.key] ?? null}
+                loading={overviewLoading}
+                className="h-full overflow-hidden"
+              />
+            ))}
           </div>
         </section>
       ))}

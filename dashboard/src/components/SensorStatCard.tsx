@@ -1,49 +1,12 @@
 import type { SensorConfig } from "../config/sensors";
-import type { SensorRecord } from "../types";
-import { min, max, fmt } from "../utils/stats";
+import type { SensorOverviewStats } from "../types";
 
 interface Props {
   config: SensorConfig;
-  androidRecords: SensorRecord[];
-  iosRecords: SensorRecord[];
+  androidStats: SensorOverviewStats | null;
+  iosStats: SensorOverviewStats | null;
   loading: boolean;
   className?: string;
-}
-
-interface PlatformStats {
-  count: number;
-  last: number;
-  min: number;
-  max: number;
-}
-
-function platformStats(
-  config: SensorConfig,
-  records: SensorRecord[],
-): PlatformStats | null {
-  if (config.countOnly) {
-    if (!records.length) return null;
-    const latest = records.reduce((a, b) => (b.timestamp > a.timestamp ? b : a));
-    return {
-      count: records.length,
-      last: latest.timestamp,
-      min: latest.timestamp,
-      max: latest.timestamp,
-    };
-  }
-
-  const pairs = records
-    .map((r) => ({ ts: r.timestamp, v: config.extract(r) }))
-    .filter((x): x is { ts: number; v: number } => x.v !== null);
-  if (!pairs.length) return null;
-  const values = pairs.map((p) => p.v);
-  const latest = pairs.reduce((a, b) => (b.ts > a.ts ? b : a));
-  return {
-    count: values.length,
-    last: latest.v,
-    min: min(values),
-    max: max(values),
-  };
 }
 
 interface StatItemProps {
@@ -64,21 +27,50 @@ function StatItem({ label, children }: StatItemProps) {
   );
 }
 
-function formatStatValue(config: SensorConfig, value: number): string {
-  if (config.countOnly) return new Date(value).toLocaleDateString();
-  return config.enumLabels?.[value] ?? fmt(value);
+function normalizeTs(ts: number): number {
+  return ts < 100000000000 ? ts * 1000 : ts;
+}
+
+function formatLastSeen(ts: number | null): string {
+  if (ts == null) return "–";
+  return new Intl.DateTimeFormat(undefined, {
+    dateStyle: "medium",
+    timeStyle: "short",
+  }).format(new Date(normalizeTs(ts)));
+}
+
+function PlatformBlock({
+  label,
+  stats,
+  color,
+}: {
+  label: string;
+  stats: SensorOverviewStats;
+  color: string;
+}) {
+  return (
+    <div className="flex-1">
+      <p className="text-[10px] uppercase tracking-[0.5px] text-sage mb-3">
+        {label}
+      </p>
+      <div className="grid grid-cols-1 gap-y-3">
+        <StatItem label="records">
+          <span style={{ color }}>{stats.count.toLocaleString()}</span>
+        </StatItem>
+        <StatItem label="last seen">{formatLastSeen(stats.last_ts)}</StatItem>
+      </div>
+    </div>
+  );
 }
 
 export default function SensorStatCard({
   config,
-  androidRecords,
-  iosRecords,
+  androidStats,
+  iosStats,
   loading,
   className = "",
 }: Props) {
-  const android = platformStats(config, androidRecords);
-  const ios = platformStats(config, iosRecords);
-  const hasData = android || ios;
+  const hasData = androidStats || iosStats;
 
   return (
     <div
@@ -107,72 +99,18 @@ export default function SensorStatCard({
         </div>
       ) : (
         <div className="flex gap-6">
-          {android && (
-            <div className="flex-1">
-              <p className="text-[10px] uppercase tracking-[0.5px] text-sage mb-3">
-                Android
-              </p>
-              <div className="grid grid-cols-2 gap-x-4 gap-y-3">
-                <StatItem label="records">
-                  {android.count.toLocaleString()}
-                </StatItem>
-                {config.countOnly ? (
-                  <StatItem label="last">
-                    <span style={{ color: config.color }}>
-                      {formatStatValue(config, android.last)}
-                    </span>
-                  </StatItem>
-                ) : (
-                  <>
-                    <StatItem label="last">
-                      <span style={{ color: config.color }}>
-                        {formatStatValue(config, android.last)}
-                      </span>
-                    </StatItem>
-                    <StatItem label="min">
-                      {formatStatValue(config, android.min)}
-                    </StatItem>
-                    <StatItem label="max">
-                      {formatStatValue(config, android.max)}
-                    </StatItem>
-                  </>
-                )}
-              </div>
-            </div>
+          {androidStats && (
+            <PlatformBlock
+              label="Android"
+              stats={androidStats}
+              color={config.color}
+            />
           )}
-          {android && ios && <div className="w-px bg-wire self-stretch" />}
-          {ios && (
-            <div className="flex-1">
-              <p className="text-[10px] uppercase tracking-[0.5px] text-sage mb-3">
-                iOS
-              </p>
-              <div className="grid grid-cols-2 gap-x-4 gap-y-3">
-                <StatItem label="records">
-                  {ios.count.toLocaleString()}
-                </StatItem>
-                {config.countOnly ? (
-                  <StatItem label="last">
-                    <span style={{ color: config.color }}>
-                      {formatStatValue(config, ios.last)}
-                    </span>
-                  </StatItem>
-                ) : (
-                  <>
-                    <StatItem label="last">
-                      <span style={{ color: config.color }}>
-                        {formatStatValue(config, ios.last)}
-                      </span>
-                    </StatItem>
-                    <StatItem label="min">
-                      {formatStatValue(config, ios.min)}
-                    </StatItem>
-                    <StatItem label="max">
-                      {formatStatValue(config, ios.max)}
-                    </StatItem>
-                  </>
-                )}
-              </div>
-            </div>
+          {androidStats && iosStats && (
+            <div className="w-px bg-wire self-stretch" />
+          )}
+          {iosStats && (
+            <PlatformBlock label="iOS" stats={iosStats} color={config.color} />
           )}
         </div>
       )}

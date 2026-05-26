@@ -62,3 +62,13 @@ export type SensorRecord = Record<string, unknown> & {
   timestamp: number;
   device_id: string;
 };
+
+export interface SensorOverviewStats {
+  count: number;
+  last_ts: number | null;
+}
+
+export interface OverviewResponse {
+  android: Record<string, SensorOverviewStats | null>;
+  ios: Record<string, SensorOverviewStats | null>;
+}
