@@ -1,8 +1,43 @@
+import asyncio
+import logging
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select, func
 from sqlalchemy.exc import ProgrammingError, OperationalError, SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
-from app.database import get_android_db, get_ios_db
+from app.database import get_android_db, get_ios_db, AndroidSessionLocal, IosSessionLocal
+
+logger = logging.getLogger(__name__)
+
+# Cached result of the slow devices query — served instantly on every request.
+# Refreshed in the background every 5 minutes by background_refresh_loop().
+_devices_cache: dict = {"android": [], "ios": []}
+
+
+async def _refresh_cache() -> None:
+    global _devices_cache
+    android: list = []
+    ios: list = []
+    try:
+        async with AndroidSessionLocal() as adb:
+            android = await list_android_devices(adb)
+    except Exception as e:
+        logger.error(f"Devices cache (android) refresh failed: {e}")
+        android = _devices_cache["android"]
+    try:
+        async with IosSessionLocal() as idb:
+            ios = await list_ios_devices(idb)
+    except Exception as e:
+        logger.error(f"Devices cache (ios) refresh failed: {e}")
+        ios = _devices_cache["ios"]
+    _devices_cache = {"android": android, "ios": ios}
+    logger.info(f"Devices cache updated: {len(android)} android, {len(ios)} ios")
+
+
+async def background_refresh_loop() -> None:
+    """Run forever, refreshing the devices cache every 5 minutes."""
+    while True:
+        await _refresh_cache()
+        await asyncio.sleep(300)
 from app.models import (
     AndroidAccelerometer,
     AndroidBattery,
@@ -374,19 +409,8 @@ async def list_ios_devices(db: AsyncSession = Depends(get_ios_db)):
 
 
 @router.get("")
-async def list_all_devices(
-    android_db: AsyncSession = Depends(get_android_db),
-    ios_db: AsyncSession = Depends(get_ios_db),
-):
-    try:
-        android = await list_android_devices(android_db)
-    except (ProgrammingError, OperationalError, SQLAlchemyError):
-        android = []
-    try:
-        ios = await list_ios_devices(ios_db)
-    except (ProgrammingError, OperationalError, SQLAlchemyError):
-        ios = []
-    return {"android": android, "ios": ios}
+async def list_all_devices():
+    return _devices_cache
 
 
 @router.get("/{platform}/{device_id}")

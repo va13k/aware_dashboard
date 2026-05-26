@@ -1,3 +1,4 @@
+import asyncio
 import logging
 from contextlib import asynccontextmanager
 from sqlalchemy import text
@@ -25,7 +26,13 @@ async def lifespan(app: FastAPI):
             logger.info(f"{name} DB connected successfully")
         except Exception as e:
             logger.error(f"{name} DB connection failed: {e}")
+    task = asyncio.create_task(devices.background_refresh_loop())
     yield
+    task.cancel()
+    try:
+        await task
+    except asyncio.CancelledError:
+        pass
 
 
 app = FastAPI(
