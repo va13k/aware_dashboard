@@ -1,6 +1,6 @@
 import asyncio
 from fastapi import APIRouter, Depends
-from sqlalchemy import select, func
+from sqlalchemy import text
 from sqlalchemy.exc import OperationalError, ProgrammingError
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import get_android_db, get_ios_db
@@ -178,39 +178,63 @@ IOS_SENSOR_MAP: dict[str, object] = {
 }
 
 
-async def _table_stats(db: AsyncSession, model) -> dict | None:
+async def _row_counts(db: AsyncSession, db_name: str) -> dict[str, int]:
+    """Single INFORMATION_SCHEMA query — returns approximate counts for all tables instantly."""
     try:
         result = await db.execute(
-            select(
-                func.count().label("count"),
-                func.max(model.timestamp).label("last_ts"),
-            )
+            text(
+                "SELECT TABLE_NAME, TABLE_ROWS "
+                "FROM INFORMATION_SCHEMA.TABLES "
+                "WHERE TABLE_SCHEMA = :db"
+            ),
+            {"db": db_name},
         )
-        row = result.one()
-        if not row.count:
-            return None
-        return {"count": row.count, "last_ts": row.last_ts}
+        return {row[0]: int(row[1] or 0) for row in result.all()}
+    except Exception:
+        return {}
+
+
+async def _table_last_ts(db: AsyncSession, table_name: str) -> float | None:
+    """Get the most recent timestamp using the primary key — O(log n), no full scan."""
+    try:
+        result = await db.execute(
+            text(f"SELECT timestamp FROM `{table_name}` ORDER BY _id DESC LIMIT 1")
+        )
+        row = result.one_or_none()
+        return float(row[0]) if row and row[0] is not None else None
     except (OperationalError, ProgrammingError):
         await db.rollback()
         return None
 
 
-async def _sensor_stats(db: AsyncSession, entry) -> dict | None:
+async def _sensor_stats(
+    db: AsyncSession, entry, counts: dict[str, int]
+) -> dict | None:
     if isinstance(entry, tuple):
-        parts = [s for s in (await asyncio.gather(*[_table_stats(db, m) for m in entry])) if s]
+        parts = []
+        for model in entry:
+            name = model.__tablename__
+            last_ts = await _table_last_ts(db, name)
+            if last_ts is not None:
+                parts.append({"count": counts.get(name, 0), "last_ts": last_ts})
         if not parts:
             return None
         return {
             "count": sum(p["count"] for p in parts),
             "last_ts": max(p["last_ts"] for p in parts),
         }
-    return await _table_stats(db, entry)
+    name = entry.__tablename__
+    last_ts = await _table_last_ts(db, name)
+    if last_ts is None:
+        return None
+    return {"count": counts.get(name, 0), "last_ts": last_ts}
 
 
-async def _platform_stats(db: AsyncSession, sensor_map: dict) -> dict:
+async def _platform_stats(db: AsyncSession, sensor_map: dict, db_name: str) -> dict:
+    counts = await _row_counts(db, db_name)
     results = {}
     for key, entry in sensor_map.items():
-        results[key] = await _sensor_stats(db, entry)
+        results[key] = await _sensor_stats(db, entry, counts)
     return results
 
 
@@ -220,7 +244,7 @@ async def get_overview(
     ios_db: AsyncSession = Depends(get_ios_db),
 ):
     android_result, ios_result = await asyncio.gather(
-        _platform_stats(android_db, ANDROID_SENSOR_MAP),
-        _platform_stats(ios_db, IOS_SENSOR_MAP),
+        _platform_stats(android_db, ANDROID_SENSOR_MAP, "aware_android"),
+        _platform_stats(ios_db, IOS_SENSOR_MAP, "aware_ios"),
     )
     return {"android": android_result, "ios": ios_result}
