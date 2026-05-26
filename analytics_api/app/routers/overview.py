@@ -1,9 +1,10 @@
 import asyncio
-from fastapi import APIRouter, Depends
+import logging
+from fastapi import APIRouter
 from sqlalchemy import text
 from sqlalchemy.exc import OperationalError, ProgrammingError
 from sqlalchemy.ext.asyncio import AsyncSession
-from app.database import get_android_db, get_ios_db
+from app.database import AndroidSessionLocal, IosSessionLocal
 from app.models import (
     AndroidAccelerometer,
     AndroidApplicationsCrashes,
@@ -89,6 +90,9 @@ from app.models import (
 )
 
 router = APIRouter(prefix="/overview", tags=["overview"])
+logger = logging.getLogger(__name__)
+
+_overview_cache: dict | None = None
 
 ANDROID_SENSOR_MAP: dict[str, object] = {
     "accelerometer": AndroidAccelerometer,
@@ -238,13 +242,29 @@ async def _platform_stats(db: AsyncSession, sensor_map: dict, db_name: str) -> d
     return results
 
 
+async def _refresh_overview_cache() -> None:
+    global _overview_cache
+    try:
+        async with AndroidSessionLocal() as adb:
+            async with IosSessionLocal() as idb:
+                android_result, ios_result = await asyncio.gather(
+                    _platform_stats(adb, ANDROID_SENSOR_MAP, "aware_android"),
+                    _platform_stats(idb, IOS_SENSOR_MAP, "aware_ios"),
+                )
+        _overview_cache = {"android": android_result, "ios": ios_result}
+        logger.info("Overview cache updated")
+    except Exception as e:
+        logger.error(f"Overview cache refresh failed: {e}")
+
+
+async def background_overview_refresh_loop() -> None:
+    while True:
+        await _refresh_overview_cache()
+        await asyncio.sleep(300)
+
+
 @router.get("")
-async def get_overview(
-    android_db: AsyncSession = Depends(get_android_db),
-    ios_db: AsyncSession = Depends(get_ios_db),
-):
-    android_result, ios_result = await asyncio.gather(
-        _platform_stats(android_db, ANDROID_SENSOR_MAP, "aware_android"),
-        _platform_stats(ios_db, IOS_SENSOR_MAP, "aware_ios"),
-    )
-    return {"android": android_result, "ios": ios_result}
+async def get_overview():
+    if _overview_cache is not None:
+        return _overview_cache
+    return {"android": {}, "ios": {}}

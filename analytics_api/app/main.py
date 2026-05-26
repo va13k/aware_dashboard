@@ -26,13 +26,16 @@ async def lifespan(app: FastAPI):
             logger.info(f"{name} DB connected successfully")
         except Exception as e:
             logger.error(f"{name} DB connection failed: {e}")
-    task = asyncio.create_task(devices.background_refresh_loop())
+    devices_task = asyncio.create_task(devices.background_refresh_loop())
+    overview_task = asyncio.create_task(overview.background_overview_refresh_loop())
     yield
-    task.cancel()
-    try:
-        await task
-    except asyncio.CancelledError:
-        pass
+    devices_task.cancel()
+    overview_task.cancel()
+    for task in (devices_task, overview_task):
+        try:
+            await task
+        except asyncio.CancelledError:
+            pass
 
 
 app = FastAPI(
