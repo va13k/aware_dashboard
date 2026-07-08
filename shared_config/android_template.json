@@ -474,11 +474,11 @@
     },
     {
       "setting": "status_esm",
-      "value": true
+      "value": false
     },
     {
       "setting": "status_webservice",
-      "value": true
+      "value": false
     }
   ]
 }
