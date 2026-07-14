@@ -344,7 +344,7 @@ def write_outputs(source):
         str(settings["public_host"]),
         int(settings["public_port"]),
     )
-    android_webservice_url = f"{base_url}/index.php/{study['study_number']}/{study['study_key']}"
+    android_webservice_url = f"{base_url}/{study['study_number']}/{study['study_key']}"
     android_config = serialize_android_config(
         source, settings, ANDROID_TEMPLATE_PATH, webservice_server=android_webservice_url
     )
