@@ -376,6 +376,46 @@ export default function Main() {
           setting: "status_mqtt",
           value: sensorData.status_mqtt ? sensorData.status_mqtt : false,
         },
+        {
+          setting: "mqtt_server",
+          value: sensorData.mqtt_server ? sensorData.mqtt_server : "",
+        },
+        {
+          setting: "mqtt_port",
+          value: sensorData.mqtt_port ? sensorData.mqtt_port : 1883,
+        },
+        {
+          setting: "mqtt_username",
+          value: sensorData.mqtt_username ? sensorData.mqtt_username : "",
+        },
+        {
+          setting: "mqtt_password",
+          value: sensorData.mqtt_password ? sensorData.mqtt_password : "",
+        },
+        {
+          setting: "mqtt_keep_alive",
+          value: sensorData.mqtt_keep_alive ? sensorData.mqtt_keep_alive : 600,
+        },
+        {
+          setting: "mqtt_qos",
+          value: sensorData.mqtt_qos ? sensorData.mqtt_qos : 2,
+        },
+        {
+          setting: "webservice_simple",
+          value: sensorData.webservice_simple
+            ? sensorData.webservice_simple
+            : false,
+        },
+        {
+          setting: "webservice_remove_data",
+          value: sensorData.webservice_remove_data
+            ? sensorData.webservice_remove_data
+            : false,
+        },
+        {
+          setting: "debug_db_slow",
+          value: sensorData.debug_db_slow ? sensorData.debug_db_slow : false,
+        },
 
         // application
         {

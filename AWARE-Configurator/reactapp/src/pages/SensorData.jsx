@@ -9,6 +9,7 @@ import {
   Checkbox,
   Radio,
   RadioGroup,
+  TextField,
   ThemeProvider,
 } from "@mui/material";
 import FormControlLabel from "@mui/material/FormControlLabel";
@@ -44,6 +45,7 @@ import customisedTheme from "../functions/theme";
 import Field from "../components/Field/Field";
 import InputField from "../components/InputField/InputField";
 import PluginAPIField from "../components/PluginAPIField/PluginAPIField";
+import PasswordField from "../components/PasswordField/PasswordField";
 
 const FUSED_LOCATION_ACCURACY_OPTIONS = [
   { value: 100, label: "Max Precise Accuracy" },
@@ -1121,6 +1123,133 @@ export default function SensorData() {
   }
 
   // eslint-disable-next-line react/no-unstable-nested-components
+  function SensorMqttSubContent() {
+    return (
+      <Grid container rowSpacing={1} columnSpacing={{ xs: 1, sm: 2, md: 3 }}>
+        <Grid width="10%" />
+        <Grid width="70%">
+          <div className="sensor_vertical_layout">
+            <Grid>
+              <p className="field_name" mb={10}>
+                Broker address
+              </p>
+            </Grid>
+            <Grid marginTop={2}>
+              <TextField
+                id="mqtt_server"
+                placeholder="mqtt.example.com"
+                value={sensorData.mqtt_server || ""}
+                type="text"
+                style={{ width: "100%" }}
+                onChange={(event) => {
+                  updateSensorData("mqtt_server", event.target.value);
+                }}
+              />
+              <p className="explanation">
+                Hostname or IP address of the MQTT broker the client should
+                connect to.
+              </p>
+            </Grid>
+          </div>
+
+          <FrequencyField
+            id="mqtt_port"
+            title="Broker port"
+            inputLabel="MQTT broker port"
+            defaultNum={1883}
+            description="Port the MQTT broker listens on (default 1883, or 8883 for TLS)."
+            field="mqtt_port"
+            studyField={sensorData.mqtt_port}
+            modeState="sensor"
+          />
+
+          <div className="sensor_vertical_layout">
+            <Grid>
+              <p className="field_name" mb={10}>
+                Username
+              </p>
+            </Grid>
+            <Grid marginTop={2}>
+              <TextField
+                id="mqtt_username"
+                placeholder="Optional"
+                value={sensorData.mqtt_username || ""}
+                type="text"
+                style={{ width: "100%" }}
+                onChange={(event) => {
+                  updateSensorData("mqtt_username", event.target.value);
+                }}
+              />
+              <p className="explanation">
+                Username for authenticating with the broker, if required.
+              </p>
+            </Grid>
+          </div>
+
+          <PasswordField
+            fieldName="Password"
+            recoilState={sensorDataState}
+            field="mqtt_password"
+            inputLabel="Optional"
+            description="Password for authenticating with the broker, if required."
+          />
+
+          <FrequencyField
+            id="mqtt_keep_alive"
+            title="Keep alive"
+            inputLabel="Keep-alive interval (seconds)"
+            defaultNum={600}
+            description="How often the client pings the broker to keep the connection alive (seconds)."
+            field="mqtt_keep_alive"
+            studyField={sensorData.mqtt_keep_alive}
+            modeState="sensor"
+          />
+
+          <div>
+            <Grid>
+              <p className="field_name" mb={10}>
+                QoS level
+              </p>
+            </Grid>
+            <Grid marginTop={2}>
+              <RadioGroup
+                aria-labelledby="mqtt_qos"
+                name="mqtt_qos"
+                value={
+                  sensorData.mqtt_qos !== undefined ? sensorData.mqtt_qos : 2
+                }
+                row
+              >
+                <FormControlLabel
+                  value={0}
+                  control={<Radio />}
+                  label="0 - At most once"
+                  onClick={() => updateSensorData("mqtt_qos", 0)}
+                />
+                <FormControlLabel
+                  value={1}
+                  control={<Radio />}
+                  label="1 - At least once"
+                  onClick={() => updateSensorData("mqtt_qos", 1)}
+                />
+                <FormControlLabel
+                  value={2}
+                  control={<Radio />}
+                  label="2 - Exactly once"
+                  onClick={() => updateSensorData("mqtt_qos", 2)}
+                />
+              </RadioGroup>
+              <p className="schedule-description">
+                Quality of service level for published/subscribed MQTT messages.
+              </p>
+            </Grid>
+          </div>
+        </Grid>
+      </Grid>
+    );
+  }
+
+  // eslint-disable-next-line react/no-unstable-nested-components
   function PluginOpenWeatherSubContent() {
     return (
       <Grid container rowSpacing={1} columnSpacing={{ xs: 1, sm: 2, md: 3 }}>
@@ -1988,6 +2117,7 @@ export default function SensorData() {
             field="status_mqtt"
             modeState="sensor"
           />
+          {sensorData.status_mqtt ? SensorMqttSubContent() : <div />}
 
           <SensorComponent
             sensorName="Screenshot"

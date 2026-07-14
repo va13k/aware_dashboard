@@ -228,6 +228,33 @@ export default function Upload() {
         case "status_mqtt":
           sensorData.status_mqtt = value;
           break;
+        case "mqtt_server":
+          sensorData.mqtt_server = value;
+          break;
+        case "mqtt_port":
+          sensorData.mqtt_port = value;
+          break;
+        case "mqtt_username":
+          sensorData.mqtt_username = value;
+          break;
+        case "mqtt_password":
+          sensorData.mqtt_password = value;
+          break;
+        case "mqtt_keep_alive":
+          sensorData.mqtt_keep_alive = value;
+          break;
+        case "mqtt_qos":
+          sensorData.mqtt_qos = value;
+          break;
+        case "webservice_simple":
+          sensorData.webservice_simple = value;
+          break;
+        case "webservice_remove_data":
+          sensorData.webservice_remove_data = value;
+          break;
+        case "debug_db_slow":
+          sensorData.debug_db_slow = value;
+          break;
         case "status_applications":
           sensorData.sensor_application = value;
           break;
