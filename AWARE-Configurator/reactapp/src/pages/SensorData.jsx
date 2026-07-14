@@ -58,7 +58,7 @@ const FUSED_LOCATION_ACCURACY_OPTIONS = [
 function normalizeFusedLocationAccuracy(value) {
   const numeric = Number(value);
   return FUSED_LOCATION_ACCURACY_OPTIONS.some(
-    (option) => option.value === numeric
+    (option) => option.value === numeric,
   )
     ? numeric
     : 102;
@@ -146,11 +146,7 @@ export default function SensorData() {
   };
 
   function AndroidOnlyNote() {
-    return (
-      <p className="explanation">
-        Android only feature.
-      </p>
-    );
+    return <p className="explanation">Android only feature.</p>;
   }
 
   // eslint-disable-next-line react/no-unstable-nested-components
@@ -303,7 +299,20 @@ export default function SensorData() {
       <Grid container rowSpacing={1} columnSpacing={{ xs: 1, sm: 2, md: 3 }}>
         <Grid width="10%" />
         <Grid width="70%">
-          <p style={{ fontSize: "0.7rem", fontWeight: 700, color: "#666", textTransform: "uppercase", letterSpacing: "0.08em", margin: "12px 0 2px", borderBottom: "1px solid #e0e0e0", paddingBottom: 2 }}>Android only</p>
+          <p
+            style={{
+              fontSize: "0.7rem",
+              fontWeight: 700,
+              color: "#666",
+              textTransform: "uppercase",
+              letterSpacing: "0.08em",
+              margin: "12px 0 2px",
+              borderBottom: "1px solid #e0e0e0",
+              paddingBottom: 2,
+            }}
+          >
+            Android only
+          </p>
           <SensorComponent
             sensorName="Communication events"
             sensorDescription="Activate or deactivate high-level context of users’ communication usage."
@@ -618,7 +627,20 @@ export default function SensorData() {
       <Grid container rowSpacing={1} columnSpacing={{ xs: 1, sm: 2, md: 3 }}>
         <Grid width="10%" />
         <Grid width="70%">
-          <p style={{ fontSize: "0.7rem", fontWeight: 700, color: "#666", textTransform: "uppercase", letterSpacing: "0.08em", margin: "8px 0 2px", borderBottom: "1px solid #e0e0e0", paddingBottom: 2 }}>Android &amp; iPhone</p>
+          <p
+            style={{
+              fontSize: "0.7rem",
+              fontWeight: 700,
+              color: "#666",
+              textTransform: "uppercase",
+              letterSpacing: "0.08em",
+              margin: "8px 0 2px",
+              borderBottom: "1px solid #e0e0e0",
+              paddingBottom: 2,
+            }}
+          >
+            Android &amp; iPhone
+          </p>
           <SensorComponent
             sensorName="Location (GPS)"
             sensorDescription="Activate or deactivate GPS locations."
@@ -649,7 +671,20 @@ export default function SensorData() {
             modeState="locations"
           />
 
-          <p style={{ fontSize: "0.7rem", fontWeight: 700, color: "#666", textTransform: "uppercase", letterSpacing: "0.08em", margin: "12px 0 2px", borderBottom: "1px solid #e0e0e0", paddingBottom: 2 }}>Android only</p>
+          <p
+            style={{
+              fontSize: "0.7rem",
+              fontWeight: 700,
+              color: "#666",
+              textTransform: "uppercase",
+              letterSpacing: "0.08em",
+              margin: "12px 0 2px",
+              borderBottom: "1px solid #e0e0e0",
+              paddingBottom: 2,
+            }}
+          >
+            Android only
+          </p>
           <SensorComponent
             sensorName="Location (Network)"
             sensorDescription="Activate or deactivate Network locations."
@@ -758,7 +793,20 @@ export default function SensorData() {
       <Grid container rowSpacing={1} columnSpacing={{ xs: 1, sm: 2, md: 3 }}>
         <Grid width="10%" />
         <Grid width="70%">
-          <p style={{ fontSize: "0.7rem", fontWeight: 700, color: "#666", textTransform: "uppercase", letterSpacing: "0.08em", margin: "8px 0 2px", borderBottom: "1px solid #e0e0e0", paddingBottom: 2 }}>Android &amp; iPhone</p>
+          <p
+            style={{
+              fontSize: "0.7rem",
+              fontWeight: 700,
+              color: "#666",
+              textTransform: "uppercase",
+              letterSpacing: "0.08em",
+              margin: "8px 0 2px",
+              borderBottom: "1px solid #e0e0e0",
+              paddingBottom: 2,
+            }}
+          >
+            Android &amp; iPhone
+          </p>
           <SensorComponent
             sensorName="Network events"
             sensorDescription="Activate or deactivate sensor."
@@ -767,7 +815,20 @@ export default function SensorData() {
             modeState="network"
           />
 
-          <p style={{ fontSize: "0.7rem", fontWeight: 700, color: "#666", textTransform: "uppercase", letterSpacing: "0.08em", margin: "12px 0 2px", borderBottom: "1px solid #e0e0e0", paddingBottom: 2 }}>Android only</p>
+          <p
+            style={{
+              fontSize: "0.7rem",
+              fontWeight: 700,
+              color: "#666",
+              textTransform: "uppercase",
+              letterSpacing: "0.08em",
+              margin: "12px 0 2px",
+              borderBottom: "1px solid #e0e0e0",
+              paddingBottom: 2,
+            }}
+          >
+            Android only
+          </p>
           <SensorComponent
             sensorName="Network traffic"
             sensorDescription="Activate or deactivate sensor."
@@ -818,7 +879,20 @@ export default function SensorData() {
       <Grid container rowSpacing={1} columnSpacing={{ xs: 1, sm: 2, md: 3 }}>
         <Grid width="10%" />
         <Grid width="70%">
-          <p style={{ fontSize: "0.7rem", fontWeight: 700, color: "#666", textTransform: "uppercase", letterSpacing: "0.08em", margin: "8px 0 2px", borderBottom: "1px solid #e0e0e0", paddingBottom: 2 }}>Android only</p>
+          <p
+            style={{
+              fontSize: "0.7rem",
+              fontWeight: 700,
+              color: "#666",
+              textTransform: "uppercase",
+              letterSpacing: "0.08em",
+              margin: "8px 0 2px",
+              borderBottom: "1px solid #e0e0e0",
+              paddingBottom: 2,
+            }}
+          >
+            Android only
+          </p>
           <FrequencyField
             id="frequency_proximity"
             title="Frequency proximity"
@@ -963,7 +1037,20 @@ export default function SensorData() {
       <Grid container rowSpacing={1} columnSpacing={{ xs: 1, sm: 2, md: 3 }}>
         <Grid width="10%" />
         <Grid width="70%">
-          <p style={{ fontSize: "0.7rem", fontWeight: 700, color: "#666", textTransform: "uppercase", letterSpacing: "0.08em", margin: "8px 0 2px", borderBottom: "1px solid #e0e0e0", paddingBottom: 2 }}>Android only</p>
+          <p
+            style={{
+              fontSize: "0.7rem",
+              fontWeight: 700,
+              color: "#666",
+              textTransform: "uppercase",
+              letterSpacing: "0.08em",
+              margin: "8px 0 2px",
+              borderBottom: "1px solid #e0e0e0",
+              paddingBottom: 2,
+            }}
+          >
+            Android only
+          </p>
           <SensorComponent
             sensorName="Touch"
             sensorDescription="Logs clicks, long-clicks and scroll up/down events."
@@ -1518,8 +1605,8 @@ export default function SensorData() {
             name="location accuracy"
             value={String(
               normalizeFusedLocationAccuracy(
-                pluginData.accuracy_google_fused_location
-              )
+                pluginData.accuracy_google_fused_location,
+              ),
             )}
           >
             {FUSED_LOCATION_ACCURACY_OPTIONS.map((option) => (
@@ -1531,7 +1618,7 @@ export default function SensorData() {
                 onClick={() =>
                   updatePluginData(
                     "accuracy_google_fused_location",
-                    option.value
+                    option.value,
                   )
                 }
               />
@@ -1714,6 +1801,17 @@ export default function SensorData() {
         <div className="border">
           <p className="title">Configuration settings</p>
           <SensorComponent
+            sensorName="Sync to server"
+            sensorDescription="Upload collected data to the study webservice. Disable to keep data on-device only."
+            stateField={
+              sensorData.status_webservice !== undefined
+                ? sensorData.status_webservice
+                : true
+            }
+            field="status_webservice"
+            modeState="sensor"
+          />
+          <SensorComponent
             sensorName="Wifi only"
             sensorDescription="Upload data only when connected to Wi-Fi."
             stateField={sensorData.wifi_only}
@@ -1742,7 +1840,7 @@ export default function SensorData() {
           <div>
             <Grid>
               <p className="field_name" mb={10}>
-                Clean data frequency
+                Clean data frequency on the participants' devices
               </p>
             </Grid>
             <Grid marginTop={2}>
@@ -1839,6 +1937,27 @@ export default function SensorData() {
             sensorDescription="Show debug messages in logcat."
             stateField={sensorData.debug_flag}
             field="debug_flag"
+            modeState="sensor"
+          />
+          <SensorComponent
+            sensorName="Slow database warnings"
+            sensorDescription="Log a warning when a local database operation takes too long."
+            stateField={sensorData.debug_db_slow}
+            field="debug_db_slow"
+            modeState="sensor"
+          />
+          <SensorComponent
+            sensorName="Simple webservice payloads"
+            sensorDescription="Upload data using the simplified webservice payload format."
+            stateField={sensorData.webservice_simple}
+            field="webservice_simple"
+            modeState="sensor"
+          />
+          <SensorComponent
+            sensorName="Remove data after upload"
+            sensorDescription="Delete local sensor data once it has been successfully uploaded to the webservice."
+            stateField={sensorData.webservice_remove_data}
+            field="webservice_remove_data"
             modeState="sensor"
           />
 

@@ -1128,7 +1128,13 @@ export default function Main() {
         },
         // default sensors
         { setting: "status_esm", value: true },
-        { setting: "status_webservice", value: true },
+        {
+          setting: "status_webservice",
+          value:
+            sensorData.status_webservice !== undefined
+              ? sensorData.status_webservice
+              : true,
+        },
       ],
       ios_sensors: {
         significant_motion:

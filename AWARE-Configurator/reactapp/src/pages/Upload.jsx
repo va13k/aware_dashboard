@@ -510,6 +510,7 @@ export default function Upload() {
         case "status_esm":
           break;
         case "status_webservice":
+          sensorData.status_webservice = value;
           break;
         case "status_screenshot":
           sensorData.sensor_screenshot = value;
