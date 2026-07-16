@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import "./FrequencyField.css";
-import { TextField } from "@mui/material";
+import { Radio, RadioGroup, TextField } from "@mui/material";
+import FormControlLabel from "@mui/material/FormControlLabel";
 import { useRecoilState } from "recoil";
 import Grid from "@mui/material/Unstable_Grid2";
 import {
@@ -28,6 +29,22 @@ import {
   pluginSensorState,
 } from "../../functions/atom";
 
+// Presets is an optional array of { key, value, label, detail } used to render
+// research-justified rate options above the raw numeric field. Each preset's
+// `label` names the use case it's good for (e.g. "Fall detection") and
+// `detail` states the actual value plus the tradeoff/citation backing it
+// (e.g. "50 Hz - needed for short-duration impact events; highest battery
+// cost of this sensor's options"). The number of presets is deliberately not
+// fixed at five - sensors whose literature only supports two or three
+// meaningfully distinct rates only get that many, plus Custom. Sensors that
+// don't pass presets keep the original plain-text-field behaviour.
+function findPresetKey(presets, value) {
+  if (!presets || presets.length === 0) return "custom";
+  const numeric = Number(value);
+  const match = presets.find((preset) => Number(preset.value) === numeric);
+  return match ? match.key : "custom";
+}
+
 function FrequencyField(inputs) {
   const {
     id,
@@ -38,15 +55,21 @@ function FrequencyField(inputs) {
     field,
     studyField,
     modeState,
+    presets,
   } = inputs;
 
-  const [localValue, setLocalValue] = useState(
-    studyField || defaultNum.toString()
+  const initialValue = studyField || defaultNum.toString();
+
+  const [localValue, setLocalValue] = useState(initialValue);
+  const [presetSelection, setPresetSelection] = useState(
+    findPresetKey(presets, initialValue)
   );
 
   useEffect(() => {
-    setLocalValue(studyField || defaultNum.toString());
-  }, [studyField, defaultNum]);
+    const nextValue = studyField || defaultNum.toString();
+    setLocalValue(nextValue);
+    setPresetSelection(findPresetKey(presets, nextValue));
+  }, [studyField, defaultNum, presets]);
 
   const [sensorData, setSensorData] = useRecoilState(sensorDataState);
   const [applicationSensor, setApplicationSensor] = useRecoilState(
@@ -257,6 +280,27 @@ function FrequencyField(inputs) {
     }
   };
 
+  const handlePresetChange = (event) => {
+    const key = event.target.value;
+    setPresetSelection(key);
+
+    if (key === "custom") {
+      // Reset to 0 so the researcher has to consciously type their own
+      // value, instead of silently inheriting whatever preset was last
+      // selected (which could be mistaken for a deliberate choice).
+      setLocalValue("0");
+      return;
+    }
+
+    const preset = presets.find((option) => option.key === key);
+    if (preset) {
+      setLocalValue(preset.value.toString());
+      updateStates(field.toString(), preset.value, modeState);
+    }
+  };
+
+  const hasPresets = Array.isArray(presets) && presets.length > 0;
+
   return (
     <div className="sensor_vertical_layout">
       <Grid>
@@ -264,25 +308,87 @@ function FrequencyField(inputs) {
           {title}
         </p>
       </Grid>
-      <Grid marginTop={2}>
-        <TextField
-          id={id}
-          label={inputLabel}
-          value={localValue}
-          type="text"
-          InputLabelProps={{
-            shrink: true,
-          }}
-          style={{ width: "100%" }}
-          onChange={handleChange}
-          onBlur={handleBlur}
-        />
-        {description ? (
-          <p className="schedule-description">{description}</p>
-        ) : (
-          <div />
-        )}
-      </Grid>
+
+      {hasPresets ? (
+        <Grid marginTop={2}>
+          <RadioGroup
+            aria-labelledby={`${id}_presets`}
+            name={`${id}_presets`}
+            value={presetSelection}
+            onChange={handlePresetChange}
+          >
+            {presets.map((preset) => (
+              <FormControlLabel
+                key={preset.key}
+                value={preset.key}
+                control={<Radio />}
+                label={
+                  <span>
+                    <span>{preset.label}</span>
+                    {preset.detail ? (
+                      <span
+                        style={{
+                          display: "block",
+                          fontSize: "0.8rem",
+                          color: "#666",
+                        }}
+                      >
+                        {preset.detail}
+                      </span>
+                    ) : null}
+                  </span>
+                }
+              />
+            ))}
+            <FormControlLabel
+              value="custom"
+              control={<Radio />}
+              label={
+                <span>
+                  <span>Custom</span>
+                  <span
+                    style={{
+                      display: "block",
+                      fontSize: "0.8rem",
+                      color: "#666",
+                    }}
+                  >
+                    Set your own value if none of the above match your study's
+                    needs.
+                  </span>
+                </span>
+              }
+            />
+          </RadioGroup>
+        </Grid>
+      ) : (
+        <div />
+      )}
+
+      {!hasPresets || presetSelection === "custom" ? (
+        <Grid marginTop={2}>
+          <TextField
+            id={id}
+            label={inputLabel}
+            value={localValue}
+            type="text"
+            InputLabelProps={{
+              shrink: true,
+            }}
+            style={{ width: "100%" }}
+            onChange={handleChange}
+            onBlur={handleBlur}
+          />
+        </Grid>
+      ) : (
+        <div />
+      )}
+
+      {description ? (
+        <p className="schedule-description">{description}</p>
+      ) : (
+        <div />
+      )}
     </div>
   );
 }
