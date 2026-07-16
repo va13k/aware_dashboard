@@ -8,9 +8,9 @@ from django.views.decorators.csrf import ensure_csrf_cookie, csrf_exempt
 
 from aware_light_config_Django import settings
 
-PROJECT_ROOT = pathlib.Path("/project")
-if PROJECT_ROOT.exists() and str(PROJECT_ROOT) not in sys.path:
-    sys.path.insert(0, str(PROJECT_ROOT))
+# settings.py already resolves PROJECT_ROOT (Docker's /project mount or the
+# repo root locally) and adds it to sys.path, so shared_config is importable.
+PROJECT_ROOT = settings.PROJECT_ROOT
 
 from shared_config.source_store import update_source
 from shared_config.runtime import (

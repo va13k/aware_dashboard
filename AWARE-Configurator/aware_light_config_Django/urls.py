@@ -15,13 +15,24 @@ Including another URLconf
 """
 from django.urls import path, re_path
 from django.views.generic import TemplateView
+from django.views.static import serve as serve_static
 
 from App01 import database_operations, general
+from aware_light_config_Django import settings
 
 urlpatterns = [
     path('test_connection/', database_operations.test_connection),
     path('get_token/', general.get_token),
     path('initialize_database/', database_operations.initialize_database),
     path('save_json_file/', general.save_json_file),
+    # Mirrors nginx's `location /studies/files/` alias (nginx/http.conf) so
+    # this works when running the Configurator standalone, without nginx in
+    # front. In the full docker-compose stack, nginx intercepts this path
+    # first and this route is never reached.
+    re_path(
+        r'^studies/files/(?P<path>.*)$',
+        serve_static,
+        {'document_root': settings.STORAGE_DIR},
+    ),
     re_path(r'.*', TemplateView.as_view(template_name='index.html')),
 ]

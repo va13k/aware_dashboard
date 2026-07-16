@@ -10,12 +10,30 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/4.1/ref/settings/
 """
 import os
+import sys
 from pathlib import Path
 from urllib.parse import urlparse
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 
 BASE_DIR = Path(__file__).resolve().parent.parent
+
+# In Docker the whole repo is bind-mounted at /project so App01 can import the
+# shared_config package that lives alongside AWARE-Configurator. Outside Docker
+# there's no /project, so fall back to the repo root relative to this file.
+PROJECT_ROOT = Path(os.environ.get("PROJECT_ROOT", "/project"))
+if not PROJECT_ROOT.exists():
+    PROJECT_ROOT = BASE_DIR.parent
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
+
+# Docker injects env vars directly via docker-compose, so this only fires for
+# local (non-Docker) runs where nothing has loaded the repo-root .env yet.
+if not os.environ.get("DJANGO_SECRET_KEY"):
+    from shared_config.runtime import load_env
+
+    for _key, _value in load_env(PROJECT_ROOT / ".env").items():
+        os.environ.setdefault(_key, _value)
 
 
 # Quick-start development settings - unsuitable for production
@@ -192,4 +210,6 @@ LOGGING = {
     },
 }
 
-STORAGE_DIR = "./saved_json_files"
+# PROJECT_ROOT/studies is the repo-root studies/ folder in both cases: in
+# Docker it's reached via the /project bind mount, locally it's just the repo.
+STORAGE_DIR = os.environ.get("DJANGO_STORAGE_DIR") or str(PROJECT_ROOT / "studies")
