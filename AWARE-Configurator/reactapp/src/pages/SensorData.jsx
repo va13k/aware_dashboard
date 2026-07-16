@@ -47,6 +47,544 @@ import InputField from "../components/InputField/InputField";
 import PluginAPIField from "../components/PluginAPIField/PluginAPIField";
 import PasswordField from "../components/PasswordField/PasswordField";
 
+// Sensor sampling-rate presets, grounded in digital-phenotyping / mobile-
+// sensing literature rather than an arbitrary evenly-spaced speed scale.
+// Each option names the use case it serves and states the tradeoff (battery,
+// storage, or missed-event risk) that justifies it. The number of options is
+// NOT fixed at five - sensors whose literature only supports two or three
+// meaningfully distinct rates get that many, plus Custom. Where no
+// phenotyping-specific research exists for a sensor (e.g. processor load),
+// the detail text says so explicitly rather than implying a citation that
+// isn't there.
+//
+// Full sources are listed in the accompanying chat response; abbreviated
+// citations below refer to the same set:
+//  [HAR-review]  npj Digital Medicine 2021 systematic review of smartphone
+//                HAR methods for health research
+//  [FallDet]     Sensors 2026, "Impact of Accelerometer Sampling Rate on
+//                Fall-Detection Model Performance"
+//  [GPS-Beiwe]   PMC10020906 + Beiwe platform docs on GPS on/off cycling and
+//                battery cost; PMC7868053 on missed-trip rates from sampled
+//                GPS traces
+//  [BLE-Prox]    Wiley Mobile Information Systems 2020, BLE advertisement-
+//                based proximity detection; scan-interval battery studies
+//  [Light]       arXiv:2003.06159 on smartphone ambient light sensor
+//                practical sampling ceiling (~5 Hz)
+//  [IndoorPos]   Sensors 24(11):3367 and related indoor-positioning sensor-
+//                fusion literature (gyroscope/magnetometer/barometer use)
+//  [StudentLife] Dartmouth StudentLife study + related smartwatch conversation-
+//                detection work on audio duty-cycling (short listening windows
+//                separated by longer idle periods)
+//  [ActivityRec] Google Play Services ActivityRecognitionClient developer
+//                documentation on detectionIntervalMillis battery tradeoffs
+//  [Fitbit-MH]   Fitbit-based mental-health studies (student mental-health
+//                screening, anxiety/stress prediction) that sync at
+//                day-level resolution
+
+// Motion/inertial sensors - accelerometer, gravity, gyroscope, linear
+// accelerometer, and rotation vector all share this table. They're kept
+// consistent with each other because they're typically fused together
+// (e.g. gravity + accelerometer, or gyroscope + accelerometer for
+// orientation), so sampling them at different rates would misalign the
+// fused signal.
+const MOTION_PRESETS = [
+  {
+    key: "fall_impact",
+    value: 20000,
+    label: "Fall / impact detection",
+    detail:
+      "50 Hz (20,000 microseconds) - the sensitivity/false-alarm balance point found across fall-detection studies [FallDet]. Highest battery and storage cost of these options.",
+  },
+  {
+    key: "activity_classification",
+    value: 50000,
+    label: "Activity / transport-mode classification",
+    detail:
+      "20 Hz (50,000 microseconds) - standard rate in HAR literature for distinguishing walking, running, cycling, vehicle travel [HAR-review].",
+  },
+  {
+    key: "coarse_mobility",
+    value: 100000,
+    label: "Coarse mobility type",
+    detail:
+      "10 Hz (100,000 microseconds) - sufficient to distinguish broad mobility categories (still / walking / in-vehicle) [HAR-review]; roughly half the data volume of the tier above.",
+  },
+  {
+    key: "battery_conservative",
+    value: 1000000,
+    label: "Long-term, battery-conservative",
+    detail:
+      "1 Hz (1,000,000 microseconds) - only detects gross movement vs. stillness. Recommended when battery life matters more than movement detail, e.g. multi-week passive studies.",
+  },
+];
+
+// Magnetometer changes more slowly than raw motion and is mainly useful
+// fused with gyroscope/accelerometer for heading - it doesn't need
+// activity-recognition-grade speed even at its fastest tier.
+const MAGNETOMETER_PRESETS = [
+  {
+    key: "indoor_positioning",
+    value: 50000,
+    label: "Indoor positioning / heading fusion",
+    detail:
+      "20 Hz (50,000 microseconds) - needed when fused with gyroscope + accelerometer for real-time dead-reckoning / indoor tracking [IndoorPos].",
+  },
+  {
+    key: "compass_context",
+    value: 200000,
+    label: "Orientation / compass context",
+    detail:
+      "5 Hz (200,000 microseconds) - general heading-context sensing without positioning-grade fusion.",
+  },
+  {
+    key: "minimal",
+    value: 1000000,
+    label: "Minimal footprint",
+    detail:
+      "1 Hz (1,000,000 microseconds) - coarse orientation only, for long-duration studies.",
+  },
+];
+
+// Ambient light - the phenomenon of interest for phenotyping (day/night,
+// indoor/outdoor, screen-exposure proxy) changes over seconds to minutes,
+// not sub-second, even though the sensor hardware itself can be read faster.
+const LIGHT_PRESETS = [
+  {
+    key: "fine_transitions",
+    value: 200000,
+    label: "Fine environmental transitions",
+    detail:
+      "5 Hz (200,000 microseconds) - close to the practical ceiling for ambient light sensing on phones [Light]; captures fast transitions like walking indoors/outdoors.",
+  },
+  {
+    key: "circadian_proxy",
+    value: 1000000,
+    label: "Circadian / screen-exposure proxy",
+    detail:
+      "1 Hz (1,000,000 microseconds) - the transitions that matter for sleep/circadian research (day/night, indoor/outdoor) happen over seconds to minutes, so faster sampling is oversampling.",
+  },
+  {
+    key: "passive_longterm",
+    value: 30000000,
+    label: "Long-term passive monitoring",
+    detail:
+      "Every 30s (30,000,000 microseconds) - minimal battery/storage draw; still captures day/night and location-context light patterns over weeks.",
+  },
+];
+
+// Barometer is mainly useful fused with accelerometer/gyroscope to detect
+// floor changes (stairs/elevator) via the pressure derivative, not as a
+// standalone high-rate signal.
+const BAROMETER_PRESETS = [
+  {
+    key: "floor_transition",
+    value: 200000,
+    label: "Real-time floor / vertical-transition detection",
+    detail:
+      "5 Hz (200,000 microseconds) - matched to the accelerometer rate it's fused with for stairs/elevator detection in indoor positioning [IndoorPos].",
+  },
+  {
+    key: "elevation_context",
+    value: 1000000,
+    label: "Coarse elevation / weather context",
+    detail:
+      "1 Hz (1,000,000 microseconds) - general altitude and pressure-trend logging.",
+  },
+  {
+    key: "minimal",
+    value: 30000000,
+    label: "Minimal footprint",
+    detail:
+      "Every 30s (30,000,000 microseconds) - passive environmental logging only.",
+  },
+];
+
+// Proximity is fundamentally a near/far event sensor (phone-to-ear, pocket),
+// not a continuous stream - most hardware reports on state change regardless
+// of the requested rate, so it only gets two meaningfully distinct options.
+const PROXIMITY_PRESETS = [
+  {
+    key: "realtime_state",
+    value: 200000,
+    label: "Real-time call / pocket-state detection",
+    detail:
+      "5 Hz (200,000 microseconds) - promptly catches phone-to-ear or pocket transitions.",
+  },
+  {
+    key: "standard_context",
+    value: 1000000,
+    label: "Standard context logging",
+    detail:
+      "1 Hz (1,000,000 microseconds) - near/far state changes are infrequent; most hardware effectively reports on-change regardless of the requested rate.",
+  },
+];
+
+// Ambient temperature: a rare hardware sensor on modern phones, and where
+// present it tracks slow-moving weather/environment, not anything that
+// changes meaningfully faster than tens of seconds. No phenotyping
+// literature calls for sub-second sampling here, so this table intentionally
+// starts much slower than the other environmental sensors.
+const TEMPERATURE_PRESETS = [
+  {
+    key: "standard",
+    value: 10000000,
+    label: "Standard environmental logging",
+    detail:
+      "Every 10s (10,000,000 microseconds) - ambient temperature changes on the order of minutes, so sub-10s sampling adds no information, only battery/storage cost.",
+  },
+  {
+    key: "minimal",
+    value: 60000000,
+    label: "Minimal footprint",
+    detail:
+      "Every 60s (60,000,000 microseconds) - matches how slowly this signal actually moves.",
+  },
+];
+
+// GPS / network location, in seconds. Both location sources share this table
+// so they stay consistent with each other. GPS is the single most
+// battery-expensive sensor on the phone, and - critically - even reasonably
+// frequent sampling misses a large share of short trips, so faster isn't a
+// silver bullet.
+const LOCATION_PRESETS = [
+  {
+    key: "trip_capture",
+    value: 30,
+    label: "Trip / transportation-mode capture",
+    detail:
+      "30s - common research interval for catching trip start/end [GPS-Beiwe]; even so, published GPS-trace studies still miss a majority of short trips at comparable rates. Most battery-costly tier - continuous GPS can drop phone battery life from ~284h to ~12h.",
+  },
+  {
+    key: "standard_mobility",
+    value: 180,
+    label: "Standard mobility-pattern capture",
+    detail:
+      "3 min - general-purpose default balancing battery life against location-change detection for most phenotyping studies.",
+  },
+  {
+    key: "battery_conservative",
+    value: 600,
+    label: "Battery-conservative",
+    detail:
+      "10 min - for multi-week deployments; accepts larger location gaps in exchange for battery life, similar to the on/off duty-cycling used by research platforms like Beiwe [GPS-Beiwe].",
+  },
+];
+
+// WiFi / Bluetooth scanning and network-traffic polling, in seconds.
+const SCAN_PRESETS = [
+  {
+    key: "realtime_colocation",
+    value: 15,
+    label: "Real-time co-location / indoor positioning",
+    detail:
+      "15s - matches Android's own default WiFi scan cadence; needed when the scan is used as a live proximity or position signal.",
+  },
+  {
+    key: "standard_proximity",
+    value: 60,
+    label: "Standard social-proximity detection",
+    detail:
+      "60s - sufficient since the exact second a proximity ends rarely matters for the research question [BLE-Prox]; AWARE's existing default.",
+  },
+  {
+    key: "battery_conservative",
+    value: 300,
+    label: "Battery-conservative",
+    detail:
+      "5 min - studies found only ~12% battery-life reduction from scanning this often over several hours [BLE-Prox]; appropriate for long deployments.",
+  },
+];
+
+// CPU load sampling, in seconds. Unlike the sensors above, there is no
+// digital-phenotyping literature recommending a specific processor sampling
+// rate - this is a general systems-monitoring judgment call, not a research
+// citation, and is labeled as such.
+const PROCESSOR_PRESETS = [
+  {
+    key: "diagnostic",
+    value: 1,
+    label: "Diagnostic / real-time load monitoring",
+    detail:
+      "1s - cheap to sample (a local read, no radio involved); catches short CPU spikes from app launches. No phenotyping-specific literature recommends a rate here; this is general systems-monitoring judgment.",
+  },
+  {
+    key: "standard",
+    value: 10,
+    label: "Standard housekeeping",
+    detail:
+      "10s - AWARE's existing default; adequate for correlating device load with battery/usage patterns.",
+  },
+  {
+    key: "minimal",
+    value: 60,
+    label: "Minimal footprint",
+    detail: "60s - coarse device-health context only.",
+  },
+];
+
+// --- Plugin frequency presets -----------------------------------------
+// Same approach as the core sensors above: named use cases with stated
+// tradeoffs, not an arbitrary speed scale. Where no phenotyping-specific
+// literature exists for a plugin's ideal rate (OpenWeather, Fitbit/HealthKit/
+// pedometer sync, BLE heart-rate interval, contacts sync), the detail text
+// says so explicitly and reasons from general engineering constraints
+// (upstream API refresh rate, rate limits, OS-level batching) instead.
+
+// Ambient noise plugin: how often a listening window is triggered, in
+// minutes. Conversation-detection research uses much shorter duty cycles
+// than this AWARE setting's unit implies, so the fastest option here is
+// framed relative to that research rather than matching it exactly.
+const AMBIENT_NOISE_PRESETS = [
+  {
+    key: "frequent",
+    value: 2,
+    label: "Frequent conversation-sensing",
+    detail:
+      "Every 2 min - closer to the ~1.5 min listening-window duty cycle used in conversation-detection research [StudentLife]; more battery and audio-processing cost.",
+  },
+  {
+    key: "standard",
+    value: 5,
+    label: "Standard social-context logging",
+    detail:
+      "Every 5 min - AWARE's existing default; balances social-context resolution with battery life.",
+  },
+  {
+    key: "battery_conservative",
+    value: 15,
+    label: "Battery-conservative",
+    detail:
+      "Every 15 min - coarse presence-of-speech context only, appropriate for long multi-week deployments.",
+  },
+];
+
+// OpenWeather plugin sync frequency, in minutes. No phenotyping-specific
+// literature recommends a rate here - reasoning instead from how often the
+// underlying weather-data source actually refreshes.
+const WEATHER_PRESETS = [
+  {
+    key: "responsive",
+    value: 15,
+    label: "Responsive local-weather context",
+    detail:
+      "Every 15 min - catches same-day weather transitions (e.g. rain starting); close to the useful ceiling since most weather APIs' source data doesn't update faster than hourly.",
+  },
+  {
+    key: "standard",
+    value: 30,
+    label: "Standard (AWARE default)",
+    detail:
+      "Every 30 min - balances API-call budget against reasonably current conditions.",
+  },
+  {
+    key: "minimal",
+    value: 60,
+    label: "Minimal footprint",
+    detail:
+      "Every 60 min - matches the roughly hourly refresh rate of most weather-data providers; polling faster doesn't get fresher data from the source.",
+  },
+];
+
+// Google Activity Recognition plugin, in seconds - maps to the API's own
+// detectionIntervalMillis parameter.
+const ACTIVITY_RECOGNITION_PRESETS = [
+  {
+    key: "responsive",
+    value: 10,
+    label: "Responsive activity-change detection",
+    detail:
+      "10s - reflects activity changes quickly; higher battery cost [ActivityRec].",
+  },
+  {
+    key: "standard",
+    value: 30,
+    label: "Standard (Google's documented balance point)",
+    detail:
+      "30s - Google's own developer guidance cites this as a reasonable balance between detection quality and battery life [ActivityRec].",
+  },
+  {
+    key: "battery_conservative",
+    value: 60,
+    label: "Battery-conservative",
+    detail:
+      "60s - fewer detections and further-reduced battery cost; acceptable when only coarse activity context is needed.",
+  },
+];
+
+// Fitbit sync frequency, in minutes. No literature specifies an ideal sync
+// interval - reasoning instead from Fitbit's API rate limit (150
+// requests/hour) and common practice in Fitbit-based studies.
+const FITBIT_PRESETS = [
+  {
+    key: "frequent",
+    value: 15,
+    label: "Near-real-time sync",
+    detail:
+      "Every 15 min - keeps derived sleep/heart-rate/step data closer to real time; consumes more of Fitbit's API rate-limit budget (150 requests/hour) sooner.",
+  },
+  {
+    key: "standard",
+    value: 60,
+    label: "Standard daily-resolution sync (AWARE default)",
+    detail:
+      "Every 60 min - adequate for day-level behavioral analysis, consistent with common practice in Fitbit-based mental-health studies [Fitbit-MH]; comfortably within API rate limits.",
+  },
+  {
+    key: "minimal",
+    value: 240,
+    label: "Minimal footprint",
+    detail: "Every 4 hours - coarse daily-trend only, lowest API/battery cost.",
+  },
+];
+
+// Contacts-list sync, in minutes. A participant's contact list changes
+// rarely, so this only gets two meaningfully distinct options.
+const CONTACTS_PRESETS = [
+  {
+    key: "standard",
+    value: 30,
+    label: "Standard (AWARE default)",
+    detail:
+      "Every 30 min - catches new contacts reasonably promptly without excessive polling of a list that rarely changes.",
+  },
+  {
+    key: "minimal",
+    value: 1440,
+    label: "Minimal footprint",
+    detail:
+      "Once daily (1440 min) - contact lists change rarely for most participants, so daily sync captures nearly all the same information at a fraction of the polling cost.",
+  },
+];
+
+// Google Fused Location plugin, in seconds. Serves the same phenotyping
+// purpose as the core GPS/network location sensors (mobility inference), so
+// it reuses that literature rather than inventing separate reasoning.
+const FUSED_LOCATION_PRESETS = [
+  {
+    key: "trip_capture",
+    value: 30,
+    label: "Trip / transportation-mode capture",
+    detail:
+      "30s - common research interval for catching trip start/end [GPS-Beiwe]; even so, GPS-trace studies show a majority of short trips are still missed at comparable rates. Highest battery cost of these options.",
+  },
+  {
+    key: "standard_mobility",
+    value: 180,
+    label: "Standard mobility-pattern capture",
+    detail:
+      "3 min - general-purpose default balancing battery life against location-change detection.",
+  },
+  {
+    key: "battery_conservative",
+    value: 600,
+    label: "Battery-conservative",
+    detail:
+      "10 min - for multi-week deployments; accepts larger location gaps in exchange for battery life.",
+  },
+];
+
+// Conversations plugin off-duty period (idle time between listening
+// windows), in seconds - the actual duty-cycle interval from the
+// conversation-detection literature.
+const CONVERSATIONS_PRESETS = [
+  {
+    key: "frequent",
+    value: 30,
+    label: "Frequent conversation-sensing",
+    detail:
+      "30s idle between listening windows - closer to real-time conversation detection; higher battery and audio-processing cost.",
+  },
+  {
+    key: "studentlife_style",
+    value: 90,
+    label: "StudentLife-style duty cycle",
+    detail:
+      "~90s idle between short listening windows mirrors the audio duty-cycling used in conversation-detection research [StudentLife].",
+  },
+  {
+    key: "battery_conservative",
+    value: 300,
+    label: "Battery-conservative",
+    detail:
+      "5 min idle between windows - captures far fewer conversations but substantially reduces battery and audio-processing load.",
+  },
+];
+
+// Apple HealthKit sync frequency, in minutes. No phenotyping-specific
+// literature recommends a rate, and iOS itself batches HealthKit background
+// delivery regardless of the requested interval.
+const HEALTHKIT_PRESETS = [
+  {
+    key: "frequent",
+    value: 15,
+    label: "Near-real-time sync",
+    detail:
+      "Every 15 min - closer to real time, though iOS HealthKit background delivery is itself OS-batched, so faster requests don't always yield fresher data.",
+  },
+  {
+    key: "standard",
+    value: 30,
+    label: "Standard (AWARE default)",
+    detail:
+      "Every 30 min - reasonable balance for day-level behavioral analysis.",
+  },
+  {
+    key: "minimal",
+    value: 240,
+    label: "Minimal footprint",
+    detail: "Every 4 hours - coarse daily-trend only.",
+  },
+];
+
+// BLE heart-rate plugin measurement interval, in minutes - how often the
+// sensor is woken up for a single reading, not continuous monitoring.
+const BLE_HEARTRATE_PRESETS = [
+  {
+    key: "frequent",
+    value: 1,
+    label: "Frequent measurement (AWARE default)",
+    detail:
+      "Every 1 min - closer to continuous monitoring; better chance of catching short-duration heart-rate changes (e.g. acute stress). Highest battery cost of these options.",
+  },
+  {
+    key: "standard",
+    value: 5,
+    label: "Standard periodic measurement",
+    detail:
+      "Every 5 min - typical balance point for periodic (non-continuous) BLE heart-rate monitoring; still resolves most meaningful heart-rate trends.",
+  },
+  {
+    key: "minimal",
+    value: 15,
+    label: "Minimal footprint",
+    detail: "Every 15 min - coarse heart-rate-trend only, lowest battery cost.",
+  },
+];
+
+// iOS pedometer sync frequency, in minutes. Step/distance counts are derived
+// continuously on-device by iOS regardless of this setting - it only
+// controls how often that data is synced to the study server.
+const PEDOMETER_PRESETS = [
+  {
+    key: "frequent",
+    value: 15,
+    label: "Near-real-time sync",
+    detail: "Every 15 min - keeps step/distance data closer to real time.",
+  },
+  {
+    key: "standard",
+    value: 30,
+    label: "Standard (AWARE default)",
+    detail: "Every 30 min - adequate for day-level step/activity analysis.",
+  },
+  {
+    key: "minimal",
+    value: 240,
+    label: "Minimal footprint",
+    detail: "Every 4 hours - coarse daily-trend only.",
+  },
+];
+
 const FUSED_LOCATION_ACCURACY_OPTIONS = [
   { value: 100, label: "Max Precise Accuracy" },
   { value: 101, label: "Location Accuracy Nearest 10 Meters" },
@@ -58,10 +596,14 @@ const FUSED_LOCATION_ACCURACY_OPTIONS = [
 function normalizeFusedLocationAccuracy(value) {
   const numeric = Number(value);
   return FUSED_LOCATION_ACCURACY_OPTIONS.some(
-    (option) => option.value === numeric,
+    (option) => option.value === numeric
   )
     ? numeric
     : 102;
+}
+
+function AndroidOnlyNote() {
+  return <p className="explanation">Android only feature.</p>;
 }
 
 export default function SensorData() {
@@ -77,7 +619,7 @@ export default function SensorData() {
 
   // software sensor states
   const [applicationSensor, setapplicationSensor] = useRecoilState(
-    applicationSensorState,
+    applicationSensorState
   );
 
   const updateApplicationSensorData = (fieldName, value) => {
@@ -90,7 +632,7 @@ export default function SensorData() {
   const [screenData, setscreenData] = useRecoilState(screenSensorState);
 
   const [communicationData, setcommunicationData] = useRecoilState(
-    communicationSensorState,
+    communicationSensorState
   );
 
   const [accelerometerData, setaccelerometerData] =
@@ -107,7 +649,7 @@ export default function SensorData() {
   const [lightData, setlightData] = useRecoilState(lightState);
 
   const [linearAccelerometerData, setLinearAccelerometerData] = useRecoilState(
-    linearAccelerometerState,
+    linearAccelerometerState
   );
 
   const [locationsData, setLocationsData] = useRecoilState(locationsState);
@@ -131,7 +673,7 @@ export default function SensorData() {
   const [wifiData, setWifiData] = useRecoilState(wifiState);
 
   const [screenshotData, setScreenshotData] = useRecoilState(
-    screenshotSensorState,
+    screenshotSensorState
   );
 
   const [noteData, setNoteData] = useRecoilState(noteState);
@@ -144,10 +686,6 @@ export default function SensorData() {
       [fieldName]: value,
     });
   };
-
-  function AndroidOnlyNote() {
-    return <p className="explanation">Android only feature.</p>;
-  }
 
   // eslint-disable-next-line react/no-unstable-nested-components
   function TextReader() {
@@ -364,11 +902,12 @@ export default function SensorData() {
             id="frequency_sample_accelerometer"
             title="Sampling frequency (in microsec.)"
             inputLabel="frequency in microseconds"
-            defaultNum={200000}
-            description="Non-deterministic frequency in microseconds (dependent of the hardware sensor capabilities and resources), e.g., 200000 (normal), 60000 (UI), 20000 (game), 0 (fastest)."
+            defaultNum={50000}
+            description="Pick the option that matches what you're trying to detect - faster rates capture more detail but cost more battery and storage. Fused with gravity/gyroscope/linear-accelerometer/rotation, so those share this same table."
             field="frequency_sample_accelerometer"
             studyField={accelerometerData.frequency_sample_accelerometer}
             modeState="accelerometer"
+            presets={MOTION_PRESETS}
           />
 
           <FrequencyField
@@ -405,11 +944,12 @@ export default function SensorData() {
             id="frequency_sample_barometer"
             title="Sampling frequency (in microsec.)"
             inputLabel="frequency in microseconds"
-            defaultNum={200000}
-            description="Non-deterministic frequency in microseconds (dependent of the hardware sensor capabilities and resources), e.g., 200000 (normal), 60000 (UI), 20000 (game), 0 (fastest)."
+            defaultNum={1000000}
+            description="Barometric pressure mainly matters fused with accelerometer/gyroscope for floor-change detection; standalone, it changes slowly enough that fast sampling is pure oversampling."
             field="frequency_sample_barometer"
             studyField={barometerData.frequency_sample_barometer}
             modeState="barometer"
+            presets={BAROMETER_PRESETS}
           />
 
           <FrequencyField
@@ -447,10 +987,11 @@ export default function SensorData() {
             title="Frequency bluetooth"
             inputLabel="frequency in seconds"
             defaultNum={60}
-            description="Deterministic frequency in seconds (default is 60 seconds)."
+            description="Bluetooth scans are typically used for social/co-location proximity - the exact second a proximity ends rarely matters, so faster scanning mostly just costs battery."
             field="frequency_bluetooth"
             studyField={bluetoothData.frequency_bluetooth}
             modeState="bluetooth"
+            presets={SCAN_PRESETS}
           />
         </Grid>
       </Grid>
@@ -467,11 +1008,12 @@ export default function SensorData() {
             id="frequency_gravity"
             title="Frequency gravity"
             inputLabel="frequency in microseconds"
-            defaultNum={200000}
-            description="Non-deterministic frequency in microseconds (dependent of the hardware sensor capabilities and resources), e.g., 200000 (normal), 60000 (UI), 20000 (game), 0 (fastest)"
+            defaultNum={50000}
+            description="Kept consistent with the accelerometer, since gravity is typically used to separate the gravity component out of raw accelerometer readings."
             field="frequency_gravity"
             studyField={gravityData.frequency_gravity}
             modeState="gravity"
+            presets={MOTION_PRESETS}
           />
 
           <FrequencyField
@@ -508,11 +1050,12 @@ export default function SensorData() {
             id="frequency_gyroscope"
             title="Frequency gyroscope"
             inputLabel="frequency in microseconds"
-            defaultNum={200000}
-            description="Non-deterministic frequency in microseconds (dependent of the hardware sensor capabilities and resources), e.g., 200000 (normal), 60000 (UI), 20000 (game), 0 (fastest)"
+            defaultNum={50000}
+            description="Kept consistent with the accelerometer, since gyroscope + accelerometer are commonly fused for orientation/attitude estimation."
             field="frequency_gyroscope"
             studyField={gyroscopeData.frequency_gyroscope}
             modeState="gyroscope"
+            presets={MOTION_PRESETS}
           />
 
           <FrequencyField
@@ -549,11 +1092,12 @@ export default function SensorData() {
             id="frequency_light"
             title="Frequency light"
             inputLabel="frequency in microseconds"
-            defaultNum={200000}
-            description="Non-deterministic frequency in microseconds (dependent of the hardware sensor capabilities and resources), e.g., 200000 (normal), 60000 (UI), 20000 (game), 0 (fastest)"
+            defaultNum={1000000}
+            description="Ambient light changes slowly relative to motion sensors - pick the option matching what environmental transitions you actually need to capture."
             field="frequency_light"
             studyField={lightData.frequency_light}
             modeState="light"
+            presets={LIGHT_PRESETS}
           />
 
           <FrequencyField
@@ -590,11 +1134,12 @@ export default function SensorData() {
             id="frequency_linear_accelerometer"
             title="Frequency linear accelerometer"
             inputLabel="frequency in microseconds"
-            defaultNum={200000}
-            description="Non-deterministic frequency in microseconds (dependent of the hardware sensor capabilities and resources), e.g., 200000 (normal), 60000 (UI), 20000 (game), 0 (fastest)"
+            defaultNum={50000}
+            description="Kept consistent with the accelerometer, since linear acceleration is the gravity-removed version of the same raw signal."
             field="frequency_linear_accelerometer"
             studyField={linearAccelerometerData.frequency_linear_accelerometer}
             modeState="linearAccelerometer"
+            presets={MOTION_PRESETS}
           />
 
           <FrequencyField
@@ -654,10 +1199,11 @@ export default function SensorData() {
             title="Frequency GPS"
             inputLabel="frequency in seconds"
             defaultNum={180}
-            description="How frequent to check the GPS location, in seconds. By default, every 180 seconds. Setting to 0 (zero) will keep the GPS location tracking always on."
+            description="GPS is the single most battery-expensive sensor on the phone. Setting to 0 (zero) will keep GPS tracking always on - not recommended outside short, high-resolution trip studies."
             field="frequency_gps"
             studyField={locationsData.frequency_gps}
             modeState="locations"
+            presets={LOCATION_PRESETS}
           />
 
           <FrequencyField
@@ -697,11 +1243,12 @@ export default function SensorData() {
             id="frequency_network"
             title="Frequency network"
             inputLabel="frequency in seconds"
-            defaultNum={300}
-            description="How frequently to check the network location, in seconds. By default, every 300 seconds. Setting to 0 (zero) will keep the network location tracking always on."
+            defaultNum={180}
+            description="Harmonized to the same options as GPS so both location sources stay consistent with each other. Setting to 0 (zero) will keep network location tracking always on."
             field="frequency_network"
             studyField={locationsData.frequency_network}
             modeState="locations"
+            presets={LOCATION_PRESETS}
           />
 
           <FrequencyField
@@ -757,10 +1304,11 @@ export default function SensorData() {
             title="Frequency magnetometer"
             inputLabel="frequency in microseconds"
             defaultNum={200000}
-            description="Non-deterministic frequency in microseconds (dependent of the hardware sensor capabilities and resources), e.g., 200000 (normal), 60000 (UI), 20000 (game), 0 (fastest)"
+            description="Magnetometer readings change more slowly than raw motion and are mainly useful fused with gyroscope/accelerometer for heading estimation."
             field="frequency_magnetometer"
             studyField={magnetometerData.frequency_magnetometer}
             modeState="magnetometer"
+            presets={MAGNETOMETER_PRESETS}
           />
 
           <FrequencyField
@@ -841,11 +1389,12 @@ export default function SensorData() {
             id="frequency_network_traffic"
             title="Network traffic frequency"
             inputLabel="frequency in seconds"
-            defaultNum={30}
-            description="How often to record network traffic data (default 30 seconds)."
+            defaultNum={60}
+            description="Uses the same options as WiFi/Bluetooth scanning to stay consistent with the other polling sensors."
             field="frequency_network_traffic"
             studyField={networkData.frequency_network_traffic}
             modeState="network"
+            presets={SCAN_PRESETS}
           />
         </Grid>
       </Grid>
@@ -863,10 +1412,11 @@ export default function SensorData() {
             title="Frequency processor"
             inputLabel="frequency in seconds"
             defaultNum={10}
-            description="Frequency in seconds to update the processor load. Android receives this value in seconds; iPhone config receives the same interval converted to microseconds."
+            description="Frequency in seconds to update the processor load. Android receives this value in seconds; iPhone config receives the same interval converted to microseconds. Note: unlike the other sensors here, there's no phenotyping-specific literature behind these options - see the option descriptions."
             field="frequency_processor"
             studyField={processorData.frequency_processor}
             modeState="processor"
+            presets={PROCESSOR_PRESETS}
           />
         </Grid>
       </Grid>
@@ -897,11 +1447,12 @@ export default function SensorData() {
             id="frequency_proximity"
             title="Frequency proximity"
             inputLabel="frequency in microseconds"
-            defaultNum={200000}
-            description="Non-deterministic frequency in microseconds (dependent of the hardware sensor capabilities and resources), e.g., 200000 (normal), 60000 (UI), 20000 (game), 0 (fastest)"
+            defaultNum={1000000}
+            description="Proximity is fundamentally a near/far event sensor rather than a continuous stream, so only two meaningfully distinct rates make sense here."
             field="frequency_proximity"
             studyField={proximityData.frequency_proximity}
             modeState="proximity"
+            presets={PROXIMITY_PRESETS}
           />
 
           <FrequencyField
@@ -938,11 +1489,12 @@ export default function SensorData() {
             id="frequency_rotation"
             title="Frequency rotation"
             inputLabel="frequency in microseconds"
-            defaultNum={200000}
-            description="Non-deterministic frequency in microseconds (dependent of the hardware sensor capabilities and resources), e.g., 200000 (normal), 60000 (UI), 20000 (game), 0 (fastest)"
+            defaultNum={50000}
+            description="Kept consistent with the accelerometer, since the rotation vector is a fused (accelerometer + gyroscope + magnetometer) orientation estimate."
             field="frequency_rotation"
             studyField={rotationData.frequency_rotation}
             modeState="rotation"
+            presets={MOTION_PRESETS}
           />
 
           <FrequencyField
@@ -979,11 +1531,12 @@ export default function SensorData() {
             id="frequency_temperature"
             title="Frequency temperature"
             inputLabel="frequency in microseconds"
-            defaultNum={200000}
-            description="Non-deterministic frequency in microseconds (dependent of the hardware sensor capabilities and resources), e.g., 200000 (normal), 60000 (UI), 20000 (game), 0 (fastest)"
+            defaultNum={10000000}
+            description="Ambient temperature (where the hardware exists at all) tracks slow-moving weather/environment - there's no phenotyping case for sub-10-second sampling."
             field="frequency_temperature"
             studyField={temperatureData.frequency_temperature}
             modeState="temperature"
+            presets={TEMPERATURE_PRESETS}
           />
 
           <FrequencyField
@@ -1021,10 +1574,11 @@ export default function SensorData() {
             title="Frequency Wi-Fi (seconds)"
             inputLabel="frequency in seconds"
             defaultNum={60}
-            description=""
+            description="WiFi scans are typically used for co-location/indoor-positioning signals or general context - pick based on how time-sensitive that signal needs to be."
             field="frequency_wifi"
             studyField={wifiData.frequency_wifi}
             modeState="wifi"
+            presets={SCAN_PRESETS}
           />
         </Grid>
       </Grid>
@@ -1115,7 +1669,7 @@ export default function SensorData() {
                   onClick={(_, checked) => {
                     updateApplicationSensorData(
                       "screenshot_package_specification",
-                      "0",
+                      "0"
                     );
                   }}
                 />
@@ -1126,7 +1680,7 @@ export default function SensorData() {
                   onClick={(_, checked) => {
                     updateApplicationSensorData(
                       "screenshot_package_specification",
-                      "1",
+                      "1"
                     );
                   }}
                 />
@@ -1137,7 +1691,7 @@ export default function SensorData() {
                   onClick={(_, checked) => {
                     updateApplicationSensorData(
                       "screenshot_package_specification",
-                      "2",
+                      "2"
                     );
                   }}
                 />
@@ -1179,10 +1733,11 @@ export default function SensorData() {
             title="Sampling Frequency"
             inputLabel="How frequently to sample the microphone (minutes)"
             defaultNum={5}
-            description="Frequency of ambient noise sampling in minutes."
+            description="How often a listening window is triggered - faster catches more conversations but costs more battery and raises more audio-processing/privacy exposure."
             field="frequency_plugin_ambient_noise"
             studyField={pluginData.frequency_plugin_ambient_noise}
             modeState="plugin"
+            presets={AMBIENT_NOISE_PRESETS}
           />
           <FrequencyField
             id="plugin_ambient_noise_sample_size"
@@ -1347,10 +1902,11 @@ export default function SensorData() {
             title="Update Frequency"
             inputLabel="How often to fetch weather data (minutes)"
             defaultNum={30}
-            description="Frequency of weather data updates in minutes."
+            description="No phenotyping literature dictates this rate - it's bounded mostly by how often the underlying weather-data source actually refreshes."
             field="plugin_openweather_frequency"
             studyField={pluginData.plugin_openweather_frequency}
             modeState="plugin"
+            presets={WEATHER_PRESETS}
           />
 
           <PluginAPIField
@@ -1381,7 +1937,7 @@ export default function SensorData() {
               onClick={(_, checked) => {
                 updatePluginData(
                   "plugin_openweather_measurement_units",
-                  "metric",
+                  "metric"
                 );
               }}
             />
@@ -1392,7 +1948,7 @@ export default function SensorData() {
               onClick={(_, checked) => {
                 updatePluginData(
                   "plugin_openweather_measurement_units",
-                  "imperial",
+                  "imperial"
                 );
               }}
             />
@@ -1412,11 +1968,12 @@ export default function SensorData() {
             id="frequency_plugin_google_activity_recognition"
             title="Update Frequency"
             inputLabel="How often to detect activity (seconds)"
-            defaultNum={10}
-            description="Frequency of Google Activity Recognition updates in seconds."
+            defaultNum={30}
+            description="Maps directly to Google's own detectionIntervalMillis parameter."
             field="frequency_plugin_google_activity_recognition"
             studyField={pluginData.frequency_plugin_google_activity_recognition}
             modeState="plugin"
+            presets={ACTIVITY_RECOGNITION_PRESETS}
           />
         </Grid>
       </Grid>
@@ -1434,10 +1991,11 @@ export default function SensorData() {
             title="Sync Frequency"
             inputLabel="How often to sync Fitbit data (minutes)"
             defaultNum={60}
-            description="Frequency of Fitbit data synchronisation in minutes."
+            description="No literature specifies an ideal sync interval - bounded mainly by Fitbit's API rate limit (150 requests/hour) and common practice in Fitbit-based studies."
             field="plugin_fitbit_frequency"
             studyField={pluginData.plugin_fitbit_frequency}
             modeState="plugin"
+            presets={FITBIT_PRESETS}
           />
 
           <PluginAPIField
@@ -1549,10 +2107,11 @@ export default function SensorData() {
             title="Sync Frequency"
             inputLabel="How often to sync contacts (minutes)"
             defaultNum={30}
-            description="Frequency of contacts list synchronisation in minutes."
+            description="A participant's contact list changes rarely, so only two meaningfully distinct rates make sense here."
             field="frequency_plugin_contacts"
             studyField={pluginData.frequency_plugin_contacts}
             modeState="plugin"
+            presets={CONTACTS_PRESETS}
           />
         </Grid>
       </Grid>
@@ -1569,11 +2128,12 @@ export default function SensorData() {
             id="frequency_google_fused_location"
             title="Update Frequency"
             inputLabel="How often to request location (seconds)"
-            defaultNum={300}
-            description="Frequency of fused location updates in seconds."
+            defaultNum={180}
+            description="Serves the same mobility-inference purpose as the core GPS/network location sensors, so it reuses that same literature-backed set of options."
             field="frequency_google_fused_location"
             studyField={pluginData.frequency_google_fused_location}
             modeState="plugin"
+            presets={FUSED_LOCATION_PRESETS}
           />
           <FrequencyField
             id="max_frequency_google_fused_location"
@@ -1605,8 +2165,8 @@ export default function SensorData() {
             name="location accuracy"
             value={String(
               normalizeFusedLocationAccuracy(
-                pluginData.accuracy_google_fused_location,
-              ),
+                pluginData.accuracy_google_fused_location
+              )
             )}
           >
             {FUSED_LOCATION_ACCURACY_OPTIONS.map((option) => (
@@ -1618,7 +2178,7 @@ export default function SensorData() {
                 onClick={() =>
                   updatePluginData(
                     "accuracy_google_fused_location",
-                    option.value,
+                    option.value
                   )
                 }
               />
@@ -1649,11 +2209,12 @@ export default function SensorData() {
             id="plugin_conversations_off_duty"
             title="Off-duty Period"
             inputLabel="Off-duty period between samples (seconds)"
-            defaultNum={30}
-            description="Period of silence (in seconds) between audio detection windows."
+            defaultNum={90}
+            description="This is the plugin's actual duty-cycle interval - shorter idle periods catch more conversations at higher battery/processing cost."
             field="plugin_conversations_off_duty"
             studyField={pluginData.plugin_conversations_off_duty}
             modeState="plugin"
+            presets={CONVERSATIONS_PRESETS}
           />
           <FrequencyField
             id="plugin_conversations_length"
@@ -1681,10 +2242,11 @@ export default function SensorData() {
             title="Sync Frequency"
             inputLabel="How often to sync HealthKit data (minutes)"
             defaultNum={30}
-            description="Frequency of HealthKit data synchronisation in minutes."
+            description="No phenotyping literature recommends a rate, and iOS itself batches HealthKit background delivery regardless of the requested interval."
             field="frequency_health_kit"
             studyField={pluginData.frequency_health_kit}
             modeState="plugin"
+            presets={HEALTHKIT_PRESETS}
           />
           <FrequencyField
             id="preperiod_days_health_kit"
@@ -1712,10 +2274,11 @@ export default function SensorData() {
             title="Measurement Interval"
             inputLabel="How often to measure heart rate (minutes)"
             defaultNum={1}
-            description="How frequently the BLE heart rate sensor is activated for a measurement."
+            description="How frequently the BLE heart rate sensor is woken up for a single measurement (not continuous monitoring)."
             field="plugin_ble_heartrate_interval_min"
             studyField={pluginData.plugin_ble_heartrate_interval_min}
             modeState="plugin"
+            presets={BLE_HEARTRATE_PRESETS}
           />
           <FrequencyField
             id="plugin_ble_heartrate_active_time_sec"
@@ -1743,10 +2306,11 @@ export default function SensorData() {
             title="Sync Frequency"
             inputLabel="How often to sync pedometer data (minutes)"
             defaultNum={30}
-            description="Frequency of pedometer data synchronisation in minutes."
+            description="Step/distance counts are derived continuously on-device by iOS regardless of this setting - it only controls how often that data is synced to the study server."
             field="frequency_ios_pedometer"
             studyField={pluginData.frequency_ios_pedometer}
             modeState="plugin"
+            presets={PEDOMETER_PRESETS}
           />
           <FrequencyField
             id="preperiod_days_ios_pedometer"
