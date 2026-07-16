@@ -11,7 +11,7 @@ import {
 
 export default function Field(inputs) {
   const [isDbConnected, setIsDbConnected] = useRecoilState(
-    databaseConnectionState,
+    databaseConnectionState
   );
 
   const {
@@ -51,7 +51,7 @@ export default function Field(inputs) {
             (subEach, subEachIdx) => {
               if (subEachIdx === subIndex) return curValue;
               return subEach;
-            },
+            }
           );
           return { ...each, [curFieldName]: newSubList };
         }
@@ -112,7 +112,7 @@ export default function Field(inputs) {
             if (type === "number") {
               updateFormByField(
                 field.toString(),
-                parseInt(event.target.value, 10),
+                parseInt(event.target.value, 10)
               );
             } else {
               updateFormByField(field.toString(), event.target.value);

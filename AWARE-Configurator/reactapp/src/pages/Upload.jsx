@@ -112,8 +112,10 @@ export default function Upload() {
         newSchedule.title = schedule.title;
         newSchedule.type = SET_SCHEDULES;
         newSchedule.esm_keep = schedule.esm_keep;
-        newSchedule.expiration = schedule.expiration !== undefined ? schedule.expiration : 60;
-        newSchedule.notification_body = schedule.notification_body || "Tap to answer";
+        newSchedule.expiration =
+          schedule.expiration !== undefined ? schedule.expiration : 60;
+        newSchedule.notification_body =
+          schedule.notification_body || "Tap to answer";
         newSchedule.questions = {};
         for (let i = 0; i < jsonValue.questions.length; i += 1) {
           const question = jsonValue.questions[i];
@@ -172,22 +174,59 @@ export default function Upload() {
     sensorData.ios_mqtt =
       iosSensors.mqtt !== undefined ? iosSensors.mqtt : false;
 
-    sensorData.status_plugin_calendar = iosPlugins.plugin_calendar !== undefined ? iosPlugins.plugin_calendar : false;
-    sensorData.status_ios_esm_scheduler = iosPlugins.plugin_esm_scheduler !== undefined ? iosPlugins.plugin_esm_scheduler : false;
-    sensorData.status_plugin_headphone_motion = iosPlugins.plugin_headphone_motion !== undefined ? iosPlugins.plugin_headphone_motion : false;
-    sensorData.status_health_kit = iosPlugins.plugin_health_kit !== undefined ? iosPlugins.plugin_health_kit : false;
-    sensorData.status_plugin_ble_heartrate = iosPlugins.plugin_ble_heartrate !== undefined ? iosPlugins.plugin_ble_heartrate : false;
-    sensorData.status_plugin_ntptime = iosPlugins.plugin_ntptime !== undefined ? iosPlugins.plugin_ntptime : false;
-    sensorData.status_plugin_ios_pedometer = iosPlugins.plugin_ios_pedometer !== undefined ? iosPlugins.plugin_ios_pedometer : false;
-    sensorData.status_push_notication = iosPlugins.plugin_push_notification !== undefined ? iosPlugins.plugin_push_notification : false;
+    sensorData.status_plugin_calendar =
+      iosPlugins.plugin_calendar !== undefined
+        ? iosPlugins.plugin_calendar
+        : false;
+    sensorData.status_ios_esm_scheduler =
+      iosPlugins.plugin_esm_scheduler !== undefined
+        ? iosPlugins.plugin_esm_scheduler
+        : false;
+    sensorData.status_plugin_headphone_motion =
+      iosPlugins.plugin_headphone_motion !== undefined
+        ? iosPlugins.plugin_headphone_motion
+        : false;
+    sensorData.status_health_kit =
+      iosPlugins.plugin_health_kit !== undefined
+        ? iosPlugins.plugin_health_kit
+        : false;
+    sensorData.status_plugin_ble_heartrate =
+      iosPlugins.plugin_ble_heartrate !== undefined
+        ? iosPlugins.plugin_ble_heartrate
+        : false;
+    sensorData.status_plugin_ntptime =
+      iosPlugins.plugin_ntptime !== undefined
+        ? iosPlugins.plugin_ntptime
+        : false;
+    sensorData.status_plugin_ios_pedometer =
+      iosPlugins.plugin_ios_pedometer !== undefined
+        ? iosPlugins.plugin_ios_pedometer
+        : false;
+    sensorData.status_push_notication =
+      iosPlugins.plugin_push_notification !== undefined
+        ? iosPlugins.plugin_push_notification
+        : false;
 
-    if (iosPluginSettings.frequency_health_kit !== undefined) pluginData.frequency_health_kit = iosPluginSettings.frequency_health_kit;
-    if (iosPluginSettings.preperiod_days_health_kit !== undefined) pluginData.preperiod_days_health_kit = iosPluginSettings.preperiod_days_health_kit;
-    if (iosPluginSettings.plugin_ble_heartrate_interval_min !== undefined) pluginData.plugin_ble_heartrate_interval_min = iosPluginSettings.plugin_ble_heartrate_interval_min;
-    if (iosPluginSettings.plugin_ble_heartrate_active_time_sec !== undefined) pluginData.plugin_ble_heartrate_active_time_sec = iosPluginSettings.plugin_ble_heartrate_active_time_sec;
-    if (iosPluginSettings.frequency_ios_pedometer !== undefined) pluginData.frequency_ios_pedometer = iosPluginSettings.frequency_ios_pedometer;
-    if (iosPluginSettings.preperiod_days_ios_pedometer !== undefined) pluginData.preperiod_days_ios_pedometer = iosPluginSettings.preperiod_days_ios_pedometer;
-    if (iosPluginSettings.plugin_push_notification_server !== undefined) pluginData.plugin_push_notification_server = iosPluginSettings.plugin_push_notification_server;
+    if (iosPluginSettings.frequency_health_kit !== undefined)
+      pluginData.frequency_health_kit = iosPluginSettings.frequency_health_kit;
+    if (iosPluginSettings.preperiod_days_health_kit !== undefined)
+      pluginData.preperiod_days_health_kit =
+        iosPluginSettings.preperiod_days_health_kit;
+    if (iosPluginSettings.plugin_ble_heartrate_interval_min !== undefined)
+      pluginData.plugin_ble_heartrate_interval_min =
+        iosPluginSettings.plugin_ble_heartrate_interval_min;
+    if (iosPluginSettings.plugin_ble_heartrate_active_time_sec !== undefined)
+      pluginData.plugin_ble_heartrate_active_time_sec =
+        iosPluginSettings.plugin_ble_heartrate_active_time_sec;
+    if (iosPluginSettings.frequency_ios_pedometer !== undefined)
+      pluginData.frequency_ios_pedometer =
+        iosPluginSettings.frequency_ios_pedometer;
+    if (iosPluginSettings.preperiod_days_ios_pedometer !== undefined)
+      pluginData.preperiod_days_ios_pedometer =
+        iosPluginSettings.preperiod_days_ios_pedometer;
+    if (iosPluginSettings.plugin_push_notification_server !== undefined)
+      pluginData.plugin_push_notification_server =
+        iosPluginSettings.plugin_push_notification_server;
 
     for (let i = 0; i < jsonValue.sensors.length; i += 1) {
       const { setting, value } = jsonValue.sensors[i];

@@ -69,7 +69,7 @@ function normalizeFusedLocationAccuracy(value) {
   return FUSED_LOCATION_ACCURACY_VALUES.includes(numeric) ? numeric : 102;
 }
 
-export default function Main() {
+export default function Overview() {
   const navigateTo = useNavigate();
 
   const studyInformation = useRecoilValue(studyFormStudyInformationState);
@@ -106,7 +106,6 @@ export default function Main() {
     status: "idle",
     message: "",
   });
-
   const normalizeScheduleQuestionIds = (schedule) => {
     const selectedQuestions = schedule?.questions;
     if (Array.isArray(selectedQuestions)) {
@@ -224,7 +223,7 @@ export default function Main() {
 
   const questionList = questions.map((question, idx) => {
     return (
-      <div>
+      <div key={`question-${idx}`}>
         {displayInfo(`Question ${(idx + 1).toString()}`, question.esm_title)}
         {displayInfo("Instructions", question.instructions)}
         {displayInfo("Question type", TYPE_MAP[question.esm_type])}
@@ -241,7 +240,7 @@ export default function Main() {
 
   const scheduleList = schedules.map((schedule, idx) => {
     return (
-      <div>
+      <div key={`schedule-${idx}`}>
         {/* {displayInfo(`Schedule ${(idx + 1).toString()}`, schedule.title)} */}
         {/* {displayInfo(`Questions`, Object.keys(schedule.questions).join(", "))} */}
 
@@ -315,7 +314,8 @@ export default function Main() {
           esm_keep: schedule.esm_keep ? schedule.esm_keep : false,
           questions: normalizeScheduleQuestionIds(schedule),
           hours,
-          expiration: schedule.expiration !== undefined ? schedule.expiration : 60,
+          expiration:
+            schedule.expiration !== undefined ? schedule.expiration : 60,
           notification_body: schedule.notification_body || "Tap to answer",
         };
       }),
@@ -1122,9 +1122,10 @@ export default function Main() {
         // significant motion (shared: controls both Android and iOS)
         {
           setting: "status_significant_motion",
-          value: sensorData.ios_significant_motion !== undefined
-            ? sensorData.ios_significant_motion
-            : false,
+          value:
+            sensorData.ios_significant_motion !== undefined
+              ? sensorData.ios_significant_motion
+              : false,
         },
         // default sensors
         { setting: "status_esm", value: true },
@@ -1148,23 +1149,56 @@ export default function Main() {
         mqtt: mqttEnabled,
       },
       ios_plugins: {
-        plugin_calendar: sensorData.status_plugin_calendar ? sensorData.status_plugin_calendar : false,
-        plugin_esm_scheduler: sensorData.status_ios_esm_scheduler ? sensorData.status_ios_esm_scheduler : false,
-        plugin_headphone_motion: sensorData.status_plugin_headphone_motion ? sensorData.status_plugin_headphone_motion : false,
-        plugin_health_kit: sensorData.status_health_kit ? sensorData.status_health_kit : false,
-        plugin_ble_heartrate: sensorData.status_plugin_ble_heartrate ? sensorData.status_plugin_ble_heartrate : false,
-        plugin_ntptime: sensorData.status_plugin_ntptime ? sensorData.status_plugin_ntptime : false,
-        plugin_ios_pedometer: sensorData.status_plugin_ios_pedometer ? sensorData.status_plugin_ios_pedometer : false,
-        plugin_push_notification: sensorData.status_push_notication ? sensorData.status_push_notication : false,
+        plugin_calendar: sensorData.status_plugin_calendar
+          ? sensorData.status_plugin_calendar
+          : false,
+        plugin_esm_scheduler: sensorData.status_ios_esm_scheduler
+          ? sensorData.status_ios_esm_scheduler
+          : false,
+        plugin_headphone_motion: sensorData.status_plugin_headphone_motion
+          ? sensorData.status_plugin_headphone_motion
+          : false,
+        plugin_health_kit: sensorData.status_health_kit
+          ? sensorData.status_health_kit
+          : false,
+        plugin_ble_heartrate: sensorData.status_plugin_ble_heartrate
+          ? sensorData.status_plugin_ble_heartrate
+          : false,
+        plugin_ntptime: sensorData.status_plugin_ntptime
+          ? sensorData.status_plugin_ntptime
+          : false,
+        plugin_ios_pedometer: sensorData.status_plugin_ios_pedometer
+          ? sensorData.status_plugin_ios_pedometer
+          : false,
+        plugin_push_notification: sensorData.status_push_notication
+          ? sensorData.status_push_notication
+          : false,
       },
       ios_plugin_settings: {
-        frequency_health_kit: pluginData.frequency_health_kit ? pluginData.frequency_health_kit : 30,
-        preperiod_days_health_kit: pluginData.preperiod_days_health_kit ? pluginData.preperiod_days_health_kit : 7,
-        plugin_ble_heartrate_interval_min: pluginData.plugin_ble_heartrate_interval_min ? pluginData.plugin_ble_heartrate_interval_min : 1,
-        plugin_ble_heartrate_active_time_sec: pluginData.plugin_ble_heartrate_active_time_sec ? pluginData.plugin_ble_heartrate_active_time_sec : 30,
-        frequency_ios_pedometer: pluginData.frequency_ios_pedometer ? pluginData.frequency_ios_pedometer : 30,
-        preperiod_days_ios_pedometer: pluginData.preperiod_days_ios_pedometer ? pluginData.preperiod_days_ios_pedometer : 7,
-        plugin_push_notification_server: pluginData.plugin_push_notification_server ? pluginData.plugin_push_notification_server : "",
+        frequency_health_kit: pluginData.frequency_health_kit
+          ? pluginData.frequency_health_kit
+          : 30,
+        preperiod_days_health_kit: pluginData.preperiod_days_health_kit
+          ? pluginData.preperiod_days_health_kit
+          : 7,
+        plugin_ble_heartrate_interval_min:
+          pluginData.plugin_ble_heartrate_interval_min
+            ? pluginData.plugin_ble_heartrate_interval_min
+            : 1,
+        plugin_ble_heartrate_active_time_sec:
+          pluginData.plugin_ble_heartrate_active_time_sec
+            ? pluginData.plugin_ble_heartrate_active_time_sec
+            : 30,
+        frequency_ios_pedometer: pluginData.frequency_ios_pedometer
+          ? pluginData.frequency_ios_pedometer
+          : 30,
+        preperiod_days_ios_pedometer: pluginData.preperiod_days_ios_pedometer
+          ? pluginData.preperiod_days_ios_pedometer
+          : 7,
+        plugin_push_notification_server:
+          pluginData.plugin_push_notification_server
+            ? pluginData.plugin_push_notification_server
+            : "",
       },
     };
   }
@@ -1387,7 +1421,10 @@ export default function Main() {
             {displaySensors("status_plugin_device_usage", "Device Usage")}
             {displaySensors("status_plugin_studentlife_audio", "Conversation")}
             {displaySensors("status_plugin_calendar", "Calendar")}
-            {displaySensors("status_plugin_headphone_motion", "Headphone Motion")}
+            {displaySensors(
+              "status_plugin_headphone_motion",
+              "Headphone Motion"
+            )}
             {displaySensors("status_health_kit", "HealthKit")}
             {displaySensors("status_plugin_ble_heartrate", "Heart Rate (BLE)")}
             {displaySensors("status_plugin_ntptime", "NTP")}

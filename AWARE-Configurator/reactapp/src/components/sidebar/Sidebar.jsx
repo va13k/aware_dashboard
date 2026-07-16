@@ -39,7 +39,7 @@ function Sidebar() {
   }
 
   const activeIndex = sidebarNavItems.findIndex(
-    (item) => item.section === curPath,
+    (item) => item.section === curPath
   );
 
   return (
@@ -49,21 +49,26 @@ function Sidebar() {
           const isActive = activeIndex === index;
           const isComplete = activeIndex > index;
 
+          let stepStatus = "Next";
+          if (isActive) {
+            stepStatus = "Current";
+          } else if (isComplete) {
+            stepStatus = "Done";
+          }
+
           return (
             <Link to={item.to} key={item.section} className="sidebar__link">
               <div
-                className={`sidebar__menu__item ${
-                  isActive ? "active" : ""
-                } ${isComplete ? "complete" : ""}`}
+                className={`sidebar__menu__item ${isActive ? "active" : ""} ${
+                  isComplete ? "complete" : ""
+                }`}
               >
                 <div className="sidebar__menu__item__step">{index + 1}</div>
                 <div className="sidebar__menu__item__content">
                   <div className="sidebar__menu__item__text">
                     {item.display}
                   </div>
-                  <div className="sidebar__menu__item__meta">
-                    {isActive ? "Current" : isComplete ? "Done" : "Next"}
-                  </div>
+                  <div className="sidebar__menu__item__meta">{stepStatus}</div>
                 </div>
               </div>
             </Link>

@@ -141,7 +141,12 @@ export default function QuestionComponent(input) {
   // checkboxes
   function optionsLayout(index, groupFieldName) {
     return (
-      <Grid container rowSpacing={1} columnSpacing={{ xs: 1, sm: 2, md: 3 }}>
+      <Grid
+        key={`${groupFieldName}-${index}`}
+        container
+        rowSpacing={1}
+        columnSpacing={{ xs: 1, sm: 2, md: 3 }}
+      >
         <Grid xs={10}>
           <Field
             fieldName={`Option ${index + 1}`}

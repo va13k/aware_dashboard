@@ -79,9 +79,11 @@ export default function StudyQuestions() {
               {blankFields.includes(-1)
                 ? "At least one question is required before proceeding."
                 : "Each question must have a title and a type. Please fix the following:"}
-              {blankFields.filter((i) => i !== -1).map((item) => (
-                <li key={item}>Question {item + 1}</li>
-              ))}
+              {blankFields
+                .filter((i) => i !== -1)
+                .map((item) => (
+                  <li key={item}>Question {item + 1}</li>
+                ))}
             </DialogContentText>
           </DialogContent>
           <DialogActions>
