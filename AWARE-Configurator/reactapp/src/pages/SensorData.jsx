@@ -918,6 +918,7 @@ export default function SensorData() {
             description="E.g., log only if [x,y,z] >= 0.01. 0 = disabled"
             field="threshold"
             studyField={accelerometerData.threshold}
+            allowZero
             modeState="accelerometer"
           />
 
@@ -960,6 +961,7 @@ export default function SensorData() {
             description="E.g., log only if [x,y,z] >= 0.01. 0 = disabled"
             field="threshold"
             studyField={barometerData.threshold}
+            allowZero
             modeState="barometer"
           />
 
@@ -1024,6 +1026,7 @@ export default function SensorData() {
             description="E.g., log only if [x,y,z] >= 0.01. 0 = disabled"
             field="threshold"
             studyField={gravityData.threshold}
+            allowZero
             modeState="gravity"
           />
 
@@ -1066,6 +1069,7 @@ export default function SensorData() {
             description="E.g., log only if [x,y,z] >= 0.01. 0 = disabled"
             field="threshold"
             studyField={gyroscopeData.threshold}
+            allowZero
             modeState="gyroscope"
           />
 
@@ -1108,6 +1112,7 @@ export default function SensorData() {
             description="E.g., log only if [x,y,z] >= 0.01. 0 = disabled"
             field="threshold"
             studyField={lightData.threshold}
+            allowZero
             modeState="light"
           />
 
@@ -1150,6 +1155,7 @@ export default function SensorData() {
             description="E.g., log only if [x,y,z] >= 0.01. 0 = disabled"
             field="threshold"
             studyField={linearAccelerometerData.threshold}
+            allowZero
             modeState="linearAccelerometer"
           />
 
@@ -1319,6 +1325,7 @@ export default function SensorData() {
             description="E.g., log only if [x,y,z] >= 0.01. 0 = disabled"
             field="threshold"
             studyField={magnetometerData.threshold}
+            allowZero
             modeState="magnetometer"
           />
 
@@ -1463,6 +1470,7 @@ export default function SensorData() {
             description="E.g., log only if [x,y,z] >= 0.01. 0 = disabled"
             field="threshold"
             studyField={proximityData.threshold}
+            allowZero
             modeState="proximity"
           />
 
@@ -1505,6 +1513,7 @@ export default function SensorData() {
             description="E.g., log only if [x,y,z] >= 0.01. 0 = disabled"
             field="threshold"
             studyField={rotationData.threshold}
+            allowZero
             modeState="rotation"
           />
 
@@ -1547,6 +1556,7 @@ export default function SensorData() {
             description="E.g., log only if [x,y,z] >= 0.01. 0 = disabled"
             field="threshold"
             studyField={temperatureData.threshold}
+            allowZero
             modeState="temperature"
           />
 

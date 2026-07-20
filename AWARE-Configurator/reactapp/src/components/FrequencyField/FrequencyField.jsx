@@ -56,6 +56,7 @@ function FrequencyField(inputs) {
     studyField,
     modeState,
     presets,
+    allowZero,
   } = inputs;
 
   const initialValue = studyField || defaultNum.toString();
@@ -122,7 +123,10 @@ function FrequencyField(inputs) {
 
   function updateStates(fieldName, value, mode) {
     const numValue = parseFloat(value);
-    if (!Number.isNaN(numValue) && numValue > 0) {
+    const isValid =
+      !Number.isNaN(numValue) &&
+      (numValue > 0 || (allowZero && numValue === 0));
+    if (isValid) {
       switch (mode) {
         case "sensor":
           setSensorData((prevData) => ({ ...prevData, [fieldName]: numValue }));
@@ -271,7 +275,10 @@ function FrequencyField(inputs) {
 
   const handleBlur = () => {
     const numValue = parseFloat(localValue);
-    if (Number.isNaN(numValue) || numValue <= 0) {
+    const isValid =
+      !Number.isNaN(numValue) &&
+      (numValue > 0 || (allowZero && numValue === 0));
+    if (!isValid) {
       setLocalValue(defaultNum.toString());
       updateStates(field.toString(), defaultNum, modeState);
     } else {
