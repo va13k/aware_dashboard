@@ -146,11 +146,11 @@
     "shared_config/source_store.py": "2295c298572bf3b83cbaf31ac0f871e30f29b3677a0711248aba7505eaa4be6d",
     "shared_config/test_serializers.py": "76251d9721e2518ecc94cd505f18ad664e11a68416063f1997331fd7acb9c739"
   },
-  "indexed_at_commit": "f55fe9a1d1421657009115fa76ecaa5afe8d77af",
-  "indexed_at_timestamp": "2026-07-27T12:44:22.107976+00:00",
+  "indexed_at_commit": "ba745e0c16cd355a079f6fb4112d70e18eaeb898",
+  "indexed_at_timestamp": "2026-07-27T13:14:37.211022+00:00",
   "schema_version": 3,
   "stats": {
-    "total_edges": 1437,
+    "total_edges": 1440,
     "total_files": 145,
     "total_nodes": 1288
   },

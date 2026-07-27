@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from "react";
 import "./PasswordField.css";
-import { TextField } from "@mui/material";
+import { TextField, IconButton, InputAdornment } from "@mui/material";
+import Visibility from "@mui/icons-material/Visibility";
+import VisibilityOff from "@mui/icons-material/VisibilityOff";
 
 import { useRecoilState } from "recoil";
 import Grid from "@mui/material/Unstable_Grid2";
@@ -17,6 +19,7 @@ export default function PasswordField(inputs) {
   } = inputs;
 
   const [isError, setIsError] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
   let information;
   let setInformation;
   if (recoilState === undefined) {
@@ -52,7 +55,7 @@ export default function PasswordField(inputs) {
       <Grid xs={12} md={9}>
         <TextField
           error={isError}
-          type="password"
+          type={showPassword ? "text" : "password"}
           required={required === undefined ? false : required}
           id="outlined-basic"
           label={inputLabel}
@@ -61,6 +64,19 @@ export default function PasswordField(inputs) {
           value={information[field] || ""}
           onChange={(event) => {
             updateFormByField(field.toString(), event.target.value);
+          }}
+          InputProps={{
+            endAdornment: (
+              <InputAdornment position="end">
+                <IconButton
+                  aria-label={showPassword ? "Hide password" : "Show password"}
+                  onClick={() => setShowPassword((visible) => !visible)}
+                  edge="end"
+                >
+                  {showPassword ? <VisibilityOff /> : <Visibility />}
+                </IconButton>
+              </InputAdornment>
+            ),
           }}
         />
         {description === undefined ? "" : <Grid xs={12} md={3} />}

@@ -77,8 +77,8 @@ export default function Main() {
             <Grid xs={4}>
               <LockIcon color="main" sx={{ fontSize: 70 }} />
               <p>
-                Deployment-level server and database settings stay managed
-                outside the form.
+                Database connection details stay managed outside the form, but
+                participant access (password and SSL) is editable here.
               </p>
             </Grid>
           </Grid>

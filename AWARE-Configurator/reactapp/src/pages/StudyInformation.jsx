@@ -10,16 +10,29 @@ import DialogTitle from "@mui/material/DialogTitle";
 import DialogContent from "@mui/material/DialogContent";
 import DialogContentText from "@mui/material/DialogContentText";
 import DialogActions from "@mui/material/DialogActions";
-import { studyFormStudyInformationState } from "../functions/atom";
+import {
+  studyFormStudyInformationState,
+  databaseInformationState,
+} from "../functions/atom";
 import Field from "../components/Field/Field";
 import customisedTheme from "../functions/theme";
+import CustomizedCheckbox from "../components/CustomizedCheckbox/CustomizedCheckbox";
+import PasswordField from "../components/PasswordField/PasswordField";
 
 const TITLE1 = "Study Information";
 const EXPLANATION1 =
   "Basic information of the study. This information will be presented to participants upon joining your study.";
 
+const DB_HELPER_STYLE = {
+  color: "#475569",
+  maxWidth: "620px",
+  fontSize: "0.85rem",
+  margin: "0 0 12px 32px",
+};
+
 export default function StudyInformation() {
   const [studyInformation] = useRecoilState(studyFormStudyInformationState);
+  const [databaseInfo] = useRecoilState(databaseInformationState);
   const navigateTo = useNavigate();
 
   const [blankFields, setBlankFields] = React.useState([]);
@@ -163,6 +176,55 @@ export default function StudyInformation() {
               {emailNotification()}
             </Grid>
           </Grid>
+        </div>
+
+        <div className="border">
+          <Grid width={400} ml={5} mt={3}>
+            <p className="title">Database access</p>
+          </Grid>
+          <p
+            style={{
+              color: "#475569",
+              maxWidth: "680px",
+              marginLeft: "40px",
+            }}
+          >
+            Controls how participant devices authenticate to the study database.
+            Saving applies these to the participant database account, so a
+            change takes effect only once the database accepts it.
+          </p>
+          <Grid container direction="column" sx={{ ml: 5, mt: 1 }}>
+            <CustomizedCheckbox
+              recoilState={databaseInformationState}
+              field="config_without_password"
+              label="Connect without a password"
+            />
+            <p style={DB_HELPER_STYLE}>
+              Participant devices connect with no database password. Saving
+              removes the password from the participant account.
+            </p>
+            <CustomizedCheckbox
+              recoilState={databaseInformationState}
+              field="require_ssl"
+              label="Require SSL for the database connection"
+            />
+            <p style={DB_HELPER_STYLE}>
+              Participant devices must connect to the database over an encrypted
+              (TLS) connection. Only enable this if the devices support TLS —
+              otherwise their uploads are rejected and data collection stops.
+            </p>
+          </Grid>
+          {!databaseInfo.config_without_password && (
+            <Box sx={{ ml: 5, mt: 1, mb: 2, maxWidth: "680px" }}>
+              <PasswordField
+                fieldName="Participant database password"
+                recoilState={databaseInformationState}
+                field="database_password"
+                inputLabel="Password"
+                description="Devices use this password to connect to the study database."
+              />
+            </Box>
+          )}
         </div>
 
         <Box sx={{ width: "100%" }} mt={5} marginBottom={5}>
