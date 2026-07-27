@@ -3,6 +3,7 @@ import logging
 import os
 import pathlib
 import sys
+import tempfile
 from django.http import HttpResponse
 from django.views.decorators.csrf import ensure_csrf_cookie, csrf_exempt
 
@@ -31,6 +32,7 @@ from shared_config.serializers import (
     serialize_ios_config,
     update_ios_plugin_settings,
 )
+from App01.participant_db import ParticipantDbError, apply_participant_credentials
 
 logger = logging.getLogger(__name__)
 storage_path = settings.STORAGE_DIR
@@ -54,30 +56,41 @@ def get_token(request):
 
 @csrf_exempt
 def save_json_file(request):
-    if request.method == "POST":
-        json_str = request.body
-        json_dict = json.loads(json_str)
-        raw_text = json_dict.get("text", None)
-        try:
-            content = json.loads(raw_text)
-        except (TypeError, json.JSONDecodeError):
-            content = raw_text
-
-        file_name = save(content)
+    if request.method != "POST":
         return HttpResponse(
-            json.dumps(
-                {
-                    "success": True,
-                    "file_name": file_name,
-                    "url": f"/studies/files/{file_name}",
-                }
-            ),
+            json.dumps({"success": False, "msg": "Invalid request method"}),
+            status=405,
+            content_type="application/json",
+        )
+
+    json_str = request.body
+    json_dict = json.loads(json_str)
+    raw_text = json_dict.get("text", None)
+    try:
+        content = json.loads(raw_text)
+    except (TypeError, json.JSONDecodeError):
+        content = raw_text
+
+    try:
+        file_name = save(content)
+    except ParticipantDbError as exc:
+        # The credential change was rejected, so nothing was written: the served
+        # config and the database stay on their previous, consistent values.
+        logger.error("Save aborted: %s", exc)
+        return HttpResponse(
+            json.dumps({"success": False, "msg": str(exc)}),
+            status=502,
             content_type="application/json",
         )
 
     return HttpResponse(
-        json.dumps({"success": False, "message": "Invalid request method"}),
-        status=405,
+        json.dumps(
+            {
+                "success": True,
+                "file_name": file_name,
+                "url": f"/studies/files/{file_name}",
+            }
+        ),
         content_type="application/json",
     )
 
@@ -87,17 +100,84 @@ def save(content):
     if not folder:
         os.makedirs(storage_path)
 
-    source = update_source(lambda s: update_source_from_android_config(s, content))
+    # Merge the submitted study config into the shared source and, when the
+    # participant credentials change, apply them to MySQL within the same
+    # locked update. If the database rejects the change the update raises and
+    # source.json is left untouched, so the served config below is only
+    # regenerated once the new credentials are actually in effect.
+    source = update_source(lambda s: _merge_and_sync_credentials(s, content))
     write_outputs(source)
 
     return STUDY_CONFIG_FILE_NAME
 
 
+def _merge_and_sync_credentials(source, content):
+    previous_credentials = _participant_credentials(source)
+    update_source_from_android_config(source, content)
+    new_credentials = _participant_credentials(source)
+
+    # Only talk to MySQL when the participant credentials actually change, so
+    # routine edits (questions, schedules, sensors) never depend on the
+    # database being reachable.
+    if new_credentials != previous_credentials:
+        _sync_participant_credentials(source)
+
+    return source
+
+
+def _participant_credentials(source):
+    """Effective (password, require_ssl) the participant account should have."""
+    android_db = source.get("database", {}).get("android", {})
+    passwordless = bool(android_db.get("config_without_password"))
+    # A passwordless account authenticates with an empty password regardless of
+    # any stored value, so collapse both fields into one effective password.
+    password = "" if passwordless else str(android_db.get("password", ""))
+    return (password, bool(android_db.get("require_ssl")))
+
+
+def _mysql_admin_settings():
+    env = load_env(ENV_PATH)
+
+    def pick(key, default=""):
+        return os.environ.get(key) or str(env.get(key, "")).strip() or default
+
+    return {
+        "host": pick("MYSQL_HOST", "mysql"),
+        "port": int(pick("MYSQL_PORT", "3306")),
+        "root_password": pick("MYSQL_ROOT_PASSWORD"),
+    }
+
+
+def _sync_participant_credentials(source):
+    android_db = source["database"]["android"]
+    password, require_ssl = _participant_credentials(source)
+    admin = _mysql_admin_settings()
+    apply_participant_credentials(
+        host=admin["host"],
+        port=admin["port"],
+        root_password=admin["root_password"],
+        username=str(android_db.get("username", "")).strip(),
+        password=password,
+        require_ssl=require_ssl,
+    )
+
+
 def write_json(path, content):
     path.parent.mkdir(parents=True, exist_ok=True)
-    with open(path, "w", encoding="utf-8") as file:
-        json.dump(content, file, indent=2)
-        file.write("\n")
+    # Write to a temporary file and swap it into place so an interrupted write
+    # can never leave a partially written config being served to devices.
+    fd, tmp_name = tempfile.mkstemp(prefix=path.name + ".", suffix=".tmp", dir=str(path.parent))
+    tmp_path = pathlib.Path(tmp_name)
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as file:
+            json.dump(content, file, indent=2)
+            file.write("\n")
+            file.flush()
+            os.fsync(file.fileno())
+        os.replace(tmp_path, path)
+    finally:
+        if tmp_path.exists():
+            tmp_path.unlink(missing_ok=True)
 
 
 def runtime_database_host() -> str:
