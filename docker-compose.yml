@@ -13,7 +13,16 @@ services:
     image: mysql:8.0
     container_name: aware_mysql
     restart: unless-stopped
-    command: --init-file=/etc/mysql/init_all.sql
+    command:
+      - --init-file=/etc/mysql/init_all.sql
+      - --plugin-load-add=connection_control.so
+      - --connection-control=FORCE_PLUS_PERMANENT
+      - --connection-control-failed-login-attempts=FORCE_PLUS_PERMANENT
+      - --connection-control-failed-connections-threshold=3
+      - --connection-control-min-connection-delay=1000
+      - --connection-control-max-connection-delay=5000
+      - --connect-timeout=5
+      - --max-user-connections=${MYSQL_MAX_USER_CONNECTIONS_PER_ACCOUNT:-100}
     environment:
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-CHANGE_ME}
     ports:

@@ -92,6 +92,13 @@ def main() -> None:
         ),
         "30",
     )
+    mysql_max_user_connections = positive_int(
+        payload.get(
+            "mysql_max_user_connections_per_account",
+            env_fallback.get("MYSQL_MAX_USER_CONNECTIONS_PER_ACCOUNT", "100"),
+        ),
+        "100",
+    )
 
     if not public_host:
         raise SystemExit("PUBLIC_HOST is required")
@@ -104,6 +111,7 @@ def main() -> None:
         f"MYSQL_BACKUP_HOST_DIR={backup_host_dir}",
         f"MYSQL_BACKUP_INTERVAL_SECONDS={backup_interval_seconds}",
         f"MYSQL_BACKUP_RETENTION_DAYS={backup_retention_days}",
+        f"MYSQL_MAX_USER_CONNECTIONS_PER_ACCOUNT={mysql_max_user_connections}",
     ]
 
     if researcher_username:

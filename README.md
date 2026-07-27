@@ -204,6 +204,17 @@ The wizard has five steps. A progress bar at the top tracks where you are. You c
 
 Set the **MySQL root password**. All services (Configurator, Micro Server, Analytics API) use this password internally to connect to the database. Choose a strong password and keep it somewhere safe — you will need it if you ever need to access MySQL directly.
 
+The database also applies built-in connection protection for participant devices:
+
+- repeated failed logins are progressively delayed after three attempts, up to five seconds;
+- incomplete connection handshakes time out after five seconds;
+- each MySQL account may use at most 100 simultaneous authenticated connections by default.
+
+The connection ceiling limits concurrent database work, not enrolled participants. Set
+`MYSQL_MAX_USER_CONNECTIONS_PER_ACCOUNT` in `.env` to change the persistent value on the
+next MySQL container recreation. To change the running server immediately without a
+restart, use MySQL's `SET GLOBAL max_user_connections = ...` statement as well.
+
 ---
 
 **Step 2 — Researcher access**
