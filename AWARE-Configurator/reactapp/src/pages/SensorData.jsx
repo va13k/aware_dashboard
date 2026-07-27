@@ -1941,7 +1941,7 @@ export default function SensorData() {
             row
           >
             <FormControlLabel
-              value="0"
+              value="metric"
               control={<Radio />}
               label="Metric"
               onClick={(_, checked) => {
@@ -1952,7 +1952,7 @@ export default function SensorData() {
               }}
             />
             <FormControlLabel
-              value="1"
+              value="imperial"
               control={<Radio />}
               label="Imperial"
               onClick={(_, checked) => {
