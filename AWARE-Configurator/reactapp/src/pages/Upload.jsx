@@ -95,7 +95,13 @@ export default function Upload() {
 
     setStudyId(studyId);
     setStudyInformation(jsonValue.study_info);
-    setDatabaseInfo(jsonValue.database || {});
+    const databaseBlock = { ...(jsonValue.database || {}) };
+    // A redacted password ("-") means the real one is not in the served config;
+    // show it blank so saving keeps the stored password rather than "-".
+    if (databaseBlock.database_password === "-") {
+      databaseBlock.database_password = "";
+    }
+    setDatabaseInfo(databaseBlock);
     setCreateTime(jsonValue.createdAt);
 
     setQuestions(

@@ -281,11 +281,6 @@ export default function Overview() {
       study_info: studyInformation,
       database: {
         ...databaseInfo,
-        database_password:
-          "config_without_password" in databaseInfo &&
-          databaseInfo.config_without_password
-            ? "-"
-            : databaseInfo.database_password,
         config_without_password: !!(
           "config_without_password" in databaseInfo &&
           databaseInfo.config_without_password

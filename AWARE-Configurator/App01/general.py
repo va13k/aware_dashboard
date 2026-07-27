@@ -126,13 +126,14 @@ def _merge_and_sync_credentials(source, content):
 
 
 def _participant_credentials(source):
-    """Effective (password, require_ssl) the participant account should have."""
+    """Credentials the participant account should have: (password, require_ssl).
+
+    config_without_password does NOT change the account — it only controls
+    whether the served study config embeds the password or omits it so the
+    participant enters it when joining. The account always keeps its password.
+    """
     android_db = source.get("database", {}).get("android", {})
-    passwordless = bool(android_db.get("config_without_password"))
-    # A passwordless account authenticates with an empty password regardless of
-    # any stored value, so collapse both fields into one effective password.
-    password = "" if passwordless else str(android_db.get("password", ""))
-    return (password, bool(android_db.get("require_ssl")))
+    return (str(android_db.get("password", "")), bool(android_db.get("require_ssl")))
 
 
 def _mysql_admin_settings():
@@ -243,7 +244,12 @@ def update_source_from_android_config(source, content):
         android_db["port"] = int(database.get("database_port", android_db["port"]))
         android_db["name"] = database.get("database_name", android_db["name"])
         android_db["username"] = database.get("database_username", android_db["username"])
-        android_db["password"] = database.get("database_password", android_db["password"])
+        # config_without_password redacts the served password to "-"; never let
+        # that sentinel (or a blank) overwrite the real stored password, so the
+        # account and the source of truth keep the working password.
+        incoming_password = database.get("database_password")
+        if incoming_password and incoming_password != "-":
+            android_db["password"] = incoming_password
         android_db["config_without_password"] = database.get(
             "config_without_password", android_db.get("config_without_password", False)
         )

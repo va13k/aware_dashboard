@@ -560,7 +560,14 @@ def serialize_android_config(
         "database_port": str(android_db["port"]),
         "database_name": android_db["name"],
         "database_username": android_db["username"],
-        "database_password": android_db["password"],
+        # config_without_password omits the real password from the served config
+        # ("-"), so participants enter it when joining. The account keeps its
+        # password regardless; only what devices receive here changes.
+        "database_password": (
+            "-"
+            if android_db.get("config_without_password", False)
+            else android_db["password"]
+        ),
         "rootUsername": "-",
         "rootPassword": "-",
         "config_without_password": android_db.get("config_without_password", False),

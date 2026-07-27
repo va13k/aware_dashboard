@@ -9,11 +9,11 @@
     "AWARE-Configurator/App01/database_operations.py": "e2ee7407e64b25c7ed74f6cc901dfcefca7a50741b733070fb2a4ab0a22b0b96",
     "AWARE-Configurator/App01/db-init.sql": "a4a1e2890bbf754649161d26e882d9581622629f1f3493229dea11d89e9d3768",
     "AWARE-Configurator/App01/db.py": "df88ab1485a802547696c0c1db4bd7b48998dd245179a67f528aadc08e5f1e37",
-    "AWARE-Configurator/App01/general.py": "2194f77d0c762b513af05febe12658eec52ed2774350470a64652f369ec30a50",
+    "AWARE-Configurator/App01/general.py": "39ebb1dd34694cafac2c43efb7e36ab6b5fe29e8e2d2512cff8fd5c88739a8e8",
     "AWARE-Configurator/App01/migrations/__init__.py": "af1349b9f5f9a1a6a0404dea36dcc9499bcb25c9adc112b7cc9a93cae41f3262",
     "AWARE-Configurator/App01/models.py": "ced7fd8fbc67667853becf65bacb4943daca6fc2e9d9ddc81765864513b60612",
     "AWARE-Configurator/App01/participant_db.py": "6aafee4393256f044d385c991fac3e7b0065b6f37ffda1c93b161b11f20a4b91",
-    "AWARE-Configurator/App01/test_general_helpers.py": "eb206d42ae84ccd9e2c55ef3f2437b53960eac05b2b50996d08f9062ae2c1d7f",
+    "AWARE-Configurator/App01/test_general_helpers.py": "cfe0924f008a8ca7a4bf884ead5d544daf3ffb4d7c9918b9495e9cf7956952b1",
     "AWARE-Configurator/App01/test_participant_db.py": "44acb71da4c85d5c6a9710b90cd009d59b9b23b1c3ce154d48cc3896aad41a7f",
     "AWARE-Configurator/App01/test_participant_db_integration.py": "9e15c20210f8b23cddc50b6dd72444a4656e0ea5782451803fa0da6cc24baf5e",
     "AWARE-Configurator/App01/tests.py": "3053eff215ec6ce85e56f8684914889b867f6164e799331c494909737743ce98",
@@ -55,12 +55,12 @@
     "AWARE-Configurator/reactapp/src/index.js": "a583b85cf46ae1f32d923c398e811d4d1235091e5c8a78a17944449842fd1744",
     "AWARE-Configurator/reactapp/src/layout/SurveyLayout.jsx": "9a66fee881c90ca460b01f2ecfdd0c21a6cc00b584fc260f7fe6d1f417d41c6d",
     "AWARE-Configurator/reactapp/src/pages/Main.jsx": "2a9289a960eed337a2ce91949c0291188fc4ed457b1716b7e4a2613098bb55e8",
-    "AWARE-Configurator/reactapp/src/pages/Overview.jsx": "2658e31c608567c64c4704f6f406a238f0d45a72a026476faacacf29b6ecea4f",
+    "AWARE-Configurator/reactapp/src/pages/Overview.jsx": "b1e6fc9133798cd0c3c279ed541477dda25b7fcc6ff9d924d21d7639a4260703",
     "AWARE-Configurator/reactapp/src/pages/ScheduleConfiguration.jsx": "27a993b7271f6be7bc17209f71916c5871c9364441e18424ca2782e14f2abfcd",
     "AWARE-Configurator/reactapp/src/pages/SensorData.jsx": "c8d5d833ff30a34277ad8efd0c785178310dbd1819f35c2cc707f81496f709be",
-    "AWARE-Configurator/reactapp/src/pages/StudyInformation.jsx": "877502f8b73c04ed026832aee828ec76a359feac030d6c4fae6282eb93615e42",
+    "AWARE-Configurator/reactapp/src/pages/StudyInformation.jsx": "8304ef7af2c687aca70ee4372990b4a2986a27e9ec045b3a4362f08aacd31e24",
     "AWARE-Configurator/reactapp/src/pages/StudyQuestions.jsx": "ffc15389d8a3628d8286fe81244e864e504f9f3b6896c14aa40a7163e7842618",
-    "AWARE-Configurator/reactapp/src/pages/Upload.jsx": "5cbfb6665ae3bbcadb100135d1ecc5e87bcc07ba4e94642bba2db1c7f43bca14",
+    "AWARE-Configurator/reactapp/src/pages/Upload.jsx": "56d42c8bb2d9f891738be6be28dd04f99c1e423daeaa69681b28c94b0844c427",
     "AWARE-Configurator/reactapp/src/reportWebVitals.js": "b2ceb4ab76516bd3505e93c6ef8eaa37ce0d70c919eaec453ffcc102bd2332a1",
     "AWARE-Configurator/reactapp/src/settings.js": "66345d63852bd37ae49b7aab61674da6bdae5b5779add3e866c2937bf1beecf2",
     "AWARE-Configurator/reactapp/src/setupProxy.js": "1d748df85c61100173b7c7c88f89d0901e37050189c0e1a5817ce5410b45d057",
@@ -142,17 +142,17 @@
     "setup/write_request_env.py": "af21ad20a1f35c7dc335f8af1a04a27ffc8cf3b31686af41faa95816c4594352",
     "shared_config/__init__.py": "f66af2aabde649c6dc7b00dcfb88dc91d3d6673cd8bd86f349eb3db3c248aad5",
     "shared_config/runtime.py": "77374d2b370614fee89778a69302cde2f4686d96e7d5b5a77f7e664e22257142",
-    "shared_config/serializers.py": "ce67aa93fe96c1b4a27600bd0f4a6139a5907602ca017b828705b052928c5aa4",
+    "shared_config/serializers.py": "4ec918b9f9134c192e489d5d5add1ba7d57c6bf723471b70f13dd222a7c205d1",
     "shared_config/source_store.py": "2295c298572bf3b83cbaf31ac0f871e30f29b3677a0711248aba7505eaa4be6d",
-    "shared_config/test_serializers.py": "76251d9721e2518ecc94cd505f18ad664e11a68416063f1997331fd7acb9c739"
+    "shared_config/test_serializers.py": "0560973b6ca83539f990d2d792b21ec52297919081efa91dc559318e8cfb9405"
   },
-  "indexed_at_commit": "234d22d94113ef5c28033cbf2954fc343afb2116",
-  "indexed_at_timestamp": "2026-07-27T13:16:57.164846+00:00",
+  "indexed_at_commit": "21307aded460eceddf1cd468cf54eaddac91129c",
+  "indexed_at_timestamp": "2026-07-27T14:59:45.802710+00:00",
   "schema_version": 3,
   "stats": {
-    "total_edges": 1440,
+    "total_edges": 1433,
     "total_files": 145,
-    "total_nodes": 1288
+    "total_nodes": 1291
   },
   "vexp_version": "2.3.0"
 }

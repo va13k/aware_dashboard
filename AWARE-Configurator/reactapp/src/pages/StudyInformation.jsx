@@ -4,7 +4,7 @@ import Grid from "@mui/material/Unstable_Grid2";
 import Box from "@mui/material/Box";
 import { useRecoilState } from "recoil";
 import { useNavigate } from "react-router-dom";
-import { Button, ThemeProvider } from "@mui/material";
+import { Alert, AlertTitle, Button, ThemeProvider } from "@mui/material";
 import Dialog from "@mui/material/Dialog";
 import DialogTitle from "@mui/material/DialogTitle";
 import DialogContent from "@mui/material/DialogContent";
@@ -30,9 +30,45 @@ const DB_HELPER_STYLE = {
   margin: "0 0 12px 32px",
 };
 
+// Describes the security of the current SSL + password-in-config combination
+// and recommends the stronger option (encrypted connection, password kept out
+// of the study config) without dictating what the researcher must do.
+function describeDatabaseSecurity(databaseInfo) {
+  const ssl = !!databaseInfo.require_ssl;
+  const passwordInConfig = !databaseInfo.config_without_password;
+
+  if (ssl && !passwordInConfig) {
+    return {
+      severity: "success",
+      title: "Recommended setup",
+      body: "The connection is encrypted and the password is never shipped in the study config — each participant enters it when joining. This is the recommended combination.",
+    };
+  }
+  if (ssl && passwordInConfig) {
+    return {
+      severity: "warning",
+      title: "Password is shipped in the config",
+      body: "Traffic is encrypted, but the password is embedded in the study config that devices download, so it can be read from there. For stronger protection we recommend keeping the password out of the config (participants enter it) and serving the deployment over HTTPS.",
+    };
+  }
+  if (!ssl && !passwordInConfig) {
+    return {
+      severity: "warning",
+      title: "Connection is not encrypted",
+      body: "The password is not shipped in the config, but the database connection is unencrypted, so sensor data travels in plaintext. We recommend enabling the encrypted connection.",
+    };
+  }
+  return {
+    severity: "error",
+    title: "Weakest option",
+    body: "The connection is unencrypted and the password is embedded in the downloaded config, so both the data and the password are exposed on the network. We recommend enabling the encrypted connection and keeping the password out of the config.",
+  };
+}
+
 export default function StudyInformation() {
   const [studyInformation] = useRecoilState(studyFormStudyInformationState);
   const [databaseInfo] = useRecoilState(databaseInformationState);
+  const dbSecurity = describeDatabaseSecurity(databaseInfo);
   const navigateTo = useNavigate();
 
   const [blankFields, setBlankFields] = React.useState([]);
@@ -189,42 +225,51 @@ export default function StudyInformation() {
               marginLeft: "40px",
             }}
           >
-            Controls how participant devices authenticate to the study database.
-            Saving applies these to the participant database account, so a
-            change takes effect only once the database accepts it.
+            Controls how participant devices reach the study database.
+            Recommended: require an encrypted connection and keep the password
+            out of the study config. Password and SSL changes are applied to the
+            participant database account when you save.
           </p>
           <Grid container direction="column" sx={{ ml: 5, mt: 1 }}>
             <CustomizedCheckbox
               recoilState={databaseInformationState}
-              field="config_without_password"
-              label="Connect without a password"
-            />
-            <p style={DB_HELPER_STYLE}>
-              Participant devices connect with no database password. Saving
-              removes the password from the participant account.
-            </p>
-            <CustomizedCheckbox
-              recoilState={databaseInformationState}
               field="require_ssl"
-              label="Require SSL for the database connection"
+              label="Require an encrypted (SSL/TLS) connection"
             />
             <p style={DB_HELPER_STYLE}>
               Participant devices must connect to the database over an encrypted
-              (TLS) connection. Only enable this if the devices support TLS —
-              otherwise their uploads are rejected and data collection stops.
+              (TLS) connection, so sensor data is never sent in plaintext. Only
+              enable this if the devices support TLS — otherwise their uploads
+              are rejected.
+            </p>
+            <CustomizedCheckbox
+              recoilState={databaseInformationState}
+              field="config_without_password"
+              label="Keep the password out of the study config"
+            />
+            <p style={DB_HELPER_STYLE}>
+              When on, the password is not written into the study config — each
+              participant enters it when joining, so it never travels in the
+              downloaded config. When off, the config includes the password and
+              joining is automatic. The database account keeps its password
+              either way.
             </p>
           </Grid>
-          {!databaseInfo.config_without_password && (
-            <Box sx={{ ml: 5, mt: 1, mb: 2, maxWidth: "680px" }}>
-              <PasswordField
-                fieldName="Participant database password"
-                recoilState={databaseInformationState}
-                field="database_password"
-                inputLabel="Password"
-                description="Devices use this password to connect to the study database."
-              />
-            </Box>
-          )}
+          <Box sx={{ ml: 5, mt: 1, mb: 2, maxWidth: "680px" }}>
+            <PasswordField
+              fieldName="Participant database password"
+              recoilState={databaseInformationState}
+              field="database_password"
+              inputLabel="Password"
+              description="The database account password. Leave blank to keep the current one."
+            />
+          </Box>
+          <Box sx={{ ml: 5, mb: 2, maxWidth: "680px" }}>
+            <Alert severity={dbSecurity.severity}>
+              <AlertTitle>{dbSecurity.title}</AlertTitle>
+              {dbSecurity.body}
+            </Alert>
+          </Box>
         </div>
 
         <Box sx={{ width: "100%" }} mt={5} marginBottom={5}>

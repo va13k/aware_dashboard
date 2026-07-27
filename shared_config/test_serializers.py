@@ -448,6 +448,16 @@ class TestSerializeAndroidConfig:
         assert db["database_password"] == "android_pass"
         assert db["database_port"] == "3306"
 
+    def test_database_password_redacted_when_config_without_password(
+        self, source, settings, android_template
+    ):
+        source["database"]["android"]["config_without_password"] = True
+        config = serialize_android_config(source, settings, android_template)
+        # Password is omitted from the served config so participants enter it;
+        # the stored account password is unchanged.
+        assert config["database"]["database_password"] == "-"
+        assert config["database"]["config_without_password"] is True
+
     def test_database_host_resolved_from_settings(self, source, settings, android_template):
         # db.internal is an abstract alias → should resolve to android_database_host from settings
         config = serialize_android_config(source, settings, android_template)

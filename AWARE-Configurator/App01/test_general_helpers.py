@@ -21,10 +21,10 @@ from App01 import general
     "android, expected",
     [
         ({"password": "pw", "config_without_password": False, "require_ssl": False}, ("pw", False)),
-        # passwordless => empty effective password, stored value ignored
-        ({"password": "pw", "config_without_password": True, "require_ssl": False}, ("", False)),
+        # config_without_password never blanks the account password
+        ({"password": "pw", "config_without_password": True, "require_ssl": False}, ("pw", False)),
         ({"password": "pw", "config_without_password": False, "require_ssl": True}, ("pw", True)),
-        ({"password": "pw", "config_without_password": True, "require_ssl": True}, ("", True)),
+        ({"password": "pw", "config_without_password": True, "require_ssl": True}, ("pw", True)),
         ({}, ("", False)),
     ],
 )
@@ -70,18 +70,34 @@ def test_sync_called_when_password_changes(monkeypatch):
     assert synced == [source]
 
 
-def test_sync_called_when_toggling_passwordless(monkeypatch):
+def test_sync_skipped_when_toggling_config_without_password(monkeypatch):
     synced = []
 
     def fake_update(source, content):
+        # config_without_password does not affect the account credentials
         source["database"]["android"]["config_without_password"] = True
         return source
 
     monkeypatch.setattr(general, "update_source_from_android_config", fake_update)
     monkeypatch.setattr(general, "_sync_participant_credentials", synced.append)
 
-    # Password unchanged, but flipping passwordless changes the effective creds.
     general._merge_and_sync_credentials(_source(password="secret"), {})
+    assert synced == []
+
+
+def test_sync_called_when_require_ssl_changes(monkeypatch):
+    synced = []
+
+    def fake_update(source, content):
+        source["database"]["android"]["require_ssl"] = True
+        return source
+
+    monkeypatch.setattr(general, "update_source_from_android_config", fake_update)
+    monkeypatch.setattr(general, "_sync_participant_credentials", synced.append)
+
+    general._merge_and_sync_credentials(
+        _source(password="secret", require_ssl=False), {}
+    )
     assert len(synced) == 1
 
 
