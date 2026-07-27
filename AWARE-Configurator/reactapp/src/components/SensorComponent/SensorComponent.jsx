@@ -306,6 +306,89 @@ export default function SensorComponent(inputs) {
     }
   }
 
+  // When a main sensor (modeState === "sensor") is switched off, its dependent
+  // sub-toggles must be switched off too - otherwise they linger as "on" in the
+  // exported config (e.g. status_location_gps staying true while the Locations
+  // sensor is disabled). Only boolean sub-toggles are cleared here; frequencies,
+  // thresholds and other numeric/text settings are plain config values rather
+  // than on/off switches, so they're left untouched.
+  function resetChildSensors(mainField) {
+    switch (mainField) {
+      case "sensor_locations":
+        setLocationsData((prev) => ({
+          ...prev,
+          gps: false,
+          network: false,
+          passive: false,
+          save_all: false,
+        }));
+        break;
+      case "sensor_network":
+        setNetworkData((prev) => ({ ...prev, events: false, traffic: false }));
+        break;
+      case "sensor_communication":
+        setCommunicationData((prev) => ({
+          ...prev,
+          events: false,
+          messages: false,
+        }));
+        break;
+      case "sensor_screen":
+        setscreenData((prev) => ({ ...prev, sensor_touch: false }));
+        break;
+      case "sensor_application":
+        setapplicationSensor((prev) => ({
+          ...prev,
+          notifications: false,
+          crashes: false,
+          keyboard: false,
+          mask_keyboard: false,
+          mask_notification: false,
+          mask_touch_text: false,
+          status_screentext: false,
+        }));
+        break;
+      case "sensor_screenshot":
+        setScreenshotData((prev) => ({
+          ...prev,
+          status_screenshot_local_storage: false,
+        }));
+        break;
+      case "sensor_accelerometer":
+        setAccelerometerData((prev) => ({ ...prev, enforce: false }));
+        break;
+      case "sensor_barometer":
+        setBarometerData((prev) => ({ ...prev, enforce: false }));
+        break;
+      case "sensor_gyroscope":
+        setGyroscopeData((prev) => ({ ...prev, enforce: false }));
+        break;
+      case "sensor_linear_accelerometer":
+        setLinearAccelerometerData((prev) => ({ ...prev, enforce: false }));
+        break;
+      case "sensor_magnetometer":
+        setMagnetometerData((prev) => ({ ...prev, enforce: false }));
+        break;
+      case "sensor_rotation":
+        setRotationData((prev) => ({ ...prev, enforce: false }));
+        break;
+      case "sensor_gravity":
+        setGravityData((prev) => ({ ...prev, enforce: false }));
+        break;
+      case "sensor_light":
+        setLightData((prev) => ({ ...prev, enforce: false }));
+        break;
+      case "sensor_proximity":
+        setProximityData((prev) => ({ ...prev, enforce: false }));
+        break;
+      case "sensor_temperature":
+        setTemperatureData((prev) => ({ ...prev, enforce: false }));
+        break;
+      default:
+        break;
+    }
+  }
+
   const { sensorName, sensorDescription, stateField, field, modeState } =
     inputs;
 
@@ -318,7 +401,9 @@ export default function SensorComponent(inputs) {
               checked={stateField || false}
               onChange={(_, checked) => {
                 updateStates(field.toString(), checked, modeState);
-                console.log(stateField, modeState);
+                if (!checked && modeState === "sensor") {
+                  resetChildSensors(field.toString());
+                }
               }}
             />
           }
