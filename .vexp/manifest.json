@@ -1,13 +1,13 @@
 {
   "file_hashes": {
-    ".claude/CLAUDE.md": "2ce3c3c3736f037581bce72e737804f6300f5d10ab6e533db041c57051af2bf9",
-    ".windsurf/rules.md": "ccb39517845450e36236dcce2505218c1a7fc7374afcc557ee63b16c3cbcd0a2",
-    "AGENTS.md": "92c4ff5f62ffefd9a032a3ee10d7e07517917216c7db8622b62d1bfbe1098a32",
+    ".claude/CLAUDE.md": "2db69f98e93596bbcf756540da079ca34b8d358fa58b56a163a018eddea1ae8a",
+    ".windsurf/rules.md": "c1c19f8e0c8f16142fbc71debd0cc579e64cb018359dbf7405fa2097e78ec69b",
+    "AGENTS.md": "d9e520db03be17d3cdae1a78b114f868af759c413e3ac5e7cacd7de0b56c5e5d",
     "AWARE-Configurator/App01/__init__.py": "af1349b9f5f9a1a6a0404dea36dcc9499bcb25c9adc112b7cc9a93cae41f3262",
     "AWARE-Configurator/App01/admin.py": "3afbe817409db07e6dd3eaca52321d14b453dd7c7d44d98a8b29415317299f0e",
     "AWARE-Configurator/App01/apps.py": "f5fa6a402d900947d56777f2f3acaf40fea24e910d3d4cb0098ee8966f2671ff",
     "AWARE-Configurator/App01/database_operations.py": "e2ee7407e64b25c7ed74f6cc901dfcefca7a50741b733070fb2a4ab0a22b0b96",
-    "AWARE-Configurator/App01/db-init.sql": "a4a1e2890bbf754649161d26e882d9581622629f1f3493229dea11d89e9d3768",
+    "AWARE-Configurator/App01/db-init.sql": "8f03eb66f87a453b42eb2a8972c1b78c1dedd9ffdbc9450109f5112667e0c003",
     "AWARE-Configurator/App01/db.py": "df88ab1485a802547696c0c1db4bd7b48998dd245179a67f528aadc08e5f1e37",
     "AWARE-Configurator/App01/general.py": "39ebb1dd34694cafac2c43efb7e36ab6b5fe29e8e2d2512cff8fd5c88739a8e8",
     "AWARE-Configurator/App01/migrations/__init__.py": "af1349b9f5f9a1a6a0404dea36dcc9499bcb25c9adc112b7cc9a93cae41f3262",
@@ -72,7 +72,7 @@
     "analytics_api/app/__init__.py": "af1349b9f5f9a1a6a0404dea36dcc9499bcb25c9adc112b7cc9a93cae41f3262",
     "analytics_api/app/database.py": "d1f132c400343e280275261c365e52ed0cc514fdbc526e6729f53102411ffe2b",
     "analytics_api/app/main.py": "ef8137b248ac78b1ca3a3d4d229100b1f30ffc53bdc165248a22d961754f6acf",
-    "analytics_api/app/models.py": "fe383e0ca8ce667075a6e28aebc38b2b066d130d534c349185ffced11b9c374d",
+    "analytics_api/app/models.py": "8a026814f87b5b9a4d65e3e8b80a32d5bee6d73d32d0359eaf8120e6e2e54744",
     "analytics_api/app/routers/__init__.py": "af1349b9f5f9a1a6a0404dea36dcc9499bcb25c9adc112b7cc9a93cae41f3262",
     "analytics_api/app/routers/android.py": "349fc5fc3a2fda9e938a5f3961190d295af447c22a725ae7145b652e54fb1873",
     "analytics_api/app/routers/auth.py": "0468f635685bbd89149626a5be8f60baf6a60e406032cef2a12205195214f023",
@@ -81,7 +81,7 @@
     "analytics_api/app/routers/export.py": "4b413a5c9a24e4a2fad21178acb47d108ecae19d664f12213b89eb80ff099d8d",
     "analytics_api/app/routers/health.py": "b73deddbf308a63dfd83b1618d524fd90a9ac8855f1400cddde828f7e5384c74",
     "analytics_api/app/routers/ios.py": "7f0f1a94164e1d3cdf5042454bc0e5a4e1fdd864c871a6caf06624de80af3fba",
-    "analytics_api/app/schemas.py": "47d180d86489ec0e0a3f5804402acfcba9195fbfd9d4257c1f991d7f311222a6",
+    "analytics_api/app/schemas.py": "f4bca19091390be3391ecff97a865329166af3dd22a27fb743949aa0c2997a02",
     "aware-micro-server/Dockerfile": "7ff96951d7318c21aa9242c73ebbf6dd80562bbc79a6e365fcdc23e08baa00f9",
     "aware-micro-server/bin/main/com/awareframework/micro/MainVerticle.kt": "b257e086abe535bdba135b6519c450dec85c4eeba0a4e8754d1d757373aa878a",
     "aware-micro-server/bin/main/com/awareframework/micro/MySQLVerticle.kt": "564118cf746dbad7c08837b33cec7bd2d0c3a0d6dcf7b73f526bc28da11f326c",
@@ -125,10 +125,11 @@
     "dashboard/src/pages/DevicePage.tsx": "e43f774ff45cf21cad205a3730f962d0c21492615fb58d9008b411ab43296683",
     "dashboard/src/pages/ManifestPage.tsx": "adc66aa8776ccb7ef930f69b7bda7ca7fd67db32ffff01faf5602318fa0a54e1",
     "dashboard/src/pages/OverviewPage.tsx": "ebb716737ede9a03880cf11d2b86060f872fb9054cb9d703e5396b717e5e626c",
-    "dashboard/src/types.ts": "55624aa3a6a1c098be880f10b9d16d4217ab65cc3cb36bd2e21e72adb6d34fe3",
+    "dashboard/src/types.ts": "5ebb515c690b9a10a89d70fc3ac0d7cddd22c78fcb8f6bdaa2830f33ef596d5a",
     "dashboard/src/utils/stats.ts": "0c9571e4f8ea03d4e3f4484449ce51e90382e218e77dd20ffc16ade63c50e534",
     "dashboard/vite.config.ts": "40f284df10761043fff2560ddc1da546b70e010c70f1f2e0d11cb8389b8f4b9c",
-    "db/init_all.sql": "55b7fabbaf41e6b76f5567eabfa8d9debdcfae1bf0cea589083a16f625abe6b9",
+    "db/init_all.sql": "37db74c54df5a185a4febfd93b1e947e4edeb67fc8d782d9eb0ff202ca25e64f",
+    "docs/android-study-status-dashboard-plan.md": "82f14a14bacb5f0c7b320d2e3ab2db46a6da1ec89e9d0670e34d8102453dfef7",
     "setup.sh": "a4c46ab39cb7f9840290c1f41d7a9bd2ada754aca1ae530afa291c65a504dbdb",
     "setup/Dockerfile": "7a809ccc1ba7fadfc0524360987c979487391833c60c5a6d46bb4620c6d13e39",
     "setup/deploy.sh": "8a1875311111a804f2ede2d5ae1e6f9b8d609e85158d8b0e7997116c826cd102",
@@ -146,13 +147,13 @@
     "shared_config/source_store.py": "2295c298572bf3b83cbaf31ac0f871e30f29b3677a0711248aba7505eaa4be6d",
     "shared_config/test_serializers.py": "0560973b6ca83539f990d2d792b21ec52297919081efa91dc559318e8cfb9405"
   },
-  "indexed_at_commit": "996f75bd51df3c5fa1cd9b065ab95e1a0ae0c8c5",
-  "indexed_at_timestamp": "2026-07-27T17:40:54.190587+00:00",
+  "indexed_at_commit": "0bb8da1495b5fb4d2d3628f19b5a708f5e19ea58",
+  "indexed_at_timestamp": "2026-07-29T16:39:26.622041+00:00",
   "schema_version": 3,
   "stats": {
-    "total_edges": 1433,
-    "total_files": 145,
-    "total_nodes": 1291
+    "total_edges": 1435,
+    "total_files": 146,
+    "total_nodes": 1342
   },
-  "vexp_version": "2.3.0"
+  "vexp_version": "2.3.1"
 }

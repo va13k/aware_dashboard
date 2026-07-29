@@ -1,18 +1,14 @@
 export interface AndroidDevice {
   device_id: string;
   board?: string | null;
-  brand?: string | null;
   device?: string | null;
   build_id?: string | null;
   hardware?: string | null;
   manufacturer: string | null;
   model: string | null;
   product?: string | null;
-  serial?: string | null;
   release?: string | null;
-  release_type?: string | null;
   sdk?: string | null;
-  label?: string | null;
   last_seen: number;
   platform: "android";
 }

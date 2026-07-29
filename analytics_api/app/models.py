@@ -12,18 +12,14 @@ class AndroidDevice(AndroidBase):
     timestamp = Column(Double, default=0)
     device_id = Column(String(150), default="")
     board = Column(Text)
-    brand = Column(Text)
     device = Column(Text)
     build_id = Column(Text)
     hardware = Column(Text)
     manufacturer = Column(Text)
     model = Column(Text)
     product = Column(Text)
-    serial = Column(Text)
     release = Column(Text)
-    release_type = Column(Text)
     sdk = Column(Text)
-    label = Column(Text)
 
 
 class AndroidAccelerometer(AndroidBase):
