@@ -1,3 +1,4 @@
+import pathlib
 import re
 
 import pymysql
@@ -125,6 +126,26 @@ def check_root_privileges(ip, port, database, username, password):
         return result
 
 
+def android_tables_sql():
+    """Path to the generated Android schema.
+
+    One source of truth with the deployment's own init_all.sql: both are built
+    from db/android-tables.sql, which db/build_init_all.py derives from the
+    AWARE client's providers. A hand-maintained second copy is what let the two
+    schemas drift apart and cost `bluetooth` 2447 rows to a missing column.
+
+    Checked against the repo root first (the configurator runs with the project
+    mounted at /project) and falls back to the path relative to this file.
+    """
+    for candidate in (
+        pathlib.Path("/project/db/android-tables.sql"),
+        pathlib.Path(__file__).resolve().parents[2] / "db" / "android-tables.sql",
+    ):
+        if candidate.is_file():
+            return str(candidate)
+    raise FileNotFoundError("db/android-tables.sql not found; run db/build_init_all.py")
+
+
 def read_sql_file(path):
     with open(path, "r") as sql_file:
         ret = sql_file.read().split(";")
@@ -146,7 +167,7 @@ def init_database(
 
     db = connect(ip, port, database, root_username, root_password)
     try:
-        db_init_sql = read_sql_file("App01/db-init.sql")
+        db_init_sql = read_sql_file(android_tables_sql())
         cursor = db.cursor()
         for each in db_init_sql:
             cursor.execute(each + ";")

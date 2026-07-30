@@ -17,7 +17,9 @@ from shared_config.runtime import load_env
 
 ENV_PATH = PROJECT / ".env"
 SOURCE_PATH = PROJECT / "source.json"
-ANDROID_INIT_SQL_PATH = PROJECT / "AWARE-Configurator" / "App01" / "db-init.sql"
+# Generated from the AWARE client's providers by db/build_init_all.py, so the
+# tables created here cannot drift from the columns the client actually sends.
+ANDROID_INIT_SQL_PATH = PROJECT / "db" / "android-tables.sql"
 MYSQL_CONTAINER = "aware_mysql"
 
 
