@@ -17,6 +17,11 @@ def _project_root() -> pathlib.Path:
 
 SOURCE_PATH = _project_root() / "source.json"
 
+# source.json is a runtime file, not source code: it holds this deployment's
+# study configuration and participant credentials, so it is gitignored and
+# materialized from the committed template on first use.
+TEMPLATE_PATH = _project_root() / "source.example.json"
+
 
 @contextlib.contextmanager
 def source_lock():
@@ -31,6 +36,27 @@ def source_lock():
             fcntl.flock(dir_fd, fcntl.LOCK_UN)
     finally:
         os.close(dir_fd)
+
+
+def _ensure_unlocked() -> None:
+    """Create source.json from the template when it does not exist yet.
+
+    Never overwrites an existing file: the Configurator persists researcher
+    edits into source.json, so re-running deployment must leave them intact.
+    """
+    if SOURCE_PATH.exists():
+        return
+
+    if not TEMPLATE_PATH.exists():
+        raise FileNotFoundError(
+            f"Neither {SOURCE_PATH.name} nor its template {TEMPLATE_PATH.name} exists; "
+            "cannot initialize the study configuration."
+        )
+
+    with TEMPLATE_PATH.open("r", encoding="utf-8") as f:
+        template = json.load(f)
+
+    _atomic_write_unlocked(template)
 
 
 def _read_unlocked() -> dict[str, Any]:
@@ -60,8 +86,15 @@ def _atomic_write_unlocked(data: dict[str, Any]) -> None:
             tmp_path.unlink(missing_ok=True)
 
 
+def ensure_source() -> None:
+    """Materialize source.json from the template if it is missing."""
+    with source_lock():
+        _ensure_unlocked()
+
+
 def read_source() -> dict[str, Any]:
     with source_lock():
+        _ensure_unlocked()
         return _read_unlocked()
 
 
@@ -72,6 +105,7 @@ def write_source(data: dict[str, Any]) -> None:
 
 def update_source(mutator: Callable[[dict[str, Any]], dict[str, Any] | None]) -> dict[str, Any]:
     with source_lock():
+        _ensure_unlocked()
         current = _read_unlocked()
         updated = mutator(current)
         if updated is None:

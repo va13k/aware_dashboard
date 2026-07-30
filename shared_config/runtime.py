@@ -1,4 +1,6 @@
+import os
 import pathlib
+import tempfile
 
 
 def load_env(path: pathlib.Path) -> dict[str, str]:
@@ -12,6 +14,43 @@ def load_env(path: pathlib.Path) -> dict[str, str]:
         key, value = line.split("=", 1)
         data[key] = value
     return data
+
+
+def set_env_value(path: pathlib.Path, key: str, value: str) -> None:
+    """Update a single key in an env file, leaving every other line untouched.
+
+    Comments, ordering and unrelated keys are preserved, and the file is
+    swapped into place atomically so a reader never sees a partial write. The
+    key is appended when it is not already present.
+    """
+    lines = []
+    if path.exists():
+        lines = path.read_text(encoding="utf-8").splitlines()
+
+    replaced = False
+    for index, line in enumerate(lines):
+        if line.startswith("#") or "=" not in line:
+            continue
+        if line.split("=", 1)[0] == key:
+            lines[index] = f"{key}={value}"
+            replaced = True
+
+    if not replaced:
+        lines.append(f"{key}={value}")
+
+    fd, tmp_name = tempfile.mkstemp(
+        prefix=path.name + ".", suffix=".tmp", dir=str(path.parent)
+    )
+    tmp_path = pathlib.Path(tmp_name)
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as tmp:
+            tmp.write("\n".join(lines) + "\n")
+            tmp.flush()
+            os.fsync(tmp.fileno())
+        os.replace(tmp_path, path)
+    finally:
+        if tmp_path.exists():
+            tmp_path.unlink(missing_ok=True)
 
 
 def strip_ipv6_brackets(host: str) -> str:

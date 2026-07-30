@@ -16,7 +16,7 @@ else:
 if str(PROJECT) not in sys.path:
     sys.path.insert(0, str(PROJECT))
 
-from shared_config.source_store import read_source
+from shared_config.source_store import update_source
 from shared_config.runtime import (
     build_public_base_url,
     get_runtime_settings,
@@ -48,8 +48,43 @@ def load_merged_env() -> dict[str, str]:
     return env
 
 
-def load_source_config() -> dict:
-    return read_source()
+PLACEHOLDER_SECRETS = {"", "CHANGE_ME"}
+
+
+def ensure_participant_password(env: dict[str, str]) -> None:
+    password = str(env.get("PARTICIPANT_DB_PASSWORD", "")).strip()
+    if password in PLACEHOLDER_SECRETS:
+        env["PARTICIPANT_DB_PASSWORD"] = secrets.token_urlsafe(16)
+
+
+def seed_source_secrets(env: dict[str, str]) -> dict:
+    """Align source.json with this deployment's credentials.
+
+    update_source() creates source.json from source.example.json on first run.
+    The participant password is then taken from .env unconditionally, because
+    .env is what MySQL's first-boot script applies to the accounts: copying any
+    other value here would serve devices a password the accounts do not have.
+    That is safe to overwrite because the Configurator writes every password
+    change back to .env, so .env already holds the researcher's own value.
+    """
+    participant_password = env["PARTICIPANT_DB_PASSWORD"]
+
+    def mutate(source: dict) -> dict:
+        for platform in ("android", "ios"):
+            database = source.get("database", {}).get(platform)
+            if database is None:
+                continue
+            database["password"] = participant_password
+
+        study = source.setdefault("study", {})
+        if str(study.get("id", "")).strip() in PLACEHOLDER_SECRETS | {
+            "00000000-0000-0000-0000-000000000000"
+        }:
+            study["id"] = env["STUDY_ID"]
+
+        return source
+
+    return update_source(mutate)
 
 
 def ensure_django_secret_key(env: dict[str, str]) -> None:
@@ -97,6 +132,7 @@ def persist_env(env: dict[str, str]) -> None:
         "STUDY_ID",
         "RESEARCHER_USERNAME",
         "RESEARCHER_PASSWORD",
+        "PARTICIPANT_DB_PASSWORD",
         "PUBLIC_HOST",
         "PUBLIC_PORT",
         "PROTOCOL",
@@ -203,6 +239,7 @@ def main() -> None:
     ensure_study_key(env)
     ensure_study_id(env)
     ensure_researcher_credentials(env)
+    ensure_participant_password(env)
     env = normalize_public_env(env)
 
     generate_htpasswd(
@@ -212,7 +249,9 @@ def main() -> None:
 
     persist_env(env)
 
-    source = load_source_config()
+    # Creates source.json from source.example.json when absent, then fills in
+    # this deployment's generated credentials before anything is serialized.
+    source = seed_source_secrets(env)
     settings = get_runtime_settings(env)
     ios_db = source["database"]["ios"]
     ios_server = source["ios"]["server"]

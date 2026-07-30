@@ -19,6 +19,7 @@ from shared_config.runtime import (
     get_runtime_settings,
     load_env,
     normalize_public_env,
+    set_env_value,
 )
 from shared_config.serializers import (
     ANDROID_ONLY_SHARED_SENSOR_NAMES,
@@ -161,6 +162,14 @@ def _sync_participant_credentials(source):
         password=password,
         require_ssl=require_ssl,
     )
+
+    # .env is the single source of truth for the participant password: the
+    # deployment step seeds source.json from it and MySQL's first-boot script
+    # applies it. Recording the new password here keeps all three in agreement,
+    # so re-running the wizard cannot hand devices a stale password. Only after
+    # MySQL accepted the change, otherwise .env would advertise a password the
+    # account does not have.
+    set_env_value(ENV_PATH, "PARTICIPANT_DB_PASSWORD", password)
 
 
 def write_json(path, content):

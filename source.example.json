@@ -1,7 +1,7 @@
 {
   "version": 1,
   "study": {
-    "id": "9c27abb5-c78d-48c3-87ff-585b9e21b2d5",
+    "id": "00000000-0000-0000-0000-000000000000",
     "title": "AWARE Default Study",
     "description": "Default study configuration generated during deployment.",
     "active": true,
@@ -23,7 +23,7 @@
       "port": 3306,
       "name": "aware_android",
       "username": "aware_android_participant",
-      "password": "participantpass",
+      "password": "CHANGE_ME",
       "require_ssl": false,
       "config_without_password": false
     },
@@ -31,26 +31,35 @@
       "port": 3306,
       "name": "aware_ios",
       "username": "aware_ios_participant",
-      "password": "participantpass",
+      "password": "CHANGE_ME",
       "engine": "mysql"
     }
   },
   "android": {
     "created_at": "",
-    "updated_at": "2026-05-13T10:15:47.242Z",
+    "updated_at": "",
     "settings": {
       "webservice_wifi_only": false,
       "webservice_charging": false,
       "frequency_webservice": 1,
       "frequency_clean_old_data": 0,
-      "webservice_silent": false,
+      "webservice_silent": true,
       "fallback_network": 30,
       "remind_to_charge": false,
-      "foreground_priority": false,
+      "foreground_priority": true,
       "debug_flag": false,
       "frequency_sync_config": 1,
       "enable_config_update": false,
       "status_mqtt": false,
+      "mqtt_server": "",
+      "mqtt_port": 1883,
+      "mqtt_username": "",
+      "mqtt_password": "",
+      "mqtt_keep_alive": 600,
+      "mqtt_qos": 2,
+      "webservice_simple": false,
+      "webservice_remove_data": false,
+      "debug_db_slow": false,
       "status_notifications": false,
       "status_crashes": false,
       "status_keyboard": false,
@@ -73,8 +82,8 @@
       "location": false,
       "status_location_gps": false,
       "status_location_network": false,
-      "frequency_location_gps": 180,
-      "frequency_location_network": 300,
+      "frequency_location_gps": 30,
+      "frequency_location_network": 30,
       "min_location_gps_accuracy": 150,
       "min_location_network_accuracy": 1500,
       "location_expiration_time": 300,
@@ -85,7 +94,7 @@
       "status_network_traffic": false,
       "frequency_network_traffic": 30,
       "status_proximity": false,
-      "frequency_proximity": 20000,
+      "frequency_proximity": 200000,
       "threshold_proximity": 10,
       "frequency_proximity_enforce": false,
       "status_screenshot": false,
@@ -96,7 +105,7 @@
       "screenshot_package_specification": "2",
       "status_notes": false,
       "status_plugin_ambient_noise": false,
-      "frequency_plugin_ambient_noise": 5,
+      "frequency_plugin_ambient_noise": 15,
       "plugin_ambient_noise_sample_size": 60,
       "plugin_ambient_noise_silence_threshold": 40,
       "status_plugin_openweather": false,
@@ -274,7 +283,7 @@
       },
       "light": {
         "enabled": false,
-        "frequency": 20000,
+        "frequency": 200000,
         "threshold": 100,
         "enforce": false
       },
@@ -286,13 +295,13 @@
       },
       "magnetometer": {
         "enabled": false,
-        "frequency": 2000000,
+        "frequency": 50000,
         "threshold": 1000000,
         "enforce": false
       },
       "processor": {
         "enabled": false,
-        "frequency": 20
+        "frequency": 60
       },
       "rotation": {
         "enabled": false,
@@ -308,7 +317,7 @@
       },
       "temperature": {
         "enabled": false,
-        "frequency": 20000,
+        "frequency": 10000000,
         "threshold": 100,
         "enforce": false
       },
@@ -318,7 +327,7 @@
       },
       "wifi": {
         "enabled": false,
-        "frequency": 60
+        "frequency": 15
       },
       "significant_motion": {
         "enabled": false

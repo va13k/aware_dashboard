@@ -850,13 +850,17 @@ class TestUpdateIosServerConfig:
 
 
 class TestSourceJsonCoverage:
-    """Ensure the real source.json has all fields required by the serializers."""
+    """Ensure the committed source template has every field the serializers need.
 
-    SOURCE_PATH = pathlib.Path(__file__).resolve().parent.parent / "source.json"
+    source.json itself is generated per deployment and gitignored, so the
+    template is what these tests can rely on being present.
+    """
+
+    SOURCE_PATH = pathlib.Path(__file__).resolve().parent.parent / "source.example.json"
 
     @pytest.fixture(scope="class")
     def real_source(self):
-        assert self.SOURCE_PATH.exists(), f"source.json not found at {self.SOURCE_PATH}"
+        assert self.SOURCE_PATH.exists(), f"source.example.json not found at {self.SOURCE_PATH}"
         return json.loads(self.SOURCE_PATH.read_text(encoding="utf-8"))
 
     def test_top_level_keys(self, real_source):
@@ -1020,7 +1024,7 @@ class TestGravitySensor:
 
     def test_gravity_absent_from_source_json_ios(self):
         """Verify the real source.json has no gravity entry in ios.sensors."""
-        source_path = pathlib.Path(__file__).resolve().parent.parent / "source.json"
+        source_path = pathlib.Path(__file__).resolve().parent.parent / "source.example.json"
         real_source = json.loads(source_path.read_text(encoding="utf-8"))
         assert (
             "gravity" not in real_source["ios"]["sensors"]
@@ -1128,14 +1132,14 @@ class TestTemperatureSensor:
         assert "temperature" not in sensor_names
 
     def test_temperature_absent_from_source_json_ios_sensors(self):
-        source_path = pathlib.Path(__file__).resolve().parent.parent / "source.json"
+        source_path = pathlib.Path(__file__).resolve().parent.parent / "source.example.json"
         real_source = json.loads(source_path.read_text(encoding="utf-8"))
         assert (
             "temperature" not in real_source["ios"]["sensors"]
         ), "ios.sensors must not contain temperature in source.json"
 
     def test_temperature_present_in_source_json_shared_sensors(self):
-        source_path = pathlib.Path(__file__).resolve().parent.parent / "source.json"
+        source_path = pathlib.Path(__file__).resolve().parent.parent / "source.example.json"
         real_source = json.loads(source_path.read_text(encoding="utf-8"))
         assert (
             "temperature" in real_source["shared"]["sensors"]
@@ -1178,14 +1182,14 @@ class TestTelephonySensor:
         assert sensor_value(config, "status_telephony") is True
 
     def test_telephony_absent_from_source_json_ios_sensors(self):
-        source_path = pathlib.Path(__file__).resolve().parent.parent / "source.json"
+        source_path = pathlib.Path(__file__).resolve().parent.parent / "source.example.json"
         real_source = json.loads(source_path.read_text(encoding="utf-8"))
         assert (
             "telephony" not in real_source["ios"]["sensors"]
         ), "ios.sensors must not contain telephony in source.json"
 
     def test_telephony_present_in_source_json_shared_sensors(self):
-        source_path = pathlib.Path(__file__).resolve().parent.parent / "source.json"
+        source_path = pathlib.Path(__file__).resolve().parent.parent / "source.example.json"
         real_source = json.loads(source_path.read_text(encoding="utf-8"))
         assert (
             "telephony" in real_source["shared"]["sensors"]
@@ -1260,14 +1264,14 @@ class TestApplicationsSensor:
         assert sensor_value(config, "frequency_applications") == 30
 
     def test_applications_absent_from_source_json_ios_sensors(self):
-        source_path = pathlib.Path(__file__).resolve().parent.parent / "source.json"
+        source_path = pathlib.Path(__file__).resolve().parent.parent / "source.example.json"
         real_source = json.loads(source_path.read_text(encoding="utf-8"))
         assert (
             "applications" not in real_source["ios"]["sensors"]
         ), "ios.sensors must not contain applications in source.json"
 
     def test_applications_present_in_source_json_shared_sensors(self):
-        source_path = pathlib.Path(__file__).resolve().parent.parent / "source.json"
+        source_path = pathlib.Path(__file__).resolve().parent.parent / "source.example.json"
         real_source = json.loads(source_path.read_text(encoding="utf-8"))
         assert (
             "applications" in real_source["shared"]["sensors"]
@@ -1332,14 +1336,14 @@ class TestLightSensor:
         assert sensor_value(config, "frequency_light") == 20000
 
     def test_light_absent_from_source_json_ios_sensors(self):
-        source_path = pathlib.Path(__file__).resolve().parent.parent / "source.json"
+        source_path = pathlib.Path(__file__).resolve().parent.parent / "source.example.json"
         real_source = json.loads(source_path.read_text(encoding="utf-8"))
         assert (
             "light" not in real_source["ios"]["sensors"]
         ), "ios.sensors must not contain light in source.json"
 
     def test_light_present_in_source_json_shared_sensors(self):
-        source_path = pathlib.Path(__file__).resolve().parent.parent / "source.json"
+        source_path = pathlib.Path(__file__).resolve().parent.parent / "source.example.json"
         real_source = json.loads(source_path.read_text(encoding="utf-8"))
         assert (
             "light" in real_source["shared"]["sensors"]
@@ -1463,13 +1467,13 @@ class TestProximitySensor:
         assert sensor_value(config, "frequency_proximity_enforce") is True
 
     def test_proximity_absent_from_source_json_ios_and_shared(self):
-        source_path = pathlib.Path(__file__).resolve().parent.parent / "source.json"
+        source_path = pathlib.Path(__file__).resolve().parent.parent / "source.example.json"
         real_source = json.loads(source_path.read_text(encoding="utf-8"))
         assert "proximity" not in real_source["ios"]["sensors"]
         assert "proximity" not in real_source["shared"]["sensors"]
 
     def test_proximity_present_in_source_json_android_settings(self):
-        source_path = pathlib.Path(__file__).resolve().parent.parent / "source.json"
+        source_path = pathlib.Path(__file__).resolve().parent.parent / "source.example.json"
         real_source = json.loads(source_path.read_text(encoding="utf-8"))
         android_settings = real_source["android"]["settings"]
         assert "status_proximity" in android_settings
@@ -1638,19 +1642,19 @@ class TestAndroidConfigCorrectness:
         assert "min_location_gps_accuracy" not in ios_settings
 
     def test_real_source_json_uses_correct_location_keys(self):
-        """The committed source.json must use the correct GPS/network frequency keys."""
-        source_path = pathlib.Path(__file__).resolve().parent.parent / "source.json"
+        """The committed source.example.json must use the correct GPS/network frequency keys."""
+        source_path = pathlib.Path(__file__).resolve().parent.parent / "source.example.json"
         real_source = json.loads(source_path.read_text(encoding="utf-8"))
         android_settings = real_source.get("android", {}).get("settings", {})
         assert (
             "frequency_location_gps" in android_settings
-        ), "source.json must use frequency_location_gps"
+        ), "source.example.json must use frequency_location_gps"
         assert (
             "frequency_location_network" in android_settings
-        ), "source.json must use frequency_location_network"
+        ), "source.example.json must use frequency_location_network"
         assert (
             "frequency_gps" not in android_settings
-        ), "source.json must not have legacy frequency_gps"
+        ), "source.example.json must not have legacy frequency_gps"
         assert (
             "frequency_network" not in android_settings
-        ), "source.json must not have legacy frequency_network"
+        ), "source.example.json must not have legacy frequency_network"
