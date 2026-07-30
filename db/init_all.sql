@@ -1,6 +1,14 @@
+-- GENERATED FILE - DO NOT EDIT.
+-- Built by db/build_init_all.py from 00-bootstrap.sql, android-tables.sql
+-- and ios-tables.sql. Edit those and re-run the script.
+
 CREATE DATABASE IF NOT EXISTS aware_ios;
 CREATE DATABASE IF NOT EXISTS aware_android;
 
+-- The participant passwords below are only a first-boot seed: on a fresh data
+-- directory zz-participant-password.sh replaces them with the per-deployment
+-- password generated into .env. CREATE USER IF NOT EXISTS means replaying this
+-- file on later restarts never resets that password.
 CREATE USER IF NOT EXISTS 'aware_android_participant'@'%' IDENTIFIED BY 'participantpass';
 GRANT INSERT ON aware_android.* TO 'aware_android_participant'@'%';
 
@@ -189,6 +197,7 @@ CREATE TABLE IF NOT EXISTS `bluetooth` (
   `bt_address` varchar(150) DEFAULT '',
   `bt_name` text,
   `bt_rssi` int DEFAULT '0',
+  `bt_status` int DEFAULT '0',
   `label` text,
   PRIMARY KEY (`_id`),
   KEY `time_device` (`timestamp`,`device_id`)
@@ -781,6 +790,36 @@ CREATE TABLE IF NOT EXISTS `notes` (
   `timestamp` double DEFAULT '0',
   `device_id` varchar(150) DEFAULT '',
   `note` text, 
+  PRIMARY KEY (`_id`),
+  KEY `time_device` (`timestamp`,`device_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Declared by the Android client (Processor_Provider, Scheduler_Provider) but
+-- absent from this schema until 2026-07-30. A table the client writes and the
+-- server lacks makes every insert for it fail with no error surfaced on the
+-- device, which is how `bluetooth` lost 2447 rows to a missing `bt_status`.
+CREATE TABLE IF NOT EXISTS `processor` (
+  `_id` bigint unsigned NOT NULL AUTO_INCREMENT,
+  `timestamp` double DEFAULT '0',
+  `device_id` varchar(150) DEFAULT '',
+  `double_last_user` double DEFAULT '0',
+  `double_last_system` double DEFAULT '0',
+  `double_last_idle` double DEFAULT '0',
+  `double_user_load` double DEFAULT '0',
+  `double_system_load` double DEFAULT '0',
+  `double_idle_load` double DEFAULT '0',
+  PRIMARY KEY (`_id`),
+  KEY `time_device` (`timestamp`,`device_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS `scheduler` (
+  `_id` bigint unsigned NOT NULL AUTO_INCREMENT,
+  `timestamp` double DEFAULT '0',
+  `device_id` varchar(150) DEFAULT '',
+  `schedule_id` text,
+  `schedule` text,
+  `last_triggered` double DEFAULT '0',
+  `package_name` text,
   PRIMARY KEY (`_id`),
   KEY `time_device` (`timestamp`,`device_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

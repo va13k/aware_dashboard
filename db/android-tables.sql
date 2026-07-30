@@ -172,6 +172,7 @@ CREATE TABLE IF NOT EXISTS `bluetooth` (
   `bt_address` varchar(150) DEFAULT '',
   `bt_name` text,
   `bt_rssi` int DEFAULT '0',
+  `bt_status` int DEFAULT '0',
   `label` text,
   PRIMARY KEY (`_id`),
   KEY `time_device` (`timestamp`,`device_id`)
@@ -217,55 +218,6 @@ CREATE TABLE IF NOT EXISTS `esms` (
   `double_esm_user_answer_timestamp` double DEFAULT '0',
   `esm_user_answer` text,
   `esm_trigger` text,
-  PRIMARY KEY (`_id`),
-  KEY `time_device` (`timestamp`,`device_id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-
-CREATE TABLE IF NOT EXISTS `fitbit_data` (
-  `_id` bigint unsigned NOT NULL AUTO_INCREMENT,
-  `timestamp` double DEFAULT '0',
-  `device_id` varchar(150) DEFAULT '',
-  `fitbit_id` text,
-  `fitbit_data_type` text,
-  `fitbit_data` text,
-  PRIMARY KEY (`_id`),
-  KEY `time_device` (`timestamp`,`device_id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-
-CREATE TABLE IF NOT EXISTS `fitbit_devices` (
-  `_id` bigint unsigned NOT NULL AUTO_INCREMENT,
-  `timestamp` double DEFAULT '0',
-  `device_id` varchar(150) DEFAULT '',
-  `fitbit_id` text,
-  `fitbit_version` text,
-  `fitbit_battery` text,
-  `fitbit_mac` text,
-  `fitbit_last_sync` text,
-  PRIMARY KEY (`_id`),
-  KEY `time_device` (`timestamp`,`device_id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-
-CREATE TABLE IF NOT EXISTS `fused_geofences` (
-  `_id` bigint unsigned NOT NULL AUTO_INCREMENT,
-  `timestamp` double DEFAULT '0',
-  `device_id` varchar(150) DEFAULT '',
-  `geofence_label` text,
-  `double_latitude` double DEFAULT NULL,
-  `double_longitude` double DEFAULT NULL,
-  `double_radius` double DEFAULT NULL,
-  PRIMARY KEY (`_id`),
-  KEY `time_device` (`timestamp`,`device_id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-
-CREATE TABLE IF NOT EXISTS `fused_geofences_data` (
-  `_id` bigint unsigned NOT NULL AUTO_INCREMENT,
-  `timestamp` double DEFAULT '0',
-  `device_id` varchar(150) DEFAULT '',
-  `geofence_label` text,
-  `double_latitude` double DEFAULT NULL,
-  `double_longitude` double DEFAULT NULL,
-  `double_distance` double DEFAULT NULL,
-  `status` int DEFAULT NULL,
   PRIMARY KEY (`_id`),
   KEY `time_device` (`timestamp`,`device_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
@@ -409,13 +361,24 @@ CREATE TABLE IF NOT EXISTS `messages` (
   KEY `time_device` (`timestamp`,`device_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
-CREATE TABLE IF NOT EXISTS `mqtt_history` (
-  `id` int(9) NOT NULL AUTO_INCREMENT,
-  `timestamp` double NOT NULL,
-  `topic` text NOT NULL,
-  `message` text NOT NULL,
-  `receivers` text NOT NULL,
-  PRIMARY KEY (`id`)
+CREATE TABLE IF NOT EXISTS `mqtt_messages` (
+  `_id` bigint unsigned NOT NULL AUTO_INCREMENT,
+  `timestamp` double DEFAULT '0',
+  `device_id` varchar(150) DEFAULT '',
+  `topic` text,
+  `message` text,
+  `status` int DEFAULT '0',
+  PRIMARY KEY (`_id`),
+  KEY `time_device` (`timestamp`,`device_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS `mqtt_subscriptions` (
+  `_id` bigint unsigned NOT NULL AUTO_INCREMENT,
+  `timestamp` double DEFAULT '0',
+  `device_id` varchar(150) DEFAULT '',
+  `topic` text,
+  PRIMARY KEY (`_id`),
+  KEY `time_device` (`timestamp`,`device_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 CREATE TABLE IF NOT EXISTS `network` (
@@ -491,20 +454,6 @@ CREATE TABLE IF NOT EXISTS `proximity` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 CREATE TABLE IF NOT EXISTS `rotation` (
-  `_id` bigint unsigned NOT NULL AUTO_INCREMENT,
-  `timestamp` double DEFAULT '0',
-  `device_id` varchar(150) DEFAULT '',
-  `double_values_0` double DEFAULT '0',
-  `double_values_1` double DEFAULT '0',
-  `double_values_2` double DEFAULT '0',
-  `double_values_3` double DEFAULT '0',
-  `accuracy` int DEFAULT '0',
-  `label` text,
-  PRIMARY KEY (`_id`),
-  KEY `time_device` (`timestamp`,`device_id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-
-CREATE TABLE IF NOT EXISTS `rotation_edited` (
   `_id` bigint unsigned NOT NULL AUTO_INCREMENT,
   `timestamp` double DEFAULT '0',
   `device_id` varchar(150) DEFAULT '',
@@ -816,6 +765,36 @@ CREATE TABLE IF NOT EXISTS `notes` (
   `timestamp` double DEFAULT '0',
   `device_id` varchar(150) DEFAULT '',
   `note` text, 
+  PRIMARY KEY (`_id`),
+  KEY `time_device` (`timestamp`,`device_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Declared by the Android client (Processor_Provider, Scheduler_Provider) but
+-- absent from this schema until 2026-07-30. A table the client writes and the
+-- server lacks makes every insert for it fail with no error surfaced on the
+-- device, which is how `bluetooth` lost 2447 rows to a missing `bt_status`.
+CREATE TABLE IF NOT EXISTS `processor` (
+  `_id` bigint unsigned NOT NULL AUTO_INCREMENT,
+  `timestamp` double DEFAULT '0',
+  `device_id` varchar(150) DEFAULT '',
+  `double_last_user` double DEFAULT '0',
+  `double_last_system` double DEFAULT '0',
+  `double_last_idle` double DEFAULT '0',
+  `double_user_load` double DEFAULT '0',
+  `double_system_load` double DEFAULT '0',
+  `double_idle_load` double DEFAULT '0',
+  PRIMARY KEY (`_id`),
+  KEY `time_device` (`timestamp`,`device_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS `scheduler` (
+  `_id` bigint unsigned NOT NULL AUTO_INCREMENT,
+  `timestamp` double DEFAULT '0',
+  `device_id` varchar(150) DEFAULT '',
+  `schedule_id` text,
+  `schedule` text,
+  `last_triggered` double DEFAULT '0',
+  `package_name` text,
   PRIMARY KEY (`_id`),
   KEY `time_device` (`timestamp`,`device_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
