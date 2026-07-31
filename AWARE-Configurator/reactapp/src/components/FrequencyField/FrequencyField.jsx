@@ -57,6 +57,7 @@ function FrequencyField(inputs) {
     modeState,
     presets,
     allowZero,
+    warnAbove,
   } = inputs;
 
   const initialValue = studyField || defaultNum.toString();
@@ -308,6 +309,16 @@ function FrequencyField(inputs) {
 
   const hasPresets = Array.isArray(presets) && presets.length > 0;
 
+  // warnAbove is the largest value that still leaves the sensor recording
+  // usefully. A value past it is not an aggressive setting but an ineffective
+  // one: it silences the sensor while it still shows as enabled, so it is
+  // flagged on the field rather than left to be discovered in the data.
+  const numericValue = parseFloat(localValue);
+  const outOfRange =
+    typeof warnAbove === "number" &&
+    !Number.isNaN(numericValue) &&
+    numericValue > warnAbove;
+
   return (
     <div className="sensor_vertical_layout">
       <Grid>
@@ -385,6 +396,12 @@ function FrequencyField(inputs) {
             style={{ width: "100%" }}
             onChange={handleChange}
             onBlur={handleBlur}
+            error={outOfRange}
+            helperText={
+              outOfRange
+                ? `${localValue} is above ${warnAbove}, more than this sensor's readings change in normal use. At this value almost every sample is filtered out and the sensor records nothing.`
+                : undefined
+            }
           />
         </Grid>
       ) : (
