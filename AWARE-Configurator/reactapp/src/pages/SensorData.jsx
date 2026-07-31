@@ -41,6 +41,7 @@ import {
 } from "../functions/atom";
 import SensorComponent from "../components/SensorComponent/SensorComponent";
 import FrequencyField from "../components/FrequencyField/FrequencyField";
+import ThresholdField from "../components/ThresholdField/ThresholdField";
 import customisedTheme from "../functions/theme";
 import Field from "../components/Field/Field";
 import InputField from "../components/InputField/InputField";
@@ -910,16 +911,9 @@ export default function SensorData() {
             presets={MOTION_PRESETS}
           />
 
-          <FrequencyField
-            id="threshold"
-            title="Threshold accelerometer"
-            inputLabel="threshold"
-            defaultNum={0}
-            description="E.g., log only if [x,y,z] >= 0.01. 0 = disabled"
-            field="threshold"
+          <ThresholdField
+            sensor="accelerometer"
             studyField={accelerometerData.threshold}
-            allowZero
-            modeState="accelerometer"
           />
 
           <AndroidOnlyNote />
@@ -953,16 +947,9 @@ export default function SensorData() {
             presets={BAROMETER_PRESETS}
           />
 
-          <FrequencyField
-            id="threshold"
-            title="Threshold barometer"
-            inputLabel="threshold"
-            defaultNum={0}
-            description="E.g., log only if [x,y,z] >= 0.01. 0 = disabled"
-            field="threshold"
+          <ThresholdField
+            sensor="barometer"
             studyField={barometerData.threshold}
-            allowZero
-            modeState="barometer"
           />
 
           <AndroidOnlyNote />
@@ -1018,17 +1005,7 @@ export default function SensorData() {
             presets={MOTION_PRESETS}
           />
 
-          <FrequencyField
-            id="threshold"
-            title="Threshold gravity"
-            inputLabel="threshold"
-            defaultNum={0}
-            description="E.g., log only if [x,y,z] >= 0.01. 0 = disabled"
-            field="threshold"
-            studyField={gravityData.threshold}
-            allowZero
-            modeState="gravity"
-          />
+          <ThresholdField sensor="gravity" studyField={gravityData.threshold} />
 
           <AndroidOnlyNote />
           <SensorComponent
@@ -1061,16 +1038,9 @@ export default function SensorData() {
             presets={MOTION_PRESETS}
           />
 
-          <FrequencyField
-            id="threshold"
-            title="Threshold gyroscope"
-            inputLabel="threshold"
-            defaultNum={0}
-            description="E.g., log only if [x,y,z] >= 0.01. 0 = disabled"
-            field="threshold"
+          <ThresholdField
+            sensor="gyroscope"
             studyField={gyroscopeData.threshold}
-            allowZero
-            modeState="gyroscope"
           />
 
           <AndroidOnlyNote />
@@ -1104,17 +1074,7 @@ export default function SensorData() {
             presets={LIGHT_PRESETS}
           />
 
-          <FrequencyField
-            id="threshold"
-            title="Threshold light"
-            inputLabel="threshold"
-            defaultNum={0}
-            description="E.g., log only if [x,y,z] >= 0.01. 0 = disabled"
-            field="threshold"
-            studyField={lightData.threshold}
-            allowZero
-            modeState="light"
-          />
+          <ThresholdField sensor="light" studyField={lightData.threshold} />
 
           <AndroidOnlyNote />
           <SensorComponent
@@ -1147,16 +1107,9 @@ export default function SensorData() {
             presets={MOTION_PRESETS}
           />
 
-          <FrequencyField
-            id="threshold"
-            title="Threshold linear accelerometer"
-            inputLabel="threshold"
-            defaultNum={0}
-            description="E.g., log only if [x,y,z] >= 0.01. 0 = disabled"
-            field="threshold"
+          <ThresholdField
+            sensor="linearAccelerometer"
             studyField={linearAccelerometerData.threshold}
-            allowZero
-            modeState="linearAccelerometer"
           />
 
           <AndroidOnlyNote />
@@ -1317,16 +1270,9 @@ export default function SensorData() {
             presets={MAGNETOMETER_PRESETS}
           />
 
-          <FrequencyField
-            id="threshold"
-            title="Threshold magnetometer"
-            inputLabel="threshold"
-            defaultNum={0}
-            description="E.g., log only if [x,y,z] >= 0.01. 0 = disabled"
-            field="threshold"
+          <ThresholdField
+            sensor="magnetometer"
             studyField={magnetometerData.threshold}
-            allowZero
-            modeState="magnetometer"
           />
 
           <AndroidOnlyNote />
@@ -1462,16 +1408,9 @@ export default function SensorData() {
             presets={PROXIMITY_PRESETS}
           />
 
-          <FrequencyField
-            id="threshold"
-            title="Threshold proximity"
-            inputLabel="threshold"
-            defaultNum={0}
-            description="E.g., log only if [x,y,z] >= 0.01. 0 = disabled"
-            field="threshold"
+          <ThresholdField
+            sensor="proximity"
             studyField={proximityData.threshold}
-            allowZero
-            modeState="proximity"
           />
 
           <AndroidOnlyNote />
@@ -1505,16 +1444,9 @@ export default function SensorData() {
             presets={MOTION_PRESETS}
           />
 
-          <FrequencyField
-            id="threshold"
-            title="Threshold rotation"
-            inputLabel="threshold"
-            defaultNum={0}
-            description="E.g., log only if [x,y,z] >= 0.01. 0 = disabled"
-            field="threshold"
+          <ThresholdField
+            sensor="rotation"
             studyField={rotationData.threshold}
-            allowZero
-            modeState="rotation"
           />
 
           <AndroidOnlyNote />
@@ -1548,16 +1480,9 @@ export default function SensorData() {
             presets={TEMPERATURE_PRESETS}
           />
 
-          <FrequencyField
-            id="threshold"
-            title="Threshold temperature"
-            inputLabel="threshold"
-            defaultNum={0}
-            description="E.g., log only if [x,y,z] >= 0.01. 0 = disabled"
-            field="threshold"
+          <ThresholdField
+            sensor="temperature"
             studyField={temperatureData.threshold}
-            allowZero
-            modeState="temperature"
           />
 
           <AndroidOnlyNote />
