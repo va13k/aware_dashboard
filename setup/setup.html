@@ -30,12 +30,20 @@
         </p>
         <div class="field">
           <label>MySQL root password</label>
-          <input
-            type="password"
-            id="mysqlPass"
-            placeholder="Enter a strong password"
-            oninput="clearFieldError('mysqlPass')"
-          />
+          <div class="field-row">
+            <input
+              type="password"
+              id="mysqlPass"
+              placeholder="Enter a strong password"
+              oninput="clearFieldError('mysqlPass')"
+            />
+            <button
+              class="eye-btn"
+              type="button"
+              id="mysqlPassEye"
+              onclick="togglePasswordVisibility('mysqlPass')"
+            ></button>
+          </div>
           <p class="field-error hidden" id="mysqlPassError"></p>
           <p class="hint">All services use this to connect to MySQL</p>
         </div>
@@ -43,12 +51,18 @@
           <label>Participant device password</label>
           <div class="field-row">
             <input
-              type="text"
+              type="password"
               id="participantPass"
               placeholder=""
               autocomplete="off"
               oninput="clearFieldError('participantPass')"
             />
+            <button
+              class="eye-btn"
+              type="button"
+              id="participantPassEye"
+              onclick="togglePasswordVisibility('participantPass')"
+            ></button>
             <button
               class="gen-btn"
               type="button"
@@ -61,7 +75,7 @@
           <p class="hint" id="participantHint">
             Devices use this account to send data. Participants type it when
             joining if the study config is served without the password. A random
-            one is filled in for you, or type your own.
+            one is filled in for you — reveal it with the eye, or type your own.
           </p>
         </div>
       </div>
@@ -86,19 +100,25 @@
           <label>Password</label>
           <div class="field-row">
             <input
-              type="text"
+              type="password"
               id="researcherPass"
               placeholder=""
               autocomplete="off"
               oninput="clearFieldError('researcherPass')"
             />
+            <button
+              class="eye-btn"
+              type="button"
+              id="researcherPassEye"
+              onclick="togglePasswordVisibility('researcherPass')"
+            ></button>
             <button class="gen-btn" type="button" onclick="suggestPassword()">
               Generate
             </button>
           </div>
           <p class="field-error hidden" id="researcherPassError"></p>
           <p class="hint" id="researcherHint">
-            Share this with your research team
+            Reveal it with the eye, then share it with your research team
           </p>
         </div>
       </div>
