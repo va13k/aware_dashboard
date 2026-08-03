@@ -79,6 +79,37 @@ def load_android_db_settings() -> tuple[str, str, str, str]:
     )
 
 
+def load_participant_accounts() -> list[dict]:
+    """The participant accounts and the credentials this deployment expects.
+
+    source.json is authoritative: deploy_config seeds it from
+    PARTICIPANT_DB_PASSWORD in .env, and the Configurator writes any later
+    change back to both. ``require_ssl`` is None when the platform does not
+    configure one, which leaves the account's existing requirement alone.
+    """
+    databases = read_source()["database"]
+    accounts = []
+    for platform in ("android", "ios"):
+        database = databases.get(platform)
+        if not database:
+            continue
+        username = str(database.get("username", "")).strip()
+        if not username:
+            continue
+        accounts.append(
+            {
+                "username": username,
+                "password": str(database.get("password", "")).strip(),
+                "require_ssl": (
+                    bool(database["require_ssl"])
+                    if "require_ssl" in database
+                    else None
+                ),
+            }
+        )
+    return accounts
+
+
 def wait_for_mysql(docker_base: list[str], timeout_seconds: int) -> None:
     deadline = time.time() + timeout_seconds
     inspect_command = docker_base + [
@@ -138,6 +169,47 @@ def ensure_android_database(
         raise RuntimeError(result.stderr.strip() or "Failed to ensure Android database exists")
 
 
+def apply_participant_passwords(
+    docker_base: list[str],
+    mysql_root_password: str,
+    accounts: list[dict],
+) -> None:
+    """Force the participant accounts onto this deployment's password.
+
+    db/zz-participant-password.sh only runs on an empty data directory, and
+    init_all.sql creates the accounts with CREATE USER IF NOT EXISTS, so
+    redeploying onto an existing MySQL volume would otherwise leave the
+    accounts on whatever password they were first given while .env and the
+    served study config advertise a newer one.
+    """
+    statements = []
+    for account in accounts:
+        user = f"{quote_sql_string(account['username'])}@'%'"
+        password = quote_sql_string(account["password"])
+        require = ""
+        if account["require_ssl"] is not None:
+            require = " REQUIRE SSL" if account["require_ssl"] else " REQUIRE NONE"
+        statements.append(f"CREATE USER IF NOT EXISTS {user} IDENTIFIED BY {password};")
+        statements.append(f"ALTER USER {user} IDENTIFIED BY {password}{require};")
+    statements.append("FLUSH PRIVILEGES;")
+
+    command = docker_base + [
+        "exec",
+        "-i",
+        MYSQL_CONTAINER,
+        "mysql",
+        "--protocol=TCP",
+        "-h127.0.0.1",
+        "-uroot",
+        f"-p{mysql_root_password}",
+    ]
+    result = run_command(command, input_text="\n".join(statements))
+    if result.returncode != 0:
+        raise RuntimeError(
+            result.stderr.strip() or "Failed to apply the participant account password"
+        )
+
+
 def apply_android_tables(
     docker_base: list[str],
     mysql_root_password: str,
@@ -178,8 +250,14 @@ def main() -> int:
         insert_username,
         insert_password,
     )
+    apply_participant_passwords(
+        docker_base,
+        mysql_root_password,
+        load_participant_accounts(),
+    )
     apply_android_tables(docker_base, mysql_root_password, database_name)
     print("Android database tables are ready.")
+    print("Participant accounts are using the configured password.")
     return 0
 
 

@@ -176,6 +176,8 @@ If `.env` already exists, the script detects them and offers a choice:
 - **Option 1** — skips the wizard and redeploys immediately with the saved config.
 - **Option 2** — opens the wizard again so you can change any settings before deploying.
 
+Both options re-apply `PARTICIPANT_DB_PASSWORD` to the participant MySQL accounts, so the password in `.env` and the one devices need never drift apart. If you edited the password directly in `.env`, run `setup.sh` (or `python3 setup/init_android_tables.py`) rather than `docker compose up` on its own — starting the containers by hand leaves the existing database untouched, and the accounts keep their old password.
+
 ### Remote server deployment
 
 On a Linux server without a graphical desktop, the browser cannot open automatically. The URL is still printed in the terminal — copy it and open it from your own computer.
