@@ -52,9 +52,17 @@ PLACEHOLDER_SECRETS = {"", "CHANGE_ME"}
 
 
 def ensure_participant_password(env: dict[str, str]) -> None:
+    """Settle on the password devices use, preferring the researcher's own.
+
+    The setup wizard writes the researcher's choice into the request env, which
+    load_merged_env() layers over .env, so a typed password wins over a
+    previously generated one. Only a deployment that has never been given a
+    password gets a random one.
+    """
     password = str(env.get("PARTICIPANT_DB_PASSWORD", "")).strip()
-    if password in PLACEHOLDER_SECRETS:
-        env["PARTICIPANT_DB_PASSWORD"] = secrets.token_urlsafe(16)
+    env["PARTICIPANT_DB_PASSWORD"] = (
+        secrets.token_urlsafe(16) if password in PLACEHOLDER_SECRETS else password
+    )
 
 
 def seed_source_secrets(env: dict[str, str]) -> dict:

@@ -39,6 +39,31 @@
           <p class="field-error hidden" id="mysqlPassError"></p>
           <p class="hint">All services use this to connect to MySQL</p>
         </div>
+        <div class="field">
+          <label>Participant device password</label>
+          <div class="field-row">
+            <input
+              type="text"
+              id="participantPass"
+              placeholder=""
+              autocomplete="off"
+              oninput="clearFieldError('participantPass')"
+            />
+            <button
+              class="gen-btn"
+              type="button"
+              onclick="suggestPassword('participantPass')"
+            >
+              Generate
+            </button>
+          </div>
+          <p class="field-error hidden" id="participantPassError"></p>
+          <p class="hint" id="participantHint">
+            Devices use this account to send data. Participants type it when
+            joining if the study config is served without the password. A random
+            one is filled in for you, or type your own.
+          </p>
+        </div>
       </div>
 
       <div class="card hidden" id="s2">
@@ -223,6 +248,18 @@
             <div class="output-block" id="credentialsText"></div>
             <p class="hint" style="margin-top: 6px">
               Save these — required to open /configurator/ and /dashboard/
+            </p>
+          </div>
+          <div
+            class="credentials-box hidden"
+            id="participantBox"
+            style="margin-top: 1.25rem; text-align: left"
+          >
+            <p class="output-label">Participant device password</p>
+            <div class="output-block" id="participantText"></div>
+            <p class="hint" style="margin-top: 6px">
+              Participants type this when joining if the study config is served
+              without the password
             </p>
           </div>
           <div class="error-detail hidden" id="errorDetail"></div>

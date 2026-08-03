@@ -1,6 +1,12 @@
 import json
 import pathlib
+import re
 import sys
+
+# Characters that survive .env, the wizard's JSON responses and MySQL quoting
+# unambiguously, and that a participant can retype from a printed sheet. Kept
+# in step with PASSWORD_PATTERN in script.js.
+PASSWORD_PATTERN = re.compile(r"^[A-Za-z0-9._~@#%^*+=:-]+$")
 
 
 def parse_env_text(env_text: str) -> dict[str, str]:
@@ -19,6 +25,22 @@ def positive_int(value: object, fallback: str) -> str:
     except (TypeError, ValueError):
         return fallback
     return str(numeric if numeric > 0 else int(fallback))
+
+
+def clean_participant_password(value: object) -> str:
+    """Validate the participant password, or return "" to let deploy generate one.
+
+    Only reached for a value the researcher typed: an empty field means "keep
+    whatever .env already holds", which deploy_config resolves.
+    """
+    text = str(value or "").strip()
+    if not text:
+        return ""
+    if not PASSWORD_PATTERN.match(text):
+        raise SystemExit(
+            "Participant password may only contain letters, digits or . _ ~ @ # % ^ * + = : -"
+        )
+    return text
 
 
 def clean_path(value: object, fallback: str) -> str:
@@ -71,6 +93,12 @@ def main() -> None:
 
     researcher_username = str(payload.get("researcher_username", "")).strip()
     researcher_password = str(payload.get("researcher_password", "")).strip()
+    participant_db_password = clean_participant_password(
+        payload.get(
+            "participant_db_password",
+            env_fallback.get("PARTICIPANT_DB_PASSWORD", ""),
+        )
+    )
     backup_host_dir = clean_path(
         payload.get(
             "mysql_backup_host_dir",
@@ -118,6 +146,10 @@ def main() -> None:
         lines.append(f"RESEARCHER_USERNAME={researcher_username}")
     if researcher_password:
         lines.append(f"RESEARCHER_PASSWORD={researcher_password}")
+    # Left out when blank so the existing .env value survives; deploy_config
+    # generates one only when neither source has a password.
+    if participant_db_password:
+        lines.append(f"PARTICIPANT_DB_PASSWORD={participant_db_password}")
 
     if protocol == "https":
         if ssl_cert:

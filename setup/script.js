@@ -5,7 +5,12 @@ var step = 0,
   customPublicHost = "",
   hasExistingResearcherAuth = false,
   researcherCredentials = null,
+  participantPassword = "",
   deploymentUrls = null;
+
+// Characters that survive .env, the wizard's JSON responses and MySQL quoting
+// unambiguously, and that a participant can retype from a printed sheet.
+var PASSWORD_PATTERN = /^[A-Za-z0-9._~@#%^*+=:-]+$/;
 
 function getSelectedHost() {
   return (document.getElementById("publicHost").value || "").trim();
@@ -125,7 +130,7 @@ function validateBackups() {
   return valid;
 }
 
-function suggestPassword() {
+function suggestPassword(id) {
   var chars = "abcdefghjkmnpqrstuvwxyz23456789";
   var buf = new Uint8Array(16);
   crypto.getRandomValues(buf);
@@ -137,7 +142,7 @@ function suggestPassword() {
     }
     parts.push(part);
   }
-  document.getElementById("researcherPass").value = parts.join("-");
+  document.getElementById(id || "researcherPass").value = parts.join("-");
 }
 
 function go(dir) {
@@ -147,8 +152,16 @@ function go(dir) {
   if (dir > 0) {
     if (step === 0) {
       var mp = (document.getElementById("mysqlPass").value || "").trim();
+      var pp = (document.getElementById("participantPass").value || "").trim();
       if (!mp) {
         showFieldError("mysqlPass", "Please enter a MySQL root password.");
+        return;
+      }
+      if (pp && !PASSWORD_PATTERN.test(pp)) {
+        showFieldError(
+          "participantPass",
+          "Use letters, digits or . _ ~ @ # % ^ * + = : - only.",
+        );
         return;
       }
     }
@@ -216,6 +229,7 @@ function restart() {
   document.getElementById("errorDetail").classList.add("hidden");
   document.getElementById("editBtn").classList.add("hidden");
   document.getElementById("credentialsBox").classList.add("hidden");
+  document.getElementById("participantBox").classList.add("hidden");
 
   var bars = document.querySelectorAll(".steps span");
   for (var i = 0; i < bars.length; i++) {
@@ -240,6 +254,7 @@ function getPayload() {
   var mp = (document.getElementById("mysqlPass").value || "CHANGE_ME").trim();
   var ru = (document.getElementById("researcherUser").value || "").trim();
   var rp = (document.getElementById("researcherPass").value || "").trim();
+  var pp = (document.getElementById("participantPass").value || "").trim();
   var host = getSelectedHost() || "localhost";
   var proto = ssl ? "https" : "http";
   var publicPort = ssl ? "443" : "80";
@@ -250,6 +265,7 @@ function getPayload() {
     mysql_root_password: mp,
     researcher_username: ru,
     researcher_password: rp,
+    participant_db_password: pp,
     public_host: host || "localhost",
     public_port: publicPort,
     protocol: proto,
@@ -273,6 +289,9 @@ function getEnv() {
     "MYSQL_ROOT_PASSWORD=" +
     payload.mysql_root_password +
     "\n" +
+    (payload.participant_db_password
+      ? "PARTICIPANT_DB_PASSWORD=" + payload.participant_db_password + "\n"
+      : "") +
     "PUBLIC_HOST=" +
     payload.public_host +
     "\n" +
@@ -350,6 +369,11 @@ function finishDeployment() {
   document.getElementById("statusIcon").innerHTML =
     '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#33B5E5" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>';
   document.getElementById("statusTitle").textContent = "Deployment complete";
+
+  if (participantPassword) {
+    document.getElementById("participantBox").classList.remove("hidden");
+    document.getElementById("participantText").textContent = participantPassword;
+  }
 
   if (researcherCredentials && researcherCredentials.username) {
     document.getElementById("credentialsBox").classList.remove("hidden");
@@ -449,6 +473,7 @@ function deploy() {
           username: d.researcher_username || "",
           password: d.researcher_password || "",
         };
+        participantPassword = d.participant_db_password || "";
         deploymentUrls = d.urls || null;
         document.getElementById("statusTitle").textContent =
           "Starting services...";
@@ -494,6 +519,15 @@ function loadExisting() {
       updateHostPlaceholder();
       if (d.MYSQL_ROOT_PASSWORD)
         document.getElementById("mysqlPass").value = d.MYSQL_ROOT_PASSWORD;
+      if (d.PARTICIPANT_DB_PASSWORD) {
+        document.getElementById("participantPass").value =
+          d.PARTICIPANT_DB_PASSWORD;
+        document.getElementById("participantHint").textContent =
+          "Devices use this account to send data. Editing it here changes the " +
+          "MySQL account on the next deployment.";
+      } else {
+        suggestPassword("participantPass");
+      }
       document.getElementById("backupHostDir").value =
         d.MYSQL_BACKUP_HOST_DIR || "./backups/mysql";
       document.getElementById("backupIntervalDays").value = String(

@@ -8,6 +8,7 @@ def main() -> None:
         "success": True,
         "researcher_username": os.environ.get("RESEARCHER_USERNAME", ""),
         "researcher_password": os.environ.get("RESEARCHER_PASSWORD", ""),
+        "participant_db_password": os.environ.get("PARTICIPANT_DB_PASSWORD", ""),
     }
 
     urls_path = Path("/project/deployment-urls.json")

@@ -206,6 +206,13 @@ The wizard has five steps. A progress bar at the top tracks where you are. You c
 
 Set the **MySQL root password**. All services (Configurator, Micro Server, Analytics API) use this password internally to connect to the database. Choose a strong password and keep it somewhere safe — you will need it if you ever need to access MySQL directly.
 
+Set the **participant device password** as well. This is the password of the MySQL account that participant devices use to insert their data, and it is the password participants type on their phone when the study configuration is served without an embedded password (the **Configure without password** option in the Configurator).
+
+- Use the **Generate** button to create a random one, or type your own — letters, digits and `. _ ~ @ # % ^ * + = : -` are allowed.
+- Leave it blank to keep the password the deployment already uses, or to have one generated on a fresh install.
+- On a re-run, the field is pre-filled with the current password. Changing it here applies the new password to the MySQL accounts on the next deployment, so any device still holding the old one must be given the new password.
+- The wizard shows the password again on the completion screen, and it is stored as `PARTICIPANT_DB_PASSWORD` in `.env`. You can also set it there before running `setup.sh`.
+
 The database also applies built-in connection protection for participant devices:
 
 - repeated failed logins are progressively delayed after three attempts, up to five seconds;
