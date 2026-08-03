@@ -18,6 +18,7 @@ import Field from "../components/Field/Field";
 import customisedTheme from "../functions/theme";
 import CustomizedCheckbox from "../components/CustomizedCheckbox/CustomizedCheckbox";
 import PasswordField from "../components/PasswordField/PasswordField";
+import Axios from "../functions/axiosSettings";
 
 const TITLE1 = "Study Information";
 const EXPLANATION1 =
@@ -29,6 +30,14 @@ const DB_HELPER_STYLE = {
   fontSize: "0.85rem",
   margin: "0 0 12px 32px",
 };
+
+// The served study config redacts the password when it is kept out of the
+// config, so the form cannot load it. This route is gated behind the researcher
+// login and is only called when the researcher clicks to reveal the field.
+const loadParticipantPassword = () =>
+  Axios({ method: "get", url: "get_participant_password/" })
+    .then((response) => response.data?.password || "")
+    .catch(() => "");
 
 // Describes the security of the current SSL + password-in-config combination
 // and recommends the stronger option (encrypted connection, password kept out
@@ -261,7 +270,8 @@ export default function StudyInformation() {
               recoilState={databaseInformationState}
               field="database_password"
               inputLabel="Password"
-              description="The database account password. Leave blank to keep the current one."
+              onReveal={loadParticipantPassword}
+              description="The database account password. Click the eye to reveal the one in use, or type a new one. Leaving it blank keeps the current password."
             />
           </Box>
           <Box sx={{ ml: 5, mb: 2, maxWidth: "680px" }}>

@@ -180,3 +180,56 @@ def test_write_json_leaves_no_temp_files(tmp_path):
     general.write_json(target, {"v": 1})
     leftovers = sorted(p.name for p in tmp_path.iterdir() if p.name != "config.json")
     assert leftovers == []
+
+
+# --------------------------------------------------------------------------
+# get_participant_password
+# --------------------------------------------------------------------------
+
+class _Request:
+    def __init__(self, method="GET"):
+        self.method = method
+
+
+def test_get_participant_password_returns_stored_value(monkeypatch):
+    monkeypatch.setattr(
+        general, "read_source", lambda: _source(password="join-me-2026")
+    )
+    response = general.get_participant_password(_Request())
+
+    assert response.status_code == 200
+    assert json.loads(response.content) == {"password": "join-me-2026"}
+
+
+def test_get_participant_password_is_not_cacheable(monkeypatch):
+    monkeypatch.setattr(general, "read_source", lambda: _source(password="secret"))
+    response = general.get_participant_password(_Request())
+
+    assert response["Cache-Control"] == "no-store"
+
+
+def test_get_participant_password_ignores_config_without_password(monkeypatch):
+    # The redaction only applies to the served config; the account keeps its
+    # password, so the researcher must still be able to read it back.
+    monkeypatch.setattr(
+        general, "read_source", lambda: _source(password="secret", passwordless=True)
+    )
+    response = general.get_participant_password(_Request())
+
+    assert json.loads(response.content) == {"password": "secret"}
+
+
+def test_get_participant_password_without_source_block(monkeypatch):
+    monkeypatch.setattr(general, "read_source", lambda: {})
+    response = general.get_participant_password(_Request())
+
+    assert json.loads(response.content) == {"password": ""}
+
+
+@pytest.mark.parametrize("method", ["POST", "PUT", "DELETE"])
+def test_get_participant_password_rejects_writes(monkeypatch, method):
+    monkeypatch.setattr(general, "read_source", lambda: _source(password="secret"))
+    response = general.get_participant_password(_Request(method))
+
+    assert response.status_code == 405
+    assert b"secret" not in response.content

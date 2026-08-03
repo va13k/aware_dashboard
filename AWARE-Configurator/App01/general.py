@@ -13,7 +13,7 @@ from aware_light_config_Django import settings
 # repo root locally) and adds it to sys.path, so shared_config is importable.
 PROJECT_ROOT = settings.PROJECT_ROOT
 
-from shared_config.source_store import update_source
+from shared_config.source_store import read_source, update_source
 from shared_config.runtime import (
     build_public_base_url,
     get_runtime_settings,
@@ -53,6 +53,33 @@ ABSTRACT_DATABASE_HOST = "db.internal"
 @ensure_csrf_cookie
 def get_token(request):
     return HttpResponse("success")
+
+
+def get_participant_password(request):
+    """Return the participant account password for the study form.
+
+    serialize_android_config redacts the password to "-" when
+    config_without_password is on, and that config is served from the public
+    /studies/files/ path devices download, so the Configurator cannot read the
+    real value back from it and the form field would always load empty. This
+    route lives under /configurator/, which nginx gates behind the researcher
+    login, so the password is only handed to an authenticated researcher.
+    """
+    if request.method != "GET":
+        return HttpResponse(
+            json.dumps({"success": False, "msg": "Invalid request method"}),
+            status=405,
+            content_type="application/json",
+        )
+
+    android_db = read_source().get("database", {}).get("android", {})
+    response = HttpResponse(
+        json.dumps({"password": str(android_db.get("password", ""))}),
+        content_type="application/json",
+    )
+    # Never let a secret settle in a browser or proxy cache.
+    response["Cache-Control"] = "no-store"
+    return response
 
 
 @csrf_exempt

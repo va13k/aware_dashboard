@@ -16,10 +16,13 @@ export default function PasswordField(inputs) {
     inputLabel, // optional feature, TextInput's inline description
     description, // optional feature
     required, // optional feature
+    onReveal, // optional feature, async () => string; fills an empty field on
+    // the first reveal, for values the form cannot load up front
   } = inputs;
 
   const [isError, setIsError] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [isRevealing, setIsRevealing] = useState(false);
   let information;
   let setInformation;
   if (recoilState === undefined) {
@@ -33,6 +36,27 @@ export default function PasswordField(inputs) {
       ...information,
       [curFieldName]: curValue,
     });
+  };
+
+  // Reveal the stored value only when the researcher asks for it, so a page
+  // visit never carries the secret into the browser on its own. Fetched once:
+  // an already-filled field is the researcher's own edit and is left alone.
+  const toggleVisibility = async () => {
+    const revealing = !showPassword;
+    setShowPassword(revealing);
+    if (!revealing || !onReveal || information[field]) {
+      return;
+    }
+    setIsRevealing(true);
+    try {
+      const value = await onReveal();
+      if (value) {
+        // Functional update: `information` is stale by the time this resolves.
+        setInformation((current) => ({ ...current, [field]: value }));
+      }
+    } finally {
+      setIsRevealing(false);
+    }
   };
 
   // required validation logic
@@ -70,7 +94,8 @@ export default function PasswordField(inputs) {
               <InputAdornment position="end">
                 <IconButton
                   aria-label={showPassword ? "Hide password" : "Show password"}
-                  onClick={() => setShowPassword((visible) => !visible)}
+                  onClick={toggleVisibility}
+                  disabled={isRevealing}
                   edge="end"
                 >
                   {showPassword ? <VisibilityOff /> : <Visibility />}
