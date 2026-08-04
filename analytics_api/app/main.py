@@ -3,7 +3,7 @@ from contextlib import asynccontextmanager
 from sqlalchemy import text
 from fastapi import FastAPI
 from app.database import android_engine, ios_engine
-from app.routers import health, devices, android, ios, auth, backup, export
+from app.routers import health, devices, android, ios, auth, backup, export, study
 
 
 class _SuppressChromeProbe(logging.Filter):
@@ -38,6 +38,7 @@ app = FastAPI(
 app.include_router(auth.router)
 app.include_router(health.router)
 app.include_router(devices.router)
+app.include_router(study.router)
 app.include_router(android.router)
 app.include_router(ios.router)
 app.include_router(backup.router)

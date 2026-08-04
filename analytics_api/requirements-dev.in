@@ -1,4 +1,4 @@
--c requirements.txt   # dev tools must not move a runtime pin
+-r requirements.txt   # a dev environment must be able to import the app
 pytest               # test runner for the study-state and config services
 pytest-asyncio       # async test support for the SQLAlchemy/FastAPI layers
 httpx                # transport behind FastAPI's TestClient

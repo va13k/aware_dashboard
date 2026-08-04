@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import select, func
 from sqlalchemy.exc import ProgrammingError, OperationalError, SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -63,9 +63,21 @@ from app.models import (
     IosTimezone,
     IosWifi,
 )
-from app.schemas import strip_ios_data_metadata
+from app.models import AndroidAwareStudy
+from app.schemas import (
+    AndroidStudyEventSchema,
+    AndroidStudyListSummarySchema,
+    AndroidStudySummarySchema,
+    ConfigDiffSchema,
+    strip_ios_data_metadata,
+)
+from app.services import config_diff, study_state
 
 router = APIRouter(prefix="/devices", tags=["devices"])
+
+#: Events kept in the device detail response. The full history is paginated
+#: through /devices/android/{device_id}/study-events.
+DETAIL_EVENT_LIMIT = 50
 
 DEVICE_METADATA_FIELDS = (
     "board",
@@ -274,6 +286,65 @@ async def _device_metadata_by_device(db: AsyncSession, model):
     return metadata_by_device
 
 
+async def _android_study_rows(db: AsyncSession, device_id: str | None = None):
+    query = select(AndroidAwareStudy).order_by(
+        AndroidAwareStudy.timestamp, AndroidAwareStudy._id
+    )
+    if device_id is not None:
+        query = query.where(AndroidAwareStudy.device_id == device_id)
+
+    try:
+        result = await db.execute(query)
+    except (ProgrammingError, OperationalError, SQLAlchemyError):
+        await _rollback_after_table_error(db)
+        return []
+    return result.scalars().all()
+
+
+async def _android_study_states(db: AsyncSession, device_id: str | None = None):
+    """Derived study state per device, keyed by device id."""
+    rows_by_device = {}
+    for row in await _android_study_rows(db, device_id):
+        if row.device_id is None:
+            continue
+        rows_by_device.setdefault(str(row.device_id), []).append(row)
+
+    return {
+        device: study_state.derive_study_state(rows)
+        for device, rows in rows_by_device.items()
+    }
+
+
+def _study_detail(state):
+    """The study summary, the config comparison and the recent timeline."""
+    diff = config_diff.compare_with_deployed(state.installed_config)
+    events = state.events[:DETAIL_EVENT_LIMIT]
+    return {
+        "study": AndroidStudySummarySchema.model_validate(state.summary).model_dump(),
+        "config_diff": ConfigDiffSchema.model_validate(diff).model_dump(),
+        "study_events": [
+            AndroidStudyEventSchema.model_validate(event).model_dump()
+            for event in events
+        ],
+    }
+
+
+def _study_list_summary(state):
+    diff = config_diff.compare_with_deployed(state.installed_config)
+    return AndroidStudyListSummarySchema(
+        enrollment_status=state.summary.enrollment_status,
+        last_study_event_at=state.summary.last_study_event_at,
+        config_status=diff.config_status,
+        diff_count=diff.diff_count,
+    ).model_dump()
+
+
+def _last_seen_sort_key(device):
+    """Sort by most recent upload, with phones that never uploaded last."""
+    last_seen = device.get("last_seen")
+    return (last_seen is not None, last_seen or 0)
+
+
 async def _stream_summary(db: AsyncSession, key: str, model, device_id: str):
     count_result = await db.execute(
         select(func.count()).select_from(model).where(model.device_id == device_id)
@@ -309,12 +380,19 @@ async def _device_detail(platform: str, device_id: str, db: AsyncSession):
                 }
             )
 
-    return {
+    detail = {
         "platform": platform,
         "device_id": device_id,
         "device": device_dict,
         "streams": stream_details,
     }
+
+    if platform == "android":
+        states = await _android_study_states(db, device_id)
+        state = states.get(device_id) or study_state.derive_study_state([])
+        detail.update(_study_detail(state))
+
+    return detail
 
 
 @router.get("/android")
@@ -324,10 +402,14 @@ async def list_android_devices(db: AsyncSession = Depends(get_android_db)):
         [AndroidDevice, *ANDROID_STREAMS.values()],
     )
     metadata_by_device = await _device_metadata_by_device(db, AndroidDevice)
+    study_states = await _android_study_states(db)
 
     devices = []
-    for device_id, last_seen in last_seen_by_device.items():
+    # A phone that joined but has not uploaded yet exists only in aware_studies,
+    # and still belongs in the list.
+    for device_id in set(last_seen_by_device) | set(study_states):
         metadata = metadata_by_device.get(device_id, {})
+        state = study_states.get(device_id)
         devices.append(
             {
                 "device_id": device_id,
@@ -338,12 +420,13 @@ async def list_android_devices(db: AsyncSession = Depends(get_android_db)):
                 },
                 "manufacturer": metadata.get("manufacturer"),
                 "model": metadata.get("model"),
-                "last_seen": last_seen,
+                "last_seen": last_seen_by_device.get(device_id),
                 "platform": "android",
+                "study": _study_list_summary(state) if state else None,
             }
         )
 
-    return sorted(devices, key=lambda d: d["last_seen"], reverse=True)
+    return sorted(devices, key=_last_seen_sort_key, reverse=True)
 
 
 @router.get("/ios")
@@ -371,7 +454,7 @@ async def list_ios_devices(db: AsyncSession = Depends(get_ios_db)):
             }
         )
 
-    return sorted(devices, key=lambda d: d["last_seen"], reverse=True)
+    return sorted(devices, key=_last_seen_sort_key, reverse=True)
 
 
 @router.get("")
@@ -388,6 +471,20 @@ async def list_all_devices(
     except (ProgrammingError, OperationalError, SQLAlchemyError):
         ios = []
     return {"android": android, "ios": ios}
+
+
+@router.get("/android/{device_id}/study-events", response_model=list[AndroidStudyEventSchema])
+async def list_android_study_events(
+    device_id: str,
+    limit: int = Query(50, ge=1, le=500),
+    offset: int = Query(0, ge=0),
+    db: AsyncSession = Depends(get_android_db),
+):
+    states = await _android_study_states(db, device_id)
+    state = states.get(device_id)
+    if state is None:
+        return []
+    return state.events[offset : offset + limit]
 
 
 @router.get("/{platform}/{device_id}")
