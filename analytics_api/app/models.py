@@ -22,6 +22,36 @@ class AndroidDevice(AndroidBase):
     sdk = Column(Text)
 
 
+class AndroidAwareStudy(AndroidBase):
+    """Study lifecycle events: joins, updates, consent, exits.
+
+    Not a sensor stream - one row per event the client reports about its own
+    study membership. The client writes a new row per event and never updates,
+    so logically identical events appear more than once with different `_id`
+    values; readers have to deduplicate.
+
+    `study_config` is the config the phone carries, and it holds the participant
+    and root database credentials in full. It must never be serialised into a
+    response - see app.services.study_config for the redacted view.
+    """
+
+    __tablename__ = "aware_studies"
+    _id = Column(BigInteger, primary_key=True, autoincrement=True)
+    timestamp = Column(Double, default=0)
+    device_id = Column(String(150), default="")
+    study_url = Column(Text)
+    study_key = Column(Integer, default=-1)
+    study_api = Column(Text)
+    study_pi = Column(Text)
+    study_config = Column(Text)
+    study_title = Column(Text)
+    study_description = Column(Text)
+    double_join = Column(Double, default=0)
+    double_updated = Column(Double, default=0)
+    double_exit = Column(Double, default=0)
+    study_compliance = Column(Text)
+
+
 class AndroidAccelerometer(AndroidBase):
     __tablename__ = "accelerometer"
     _id = Column(BigInteger, primary_key=True, autoincrement=True)
