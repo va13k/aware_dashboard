@@ -206,6 +206,11 @@ def write_json(path, content):
     fd, tmp_name = tempfile.mkstemp(prefix=path.name + ".", suffix=".tmp", dir=str(path.parent))
     tmp_path = pathlib.Path(tmp_name)
     try:
+        # mkstemp always creates the file at 0600, readable only by whichever
+        # UID is running this container. These configs are read back by other
+        # containers (micro-server's appuser, nginx) and by devices, so widen
+        # it before anything is written.
+        os.fchmod(fd, 0o644)
         with os.fdopen(fd, "w", encoding="utf-8") as file:
             json.dump(content, file, indent=2)
             file.write("\n")

@@ -20,6 +20,17 @@ if ! sudo docker compose version > /dev/null 2>&1; then
     exit 1
 fi
 
+# Containers that write into bind-mounted host directories (e.g. the
+# Configurator saving studyConfig.json / ios-esm-config.json) run as this
+# UID:GID instead of root, so the files stay owned by whoever deployed the
+# stack. Re-seeded on every run in case setup.sh is invoked by a different
+# user than the one who deployed originally.
+if [ -f .env ]; then
+    grep -v '^HOST_UID=\|^HOST_GID=' .env > .env.tmp || true
+    mv .env.tmp .env
+fi
+printf 'HOST_UID=%s\nHOST_GID=%s\n' "$(id -u)" "$(id -g)" >> .env
+
 deploy_stack() {
     mkdir -p studies aware-micro-server/cache aware-micro-server/esm
     python3 setup/deploy_config.py

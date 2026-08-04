@@ -96,6 +96,7 @@ services:
         SERVER_BASE_PATH: /configurator
     container_name: aware_configurator
     restart: unless-stopped
+    user: "${HOST_UID:-1000}:${HOST_GID:-1000}"
     environment:
       DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY}
       PUBLIC_HOST: ${PUBLIC_HOST:-localhost}
