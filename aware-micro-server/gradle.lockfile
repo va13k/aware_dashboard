@@ -5,6 +5,7 @@ ch.qos.logback:logback-classic:1.5.12=compileClasspath,runtimeClasspath
 ch.qos.logback:logback-core:1.5.12=compileClasspath,runtimeClasspath
 com.fasterxml.jackson.core:jackson-core:2.16.1=compileClasspath,runtimeClasspath
 com.fasterxml.jackson:jackson-bom:2.16.1=compileClasspath,runtimeClasspath
+com.google.zxing:core:3.5.3=compileClasspath,runtimeClasspath
 com.hazelcast:hazelcast:5.3.5=compileClasspath,runtimeClasspath
 com.ongres.scram:client:2.1=compileClasspath,runtimeClasspath
 com.ongres.scram:common:2.1=compileClasspath,runtimeClasspath

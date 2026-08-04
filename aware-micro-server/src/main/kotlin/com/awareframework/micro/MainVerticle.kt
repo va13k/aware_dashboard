@@ -1,5 +1,9 @@
 package com.awareframework.micro
 
+import com.google.zxing.BarcodeFormat
+import com.google.zxing.EncodeHintType
+import com.google.zxing.qrcode.QRCodeWriter
+import com.google.zxing.qrcode.decoder.ErrorCorrectionLevel
 import com.mitchellbosecke.pebble.PebbleEngine
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.vertx.config.ConfigRetriever
@@ -25,8 +29,25 @@ import io.vertx.ext.web.codec.BodyCodec
 import io.vertx.ext.web.handler.BodyHandler
 import io.vertx.ext.web.handler.StaticHandler
 import io.vertx.ext.web.templ.pebble.PebbleTemplateEngine
+import java.awt.image.BufferedImage
+import java.io.ByteArrayOutputStream
 import java.net.URL
+import javax.imageio.ImageIO
 import javax.xml.parsers.DocumentBuilderFactory
+
+private fun generateQrCodePng(data: String, size: Int = 250): ByteArray {
+  val hints = mapOf(EncodeHintType.ERROR_CORRECTION to ErrorCorrectionLevel.M)
+  val matrix = QRCodeWriter().encode(data, BarcodeFormat.QR_CODE, size, size, hints)
+  val image = BufferedImage(matrix.width, matrix.height, BufferedImage.TYPE_INT_RGB)
+  for (x in 0 until matrix.width) {
+    for (y in 0 until matrix.height) {
+      image.setRGB(x, y, if (matrix.get(x, y)) 0x000000 else 0xFFFFFF)
+    }
+  }
+  val output = ByteArrayOutputStream()
+  ImageIO.write(image, "png", output)
+  return output.toByteArray()
+}
 
 class MainVerticle : AbstractVerticle() {
 
@@ -154,7 +175,7 @@ class MainVerticle : AbstractVerticle() {
         serverOptions.host = serverConfig.getString("server_host")
 
         /**
-         * Generate QRCode to join the study using Google's Chart API
+         * Generate QRCode to join the study
          */
         router.route(HttpMethod.GET, "/:studyNumber/:studyKey").handler { route ->
           val currentServerConfig = currentServerConfig()
@@ -165,59 +186,36 @@ class MainVerticle : AbstractVerticle() {
               route.request().getParam("studyKey")
             )
           ) {
-            vertx.fileSystem().delete("./cache/qrcode.png") {
-              if (it.succeeded()) logger.info { "Cleared old qrcode..." }
-            }
-            vertx.fileSystem().open(
-              "./cache/qrcode.png",
-              OpenOptions().setTruncateExisting(true).setCreate(true).setWrite(true)
-            ) { write ->
+            val serverURL =
+              "${getExternalServerHost(currentServerConfig)}:${getExternalServerPort(currentServerConfig)}/index.php/${currentStudy.getInteger(
+                "study_number"
+              )}/${currentStudy.getString("study_key")}"
+
+            logger.info { "URL encoded for the QRCode is: $serverURL" }
+
+            val qrPng = generateQrCodePng(serverURL)
+            vertx.fileSystem().writeFile("./cache/qrcode.png", Buffer.buffer(qrPng)) { write ->
               if (write.succeeded()) {
-                val asyncQrcode = write.result()
-                val webClientOptions = WebClientOptions()
-                  .setKeepAlive(true)
-                  .setPipelining(true)
-                  .setFollowRedirects(true)
-                  .setSsl(true)
-                  .setTrustAll(true)
-
-                val client = WebClient.create(vertx, webClientOptions)
-                val serverURL =
-                  "${getExternalServerHost(currentServerConfig)}:${getExternalServerPort(currentServerConfig)}/index.php/${currentStudy.getInteger(
-                    "study_number"
-                  )}/${currentStudy.getString("study_key")}"
-
-                logger.info { "URL encoded for the QRCode is: $serverURL" }
-
-                client.get(
-                  443, "qrcode.tec-it.com",
-                  "/API/QRCode?size=small&data=$serverURL"
-                )
-                  .`as`(BodyCodec.pipe(asyncQrcode, true))
-                  .send { request ->
-                    if (request.succeeded()) {
-                      pebbleEngine.render(
-                        JsonObject()
-                          .put("studyURL", serverURL)
-                          .put("qrCodeVersion", serverURL.hashCode().toString()),
-                        "templates/qrcode.peb"
-                      ) { pebble ->
-                        if (pebble.succeeded()) {
-                          route.response().statusCode = 200
-                          route.response().putHeader(HttpHeaders.CONTENT_TYPE, "text/html").end(pebble.result())
-                        }
-                      }
-                    } else {
-                      logger.error(request.cause()) { "QRCode creation failed." }
-                    }
+                pebbleEngine.render(
+                  JsonObject()
+                    .put("studyURL", serverURL)
+                    .put("qrCodeVersion", serverURL.hashCode().toString()),
+                  "templates/qrcode.peb"
+                ) { pebble ->
+                  if (pebble.succeeded()) {
+                    route.response().statusCode = 200
+                    route.response().putHeader(HttpHeaders.CONTENT_TYPE, "text/html").end(pebble.result())
                   }
+                }
+              } else {
+                logger.error(write.cause()) { "QRCode creation failed." }
               }
             }
           } else {
             route.response().statusCode = 404
             route.response().end()
           }
-	        }
+        }
 
         router.route(HttpMethod.POST, "/:studyNumber/:studyKey").handler { route ->
           val currentStudy = currentStudyInfo()
