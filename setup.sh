@@ -26,10 +26,19 @@ fi
 # stack. Re-seeded on every run in case setup.sh is invoked by a different
 # user than the one who deployed originally.
 if [ -f .env ]; then
+    # Without this check an unreadable .env yields an empty strip that still
+    # replaces it, silently discarding every secret it held.
+    if [ ! -r .env ]; then
+        echo "  Cannot read .env — it is owned by another user (root?)."
+        echo "  Fix its ownership, then rerun ./setup.sh."
+        echo ""
+        exit 1
+    fi
     grep -v '^HOST_UID=\|^HOST_GID=' .env > .env.tmp || true
     mv .env.tmp .env
 fi
-printf 'HOST_UID=%s\nHOST_GID=%s\n' "$(id -u)" "$(id -g)" >> .env
+# SUDO_UID/SUDO_GID keep the real user's ids under sudo, where id -u reports 0.
+printf 'HOST_UID=%s\nHOST_GID=%s\n' "${SUDO_UID:-$(id -u)}" "${SUDO_GID:-$(id -g)}" >> .env
 
 deploy_stack() {
     mkdir -p studies aware-micro-server/cache aware-micro-server/esm
@@ -82,9 +91,10 @@ wait_for_service_redirect() {
             -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' \
             aware_mysql aware_micro aware_configurator aware_dashboard_api aware_dashboard aware_nginx \
             2>/dev/null | awk '
-                BEGIN { ok = 1 }
+                BEGIN { ok = 1; n = 0 }
+                { n++ }
                 $0 != "healthy" && $0 != "running" { ok = 0 }
-                END { exit ok ? 0 : 1 }
+                END { exit (ok && n == 6) ? 0 : 1 }
             '; then
             echo "  Services are ready. Redirecting browser shortly..."
             sleep 5
