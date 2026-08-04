@@ -167,10 +167,14 @@ services:
       # from the current one. Read-only: the API never writes study configs, and
       # it must never return the file itself - it holds participant credentials.
       CURRENT_STUDY_CONFIG_PATH: /app/studies/studyConfig.json
+      # studyConfig.json holds the Android settings; the settings iPhones
+      # receive come from the micro-server config.
+      MICRO_SERVER_CONFIG_PATH: /app/aware-config.json
     expose:
       - "8000"
     volumes:
       - ./studies:/app/studies:ro
+      - ./aware-micro-server/aware-config.json:/app/aware-config.json:ro
     depends_on:
       mysql:
         condition: service_healthy
