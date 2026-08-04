@@ -1,0 +1,4 @@
+-c requirements.txt   # dev tools must not move a runtime pin
+pytest               # test runner for the study-state and config services
+pytest-asyncio       # async test support for the SQLAlchemy/FastAPI layers
+httpx                # transport behind FastAPI's TestClient

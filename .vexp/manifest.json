@@ -83,6 +83,8 @@
     "analytics_api/app/routers/health.py": "b73deddbf308a63dfd83b1618d524fd90a9ac8855f1400cddde828f7e5384c74",
     "analytics_api/app/routers/ios.py": "7f0f1a94164e1d3cdf5042454bc0e5a4e1fdd864c871a6caf06624de80af3fba",
     "analytics_api/app/schemas.py": "f4bca19091390be3391ecff97a865329166af3dd22a27fb743949aa0c2997a02",
+    "analytics_api/conftest.py": "9e5fe4e8dc356c6eae8592a9eb7fc33b19b657eeefe0d9dd15c48b9ab0d99a17",
+    "analytics_api/tests/test_prerequisites.py": "d85f37dc2538fd932b2f3d6eefd3ecbb7a8f8158716f3fcc4cffde7bd67ff254",
     "aware-micro-server/Dockerfile": "7ff96951d7318c21aa9242c73ebbf6dd80562bbc79a6e365fcdc23e08baa00f9",
     "aware-micro-server/build.gradle": "cc7d89d00b032cf4670e67c33d7d3727230cd9b13143df3b58e2c17ef1506f0a",
     "aware-micro-server/entrypoint.sh": "76305b4ae80203427b070f25bed27d2a9ff66fdf84dea8947d92b316a2c9c9f5",
@@ -132,7 +134,7 @@
     "db/ios-tables.sql": "5d2c64467ca2c00f458d505f4817e238f522db6da621620f465781479519def3",
     "db/zz-participant-password.sh": "6e179c0205f9851a72862409939477294a2767f3dd74ee73c8799488876d5055",
     "docs/android-study-status-dashboard-plan.md": "82f14a14bacb5f0c7b320d2e3ab2db46a6da1ec89e9d0670e34d8102453dfef7",
-    "docs/dashboard-device-view-rework-plan.md": "4d36df383f68fcab2655b9d5536e828e2cd85954ab75270c647c4cb37a9d778e",
+    "docs/dashboard-device-view-rework-plan.md": "7821a7deab3063490777114db18834b0738066bf99bebfbc7379f515f64eaf48",
     "setup.sh": "718c47a315a28f57fabd178295196fbaee7d4a2c7a79ac936190d517aac2c3c4",
     "setup/Dockerfile": "7a809ccc1ba7fadfc0524360987c979487391833c60c5a6d46bb4620c6d13e39",
     "setup/deploy.sh": "d63de94fbe1fe0ce60d75d76d69cdd40230df5383543f20f5b30522d47727d1e",
@@ -150,13 +152,13 @@
     "shared_config/source_store.py": "ceaf715a4f7aa1198409553bed5ab30ab761f23c6f6db02140ee2e84148aa1f9",
     "shared_config/test_serializers.py": "d7614beeadecc7e75fcf9671fbc58ae7c8d9ce338a9cc21480128038ccd23fdb"
   },
-  "indexed_at_commit": "276eb2c4c3fe847bf23b346dfc6ed35a7ffd08b5",
-  "indexed_at_timestamp": "2026-08-04T16:10:50.098628+00:00",
+  "indexed_at_commit": "a247ba4187a0774364d266e36309639cac59d0f2",
+  "indexed_at_timestamp": "2026-08-04T16:21:46.727890+00:00",
   "schema_version": 3,
   "stats": {
-    "total_edges": 1393,
-    "total_files": 149,
-    "total_nodes": 1373
+    "total_edges": 1397,
+    "total_files": 151,
+    "total_nodes": 1383
   },
   "vexp_version": "2.4.0"
 }
