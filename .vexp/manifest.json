@@ -73,7 +73,7 @@
     "analytics_api/app/__init__.py": "af1349b9f5f9a1a6a0404dea36dcc9499bcb25c9adc112b7cc9a93cae41f3262",
     "analytics_api/app/database.py": "d1f132c400343e280275261c365e52ed0cc514fdbc526e6729f53102411ffe2b",
     "analytics_api/app/main.py": "ef8137b248ac78b1ca3a3d4d229100b1f30ffc53bdc165248a22d961754f6acf",
-    "analytics_api/app/models.py": "8a026814f87b5b9a4d65e3e8b80a32d5bee6d73d32d0359eaf8120e6e2e54744",
+    "analytics_api/app/models.py": "744e5c00c04cf6e13df353869f0052016fd8b7f6bc2f9b8baac11bae889d9e1e",
     "analytics_api/app/routers/__init__.py": "af1349b9f5f9a1a6a0404dea36dcc9499bcb25c9adc112b7cc9a93cae41f3262",
     "analytics_api/app/routers/android.py": "349fc5fc3a2fda9e938a5f3961190d295af447c22a725ae7145b652e54fb1873",
     "analytics_api/app/routers/auth.py": "0468f635685bbd89149626a5be8f60baf6a60e406032cef2a12205195214f023",
@@ -83,8 +83,12 @@
     "analytics_api/app/routers/health.py": "b73deddbf308a63dfd83b1618d524fd90a9ac8855f1400cddde828f7e5384c74",
     "analytics_api/app/routers/ios.py": "7f0f1a94164e1d3cdf5042454bc0e5a4e1fdd864c871a6caf06624de80af3fba",
     "analytics_api/app/schemas.py": "f4bca19091390be3391ecff97a865329166af3dd22a27fb743949aa0c2997a02",
+    "analytics_api/app/services/__init__.py": "af1349b9f5f9a1a6a0404dea36dcc9499bcb25c9adc112b7cc9a93cae41f3262",
+    "analytics_api/app/services/study_config.py": "c1a44e272949b30e5e20cfff2e14fb204e7bd5b9d695f08b86918d2291f7818c",
     "analytics_api/conftest.py": "9e5fe4e8dc356c6eae8592a9eb7fc33b19b657eeefe0d9dd15c48b9ab0d99a17",
+    "analytics_api/tests/test_models.py": "0ddcf317ab3337fa3b6589a0ee670d26696ca2f7d529622c7a7f8286565238a5",
     "analytics_api/tests/test_prerequisites.py": "d85f37dc2538fd932b2f3d6eefd3ecbb7a8f8158716f3fcc4cffde7bd67ff254",
+    "analytics_api/tests/test_study_config.py": "c16bbebcfca7305f98caefb8431f4a58a180c946cf74b89aed90e38f481de3a6",
     "aware-micro-server/Dockerfile": "7ff96951d7318c21aa9242c73ebbf6dd80562bbc79a6e365fcdc23e08baa00f9",
     "aware-micro-server/build.gradle": "cc7d89d00b032cf4670e67c33d7d3727230cd9b13143df3b58e2c17ef1506f0a",
     "aware-micro-server/entrypoint.sh": "76305b4ae80203427b070f25bed27d2a9ff66fdf84dea8947d92b316a2c9c9f5",
@@ -134,7 +138,7 @@
     "db/ios-tables.sql": "5d2c64467ca2c00f458d505f4817e238f522db6da621620f465781479519def3",
     "db/zz-participant-password.sh": "6e179c0205f9851a72862409939477294a2767f3dd74ee73c8799488876d5055",
     "docs/android-study-status-dashboard-plan.md": "82f14a14bacb5f0c7b320d2e3ab2db46a6da1ec89e9d0670e34d8102453dfef7",
-    "docs/dashboard-device-view-rework-plan.md": "7821a7deab3063490777114db18834b0738066bf99bebfbc7379f515f64eaf48",
+    "docs/dashboard-device-view-rework-plan.md": "02337f8074991aa1b3120d8f3337ac3b7a0ce6004f4c7624b9620294d2dba6fc",
     "setup.sh": "718c47a315a28f57fabd178295196fbaee7d4a2c7a79ac936190d517aac2c3c4",
     "setup/Dockerfile": "7a809ccc1ba7fadfc0524360987c979487391833c60c5a6d46bb4620c6d13e39",
     "setup/deploy.sh": "d63de94fbe1fe0ce60d75d76d69cdd40230df5383543f20f5b30522d47727d1e",
@@ -152,13 +156,13 @@
     "shared_config/source_store.py": "ceaf715a4f7aa1198409553bed5ab30ab761f23c6f6db02140ee2e84148aa1f9",
     "shared_config/test_serializers.py": "d7614beeadecc7e75fcf9671fbc58ae7c8d9ce338a9cc21480128038ccd23fdb"
   },
-  "indexed_at_commit": "a247ba4187a0774364d266e36309639cac59d0f2",
-  "indexed_at_timestamp": "2026-08-04T16:21:46.727890+00:00",
+  "indexed_at_commit": "b0f937e44cd108e179f5026490bdeba3800d45bb",
+  "indexed_at_timestamp": "2026-08-04T16:33:35.023400+00:00",
   "schema_version": 3,
   "stats": {
-    "total_edges": 1397,
-    "total_files": 151,
-    "total_nodes": 1383
+    "total_edges": 1480,
+    "total_files": 155,
+    "total_nodes": 1444
   },
   "vexp_version": "2.4.0"
 }
