@@ -1,8 +1,10 @@
 import type {
+  AndroidStudyEvent,
   DeviceDetail,
   DevicesResponse,
   Manifest,
   SensorRecord,
+  StudyRequirements,
 } from "../types";
 
 export const BASE = "/api";
@@ -25,6 +27,23 @@ export const fetchDeviceDetail = (
   deviceId: string,
 ): Promise<DeviceDetail> =>
   get(`/devices/${platform}/${encodeURIComponent(deviceId)}`);
+
+export const fetchStudyEvents = (
+  deviceId: string,
+  limit = 50,
+  offset = 0,
+): Promise<AndroidStudyEvent[]> => {
+  const params = new URLSearchParams({
+    limit: String(limit),
+    offset: String(offset),
+  });
+  return get(
+    `/devices/android/${encodeURIComponent(deviceId)}/study-events?${params.toString()}`,
+  );
+};
+
+export const fetchStudyRequirements = (): Promise<StudyRequirements> =>
+  get("/study/requirements");
 
 export const fetchSensor = (
   platform: "android" | "ios",
