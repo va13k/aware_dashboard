@@ -64,6 +64,11 @@ if "%HAS_ENV%"=="1" if "%HAS_MICRO_CONFIG%"=="1" (
         echo   Regenerating config and starting services...
         echo.
         call :deploy_stack
+        if errorlevel 1 (
+            echo.
+            echo   Deployment failed. Check the output above.
+            exit /b 1
+        )
         echo.
         echo   All services are starting.
         call :print_deployment_links
@@ -155,6 +160,7 @@ echo.
 docker compose up --build -d
 if errorlevel 1 exit /b 1
 !PYTHON! setup\init_android_tables.py
+if errorlevel 1 exit /b 1
 
 :: Keep the wizard alive until services are healthy (browser uses it to detect readiness)
 call :wait_for_service_redirect
@@ -182,6 +188,7 @@ if errorlevel 1 exit /b 1
 docker compose up --build -d
 if errorlevel 1 exit /b 1
 %PYTHON% setup\init_android_tables.py
+if errorlevel 1 exit /b 1
 exit /b 0
 
 
