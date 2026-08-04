@@ -1,16 +1,12 @@
 {
   "file_hashes": {
-    ".claude/CLAUDE.md": "988a018b6863b15e0fce71b67b9ad0690508b5fc19874bca8a29076c64b6a813",
-    ".claude/hooks/vexp-hint.sh": "fa8dae7c2bf6bf7de0f453637c7284d8aad04e4adedf7f9239792b94a0100404",
-    ".codex/vexp-hint.sh": "fa8dae7c2bf6bf7de0f453637c7284d8aad04e4adedf7f9239792b94a0100404",
-    ".windsurf/rules.md": "c09482139c0b2f336402c0412a3746574f3695c652126a4f869afd91c48f2859",
     "AGENTS.md": "fdc0961fb3de9c9c3f4adc6613ce17319b9d3069fcd1cffc75489d690a3800be",
     "AWARE-Configurator/App01/__init__.py": "af1349b9f5f9a1a6a0404dea36dcc9499bcb25c9adc112b7cc9a93cae41f3262",
     "AWARE-Configurator/App01/admin.py": "3afbe817409db07e6dd3eaca52321d14b453dd7c7d44d98a8b29415317299f0e",
     "AWARE-Configurator/App01/apps.py": "f5fa6a402d900947d56777f2f3acaf40fea24e910d3d4cb0098ee8966f2671ff",
     "AWARE-Configurator/App01/database_operations.py": "e2ee7407e64b25c7ed74f6cc901dfcefca7a50741b733070fb2a4ab0a22b0b96",
     "AWARE-Configurator/App01/db.py": "f58e9558491b486c1d43561367411debdfa956ec5e456522e3ea6fdec8989113",
-    "AWARE-Configurator/App01/general.py": "e9071dcbd49dc27519a821febf2c8287441e2f7f4194a988e987743591351122",
+    "AWARE-Configurator/App01/general.py": "4e0c9621bd2811116ce51e6c3b13905ed4165e0d77704b0ac145de3dc2644eb3",
     "AWARE-Configurator/App01/migrations/__init__.py": "af1349b9f5f9a1a6a0404dea36dcc9499bcb25c9adc112b7cc9a93cae41f3262",
     "AWARE-Configurator/App01/models.py": "ced7fd8fbc67667853becf65bacb4943daca6fc2e9d9ddc81765864513b60612",
     "AWARE-Configurator/App01/participant_db.py": "6aafee4393256f044d385c991fac3e7b0065b6f37ffda1c93b161b11f20a4b91",
@@ -136,11 +132,11 @@
     "db/ios-tables.sql": "5d2c64467ca2c00f458d505f4817e238f522db6da621620f465781479519def3",
     "db/zz-participant-password.sh": "6e179c0205f9851a72862409939477294a2767f3dd74ee73c8799488876d5055",
     "docs/android-study-status-dashboard-plan.md": "82f14a14bacb5f0c7b320d2e3ab2db46a6da1ec89e9d0670e34d8102453dfef7",
-    "qr-code-independence.md": "988b6628963ce3974a2801f87897b21cb5309ffd30e8f399c2f3ccfcd3af5f42",
-    "setup.sh": "5aa2d678dabefa3672f833f0463e7bf967a11d1f62767ebe61360387185f3a72",
+    "docs/dashboard-device-view-rework-plan.md": "4d36df383f68fcab2655b9d5536e828e2cd85954ab75270c647c4cb37a9d778e",
+    "setup.sh": "718c47a315a28f57fabd178295196fbaee7d4a2c7a79ac936190d517aac2c3c4",
     "setup/Dockerfile": "7a809ccc1ba7fadfc0524360987c979487391833c60c5a6d46bb4620c6d13e39",
     "setup/deploy.sh": "d63de94fbe1fe0ce60d75d76d69cdd40230df5383543f20f5b30522d47727d1e",
-    "setup/deploy_config.py": "d2fe6dc8995a4a4d1aae61e3c157d0d4cc13a183ad7482bbbe2dbd447c926143",
+    "setup/deploy_config.py": "06c39dcef7c7cd5d86bf688fce3c6e1bc713937d5c20081e50031f37e5d19395",
     "setup/deploy_response.py": "40f2d96c20a2a871b5eb167e06a3ac665c61b1a0d300e1a8956436b831dc449d",
     "setup/detect_public_host.py": "412ca400a44a67c38585db076a99e8cc88431a70cede0304e9a4b3029e0d9018",
     "setup/init_android_tables.py": "7b20641497eed109512ea1b932e56ca59f3ed76cb43a50be03b9eae6822e9664",
@@ -149,18 +145,18 @@
     "setup/server.py": "be4f09d7b57285a0e2f26c29ccbc97f2c077b11301423aaaae56b20506e2b813",
     "setup/write_request_env.py": "24739af5d220ec7c0b2dfdeb89bf50570503b0389849b7d34caecb87e5971270",
     "shared_config/__init__.py": "f66af2aabde649c6dc7b00dcfb88dc91d3d6673cd8bd86f349eb3db3c248aad5",
-    "shared_config/runtime.py": "b47dd40889ca06ef1ceb36a82822b59667915e43479a934653c89160bcc5401d",
+    "shared_config/runtime.py": "1ce2144e2bc7bcd89750223c8736a0720f7fc5f1bdf0caff5f98a774b51a378b",
     "shared_config/serializers.py": "4ec918b9f9134c192e489d5d5add1ba7d57c6bf723471b70f13dd222a7c205d1",
-    "shared_config/source_store.py": "e29b2571e6706ee7b45705c7d80f4127f16b375bf5ec74eae17747bd4905f6fb",
+    "shared_config/source_store.py": "ceaf715a4f7aa1198409553bed5ab30ab761f23c6f6db02140ee2e84148aa1f9",
     "shared_config/test_serializers.py": "d7614beeadecc7e75fcf9671fbc58ae7c8d9ce338a9cc21480128038ccd23fdb"
   },
-  "indexed_at_commit": "1fed673b5a15947b6369a7703c3418a14a790dba",
-  "indexed_at_timestamp": "2026-08-04T13:39:00.204655+00:00",
+  "indexed_at_commit": "276eb2c4c3fe847bf23b346dfc6ed35a7ffd08b5",
+  "indexed_at_timestamp": "2026-08-04T16:10:50.098628+00:00",
   "schema_version": 3,
   "stats": {
-    "total_edges": 1382,
-    "total_files": 153,
-    "total_nodes": 1375
+    "total_edges": 1393,
+    "total_files": 149,
+    "total_nodes": 1373
   },
   "vexp_version": "2.4.0"
 }

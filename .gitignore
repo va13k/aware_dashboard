@@ -32,5 +32,10 @@ backups/
 # Compiled JAR - built inside Docker, no need to commit
 aware-micro-server/output/*.jar
 
+# Dot-folders - editor/IDE settings, tool caches, virtualenvs, AI assistant configs
+.*/
+# ...except CI config, which is source
+!.github/
+
 # macOS
 .DS_Store
