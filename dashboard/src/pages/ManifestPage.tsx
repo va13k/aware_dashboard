@@ -2,26 +2,7 @@ import { useEffect, useState } from "react";
 import { fetchManifest } from "../api/client";
 import { SENSOR_CONFIGS } from "../config/sensors";
 import type { Manifest, SensorManifestEntry } from "../types";
-
-function normalizeTs(ts: number): number {
-  return ts < 1e11 ? ts * 1000 : ts;
-}
-
-function fmtDate(ts: number | null): string {
-  if (ts == null) return "—";
-  return new Date(normalizeTs(ts)).toLocaleDateString(undefined, {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-  });
-}
-
-function fmtDateTime(iso: string): string {
-  return new Date(iso).toLocaleString(undefined, {
-    dateStyle: "medium",
-    timeStyle: "short",
-  });
-}
+import { absoluteDate, isoDateTime } from "../utils/time";
 
 function studySpan(manifest: Manifest): {
   first: number | null;
@@ -145,7 +126,7 @@ function SensorRow({ name, entry, deviceCount }: SensorRowProps) {
             <div
               className={`text-[13px] font-bold ${hasData ? "text-ink" : "text-sage/40"}`}
             >
-              {fmtDate(entry.first_timestamp)}
+              {absoluteDate(entry.first_timestamp)}
             </div>
           </div>
 
@@ -156,7 +137,7 @@ function SensorRow({ name, entry, deviceCount }: SensorRowProps) {
             <div
               className={`text-[13px] font-bold ${hasData ? "text-ink" : "text-sage/40"}`}
             >
-              {fmtDate(entry.last_timestamp)}
+              {absoluteDate(entry.last_timestamp)}
             </div>
           </div>
 
@@ -272,7 +253,7 @@ export default function ManifestPage() {
             <h1 className="text-[20px] font-bold text-ink">Study Manifest</h1>
             {manifest && (
               <p className="mt-1 text-[12px] text-sage">
-                Generated {fmtDateTime(manifest.generated_at)}
+                Generated {isoDateTime(manifest.generated_at)}
               </p>
             )}
           </div>
@@ -314,7 +295,7 @@ export default function ManifestPage() {
               label: "Study span",
               value:
                 span?.first != null && span?.last != null
-                  ? `${fmtDate(span.first)} – ${fmtDate(span.last)}`
+                  ? `${absoluteDate(span.first)} – ${absoluteDate(span.last)}`
                   : "—",
             },
           ].map(({ label, value }) => (

@@ -113,7 +113,7 @@
     "dashboard/README.md": "782f2c18441c4dfe79ec3c119f683ef8b4cc4b254ea3bfd1edd0b58233c3d7a0",
     "dashboard/eslint.config.js": "aca28c59ed36fcb61767d95ac0f53b32021918bef6550e61ae5830658834e643",
     "dashboard/src/App.tsx": "e546109cb5d530a69a6ae9841b83e3feb80b0c691480bc283338751aac4df2ad",
-    "dashboard/src/api/client.ts": "62dea7fa355027c57dd38d69c4b81275da0c4b2a9942400f830a20a38b60e950",
+    "dashboard/src/api/client.ts": "09f96b28e52ca05ccd85624eac66af094618f21ad528ad5a074fc716b8513b9a",
     "dashboard/src/components/AccelerometerRecordsCard.tsx": "a9fa79ff68c18431dde4c1e368577526924fc477681e1839b5a0c9cbec1058dd",
     "dashboard/src/components/ActivityCard.tsx": "4cce68f3ad3eee6316d45dc79436578d7a48d64f8ff44e9a6e8f3f21093b5afc",
     "dashboard/src/components/AmbientNoiseCard.tsx": "e99ad51c340f74eef90ac2c9ce09db29899f34c1bd610bdb4dfd1dc007705eee",
@@ -135,11 +135,12 @@
     "dashboard/src/components/WifiRecordsCard.tsx": "2a4b03fb96ce10de7b283ba7f705c1bf45f017e81339c4d5abbd2d1297394603",
     "dashboard/src/config/sensors.ts": "39308ec30c75546c01fedb9190d3eb64bf00be69f922f328378164f3c5388eda",
     "dashboard/src/main.tsx": "717427d5d64470f97e4bb18e907ab095427e2aa9a6800fe3390b43bede6e9b35",
-    "dashboard/src/pages/DevicePage.tsx": "e43f774ff45cf21cad205a3730f962d0c21492615fb58d9008b411ab43296683",
-    "dashboard/src/pages/ManifestPage.tsx": "adc66aa8776ccb7ef930f69b7bda7ca7fd67db32ffff01faf5602318fa0a54e1",
-    "dashboard/src/pages/OverviewPage.tsx": "ebb716737ede9a03880cf11d2b86060f872fb9054cb9d703e5396b717e5e626c",
-    "dashboard/src/types.ts": "5ebb515c690b9a10a89d70fc3ac0d7cddd22c78fcb8f6bdaa2830f33ef596d5a",
+    "dashboard/src/pages/DevicePage.tsx": "0ec4e4323a85aa002e73d67e11f32befec7bce6371c75bb126d080049ab8a873",
+    "dashboard/src/pages/ManifestPage.tsx": "bc1932f4fd5a18cb32c4a3cce885d354deeddd90672d927affdcaaa1c3dfd4a9",
+    "dashboard/src/pages/OverviewPage.tsx": "61de47f4e021f44163d84c18aa7699b9484e81783c0f80864cd45023b2a7f148",
+    "dashboard/src/types.ts": "c1d798cdf389f8ceee554fd5951f3f695de6519eb2ea0afebad3a02ef9603ead",
     "dashboard/src/utils/stats.ts": "0c9571e4f8ea03d4e3f4484449ce51e90382e218e77dd20ffc16ade63c50e534",
+    "dashboard/src/utils/time.ts": "643eee565a677da492ab4de7491af03fd4484b892c9c0147d1f96314e2e6895a",
     "dashboard/vite.config.ts": "40f284df10761043fff2560ddc1da546b70e010c70f1f2e0d11cb8389b8f4b9c",
     "db/00-bootstrap.sql": "702ddc1cbcfb73e83ada5c076d80f521f0a63f1fda084d4d1c74f3f3ed9aaa7a",
     "db/android-tables.sql": "224baecdd6981cc8a02283c833340089898c1126ff60f0a4a8a993ab8beeb386",
@@ -149,7 +150,7 @@
     "db/ios-tables.sql": "5d2c64467ca2c00f458d505f4817e238f522db6da621620f465781479519def3",
     "db/zz-participant-password.sh": "6e179c0205f9851a72862409939477294a2767f3dd74ee73c8799488876d5055",
     "docs/android-study-status-dashboard-plan.md": "82f14a14bacb5f0c7b320d2e3ab2db46a6da1ec89e9d0670e34d8102453dfef7",
-    "docs/dashboard-device-view-rework-plan.md": "740f479987b44ac3067142d9d531e73dd02986649293d31e25394e82759baee1",
+    "docs/dashboard-device-view-rework-plan.md": "f72d174571ac7bbfb95fcda4b761efca378b85ca99aec90edd1edc541a7b43c6",
     "setup.sh": "718c47a315a28f57fabd178295196fbaee7d4a2c7a79ac936190d517aac2c3c4",
     "setup/Dockerfile": "7a809ccc1ba7fadfc0524360987c979487391833c60c5a6d46bb4620c6d13e39",
     "setup/deploy.sh": "d63de94fbe1fe0ce60d75d76d69cdd40230df5383543f20f5b30522d47727d1e",
@@ -167,13 +168,13 @@
     "shared_config/source_store.py": "ceaf715a4f7aa1198409553bed5ab30ab761f23c6f6db02140ee2e84148aa1f9",
     "shared_config/test_serializers.py": "d7614beeadecc7e75fcf9671fbc58ae7c8d9ce338a9cc21480128038ccd23fdb"
   },
-  "indexed_at_commit": "3eb7596441719c6e7d40c943512825c1cc821031",
-  "indexed_at_timestamp": "2026-08-04T17:36:03.533707+00:00",
+  "indexed_at_commit": "68308adb7a7d1fdc87dd821f000c891a47a8081a",
+  "indexed_at_timestamp": "2026-08-04T17:43:01.140432+00:00",
   "schema_version": 3,
   "stats": {
-    "total_edges": 1773,
-    "total_files": 166,
-    "total_nodes": 1666
+    "total_edges": 1756,
+    "total_files": 167,
+    "total_nodes": 1683
   },
   "vexp_version": "2.4.0"
 }

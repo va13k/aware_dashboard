@@ -15,6 +15,7 @@ import {
 import SensorStatCard from "../components/SensorStatCard";
 import WifiRecordsCard from "../components/WifiRecordsCard";
 import ExportLink from "../components/ExportLink";
+import { absoluteTime, normalizeTimestamp, relativeAge } from "../utils/time";
 import type { Device, DevicesResponse, SensorRecord } from "../types";
 
 type SensorData = Record<
@@ -33,26 +34,6 @@ function deviceLabel(device: Device): string {
   }
 
   return device.device_id.slice(0, 16);
-}
-
-function normalizeTimestamp(timestamp: number): number {
-  return timestamp < 100000000000 ? timestamp * 1000 : timestamp;
-}
-
-function formatUploadDate(timestamp: number): string {
-  return new Intl.DateTimeFormat(undefined, {
-    dateStyle: "medium",
-    timeStyle: "short",
-  }).format(new Date(normalizeTimestamp(timestamp)));
-}
-
-function uploadAgeLabel(timestamp: number, now: number): string {
-  const diff = (now - normalizeTimestamp(timestamp)) / 1000;
-
-  if (diff < 60) return "just now";
-  if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
-  if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
-  return `${Math.floor(diff / 86400)}d ago`;
 }
 
 function readHideEmptySensors(): boolean {
@@ -168,15 +149,18 @@ export default function OverviewPage() {
   }, [hideEmptySensors]);
 
   const allDevices = devices ? [...devices.android, ...devices.ios] : [];
+  // A phone that joined the study but has never uploaded has no timestamp to
+  // compare, so it can never be the most recent upload.
   const latestUpload = allDevices.reduce<Device | null>((latest, device) => {
+    const uploaded = normalizeTimestamp(device.last_seen);
+    if (uploaded == null) return latest;
     if (!latest) return device;
-    return normalizeTimestamp(device.last_seen) >
-      normalizeTimestamp(latest.last_seen)
+    return uploaded > (normalizeTimestamp(latest.last_seen) ?? 0)
       ? device
       : latest;
   }, null);
   const latestUploadText = (() => {
-    if (latestUpload) return formatUploadDate(latestUpload.last_seen);
+    if (latestUpload) return absoluteTime(latestUpload.last_seen);
     if (devices) return "No uploads yet";
     return "Checking uploads...";
   })();
@@ -235,7 +219,7 @@ export default function OverviewPage() {
               />
               <div className="rounded-xl bg-teal-soft px-3 py-2 text-right">
                 <p className="text-[12px] font-semibold text-teal">
-                  {uploadAgeLabel(latestUpload.last_seen, now)}
+                  {relativeAge(latestUpload.last_seen, now)}
                 </p>
                 <p className="mt-0.5 text-[11px] text-sage">
                   {latestUpload.platform} - {deviceLabel(latestUpload)}

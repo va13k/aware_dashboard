@@ -26,6 +26,12 @@ import ProcessorCard from "../components/ProcessorCard";
 import BatteryEventsCard from "../components/BatteryEventsCard";
 import AmbientNoiseCard from "../components/AmbientNoiseCard";
 import ExportLink from "../components/ExportLink";
+import {
+  absoluteTime,
+  latestTimestamp,
+  normalizeTimestamp,
+  relativeAge,
+} from "../utils/time";
 import type {
   Device,
   DeviceDetail,
@@ -35,13 +41,6 @@ import type {
 
 const POLL_INTERVAL_MS = 60_000;
 const SENSOR_FILTER_STORAGE_KEY = "aware-dashboard-hide-empty-sensors";
-
-function timeSince(ts: number): string {
-  const s = Math.floor((Date.now() - ts) / 1000);
-  if (s < 10) return "just now";
-  if (s < 60) return `${s}s ago`;
-  return `${Math.floor(s / 60)}m ago`;
-}
 
 interface DeviceSensorState {
   key: string | null;
@@ -69,32 +68,10 @@ function deviceLabel(d: Device): string {
   );
 }
 
-function lastSeenLabel(ts: number | null | undefined): string {
-  if (!ts) return "never";
-  const diff = (Date.now() - ts) / 1000;
-  if (diff < 60) return "just now";
-  if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
-  if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
-  return `${Math.floor(diff / 86400)}d ago`;
-}
-
-function timestampValue(value: unknown): number | null {
-  if (typeof value === "number" && Number.isFinite(value)) return value;
-  if (typeof value === "string" && value.trim() !== "") {
-    const parsed = Number(value);
-    return Number.isFinite(parsed) ? parsed : null;
-  }
-  return null;
-}
-
 function formatValue(label: string, value: unknown): string {
   if (value == null || value === "") return "-";
   if (label.toLowerCase().includes("timestamp")) {
-    const ts = timestampValue(value);
-    if (ts != null) {
-      const normalized = ts < 100_000_000_000 ? ts * 1000 : ts;
-      return new Date(normalized).toLocaleString();
-    }
+    if (normalizeTimestamp(value) != null) return absoluteTime(value);
   }
   if (typeof value === "number") {
     return Number.isInteger(value) ? value.toLocaleString() : value.toFixed(3);
@@ -167,8 +144,8 @@ function DeviceDetailPanel({
             <DetailField label="device id" value={detail.device_id} />
             <DetailField
               label="last seen"
-              value={lastSeenLabel(
-                Math.max(0, ...activeStreams.map((s) => s.last_seen ?? 0)),
+              value={relativeAge(
+                latestTimestamp(activeStreams.map((s) => s.last_seen)),
               )}
             />
             <DetailField label="sensors" value={activeStreams.length} />
@@ -406,7 +383,7 @@ export default function DevicePage() {
                       {d.platform}
                     </span>
                     <span className="text-[11px] text-sage">
-                      {lastSeenLabel(d.last_seen)}
+                      {relativeAge(d.last_seen)}
                     </span>
                   </div>
                   <div className="text-[13px] font-semibold leading-tight truncate text-ink">
@@ -506,7 +483,7 @@ export default function DevicePage() {
                   <div className="flex items-center gap-1.5 text-[11px] text-sage">
                     <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" />
                     {lastUpdated
-                      ? `Updated ${timeSince(lastUpdated)}`
+                      ? `Updated ${relativeAge(lastUpdated)}`
                       : "Loading…"}
                   </div>
                   <label className="flex cursor-pointer items-center gap-2 self-start rounded-xl border border-wire bg-card px-3 py-2 text-[12px] font-semibold text-ink shadow-card sm:self-auto">
