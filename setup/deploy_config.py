@@ -18,6 +18,9 @@ if str(PROJECT) not in sys.path:
 
 from shared_config.source_store import update_source
 from shared_config.runtime import (
+    SECRET_MODE,
+    SHARED_MODE,
+    atomic_write_text,
     build_public_base_url,
     get_runtime_settings,
     load_env,
@@ -128,8 +131,7 @@ def generate_htpasswd(username: str, password: str) -> None:
         check=True,
     )
     hashed = result.stdout.strip()
-    HTPASSWD_PATH.parent.mkdir(parents=True, exist_ok=True)
-    HTPASSWD_PATH.write_text(f"{username}:{hashed}\n", encoding="utf-8")
+    atomic_write_text(HTPASSWD_PATH, f"{username}:{hashed}\n", SECRET_MODE)
 
 
 def persist_env(env: dict[str, str]) -> None:
@@ -162,19 +164,21 @@ def persist_env(env: dict[str, str]) -> None:
         if key not in ordered_keys and value:
             env_lines.append(f"{key}={value}")
 
-    ENV_PATH.write_text("\n".join(env_lines) + "\n", encoding="utf-8")
+    atomic_write_text(ENV_PATH, "\n".join(env_lines) + "\n", SECRET_MODE)
 
 def write_micro_config(config: dict) -> None:
-    CONFIG_PATH.write_text(json.dumps(config, indent=2) + "\n", encoding="utf-8")
+    # Bind-mounted into the micro-server, which runs as appuser.
+    atomic_write_text(CONFIG_PATH, json.dumps(config, indent=2) + "\n", SHARED_MODE)
 
 
 def write_ios_esm_config(config: list[dict]) -> None:
-    ESM_CONFIG_PATH.parent.mkdir(parents=True, exist_ok=True)
-    ESM_CONFIG_PATH.write_text(json.dumps(config, indent=2) + "\n", encoding="utf-8")
+    # Served to iOS devices by nginx at /esm/.
+    atomic_write_text(ESM_CONFIG_PATH, json.dumps(config, indent=2) + "\n", SHARED_MODE)
 
 
 def write_android_config(config: dict) -> None:
-    STUDY_CONFIG_PATH.write_text(json.dumps(config, indent=2) + "\n", encoding="utf-8")
+    # Served to Android devices by nginx at /studies/files/.
+    atomic_write_text(STUDY_CONFIG_PATH, json.dumps(config, indent=2) + "\n", SHARED_MODE)
 
 
 def build_study_join_urls(
@@ -228,16 +232,20 @@ def build_studies_index(
 def write_studies_index(
     base_url: str, study_join_path: str, study_join_url: str, android_join_url: str = ""
 ) -> None:
-    STUDIES_INDEX_PATH.write_text(
+    atomic_write_text(
+        STUDIES_INDEX_PATH,
         build_studies_index(base_url, study_join_path, study_join_url, android_join_url),
-        encoding="utf-8",
+        SHARED_MODE,
     )
 
 
 def write_deployment_urls(urls: dict[str, str]) -> None:
-    (PROJECT / "deployment-urls.json").write_text(
+    # Read back by setup.sh/setup.bat as the host user, which may differ from
+    # the wizard container's UID that writes it.
+    atomic_write_text(
+        PROJECT / "deployment-urls.json",
         json.dumps(urls, indent=2) + "\n",
-        encoding="utf-8",
+        SHARED_MODE,
     )
 
 

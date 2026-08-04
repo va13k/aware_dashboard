@@ -2,6 +2,37 @@ import os
 import pathlib
 import tempfile
 
+# Every generated file gets its mode stated explicitly, because the two writing
+# styles in this project disagree by default: mkstemp() creates its file 0600
+# and os.replace() carries that onto the destination, while Path.write_text()
+# leaves an existing file's mode untouched. Without an explicit chmod a file's
+# permissions end up decided by whichever writer ran last instead of by who has
+# to read it, which silently breaks readers running as other users.
+SHARED_MODE = 0o644  # nginx, the micro-server's appuser, or the host user reads it
+SECRET_MODE = 0o600  # only the deploying user may read it
+
+
+def atomic_write_text(path: pathlib.Path, text: str, mode: int = SECRET_MODE) -> None:
+    """Write text to path atomically with an explicit permission mode."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    fd, tmp_name = tempfile.mkstemp(
+        prefix=path.name + ".", suffix=".tmp", dir=str(path.parent)
+    )
+    tmp_path = pathlib.Path(tmp_name)
+    try:
+        # mkstemp always creates the file at 0600. Set the intended mode on the
+        # open descriptor before writing anything, so the file never exists with
+        # the wrong permissions and there is no path-based race.
+        os.fchmod(fd, mode)
+        with os.fdopen(fd, "w", encoding="utf-8") as tmp:
+            tmp.write(text)
+            tmp.flush()
+            os.fsync(tmp.fileno())
+        os.replace(tmp_path, path)
+    finally:
+        if tmp_path.exists():
+            tmp_path.unlink(missing_ok=True)
+
 
 def load_env(path: pathlib.Path) -> dict[str, str]:
     data: dict[str, str] = {}
@@ -38,19 +69,8 @@ def set_env_value(path: pathlib.Path, key: str, value: str) -> None:
     if not replaced:
         lines.append(f"{key}={value}")
 
-    fd, tmp_name = tempfile.mkstemp(
-        prefix=path.name + ".", suffix=".tmp", dir=str(path.parent)
-    )
-    tmp_path = pathlib.Path(tmp_name)
-    try:
-        with os.fdopen(fd, "w", encoding="utf-8") as tmp:
-            tmp.write("\n".join(lines) + "\n")
-            tmp.flush()
-            os.fsync(tmp.fileno())
-        os.replace(tmp_path, path)
-    finally:
-        if tmp_path.exists():
-            tmp_path.unlink(missing_ok=True)
+    # .env holds the MySQL root password and researcher credentials.
+    atomic_write_text(path, "\n".join(lines) + "\n", SECRET_MODE)
 
 
 def strip_ipv6_brackets(host: str) -> str:

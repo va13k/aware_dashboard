@@ -3,7 +3,6 @@ import logging
 import os
 import pathlib
 import sys
-import tempfile
 from django.http import HttpResponse
 from django.views.decorators.csrf import ensure_csrf_cookie, csrf_exempt
 
@@ -15,6 +14,8 @@ PROJECT_ROOT = settings.PROJECT_ROOT
 
 from shared_config.source_store import read_source, update_source
 from shared_config.runtime import (
+    SHARED_MODE,
+    atomic_write_text,
     build_public_base_url,
     get_runtime_settings,
     load_env,
@@ -199,27 +200,11 @@ def _sync_participant_credentials(source):
     set_env_value(ENV_PATH, "PARTICIPANT_DB_PASSWORD", password)
 
 
-def write_json(path, content):
-    path.parent.mkdir(parents=True, exist_ok=True)
-    # Write to a temporary file and swap it into place so an interrupted write
-    # can never leave a partially written config being served to devices.
-    fd, tmp_name = tempfile.mkstemp(prefix=path.name + ".", suffix=".tmp", dir=str(path.parent))
-    tmp_path = pathlib.Path(tmp_name)
-    try:
-        # mkstemp always creates the file at 0600, readable only by whichever
-        # UID is running this container. These configs are read back by other
-        # containers (micro-server's appuser, nginx) and by devices, so widen
-        # it before anything is written.
-        os.fchmod(fd, 0o644)
-        with os.fdopen(fd, "w", encoding="utf-8") as file:
-            json.dump(content, file, indent=2)
-            file.write("\n")
-            file.flush()
-            os.fsync(file.fileno())
-        os.replace(tmp_path, path)
-    finally:
-        if tmp_path.exists():
-            tmp_path.unlink(missing_ok=True)
+def write_json(path, content, mode=SHARED_MODE):
+    # These configs are read back by other containers (micro-server's appuser,
+    # nginx) and by devices, so they default to SHARED_MODE rather than the
+    # 0600 an atomic swap would otherwise leave behind.
+    atomic_write_text(path, json.dumps(content, indent=2) + "\n", mode)
 
 
 def runtime_database_host() -> str:

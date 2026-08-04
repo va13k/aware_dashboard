@@ -4,8 +4,9 @@ import contextlib
 import json
 import os
 import pathlib
-import tempfile
 from typing import Any, Callable
+
+from shared_config.runtime import SECRET_MODE, atomic_write_text
 
 
 def _project_root() -> pathlib.Path:
@@ -65,25 +66,9 @@ def _read_unlocked() -> dict[str, Any]:
 
 
 def _atomic_write_unlocked(data: dict[str, Any]) -> None:
-    fd, tmp_name = tempfile.mkstemp(
-        prefix=SOURCE_PATH.name + ".",
-        suffix=".tmp",
-        dir=str(SOURCE_PATH.parent),
-    )
-    tmp_path = pathlib.Path(tmp_name)
-
-    try:
-        with os.fdopen(fd, "w", encoding="utf-8") as tmp:
-            json.dump(data, tmp, indent=2)
-            tmp.write("\n")
-            tmp.flush()
-            os.fsync(tmp.fileno())
-
-        os.replace(tmp_path, SOURCE_PATH)
-
-    finally:
-        if tmp_path.exists():
-            tmp_path.unlink(missing_ok=True)
+    # source.json holds participant credentials and is only ever read by the
+    # Configurator, which runs as the deploying user.
+    atomic_write_text(SOURCE_PATH, json.dumps(data, indent=2) + "\n", SECRET_MODE)
 
 
 def ensure_source() -> None:
