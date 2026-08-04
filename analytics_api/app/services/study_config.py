@@ -150,16 +150,21 @@ def is_enabled(value: Any) -> bool:
     return False
 
 
-def _canonical(config: dict) -> dict:
+def comparable(config: dict) -> dict:
+    """The content two configs should be compared on: redacted and canonical.
+
+    Both the fingerprint and the field-level diff are built from this, so
+    "identical fingerprints" and "no differing fields" cannot disagree.
+    """
     data = {
         key: value
         for key, value in redact(config).items()
         if key not in VOLATILE_KEYS
     }
     if isinstance(data.get(SENSORS_KEY), list):
-        # As a mapping the fingerprint no longer depends on list order. Today
-        # the client stores the list verbatim, but a reordering client must not
-        # make every phone look stale.
+        # As a mapping the content no longer depends on list order. Today the
+        # client stores the list verbatim, but a reordering client must not make
+        # every phone look stale.
         data[SENSORS_KEY] = settings_map(config)
     return data
 
@@ -167,7 +172,7 @@ def _canonical(config: dict) -> dict:
 def content_fingerprint(config: dict) -> str:
     """SHA-256 over the canonical, redacted, order-independent content."""
     payload = json.dumps(
-        _canonical(config),
+        comparable(config),
         sort_keys=True,
         separators=(",", ":"),
         ensure_ascii=False,
