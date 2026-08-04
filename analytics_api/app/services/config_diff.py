@@ -61,7 +61,7 @@ class ConfigDiff:
 def _updated_at(config: dict | None) -> str | None:
     if not isinstance(config, dict):
         return None
-    return config.get("updatedAt") or None
+    return study_config.as_text(config.get("updatedAt"))
 
 
 def _update_flag(config: dict | None) -> bool:

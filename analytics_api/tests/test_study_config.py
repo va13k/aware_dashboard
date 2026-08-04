@@ -512,3 +512,35 @@ def test_redaction_leaves_no_secret_field_behind(config):
     assert _secret_key_names(study_config.redact(config)) == set()
     assert _secret_key_names(study_config.safe_summary(config)) == set()
     assert _secret_key_names(config), "the fixture should carry secrets"
+
+
+# --- configs that are not shaped as expected ------------------------------
+
+
+@pytest.mark.parametrize(
+    "broken",
+    [
+        {"study_info": ["a list"]},
+        {"study_info": 5},
+        {"database": ["a list"]},
+        {"database": "a string"},
+        {"sensors": {"status_wifi": True}},
+        {"sensors": "a string"},
+        {"ios_sensors": [1, 2]},
+        {"study_info": 1, "database": [], "sensors": "no", "ios_sensors": 3},
+    ],
+)
+def test_a_summary_survives_a_config_with_the_wrong_shapes(broken):
+    """A hand-edited or future-format config must not take the API down."""
+    summary = study_config.safe_summary(broken)
+
+    assert summary["study_title"] is None
+    assert summary["require_ssl"] is False
+    assert summary["enabled_sensor_count"] == 0
+
+
+def test_is_secret_key_tolerates_a_value_that_is_not_a_name():
+    """It is called on `entry["setting"]`, which a broken config can fill with anything."""
+    assert study_config.is_secret_key({"unhashable": 1}) is False
+    assert study_config.is_secret_key(["also", "unhashable"]) is False
+    assert study_config.is_secret_key(None) is False

@@ -1,4 +1,4 @@
-from typing import Any
+from typing import Any, Literal
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
@@ -347,3 +347,95 @@ class IosSchema(_Base):
             "device_id": getattr(v, "device_id", None),
             **data,
         }
+
+
+# ---------------------------------------------------------------------------
+# Study status — derived from aware_studies and the two deployed configs
+# ---------------------------------------------------------------------------
+
+
+class _Derived(BaseModel):
+    """Built from the service dataclasses rather than from a table row."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class AndroidStudyEventSchema(_Derived):
+    timestamp: float | None = None
+    kind: str
+    message: str = ""
+    occurrences: int = 1
+    joined_at: float | None = None
+    updated_at: float | None = None
+    exited_at: float | None = None
+    approved_consents: list[str] = []
+    declined_consents: list[str] = []
+    consent_context: str | None = None
+    config_id: str | None = None
+    config_updated_at: str | None = None
+
+
+class AndroidStudySummarySchema(_Derived):
+    enrollment_status: Literal["in_study", "left_study", "unknown"] = "unknown"
+    last_study_event_at: float | None = None
+    last_study_event: str | None = None
+    last_join_at: float | None = None
+    last_exit_at: float | None = None
+    last_rejoin_at: float | None = None
+    last_rejoin_pause_started_at: float | None = None
+    last_rejoin_pause_ms: float | None = None
+    config_id: str | None = None
+    config_updated_at: str | None = None
+    approved_consents: list[str] = []
+    declined_consents: list[str] = []
+    last_consent_at: float | None = None
+    consent_context: Literal["initial", "study_update"] | None = None
+    event_count: int = 0
+    duplicate_row_count: int = 0
+
+
+class ConfigDiffRowSchema(_Derived):
+    path: str
+    kind: Literal["changed", "only_on_server", "only_on_device"]
+    server_value: Any = None
+    device_value: Any = None
+
+
+class ConfigDiffSchema(_Derived):
+    config_status: Literal["current", "stale", "unknown"] = "unknown"
+    status_reason: Literal["no_device_config", "no_server_config"] | None = None
+    config_update_enabled: bool = False
+    device_config_update_enabled: bool = False
+    server_updated_at: str | None = None
+    device_updated_at: str | None = None
+    diff_count: int = 0
+    rows: list[ConfigDiffRowSchema] = []
+
+
+class AndroidStudyListSummarySchema(_Derived):
+    """What a row in the device list needs, without the timeline or the diff."""
+
+    enrollment_status: Literal["in_study", "left_study", "unknown"] = "unknown"
+    last_study_event_at: float | None = None
+    config_status: Literal["current", "stale", "unknown"] = "unknown"
+    diff_count: int = 0
+
+
+class SensorRequirementSchema(_Derived):
+    sensor_key: str
+    required: bool
+    settings: list[str] = []
+
+
+class PlatformRequirementsSchema(_Derived):
+    platform: Literal["android", "ios"]
+    available: bool = False
+    sensors: list[SensorRequirementSchema] = []
+    required_without_stream: list[str] = []
+    unmapped_settings: list[str] = []
+    required_sensor_count: int = 0
+
+
+class StudyRequirementsSchema(BaseModel):
+    android: PlatformRequirementsSchema
+    ios: PlatformRequirementsSchema

@@ -16,6 +16,7 @@ function.
 import hashlib
 import json
 import pathlib
+from functools import lru_cache
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -60,11 +61,27 @@ VOLATILE_KEYS = frozenset({"createdAt", "updatedAt"})
 _DROP = object()
 
 
-def is_secret_key(name: Any) -> bool:
-    lowered = str(name).lower()
+@lru_cache(maxsize=4096)
+def _is_secret_name(lowered: str) -> bool:
     if lowered in PUBLIC_KEY_NAMES:
         return False
     return any(marker in lowered for marker in SECRET_KEY_MARKERS)
+
+
+def is_secret_key(name: Any) -> bool:
+    # Cached on the normalised name: redacting one config asks this a few hundred
+    # times, over the same 150-odd names. `str()` first, because a malformed
+    # config can put an unhashable value where a setting name belongs.
+    return _is_secret_name(str(name).lower())
+
+
+def _as_dict(value: Any) -> dict:
+    """A section of a config that should be an object, or an empty one.
+
+    Configs are files on disk and payloads from phones; a section that arrives as
+    a list or a number must not take the endpoint down.
+    """
+    return value if isinstance(value, dict) else {}
 
 
 def _is_setting_entry(value: dict) -> bool:
@@ -137,6 +154,22 @@ def ios_settings_map(config: dict) -> dict[str, Any]:
     return dict(ios_settings)
 
 
+def as_text(value: Any) -> str | None:
+    """A config identifier as text, or None when it is not a scalar.
+
+    `_id` and `updatedAt` come from a phone, so they can be any JSON type. A
+    number is reported as text; a list or an object is reported as absent. Both
+    the event signature and the response schemas need a hashable scalar here.
+    """
+    if isinstance(value, str):
+        return value or None
+    if isinstance(value, bool) or value is None:
+        return None
+    if isinstance(value, (int, float)):
+        return str(value)
+    return None
+
+
 def is_enabled(value: Any) -> bool:
     """Truthiness of a config flag, tolerant of how it was serialised."""
     if isinstance(value, bool):
@@ -183,8 +216,8 @@ def safe_summary(config: dict) -> dict[str, Any]:
     """The config facts that may be returned to a browser."""
     safe = redact(config)
     settings = settings_map(config)
-    database = safe.get(DATABASE_KEY) or {}
-    study_info = safe.get("study_info") or {}
+    database = _as_dict(safe.get(DATABASE_KEY))
+    study_info = _as_dict(safe.get("study_info"))
 
     status_settings = {
         name: value for name, value in settings.items() if name.startswith("status_")

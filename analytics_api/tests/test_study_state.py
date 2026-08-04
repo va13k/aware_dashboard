@@ -579,3 +579,90 @@ def test_the_service_reads_orm_rows():
     assert state.summary.config_id == "config-id-1"
     assert state.summary.approved_consents == ["Location", "Wi-Fi"]
     assert state.events[0].device_id == DEVICE
+
+
+# --- configs a phone reported in an unexpected shape ----------------------
+
+
+@pytest.mark.parametrize(
+    "config_id",
+    [{"nested": "object"}, ["a", "list"], 12345, 12.5, True, None, ""],
+)
+def test_an_odd_config_id_does_not_break_deduplication(config_id):
+    """The id reaches the event signature, which is used as a dict key.
+
+    An unhashable value there would fail the whole device list, not just this
+    phone, so anything that is not a scalar is reported as absent.
+    """
+    rows = [
+        row(_id=index, timestamp=1_000.0, study_compliance="updated study",
+            study_config=json.dumps({"_id": config_id, "sensors": []}))
+        for index in (1, 2)
+    ]
+    state = study_state.derive_study_state(rows)
+
+    assert len(state.events) == 1
+    assert state.events[0].occurrences == 2
+    assert isinstance(state.summary.config_id, (str, type(None)))
+
+
+@pytest.mark.parametrize("value", [12345, 12.5, {"a": 1}, ["b"], True])
+def test_odd_config_versions_still_pass_schema_validation(value):
+    """The summary and the timeline are serialised through Pydantic."""
+    from app.schemas import AndroidStudyEventSchema, AndroidStudySummarySchema
+
+    state = study_state.derive_study_state(
+        [
+            row(
+                study_compliance="updated study",
+                study_config=json.dumps({"_id": value, "updatedAt": value, "sensors": []}),
+            )
+        ]
+    )
+
+    AndroidStudySummarySchema.model_validate(state.summary)
+    AndroidStudyEventSchema.model_validate(state.events[0])
+
+
+def test_a_numeric_config_id_is_reported_as_text():
+    state = study_state.derive_study_state(
+        [row(study_compliance="updated study",
+             study_config=json.dumps({"_id": 999, "updatedAt": 1785, "sensors": []}))]
+    )
+
+    assert state.summary.config_id == "999"
+    assert state.summary.config_updated_at == "1785"
+
+
+def test_a_config_without_a_version_still_yields_a_fingerprint():
+    state = study_state.derive_study_state(
+        [row(study_compliance="updated study", study_config=json.dumps({"sensors": []}))]
+    )
+
+    assert state.summary.config_id is None
+    assert state.summary.config_fingerprint is not None
+    # The redacted config, not the canonical form the fingerprint is taken over.
+    assert state.installed_config == {"sensors": []}
+
+
+def test_deriving_state_does_not_mutate_the_reported_config():
+    """The parsed identity is cached, so nothing may be modified in place."""
+    original = config_json()
+    study_state.derive_study_state(
+        [row(study_compliance="updated study", study_config=original)]
+    )
+
+    assert json.loads(original) == json.loads(config_json())
+
+
+def test_the_same_config_text_is_parsed_once():
+    study_state.config_identity.cache_clear()
+    rows = [
+        row(_id=index, timestamp=1_000.0 + index, study_compliance="updated study",
+            study_config=config_json())
+        for index in range(1, 21)
+    ]
+    study_state.derive_study_state(rows)
+
+    assert study_state.config_identity.cache_info().misses == 1
+    assert study_state.config_identity.cache_info().hits == 19

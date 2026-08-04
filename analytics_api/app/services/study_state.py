@@ -14,6 +14,7 @@ this module does not recognise stays visible instead of being swallowed.
 import json
 import re
 from dataclasses import dataclass, field, replace
+from functools import lru_cache
 from typing import Any
 
 from app.services import study_config
@@ -134,8 +135,8 @@ def classify(message: str, exited: float | None, joined: float | None) -> str:
     return OTHER
 
 
-def device_config(raw: Any) -> dict | None:
-    """The phone's config, redacted, or None when it reported none.
+def parse_config(raw: Any) -> dict | None:
+    """The config a phone reported, parsed but not yet redacted.
 
     The column is `NULL` on some events and an empty string on most of them -
     only the update events carry a config - so an absent config is normal and
@@ -147,9 +148,34 @@ def device_config(raw: Any) -> dict | None:
         parsed = json.loads(raw)
     except ValueError:
         return None
-    if not isinstance(parsed, dict):
-        return None
-    return study_config.redact(parsed)
+    return parsed if isinstance(parsed, dict) else None
+
+
+def device_config(raw: Any) -> dict | None:
+    """The config a phone reported, redacted."""
+    parsed = parse_config(raw)
+    return None if parsed is None else study_config.redact(parsed)
+
+
+@lru_cache(maxsize=64)
+def config_identity(raw: str) -> tuple[str | None, str | None]:
+    """The `(config_id, updated_at)` a config text reports.
+
+    Cached, and this is where the caching earns its place: a phone sends the same
+    config on every update event, and every phone in a study is usually on the
+    same one, so a whole device list resolves to a handful of distinct texts. Only
+    the identity is derived here, so nothing mutable is shared between callers.
+    """
+    parsed = parse_config(raw)
+    if parsed is None:
+        return None, None
+    return study_config.as_text(parsed.get("_id")), study_config.as_text(
+        parsed.get("updatedAt")
+    )
+
+
+def _config_text(value: Any) -> str | None:
+    return value if isinstance(value, str) and value.strip() else None
 
 
 @dataclass(frozen=True)
@@ -166,7 +192,6 @@ class StudyEvent:
     consent_context: str | None = None
     config_id: str | None = None
     config_updated_at: str | None = None
-    config_fingerprint: str | None = None
     # How many raw rows collapsed into this event. Above 1 means the client
     # reported it more than once, which is normal and not a data problem.
     occurrences: int = 1
@@ -220,7 +245,7 @@ class StudyState:
     installed_config: dict | None = field(default=None, repr=False)
 
 
-def _to_event(row: Any, config: dict | None) -> StudyEvent:
+def _to_event(row: Any, config_version: tuple[str | None, str | None]) -> StudyEvent:
     message = _message(getattr(row, "study_compliance", None))
     joined_at = _number(getattr(row, "double_join", None))
     updated_at = _number(getattr(row, "double_updated", None))
@@ -233,13 +258,7 @@ def _to_event(row: Any, config: dict | None) -> StudyEvent:
     if kind == CONSENT:
         approved, declined, context = parse_consent(message)
 
-    config_id = None
-    config_updated_at = None
-    fingerprint = None
-    if config is not None:
-        config_id = config.get("_id") or None
-        config_updated_at = config.get("updatedAt") or None
-        fingerprint = study_config.content_fingerprint(config)
+    config_id, config_updated_at = config_version
 
     device_id = getattr(row, "device_id", None)
     return StudyEvent(
@@ -255,7 +274,6 @@ def _to_event(row: Any, config: dict | None) -> StudyEvent:
         consent_context=context,
         config_id=config_id,
         config_updated_at=config_updated_at,
-        config_fingerprint=fingerprint,
     )
 
 
@@ -357,12 +375,14 @@ def _rejoin_window(
 
 def derive_study_state(rows) -> StudyState:
     """Everything the dashboard shows about one phone's study membership."""
-    configs = []
+    config_texts = []
     raw_events = []
     for row in _sorted_rows(rows):
-        config = device_config(getattr(row, "study_config", None))
-        configs.append(config)
-        raw_events.append(_to_event(row, config))
+        text = _config_text(getattr(row, "study_config", None))
+        config_texts.append(text)
+        raw_events.append(
+            _to_event(row, config_identity(text) if text else (None, None))
+        )
 
     events = _deduplicate(raw_events)
     if not events:
@@ -374,11 +394,27 @@ def derive_study_state(rows) -> StudyState:
     left = _latest(events, LEFT)
     # Most events carry no config at all - only the update events do - so the
     # installed config is the last one reported, not the one on the last event.
-    installed_config = next(
-        (config for config in reversed(configs) if config is not None), None
+    # Redacting and fingerprinting happen here, once per phone rather than once
+    # per event: both walk the whole config, and a phone reports the same one on
+    # every update.
+    reported = None
+    for text in reversed(config_texts):
+        if text is None:
+            continue
+        reported = parse_config(text)
+        if reported is not None:
+            break
+    installed_config = None if reported is None else study_config.redact(reported)
+    fingerprint = (
+        None if reported is None else study_config.content_fingerprint(reported)
     )
     configured = next(
-        (event for event in reversed(events) if event.config_fingerprint), None
+        (
+            event
+            for event in reversed(events)
+            if event.config_id or event.config_updated_at
+        ),
+        None,
     )
 
     rejoined_at, pause_started_at, paused_ms = _rejoin_window(events)
@@ -391,7 +427,7 @@ def derive_study_state(rows) -> StudyState:
         last_exit_at=left.exited_at if left else None,
         config_id=configured.config_id if configured else None,
         config_updated_at=configured.config_updated_at if configured else None,
-        config_fingerprint=configured.config_fingerprint if configured else None,
+        config_fingerprint=fingerprint,
         approved_consents=consent.approved_consents if consent else [],
         declined_consents=consent.declined_consents if consent else [],
         last_consent_at=consent.timestamp if consent else None,
