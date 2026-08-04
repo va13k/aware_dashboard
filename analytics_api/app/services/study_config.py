@@ -15,13 +15,11 @@ function.
 
 import hashlib
 import json
-import logging
-import os
 import pathlib
 from dataclasses import dataclass, field
 from typing import Any
 
-logger = logging.getLogger(__name__)
+from app.services.config_file import JsonConfigFile
 
 CONFIG_PATH_ENV = "CURRENT_STUDY_CONFIG_PATH"
 DEFAULT_CONFIG_PATH = pathlib.Path("/app/studies/studyConfig.json")
@@ -228,26 +226,31 @@ class DeployedStudyConfig:
     summary: dict = field(default_factory=dict, repr=False)
 
 
+def _build(raw: dict) -> DeployedStudyConfig:
+    return DeployedStudyConfig(
+        path=_file.path(),
+        config=redact(raw),
+        settings=settings_map(raw),
+        ios_settings=ios_settings_map(raw),
+        fingerprint=content_fingerprint(raw),
+        summary=safe_summary(raw),
+    )
+
+
+_file = JsonConfigFile(
+    env_var=CONFIG_PATH_ENV,
+    default_path=DEFAULT_CONFIG_PATH,
+    build=_build,
+    description="deployed study config",
+)
+
+
 def config_path() -> pathlib.Path:
-    configured = os.getenv(CONFIG_PATH_ENV, "").strip()
-    return pathlib.Path(configured) if configured else DEFAULT_CONFIG_PATH
-
-
-# Keyed on (path, mtime, size): the Configurator and the setup script both
-# rewrite this file while the API is running, so a value cached for the process
-# lifetime would go stale.
-_cache_key: tuple | None = None
-_cached: DeployedStudyConfig | None = None
-# Remembered separately so a broken file is not re-read and re-logged on every
-# request, only after it changes on disk.
-_failed_key: tuple | None = None
+    return _file.path()
 
 
 def clear_cache() -> None:
-    global _cache_key, _cached, _failed_key
-    _cache_key = None
-    _cached = None
-    _failed_key = None
+    _file.clear_cache()
 
 
 def load_deployed_config() -> DeployedStudyConfig | None:
@@ -256,47 +259,4 @@ def load_deployed_config() -> DeployedStudyConfig | None:
     Absent is a normal state, not an error: the file is generated at deployment
     time. Callers report an unknown config status instead of failing.
     """
-    global _cache_key, _cached, _failed_key
-
-    path = config_path()
-    try:
-        stat = path.stat()
-    except OSError:
-        _cache_key = None
-        _cached = None
-        return None
-
-    key = (str(path), stat.st_mtime_ns, stat.st_size)
-    if _cached is not None and _cache_key == key:
-        return _cached
-    if _failed_key == key:
-        return None
-
-    try:
-        raw = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, ValueError) as error:
-        logger.warning("Could not read the deployed study config at %s: %s", path, error)
-        _cache_key = None
-        _cached = None
-        _failed_key = key
-        return None
-
-    if not isinstance(raw, dict):
-        logger.warning("The deployed study config at %s is not a JSON object", path)
-        _cache_key = None
-        _cached = None
-        _failed_key = key
-        return None
-
-    deployed = DeployedStudyConfig(
-        path=path,
-        config=redact(raw),
-        settings=settings_map(raw),
-        ios_settings=ios_settings_map(raw),
-        fingerprint=content_fingerprint(raw),
-        summary=safe_summary(raw),
-    )
-    _cache_key = key
-    _cached = deployed
-    _failed_key = None
-    return deployed
+    return _file.load()
