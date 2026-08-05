@@ -5,18 +5,33 @@ import {
   exportSensorZipHref,
   fetchDevices,
   fetchSensor,
+  fetchStudyRequirements,
 } from "../api/client";
 import {
   ANDROID_SENSOR_CONFIGS,
   IOS_SENSOR_CONFIGS,
   SENSOR_CONFIGS,
   SHARED_SENSOR_CONFIGS,
+  type SensorConfig,
 } from "../config/sensors";
 import SensorStatCard from "../components/SensorStatCard";
 import WifiRecordsCard from "../components/WifiRecordsCard";
 import ExportLink from "../components/ExportLink";
+import SensorViewFilter from "../components/SensorViewFilter";
+import { useSensorView } from "../utils/sensorView";
+import {
+  RequiredEmptyCard,
+  RequiredStreamNote,
+} from "../components/RequiredByConfig";
+import { combinedRequirements } from "../utils/requirements";
 import { absoluteTime, normalizeTimestamp, relativeAge } from "../utils/time";
-import type { Device, DevicesResponse, SensorRecord } from "../types";
+import { deviceLabel } from "../utils/devices";
+import type {
+  Device,
+  DevicesResponse,
+  SensorRecord,
+  StudyRequirements,
+} from "../types";
 
 type SensorData = Record<
   string,
@@ -25,20 +40,6 @@ type SensorData = Record<
 
 const REFRESH_INTERVAL_MS = 60000;
 const CLOCK_INTERVAL_MS = 10000;
-const SENSOR_FILTER_STORAGE_KEY = "aware-dashboard-hide-empty-sensors";
-
-function deviceLabel(device: Device): string {
-  if (device.platform === "android") {
-    const name = [device.manufacturer, device.model].filter(Boolean).join(" ");
-    return name || device.device_id.slice(0, 12);
-  }
-
-  return device.device_id.slice(0, 16);
-}
-
-function readHideEmptySensors(): boolean {
-  return window.localStorage.getItem(SENSOR_FILTER_STORAGE_KEY) === "true";
-}
 
 function recordsForSensor(
   sensorData: SensorData,
@@ -47,14 +48,21 @@ function recordsForSensor(
   return sensorData[key] ?? { android: [], ios: [] };
 }
 
+interface Section {
+  title: string;
+  sensors: SensorConfig[];
+}
+
 export default function OverviewPage() {
   const [devices, setDevices] = useState<DevicesResponse | null>(null);
   const [sensorData, setSensorData] = useState<SensorData>({});
   const [loadingKeys, setLoadingKeys] = useState<Set<string>>(
     new Set(SENSOR_CONFIGS.map((s) => s.key)),
   );
-  const [hideEmptySensors, setHideEmptySensors] =
-    useState(readHideEmptySensors);
+  const [view, setView] = useSensorView();
+  const [requirements, setRequirements] = useState<StudyRequirements | null>(
+    null,
+  );
   const [error, setError] = useState<string | null>(null);
   const [now, setNow] = useState(() => Date.now());
 
@@ -132,6 +140,12 @@ export default function OverviewPage() {
   }, []);
 
   useEffect(() => {
+    fetchStudyRequirements()
+      .then((data) => setRequirements(data))
+      .catch(() => setRequirements(null));
+  }, []);
+
+  useEffect(() => {
     const intervalId = window.setInterval(() => {
       setNow(Date.now());
     }, CLOCK_INTERVAL_MS);
@@ -140,13 +154,6 @@ export default function OverviewPage() {
       window.clearInterval(intervalId);
     };
   }, []);
-
-  useEffect(() => {
-    window.localStorage.setItem(
-      SENSOR_FILTER_STORAGE_KEY,
-      String(hideEmptySensors),
-    );
-  }, [hideEmptySensors]);
 
   const allDevices = devices ? [...devices.android, ...devices.ios] : [];
   // A phone that joined the study but has never uploaded has no timestamp to
@@ -164,26 +171,92 @@ export default function OverviewPage() {
     if (devices) return "No uploads yet";
     return "Checking uploads...";
   })();
+
   const hasSensorRecords = (key: string) => {
     const records = recordsForSensor(sensorData, key);
     return records.android.length + records.ios.length > 0;
   };
-  const shouldShowSensor = (key: string) =>
-    !hideEmptySensors || loadingKeys.has(key) || hasSensorRecords(key);
-  const visibleSections = [
-    { title: "Shared", sensors: SHARED_SENSOR_CONFIGS },
-    { title: "Android only", sensors: ANDROID_SENSOR_CONFIGS },
-    { title: "iPhone only", sensors: IOS_SENSOR_CONFIGS },
-  ]
-    .map((section) => ({
-      ...section,
-      sensors: section.sensors.filter((sensor) => shouldShowSensor(sensor.key)),
-    }))
-    .filter((section) => !hideEmptySensors || section.sensors.length > 0);
-  const visibleSensorCount = visibleSections.reduce(
+
+  const required = combinedRequirements(requirements);
+
+  // Which sensors, grouped into headed sections, the current view shows.
+  const sections: Section[] = (() => {
+    const base = [
+      { title: "Shared", sensors: SHARED_SENSOR_CONFIGS },
+      { title: "Android only", sensors: ANDROID_SENSOR_CONFIGS },
+      { title: "iPhone only", sensors: IOS_SENSOR_CONFIGS },
+    ];
+
+    if (view === "required") {
+      // Every required sensor, even with no data - that gap is the research
+      // question - and everything still recording but not required kept under
+      // its own heading rather than hidden.
+      const requiredSections = base
+        .map((section) => ({
+          ...section,
+          sensors: section.sensors.filter((s) => required.required.has(s.key)),
+        }))
+        .filter((section) => section.sensors.length > 0);
+      const notInConfig = SENSOR_CONFIGS.filter(
+        (s) => !required.required.has(s.key) && hasSensorRecords(s.key),
+      );
+      return notInConfig.length > 0
+        ? [...requiredSections, { title: "Not in config", sensors: notInConfig }]
+        : requiredSections;
+    }
+
+    const shouldShow = (key: string) =>
+      view === "all" || loadingKeys.has(key) || hasSensorRecords(key);
+    return base
+      .map((section) => ({
+        ...section,
+        sensors: section.sensors.filter((s) => shouldShow(s.key)),
+      }))
+      .filter((section) => view === "all" || section.sensors.length > 0);
+  })();
+
+  const visibleSensorCount = sections.reduce(
     (sum, section) => sum + section.sensors.length,
     0,
   );
+
+  const renderCard = (config: SensorConfig) =>
+    config.key === "wifi" ? (
+      <WifiRecordsCard
+        groups={[
+          {
+            label: "Android",
+            records: sensorData[config.key]?.android ?? [],
+          },
+          {
+            label: "iOS",
+            records: sensorData[config.key]?.ios ?? [],
+          },
+        ]}
+        loading={loadingKeys.has(config.key)}
+        className="h-full overflow-hidden"
+        tableClassName="max-h-[138px]"
+      />
+    ) : (
+      <SensorStatCard
+        config={config}
+        androidRecords={sensorData[config.key]?.android ?? []}
+        iosRecords={sensorData[config.key]?.ios ?? []}
+        loading={loadingKeys.has(config.key)}
+        className="h-full overflow-hidden"
+        androidExportHref={
+          config.platform === "shared" || config.platform === "android"
+            ? exportSensorZipHref("android", config.key)
+            : undefined
+        }
+        iosExportHref={
+          config.platform === "shared" || config.platform === "ios"
+            ? exportSensorZipHref("ios", config.key)
+            : undefined
+        }
+      />
+    );
+
   if (error)
     return (
       <div className="mt-4 p-4 text-red-700 bg-red-50 border border-red-200 rounded-2xl">
@@ -250,72 +323,55 @@ export default function OverviewPage() {
         <div className="text-[11px] font-semibold uppercase tracking-[0.6px] text-sage">
           Sensors
         </div>
-        <label className="flex cursor-pointer items-center gap-2 self-start rounded-xl border border-wire bg-card px-3 py-2 text-[12px] font-semibold text-ink shadow-card sm:self-auto">
-          <input
-            type="checkbox"
-            checked={hideEmptySensors}
-            onChange={(event) => setHideEmptySensors(event.target.checked)}
-            className="h-4 w-4 accent-teal"
-          />
-          Only sensors with records
-        </label>
+        <SensorViewFilter value={view} onChange={setView} />
       </div>
 
-      {visibleSensorCount === 0 && hideEmptySensors ? (
+      {view === "required" && !required.available ? (
         <div className="rounded-2xl border border-wire bg-card p-6 text-center text-[13px] text-sage shadow-card">
-          No sensors have records yet.
+          {requirements
+            ? "No deployed config was found to derive sensor requirements from."
+            : "Loading sensor requirements…"}
+        </div>
+      ) : visibleSensorCount === 0 && view !== "all" ? (
+        <div className="rounded-2xl border border-wire bg-card p-6 text-center text-[13px] text-sage shadow-card">
+          {view === "required"
+            ? "The deployed config requires no sensors this dashboard can show."
+            : "No sensors have records yet."}
         </div>
       ) : null}
 
-      {visibleSections.map((section) => (
+      {sections.map((section) => (
         <section key={section.title} className="mt-5">
           <div className="mb-2 px-1 text-[11px] font-semibold uppercase tracking-[0.6px] text-sage">
             {section.title}
           </div>
           <div className="grid auto-rows-[220px] grid-cols-[repeat(auto-fill,minmax(340px,1fr))] gap-4">
-            {section.sensors.map((config) =>
-              config.key === "wifi" ? (
-                <WifiRecordsCard
-                  key={config.key}
-                  groups={[
-                    {
-                      label: "Android",
-                      records: sensorData[config.key]?.android ?? [],
-                    },
-                    {
-                      label: "iOS",
-                      records: sensorData[config.key]?.ios ?? [],
-                    },
-                  ]}
-                  loading={loadingKeys.has(config.key)}
-                  className="h-full overflow-hidden"
-                  tableClassName="max-h-[138px]"
-                />
-              ) : (
-                <SensorStatCard
-                  key={config.key}
-                  config={config}
-                  androidRecords={sensorData[config.key]?.android ?? []}
-                  iosRecords={sensorData[config.key]?.ios ?? []}
-                  loading={loadingKeys.has(config.key)}
-                  className="h-full overflow-hidden"
-                  androidExportHref={
-                    config.platform === "shared" ||
-                    config.platform === "android"
-                      ? exportSensorZipHref("android", config.key)
-                      : undefined
-                  }
-                  iosExportHref={
-                    config.platform === "shared" || config.platform === "ios"
-                      ? exportSensorZipHref("ios", config.key)
-                      : undefined
-                  }
-                />
-              ),
-            )}
+            {section.sensors.map((config) => {
+              const flagged =
+                view === "required" &&
+                required.required.has(config.key) &&
+                !loadingKeys.has(config.key) &&
+                !hasSensorRecords(config.key);
+              return (
+                <div key={config.key} className="h-full">
+                  {flagged ? (
+                    <RequiredEmptyCard
+                      config={config}
+                      className="h-full overflow-hidden"
+                    />
+                  ) : (
+                    renderCard(config)
+                  )}
+                </div>
+              );
+            })}
           </div>
         </section>
       ))}
+
+      {view === "required" && required.available ? (
+        <RequiredStreamNote settings={required.requiredWithoutStream} />
+      ) : null}
     </div>
   );
 }

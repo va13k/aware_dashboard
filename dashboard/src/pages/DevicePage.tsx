@@ -6,6 +6,7 @@ import {
   fetchDeviceDetail,
   fetchDevices,
   fetchSensor,
+  fetchStudyRequirements,
 } from "../api/client";
 import { SENSOR_CONFIGS, deviceSensorsForPlatform } from "../config/sensors";
 import SensorTimeSeriesCard from "../components/SensorTimeSeriesCard";
@@ -26,6 +27,17 @@ import ProcessorCard from "../components/ProcessorCard";
 import BatteryEventsCard from "../components/BatteryEventsCard";
 import AmbientNoiseCard from "../components/AmbientNoiseCard";
 import ExportLink from "../components/ExportLink";
+import DeviceList from "../components/DeviceList";
+import StudyStatusPanel from "../components/StudyStatusPanel";
+import ConfigDiffPanel from "../components/ConfigDiffPanel";
+import StudyEventsTimeline from "../components/StudyEventsTimeline";
+import SensorViewFilter from "../components/SensorViewFilter";
+import { useSensorView } from "../utils/sensorView";
+import {
+  RequiredEmptyCard,
+  RequiredStreamNote,
+} from "../components/RequiredByConfig";
+import { platformRequirements } from "../utils/requirements";
 import {
   absoluteTime,
   latestTimestamp,
@@ -37,10 +49,10 @@ import type {
   DeviceDetail,
   DevicesResponse,
   SensorRecord,
+  StudyRequirements,
 } from "../types";
 
 const POLL_INTERVAL_MS = 60_000;
-const SENSOR_FILTER_STORAGE_KEY = "aware-dashboard-hide-empty-sensors";
 
 interface DeviceSensorState {
   key: string | null;
@@ -53,20 +65,6 @@ const EMPTY_SENSOR_STATE: DeviceSensorState = {
   sensorData: {},
   loadingKeys: new Set(),
 };
-
-function readHideEmptySensors(): boolean {
-  return window.localStorage.getItem(SENSOR_FILTER_STORAGE_KEY) === "true";
-}
-
-function deviceLabel(d: Device): string {
-  if (d.platform === "android") {
-    const name = [d.manufacturer, d.model].filter(Boolean).join(" ");
-    return name || d.device_id.slice(0, 12);
-  }
-  return (
-    d.label || d.device || d.model || d.product || d.device_id.slice(0, 16)
-  );
-}
 
 function formatValue(label: string, value: unknown): string {
   if (value == null || value === "") return "-";
@@ -185,8 +183,10 @@ export default function DevicePage() {
     useState<DeviceSensorState>(EMPTY_SENSOR_STATE);
   const [error, setError] = useState<string | null>(null);
   const [lastUpdated, setLastUpdated] = useState<number | null>(null);
-  const [hideEmptySensors, setHideEmptySensors] =
-    useState(readHideEmptySensors);
+  const [view, setView] = useSensorView();
+  const [requirements, setRequirements] = useState<StudyRequirements | null>(
+    null,
+  );
   // Ticks every 10 s so the "X ago" label stays fresh without re-fetching.
   const [, setTick] = useState(0);
 
@@ -194,6 +194,12 @@ export default function DevicePage() {
     fetchDevices()
       .then((d) => setDevices(d))
       .catch((e) => setError(String(e)));
+  }, []);
+
+  useEffect(() => {
+    fetchStudyRequirements()
+      .then((data) => setRequirements(data))
+      .catch(() => setRequirements(null));
   }, []);
 
   const allDevices: Device[] = useMemo(
@@ -236,13 +242,6 @@ export default function DevicePage() {
     const id = setInterval(() => setTick((t) => t + 1), 10_000);
     return () => clearInterval(id);
   }, []);
-
-  useEffect(() => {
-    window.localStorage.setItem(
-      SENSOR_FILTER_STORAGE_KEY,
-      String(hideEmptySensors),
-    );
-  }, [hideEmptySensors]);
 
   useEffect(() => {
     if (!selected) return;
@@ -330,74 +329,16 @@ export default function DevicePage() {
 
   return (
     <div className="grid grid-cols-[minmax(280px,360px)_1fr] gap-5 items-start max-xl:grid-cols-1">
-      <section className="bg-card backdrop-blur-xl border border-wire rounded-3xl shadow-card p-4">
-        <div className="flex items-center justify-between gap-3 mb-3">
-          <div>
-            <h1 className="text-[16px] font-bold text-ink">All devices</h1>
-            <p className="text-[12px] text-sage mt-0.5">
-              {(allDevices.length || 0).toLocaleString()} total
-            </p>
-          </div>
-          <div className="flex gap-1.5 text-[11px] text-sage">
-            <span className="px-2 py-1 rounded-lg bg-card-strong border border-wire">
-              {devices?.android.length ?? 0} Android
-            </span>
-            <span className="px-2 py-1 rounded-lg bg-card-strong border border-wire">
-              {devices?.ios.length ?? 0} iOS
-            </span>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-1 gap-2 max-xl:grid-cols-[repeat(auto-fill,minmax(220px,1fr))]">
-          {!devices ? (
-            <div className="h-24 rounded-xl shimmer" />
-          ) : allDevices.length === 0 ? (
-            <div className="text-sage text-[13px] py-8 text-center">
-              No devices
-            </div>
-          ) : (
-            allDevices.map((d) => {
-              const isSelected =
-                d.device_id === selected?.device_id &&
-                d.platform === selected?.platform;
-              return (
-                <button
-                  key={`${d.platform}:${d.device_id}`}
-                  onClick={() =>
-                    navigate(
-                      `/devices/${d.platform}/${encodeURIComponent(d.device_id)}`,
-                      { replace: true },
-                    )
-                  }
-                  className={`w-full text-left px-3.5 py-3 rounded-2xl border transition-colors cursor-pointer
-                  ${
-                    isSelected
-                      ? "bg-teal-soft border-teal"
-                      : "bg-card-strong border-wire hover:bg-teal-soft/50"
-                  }`}
-                >
-                  <div className="flex items-center justify-between gap-2 mb-1">
-                    <span
-                      className={`text-[11px] uppercase tracking-[0.5px] font-semibold ${isSelected ? "text-teal" : "text-sage"}`}
-                    >
-                      {d.platform}
-                    </span>
-                    <span className="text-[11px] text-sage">
-                      {relativeAge(d.last_seen)}
-                    </span>
-                  </div>
-                  <div className="text-[13px] font-semibold leading-tight truncate text-ink">
-                    {deviceLabel(d)}
-                  </div>
-                  <div className="text-[11px] text-sage mt-1 truncate">
-                    {d.device_id}
-                  </div>
-                </button>
-              );
-            })
-          )}
-        </div>
-      </section>
+      <DeviceList
+        devices={devices}
+        selected={selected}
+        onSelect={(device) =>
+          navigate(
+            `/devices/${device.platform}/${encodeURIComponent(device.device_id)}`,
+            { replace: true },
+          )
+        }
+      />
 
       <div className="flex flex-col gap-4 min-w-0">
         <DeviceDetailPanel
@@ -405,6 +346,21 @@ export default function DevicePage() {
           loading={Boolean(selected && !currentDetail)}
           exportHref={selectedDeviceExportHref}
         />
+
+        {currentDetail?.study ? (
+          <StudyStatusPanel
+            study={currentDetail.study}
+            configDiff={currentDetail.config_diff}
+          />
+        ) : null}
+
+        {currentDetail?.config_diff ? (
+          <ConfigDiffPanel diff={currentDetail.config_diff} />
+        ) : null}
+
+        {currentDetail?.study ? (
+          <StudyEventsTimeline events={currentDetail.study_events ?? []} />
+        ) : null}
 
         {selected &&
           (() => {
@@ -414,10 +370,55 @@ export default function DevicePage() {
             const sensorRecords = (key: string) =>
               currentSensorState.sensorData[key] ?? [];
             const sensorLoading = (key: string) => pendingSensorKeys.has(key);
-            const shouldShowSensor = (key: string) =>
-              !hideEmptySensors ||
-              sensorLoading(key) ||
-              sensorRecords(key).length > 0;
+            const hasRecords = (key: string) => sensorRecords(key).length > 0;
+            const requiredLookup = platformRequirements(
+              requirements,
+              selected.platform,
+            );
+            const requiredSet = requiredLookup.required;
+            // A group - one key, or the several keys behind a composite card - is
+            // shown when any key has data or is still loading; in the required
+            // view it also shows when the config asks for it, even with nothing
+            // recorded yet.
+            const groupVisible = (keys: string[]) => {
+              if (view === "all") return true;
+              if (keys.some((k) => sensorLoading(k) || hasRecords(k)))
+                return true;
+              return view === "required" && keys.some((k) => requiredSet.has(k));
+            };
+            const shouldShowSensor = (key: string) => groupVisible([key]);
+            // Required by the config, done loading, and still empty - the gap the
+            // required view exists to surface.
+            const flagRequired = (key: string) =>
+              view === "required" &&
+              requiredSet.has(key) &&
+              !sensorLoading(key) &&
+              !hasRecords(key);
+            // Fill the grid cell (`h-full` on both the wrapper and the card
+            // div it holds) so every card in a row shares the row's height and
+            // the rows stop looking ragged. A required-but-empty sensor renders
+            // the orange placeholder instead of its own (empty) card.
+            const withFlag = (
+              key: string,
+              node: React.ReactNode,
+              className = "",
+            ) => {
+              const config = platformSensors.find((s) => s.key === key);
+              const content =
+                flagRequired(key) && config ? (
+                  <RequiredEmptyCard config={config} />
+                ) : (
+                  node
+                );
+              return (
+                <div
+                  key={key}
+                  className={`h-full [&>div]:h-full ${className}`.trim()}
+                >
+                  {content}
+                </div>
+              );
+            };
             const visibleSharedSensors = sharedSensors.filter((sensor) =>
               shouldShowSensor(sensor.key),
             );
@@ -429,11 +430,7 @@ export default function DevicePage() {
               "battery-charges",
               "battery-discharges",
             ];
-            const shouldShowBatteryCard =
-              !hideEmptySensors ||
-              BATTERY_KEYS.some(
-                (k) => sensorLoading(k) || sensorRecords(k).length > 0,
-              );
+            const shouldShowBatteryCard = groupVisible(BATTERY_KEYS);
             const sharedChartSensors = visibleSharedSensors.filter(
               (s) =>
                 !["locations", "network", ...BATTERY_KEYS].includes(s.key),
@@ -450,11 +447,7 @@ export default function DevicePage() {
               "applications-history",
               "applications-notifications",
             ];
-            const shouldShowApplications =
-              !hideEmptySensors ||
-              ALL_APP_KEYS.some(
-                (k) => sensorLoading(k) || sensorRecords(k).length > 0,
-              );
+            const shouldShowApplications = groupVisible(ALL_APP_KEYS);
             const specificSensors = platformSensors.filter(
               (s) =>
                 s.platform !== "shared" &&
@@ -486,22 +479,20 @@ export default function DevicePage() {
                       ? `Updated ${relativeAge(lastUpdated)}`
                       : "Loading…"}
                   </div>
-                  <label className="flex cursor-pointer items-center gap-2 self-start rounded-xl border border-wire bg-card px-3 py-2 text-[12px] font-semibold text-ink shadow-card sm:self-auto">
-                    <input
-                      type="checkbox"
-                      checked={hideEmptySensors}
-                      onChange={(event) =>
-                        setHideEmptySensors(event.target.checked)
-                      }
-                      className="h-4 w-4 accent-teal"
-                    />
-                    Only sensors with records
-                  </label>
+                  <SensorViewFilter value={view} onChange={setView} />
                 </div>
 
-                {visibleSensorCount === 0 && hideEmptySensors ? (
+                {view === "required" && !requiredLookup.available ? (
                   <div className="rounded-2xl border border-wire bg-card p-6 text-center text-[13px] text-sage shadow-card">
-                    No sensors have records for this device yet.
+                    {requirements
+                      ? `No deployed ${selected.platform} config was found to derive sensor requirements from.`
+                      : "Loading sensor requirements…"}
+                  </div>
+                ) : visibleSensorCount === 0 && view !== "all" ? (
+                  <div className="rounded-2xl border border-wire bg-card p-6 text-center text-[13px] text-sage shadow-card">
+                    {view === "required"
+                      ? "The deployed config requires no sensors this dashboard can show."
+                      : "No sensors have records for this device yet."}
                   </div>
                 ) : null}
 
@@ -510,9 +501,11 @@ export default function DevicePage() {
                     <div className="text-[11px] font-semibold uppercase tracking-[0.6px] text-sage px-1">
                       Shared
                     </div>
-                    <div className="grid grid-cols-[repeat(auto-fill,minmax(320px,1fr))] gap-4">
+                    <div className="grid grid-flow-dense grid-cols-[repeat(auto-fill,minmax(320px,1fr))] gap-4">
                       {sharedChartSensors.map((config) =>
-                        config.key === "calls" ? (
+                        withFlag(
+                          config.key,
+                          config.key === "calls" ? (
                           <CallsRecordsCard
                             key={config.key}
                             records={
@@ -608,16 +601,21 @@ export default function DevicePage() {
                             loading={pendingSensorKeys.has(config.key)}
                             exportHref={selectedSensorExportHref(config.key)}
                           />
+                          ),
+                          config.key === "bluetooth" ? "col-span-2" : "",
                         ),
                       )}
-                      {showNetwork ? (
-                        <NetworkTypeCard
-                          records={sensorRecords("network")}
-                          loading={sensorLoading("network")}
-                          platform={selected.platform}
-                          exportHref={selectedSensorExportHref("network")}
-                        />
-                      ) : null}
+                      {showNetwork
+                        ? withFlag(
+                            "network",
+                            <NetworkTypeCard
+                              records={sensorRecords("network")}
+                              loading={sensorLoading("network")}
+                              platform={selected.platform}
+                              exportHref={selectedSensorExportHref("network")}
+                            />,
+                          )
+                        : null}
                       {shouldShowBatteryCard ? (
                         <div className="col-span-full">
                           <BatteryEventsCard
@@ -645,18 +643,22 @@ export default function DevicePage() {
                       ) : null}
                     </div>
 
-                    {locationSensor ? (
-                      <LocationRecordsCard
-                        records={
-                          currentSensorState.sensorData[locationSensor.key] ??
-                          []
-                        }
-                        loading={pendingSensorKeys.has(locationSensor.key)}
-                        exportHref={selectedSensorExportHref(
+                    {locationSensor
+                      ? withFlag(
                           locationSensor.key,
-                        )}
-                      />
-                    ) : null}
+                          <LocationRecordsCard
+                            records={
+                              currentSensorState.sensorData[
+                                locationSensor.key
+                              ] ?? []
+                            }
+                            loading={pendingSensorKeys.has(locationSensor.key)}
+                            exportHref={selectedSensorExportHref(
+                              locationSensor.key,
+                            )}
+                          />,
+                        )
+                      : null}
                   </>
                 ) : null}
 
@@ -665,9 +667,11 @@ export default function DevicePage() {
                     <div className="text-[11px] font-semibold uppercase tracking-[0.6px] text-sage px-1 mt-2">
                       {specificLabel}
                     </div>
-                    <div className="grid grid-cols-[repeat(auto-fill,minmax(320px,1fr))] gap-4">
+                    <div className="grid grid-flow-dense grid-cols-[repeat(auto-fill,minmax(320px,1fr))] gap-4">
                       {specificSensors.map((config) =>
-                        config.key === "studentlife-audio" ? (
+                        withFlag(
+                          config.key,
+                          config.key === "studentlife-audio" ? (
                           <ConversationRecordsCard
                             key={config.key}
                             records={
@@ -741,10 +745,20 @@ export default function DevicePage() {
                             loading={pendingSensorKeys.has(config.key)}
                             exportHref={selectedSensorExportHref(config.key)}
                           />
+                          ),
+                          config.key === "applications"
+                            ? "col-span-full"
+                            : "",
                         ),
                       )}
                     </div>
                   </>
+                ) : null}
+
+                {view === "required" && requiredLookup.available ? (
+                  <RequiredStreamNote
+                    settings={requiredLookup.requiredWithoutStream}
+                  />
                 ) : null}
               </>
             );
