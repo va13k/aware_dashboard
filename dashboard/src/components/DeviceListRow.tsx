@@ -2,6 +2,7 @@ import type { Device } from "../types";
 import { deviceLabel } from "../utils/devices";
 import { relativeAge } from "../utils/time";
 import { ConfigBadge, EnrollmentBadge } from "./StudyBadges";
+import PlatformIcon from "./PlatformIcon";
 
 /**
  * One phone in the list.
@@ -33,14 +34,8 @@ export default function DeviceListRow({
           : "border-wire bg-card-strong hover:bg-teal-soft/50"
       }`}
     >
-      <div className="flex min-w-0 items-baseline gap-2">
-        <span
-          className={`shrink-0 text-[10px] font-semibold uppercase tracking-[0.5px] ${
-            selected ? "text-teal" : "text-sage"
-          }`}
-        >
-          {device.platform}
-        </span>
+      <div className="flex min-w-0 items-center gap-2">
+        <PlatformIcon platform={device.platform} className="h-4 w-4 shrink-0" />
         <span className="min-w-0 flex-1 truncate text-[13px] font-semibold leading-tight text-ink">
           {deviceLabel(device)}
         </span>

@@ -5,7 +5,14 @@ import { normalizeTimestamp } from "../utils/time";
 import DeviceListRow from "./DeviceListRow";
 
 type StatusFilter = "all" | StudyEnrollmentStatus | "not_tracked";
+type PlatformFilter = "all" | "android" | "ios";
 type SortOrder = "upload" | "status" | "name";
+
+const PLATFORM_OPTIONS: { value: PlatformFilter; label: string }[] = [
+  { value: "all", label: "All platforms" },
+  { value: "android", label: "Android" },
+  { value: "ios", label: "iPhone" },
+];
 
 const STATUS_OPTIONS: { value: StatusFilter; label: string }[] = [
   { value: "all", label: "All statuses" },
@@ -64,6 +71,7 @@ export default function DeviceList({
   selected: Device | null;
   onSelect: (device: Device) => void;
 }) {
+  const [platform, setPlatform] = useState<PlatformFilter>("all");
   const [status, setStatus] = useState<StatusFilter>("all");
   const [order, setOrder] = useState<SortOrder>("upload");
 
@@ -73,13 +81,16 @@ export default function DeviceList({
   );
 
   const visible = useMemo(() => {
-    const filtered =
-      status === "all" ? all : all.filter((device) => statusOf(device) === status);
+    const filtered = all.filter(
+      (device) =>
+        (platform === "all" || device.platform === platform) &&
+        (status === "all" || statusOf(device) === status),
+    );
     return [...filtered].sort((a, b) => compare(a, b, order));
-  }, [all, status, order]);
+  }, [all, platform, status, order]);
 
   const selectClass =
-    "min-w-0 flex-1 cursor-pointer rounded-xl border border-wire bg-card-strong px-2 py-1.5 text-[11px] font-semibold text-ink";
+    "min-w-[120px] flex-1 cursor-pointer rounded-xl border border-wire bg-card-strong px-2 py-1.5 text-[11px] font-semibold text-ink";
 
   return (
     <section className="rounded-3xl border border-wire bg-card p-4 shadow-card backdrop-blur-xl">
@@ -90,7 +101,21 @@ export default function DeviceList({
         </p>
       </div>
 
-      <div className="mb-3 flex gap-2">
+      <div className="mb-3 flex flex-wrap gap-2">
+        <select
+          aria-label="Filter by platform"
+          className={selectClass}
+          value={platform}
+          onChange={(event) =>
+            setPlatform(event.target.value as PlatformFilter)
+          }
+        >
+          {PLATFORM_OPTIONS.map((option) => (
+            <option key={option.value} value={option.value}>
+              {option.label}
+            </option>
+          ))}
+        </select>
         <select
           aria-label="Filter by study status"
           className={selectClass}
@@ -117,14 +142,14 @@ export default function DeviceList({
         </select>
       </div>
 
-      <div className="grid grid-cols-1 gap-2 max-xl:grid-cols-[repeat(auto-fill,minmax(260px,1fr))]">
+      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
         {!devices ? (
-          <div className="h-24 rounded-xl shimmer" />
+          <div className="h-24 rounded-xl shimmer sm:col-span-2" />
         ) : visible.length === 0 ? (
-          <div className="py-8 text-center text-[13px] text-sage">
+          <div className="py-8 text-center text-[13px] text-sage sm:col-span-2">
             {all.length === 0
               ? "No devices"
-              : `No devices with this status (${all.length} hidden)`}
+              : `No devices match these filters (${all.length} hidden)`}
           </div>
         ) : (
           visible.map((device) => (
