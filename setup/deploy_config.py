@@ -1,5 +1,6 @@
 import html
 import json
+import os
 import pathlib
 import secrets
 import subprocess
@@ -249,6 +250,81 @@ def write_deployment_urls(urls: dict[str, str]) -> None:
     )
 
 
+def chown_generated_paths(env: dict[str, str]) -> None:
+    """Align on-disk ownership with the deploying user.
+
+    The setup wizard runs this script as root inside its container (it also
+    reads /var/run/docker.sock to poll service health, which needs root or
+    the docker group, so it can't drop to HOST_UID:HOST_GID the way the
+    Configurator does). Left alone, every file below would stay root-owned,
+    and the Configurator — which does run as HOST_UID:HOST_GID — would get a
+    PermissionError, surfaced to the researcher as a 500, the moment they hit
+    Save. Re-running this as a normal, non-root user (setup.sh's redeploy
+    path) is a harmless no-op: chowning a path to its own uid/gid always
+    succeeds without extra privilege.
+
+    Windows has no Unix uid/gid concept — os.chown doesn't exist there — and
+    setup.bat never writes HOST_UID/HOST_GID to .env, since Docker Desktop's
+    bind mounts don't enforce host-side ownership the way a native Linux bind
+    mount does. Bail out before touching os.getuid/os.chown, both of which
+    would raise AttributeError on that platform.
+
+    Every path this touches holds a secret or credentials (.env, the
+    htpasswd, source.json's database passwords), so the target uid:gid is
+    not trusted blindly: it must match the project directory's own owner,
+    which was established out-of-band at `git clone` time and is not
+    reachable from any web request (write_request_env.py's fixed key
+    allowlist already excludes HOST_UID/HOST_GID, so the wizard's HTTP body
+    cannot inject one either — this is defense in depth for a future code
+    path or a hand-edited .env, not a plugged hole).
+    """
+    if not hasattr(os, "chown"):
+        return
+
+    try:
+        uid = int(env.get("HOST_UID", os.getuid()))
+        gid = int(env.get("HOST_GID", os.getgid()))
+    except (TypeError, ValueError):
+        return
+
+    try:
+        anchor = PROJECT.stat()
+    except OSError as exc:
+        print(f"deploy_config: could not stat {PROJECT}: {exc}", file=sys.stderr)
+        return
+
+    if (uid, gid) != (anchor.st_uid, anchor.st_gid):
+        print(
+            f"deploy_config: refusing to chown generated files to {uid}:{gid} — "
+            f"it does not match the project directory's owner "
+            f"{anchor.st_uid}:{anchor.st_gid}. Check HOST_UID/HOST_GID in .env.",
+            file=sys.stderr,
+        )
+        return
+
+    paths = [
+        ENV_PATH,
+        HTPASSWD_PATH,
+        HTPASSWD_PATH.parent,
+        SOURCE_PATH,
+        CONFIG_PATH,
+        CONFIG_PATH.parent,
+        CONFIG_PATH.parent / "cache",
+        ESM_CONFIG_PATH,
+        ESM_CONFIG_PATH.parent,
+        STUDY_CONFIG_PATH,
+        STUDY_CONFIG_PATH.parent,
+        STUDIES_INDEX_PATH,
+        PROJECT / "deployment-urls.json",
+    ]
+    for path in paths:
+        try:
+            if path.exists():
+                os.chown(path, uid, gid)
+        except OSError as exc:
+            print(f"deploy_config: could not chown {path}: {exc}", file=sys.stderr)
+
+
 def main() -> None:
     env = load_merged_env()
     ensure_django_secret_key(env)
@@ -301,6 +377,8 @@ def main() -> None:
     study_join_url = f"{base_url}{study_join_path}"
     write_studies_index(base_url, study_join_path, study_join_url, android_study_url)
     write_deployment_urls(build_deployment_urls(base_url, study_join_url, android_study_url))
+
+    chown_generated_paths(env)
 
 
 if __name__ == "__main__":
