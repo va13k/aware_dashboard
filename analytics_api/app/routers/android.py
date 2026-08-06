@@ -84,6 +84,12 @@ from app.schemas import (
 
 router = APIRouter(prefix="/android/{device_id}", tags=["android"])
 
+# The largest window a single data request may pull. The dashboard asks for at
+# most 1500 points per chart; this ceiling leaves headroom for direct API use
+# while keeping a single-device range scan bounded. Full-history dumps go
+# through the CSV export endpoints, not these JSON routes.
+MAX_RECORD_LIMIT = 5000
+
 
 def _base_query(model, device_id, from_ts, to_ts, limit, offset):
     q = select(model).where(model.device_id == device_id)
@@ -99,7 +105,7 @@ async def get_accelerometer(
     device_id: str,
     from_ts: float | None = Query(None),
     to_ts: float | None = Query(None),
-    limit: int = Query(100, le=1000),
+    limit: int = Query(100, le=MAX_RECORD_LIMIT),
     offset: int = Query(0),
     db: AsyncSession = Depends(get_android_db),
 ):
@@ -114,7 +120,7 @@ async def get_applications(
     device_id: str,
     from_ts: float | None = Query(None),
     to_ts: float | None = Query(None),
-    limit: int = Query(100, le=1000),
+    limit: int = Query(100, le=MAX_RECORD_LIMIT),
     offset: int = Query(0),
     db: AsyncSession = Depends(get_android_db),
 ):
@@ -129,7 +135,7 @@ async def get_applications_crashes(
     device_id: str,
     from_ts: float | None = Query(None),
     to_ts: float | None = Query(None),
-    limit: int = Query(100, le=1000),
+    limit: int = Query(100, le=MAX_RECORD_LIMIT),
     offset: int = Query(0),
     db: AsyncSession = Depends(get_android_db),
 ):
@@ -144,7 +150,7 @@ async def get_applications_history(
     device_id: str,
     from_ts: float | None = Query(None),
     to_ts: float | None = Query(None),
-    limit: int = Query(100, le=1000),
+    limit: int = Query(100, le=MAX_RECORD_LIMIT),
     offset: int = Query(0),
     db: AsyncSession = Depends(get_android_db),
 ):
@@ -161,7 +167,7 @@ async def get_applications_notifications(
     device_id: str,
     from_ts: float | None = Query(None),
     to_ts: float | None = Query(None),
-    limit: int = Query(100, le=1000),
+    limit: int = Query(100, le=MAX_RECORD_LIMIT),
     offset: int = Query(0),
     db: AsyncSession = Depends(get_android_db),
 ):
@@ -176,7 +182,7 @@ async def get_barometer(
     device_id: str,
     from_ts: float | None = Query(None),
     to_ts: float | None = Query(None),
-    limit: int = Query(100, le=1000),
+    limit: int = Query(100, le=MAX_RECORD_LIMIT),
     offset: int = Query(0),
     db: AsyncSession = Depends(get_android_db),
 ):
@@ -191,7 +197,7 @@ async def get_battery(
     device_id: str,
     from_ts: float | None = Query(None),
     to_ts: float | None = Query(None),
-    limit: int = Query(100, le=1000),
+    limit: int = Query(100, le=MAX_RECORD_LIMIT),
     offset: int = Query(0),
     db: AsyncSession = Depends(get_android_db),
 ):
@@ -204,7 +210,7 @@ async def get_battery_charges(
     device_id: str,
     from_ts: float | None = Query(None),
     to_ts: float | None = Query(None),
-    limit: int = Query(100, le=1000),
+    limit: int = Query(100, le=MAX_RECORD_LIMIT),
     offset: int = Query(0),
     db: AsyncSession = Depends(get_android_db),
 ):
@@ -219,7 +225,7 @@ async def get_battery_discharges(
     device_id: str,
     from_ts: float | None = Query(None),
     to_ts: float | None = Query(None),
-    limit: int = Query(100, le=1000),
+    limit: int = Query(100, le=MAX_RECORD_LIMIT),
     offset: int = Query(0),
     db: AsyncSession = Depends(get_android_db),
 ):
@@ -234,7 +240,7 @@ async def get_bluetooth(
     device_id: str,
     from_ts: float | None = Query(None),
     to_ts: float | None = Query(None),
-    limit: int = Query(100, le=1000),
+    limit: int = Query(100, le=MAX_RECORD_LIMIT),
     offset: int = Query(0),
     db: AsyncSession = Depends(get_android_db),
 ):
@@ -249,7 +255,7 @@ async def get_calls(
     device_id: str,
     from_ts: float | None = Query(None),
     to_ts: float | None = Query(None),
-    limit: int = Query(100, le=1000),
+    limit: int = Query(100, le=MAX_RECORD_LIMIT),
     offset: int = Query(0),
     db: AsyncSession = Depends(get_android_db),
 ):
@@ -262,7 +268,7 @@ async def get_esms(
     device_id: str,
     from_ts: float | None = Query(None),
     to_ts: float | None = Query(None),
-    limit: int = Query(100, le=1000),
+    limit: int = Query(100, le=MAX_RECORD_LIMIT),
     offset: int = Query(0),
     db: AsyncSession = Depends(get_android_db),
 ):
@@ -275,7 +281,7 @@ async def get_gravity(
     device_id: str,
     from_ts: float | None = Query(None),
     to_ts: float | None = Query(None),
-    limit: int = Query(100, le=1000),
+    limit: int = Query(100, le=MAX_RECORD_LIMIT),
     offset: int = Query(0),
     db: AsyncSession = Depends(get_android_db),
 ):
@@ -288,7 +294,7 @@ async def get_gyroscope(
     device_id: str,
     from_ts: float | None = Query(None),
     to_ts: float | None = Query(None),
-    limit: int = Query(100, le=1000),
+    limit: int = Query(100, le=MAX_RECORD_LIMIT),
     offset: int = Query(0),
     db: AsyncSession = Depends(get_android_db),
 ):
@@ -303,7 +309,7 @@ async def get_installations(
     device_id: str,
     from_ts: float | None = Query(None),
     to_ts: float | None = Query(None),
-    limit: int = Query(100, le=1000),
+    limit: int = Query(100, le=MAX_RECORD_LIMIT),
     offset: int = Query(0),
     db: AsyncSession = Depends(get_android_db),
 ):
@@ -318,7 +324,7 @@ async def get_keyboard(
     device_id: str,
     from_ts: float | None = Query(None),
     to_ts: float | None = Query(None),
-    limit: int = Query(100, le=1000),
+    limit: int = Query(100, le=MAX_RECORD_LIMIT),
     offset: int = Query(0),
     db: AsyncSession = Depends(get_android_db),
 ):
@@ -333,7 +339,7 @@ async def get_light(
     device_id: str,
     from_ts: float | None = Query(None),
     to_ts: float | None = Query(None),
-    limit: int = Query(100, le=1000),
+    limit: int = Query(100, le=MAX_RECORD_LIMIT),
     offset: int = Query(0),
     db: AsyncSession = Depends(get_android_db),
 ):
@@ -346,7 +352,7 @@ async def get_linear_accelerometer(
     device_id: str,
     from_ts: float | None = Query(None),
     to_ts: float | None = Query(None),
-    limit: int = Query(100, le=1000),
+    limit: int = Query(100, le=MAX_RECORD_LIMIT),
     offset: int = Query(0),
     db: AsyncSession = Depends(get_android_db),
 ):
@@ -361,7 +367,7 @@ async def get_locations(
     device_id: str,
     from_ts: float | None = Query(None),
     to_ts: float | None = Query(None),
-    limit: int = Query(100, le=1000),
+    limit: int = Query(100, le=MAX_RECORD_LIMIT),
     offset: int = Query(0),
     db: AsyncSession = Depends(get_android_db),
 ):
@@ -376,7 +382,7 @@ async def get_magnetometer(
     device_id: str,
     from_ts: float | None = Query(None),
     to_ts: float | None = Query(None),
-    limit: int = Query(100, le=1000),
+    limit: int = Query(100, le=MAX_RECORD_LIMIT),
     offset: int = Query(0),
     db: AsyncSession = Depends(get_android_db),
 ):
@@ -391,7 +397,7 @@ async def get_messages(
     device_id: str,
     from_ts: float | None = Query(None),
     to_ts: float | None = Query(None),
-    limit: int = Query(100, le=1000),
+    limit: int = Query(100, le=MAX_RECORD_LIMIT),
     offset: int = Query(0),
     db: AsyncSession = Depends(get_android_db),
 ):
@@ -406,7 +412,7 @@ async def get_network(
     device_id: str,
     from_ts: float | None = Query(None),
     to_ts: float | None = Query(None),
-    limit: int = Query(100, le=1000),
+    limit: int = Query(100, le=MAX_RECORD_LIMIT),
     offset: int = Query(0),
     db: AsyncSession = Depends(get_android_db),
 ):
@@ -419,7 +425,7 @@ async def get_network_traffic(
     device_id: str,
     from_ts: float | None = Query(None),
     to_ts: float | None = Query(None),
-    limit: int = Query(100, le=1000),
+    limit: int = Query(100, le=MAX_RECORD_LIMIT),
     offset: int = Query(0),
     db: AsyncSession = Depends(get_android_db),
 ):
@@ -434,7 +440,7 @@ async def get_notes(
     device_id: str,
     from_ts: float | None = Query(None),
     to_ts: float | None = Query(None),
-    limit: int = Query(100, le=1000),
+    limit: int = Query(100, le=MAX_RECORD_LIMIT),
     offset: int = Query(0),
     db: AsyncSession = Depends(get_android_db),
 ):
@@ -447,7 +453,7 @@ async def get_plugin_ambient_noise(
     device_id: str,
     from_ts: float | None = Query(None),
     to_ts: float | None = Query(None),
-    limit: int = Query(100, le=1000),
+    limit: int = Query(100, le=MAX_RECORD_LIMIT),
     offset: int = Query(0),
     db: AsyncSession = Depends(get_android_db),
 ):
@@ -462,7 +468,7 @@ async def get_plugin_openweather(
     device_id: str,
     from_ts: float | None = Query(None),
     to_ts: float | None = Query(None),
-    limit: int = Query(100, le=1000),
+    limit: int = Query(100, le=MAX_RECORD_LIMIT),
     offset: int = Query(0),
     db: AsyncSession = Depends(get_android_db),
 ):
@@ -477,7 +483,7 @@ async def get_proximity(
     device_id: str,
     from_ts: float | None = Query(None),
     to_ts: float | None = Query(None),
-    limit: int = Query(100, le=1000),
+    limit: int = Query(100, le=MAX_RECORD_LIMIT),
     offset: int = Query(0),
     db: AsyncSession = Depends(get_android_db),
 ):
@@ -492,7 +498,7 @@ async def get_rotation(
     device_id: str,
     from_ts: float | None = Query(None),
     to_ts: float | None = Query(None),
-    limit: int = Query(100, le=1000),
+    limit: int = Query(100, le=MAX_RECORD_LIMIT),
     offset: int = Query(0),
     db: AsyncSession = Depends(get_android_db),
 ):
@@ -507,7 +513,7 @@ async def get_screen(
     device_id: str,
     from_ts: float | None = Query(None),
     to_ts: float | None = Query(None),
-    limit: int = Query(100, le=1000),
+    limit: int = Query(100, le=MAX_RECORD_LIMIT),
     offset: int = Query(0),
     db: AsyncSession = Depends(get_android_db),
 ):
@@ -520,7 +526,7 @@ async def get_screentext(
     device_id: str,
     from_ts: float | None = Query(None),
     to_ts: float | None = Query(None),
-    limit: int = Query(100, le=1000),
+    limit: int = Query(100, le=MAX_RECORD_LIMIT),
     offset: int = Query(0),
     db: AsyncSession = Depends(get_android_db),
 ):
@@ -535,7 +541,7 @@ async def get_significant_motion(
     device_id: str,
     from_ts: float | None = Query(None),
     to_ts: float | None = Query(None),
-    limit: int = Query(100, le=1000),
+    limit: int = Query(100, le=MAX_RECORD_LIMIT),
     offset: int = Query(0),
     db: AsyncSession = Depends(get_android_db),
 ):
@@ -550,7 +556,7 @@ async def get_telephony(
     device_id: str,
     from_ts: float | None = Query(None),
     to_ts: float | None = Query(None),
-    limit: int = Query(100, le=1000),
+    limit: int = Query(100, le=MAX_RECORD_LIMIT),
     offset: int = Query(0),
     db: AsyncSession = Depends(get_android_db),
 ):
@@ -565,7 +571,7 @@ async def get_temperature(
     device_id: str,
     from_ts: float | None = Query(None),
     to_ts: float | None = Query(None),
-    limit: int = Query(100, le=1000),
+    limit: int = Query(100, le=MAX_RECORD_LIMIT),
     offset: int = Query(0),
     db: AsyncSession = Depends(get_android_db),
 ):
@@ -580,7 +586,7 @@ async def get_timezone(
     device_id: str,
     from_ts: float | None = Query(None),
     to_ts: float | None = Query(None),
-    limit: int = Query(100, le=1000),
+    limit: int = Query(100, le=MAX_RECORD_LIMIT),
     offset: int = Query(0),
     db: AsyncSession = Depends(get_android_db),
 ):
@@ -595,7 +601,7 @@ async def get_touch(
     device_id: str,
     from_ts: float | None = Query(None),
     to_ts: float | None = Query(None),
-    limit: int = Query(100, le=1000),
+    limit: int = Query(100, le=MAX_RECORD_LIMIT),
     offset: int = Query(0),
     db: AsyncSession = Depends(get_android_db),
 ):
@@ -608,7 +614,7 @@ async def get_wifi(
     device_id: str,
     from_ts: float | None = Query(None),
     to_ts: float | None = Query(None),
-    limit: int = Query(100, le=1000),
+    limit: int = Query(100, le=MAX_RECORD_LIMIT),
     offset: int = Query(0),
     db: AsyncSession = Depends(get_android_db),
 ):

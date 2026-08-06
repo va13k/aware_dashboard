@@ -648,3 +648,22 @@ export function deviceSensorsForPlatform(
 ): SensorConfig[] {
   return sensorsForPlatform(platform);
 }
+
+/** A sensor's already-fetched records, keyed by the data key they belong to. */
+export type SensorData = Record<string, SensorRecord[]>;
+
+/** The data keys a sensor needs fetched (composite cards pull several). */
+export function sensorDataKeys(key: string): string[] {
+  if (key === "battery") {
+    return ["battery", "battery-charges", "battery-discharges"];
+  }
+  if (key === "applications") {
+    return [
+      "applications",
+      "applications-crashes",
+      "applications-history",
+      "applications-notifications",
+    ];
+  }
+  return [key];
+}

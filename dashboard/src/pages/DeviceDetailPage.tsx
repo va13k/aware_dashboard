@@ -3,40 +3,26 @@ import { useParams, useNavigate } from "react-router-dom";
 import { useHeaderSlot } from "../utils/headerSlot";
 import {
   exportDeviceHref,
-  exportSensorHref,
   fetchDeviceDetail,
   fetchDevices,
   fetchSensor,
   fetchStudyRequirements,
 } from "../api/client";
-import { SENSOR_CONFIGS, deviceSensorsForPlatform } from "../config/sensors";
-import SensorTimeSeriesCard from "../components/SensorTimeSeriesCard";
-import NetworkTypeCard from "../components/NetworkTypeCard";
-import ActivityCard from "../components/ActivityCard";
-import ApplicationsCard from "../components/ApplicationsCard";
-import WifiRecordsCard from "../components/WifiRecordsCard";
-import LocationRecordsCard from "../components/LocationRecordsCard";
-import CallsRecordsCard from "../components/CallsRecordsCard";
-import TimezoneRecordsCard from "../components/TimezoneRecordsCard";
-import AccelerometerRecordsCard from "../components/AccelerometerRecordsCard";
-import BluetoothRecordsCard from "../components/BluetoothRecordsCard";
-import GyroscopeRecordsCard from "../components/GyroscopeRecordsCard";
-import LinearAccelerometerRecordsCard from "../components/LinearAccelerometerRecordsCard";
-import ConversationRecordsCard from "../components/ConversationRecordsCard";
-import DeviceUsageRecordsCard from "../components/DeviceUsageRecordsCard";
-import ProcessorCard from "../components/ProcessorCard";
-import BatteryEventsCard from "../components/BatteryEventsCard";
-import AmbientNoiseCard from "../components/AmbientNoiseCard";
+import type { SensorConfig } from "../config/sensors";
+import {
+  SENSOR_CONFIGS,
+  deviceSensorsForPlatform,
+  sensorDataKeys,
+} from "../config/sensors";
+import SensorTile from "../components/SensorTile";
+import SensorModal from "../components/SensorModal";
 import ExportLink from "../components/ExportLink";
 import StudyStatusPanel from "../components/StudyStatusPanel";
 import ConfigDiffPanel from "../components/ConfigDiffPanel";
 import StudyEventsTimeline from "../components/StudyEventsTimeline";
 import SensorViewFilter from "../components/SensorViewFilter";
 import { useSensorView } from "../utils/sensorView";
-import {
-  RequiredEmptyCard,
-  RequiredStreamNote,
-} from "../components/RequiredByConfig";
+import { RequiredStreamNote } from "../components/RequiredByConfig";
 import { platformRequirements } from "../utils/requirements";
 import { deviceLabel } from "../utils/devices";
 import {
@@ -247,6 +233,8 @@ export default function DeviceDetailPage() {
   const [requirements, setRequirements] = useState<StudyRequirements | null>(
     null,
   );
+  // The sensor whose time-range chart modal is open, or null when closed.
+  const [openConfig, setOpenConfig] = useState<SensorConfig | null>(null);
   // Ticks every 10 s so the "X ago" label stays fresh without re-fetching.
   const [, setTick] = useState(0);
 
@@ -276,10 +264,6 @@ export default function DeviceDetailPage() {
   const selectedDeviceExportHref = selected
     ? exportDeviceHref(selected.platform, selected.device_id)
     : undefined;
-  const selectedSensorExportHref = (sensor: string) =>
-    selected
-      ? exportSensorHref(selected.platform, selected.device_id, sensor)
-      : undefined;
   const currentDetail =
     detail &&
     selected &&
@@ -462,115 +446,89 @@ export default function DeviceDetailPage() {
 
           {selected &&
             (() => {
-              const sharedSensors = platformSensors.filter(
-                (s) => s.platform === "shared",
-              );
-              const sensorRecords = (key: string) =>
+              const records = (key: string) =>
                 currentSensorState.sensorData[key] ?? [];
-              const sensorLoading = (key: string) => pendingSensorKeys.has(key);
-              const hasRecords = (key: string) => sensorRecords(key).length > 0;
+              const loadingKey = (key: string) => pendingSensorKeys.has(key);
               const requiredLookup = platformRequirements(
                 requirements,
                 selected.platform,
               );
               const requiredSet = requiredLookup.required;
-              // A group - one key, or the several keys behind a composite card -
-              // is shown when any key has data or is still loading; in the
-              // required view it also shows when the config asks for it, even
-              // with nothing recorded yet.
-              const groupVisible = (keys: string[]) => {
+
+              // Sub-keys that fold into a parent tile rather than get their own:
+              // the battery and applications composites each cover several
+              // streams behind a single card.
+              const FOLDED_KEYS = new Set([
+                "battery-charges",
+                "battery-discharges",
+                "applications-crashes",
+                "applications-history",
+                "applications-notifications",
+              ]);
+
+              // The device's true, unbounded per-sensor total comes from the
+              // detail endpoint's stream counts; the sensors it does not expose
+              // fall back to the (capped) fetched length.
+              const streamCount = (key: string) =>
+                currentDetail?.streams.find((s) => s.key === key)?.count;
+              const tileCount = (config: SensorConfig) =>
+                sensorDataKeys(config.key).reduce(
+                  (sum, key) => sum + (streamCount(key) ?? records(key).length),
+                  0,
+                );
+              const tileLastSeen = (config: SensorConfig) =>
+                latestTimestamp(
+                  sensorDataKeys(config.key).flatMap((key) =>
+                    records(key).map((r) => r.timestamp),
+                  ),
+                );
+              const anyLoading = (config: SensorConfig) =>
+                sensorDataKeys(config.key).some(loadingKey);
+              // A tile shows when any of its streams has data or is still
+              // loading; the required view also keeps a required-but-empty
+              // sensor so the gap stays visible.
+              const configVisible = (config: SensorConfig) => {
                 if (view === "all") return true;
-                if (keys.some((k) => sensorLoading(k) || hasRecords(k)))
+                const keys = sensorDataKeys(config.key);
+                if (keys.some((k) => loadingKey(k) || records(k).length > 0))
                   return true;
                 return (
                   view === "required" && keys.some((k) => requiredSet.has(k))
                 );
               };
-              const shouldShowSensor = (key: string) => groupVisible([key]);
-              // Required by the config, done loading, and still empty - the gap
-              // the required view exists to surface.
-              const flagRequired = (key: string) =>
+              // Required by the config, done loading, still empty - the tile
+              // flags this in orange.
+              const flagRequired = (config: SensorConfig) =>
                 view === "required" &&
-                requiredSet.has(key) &&
-                !sensorLoading(key) &&
-                !hasRecords(key);
-              // Fill the grid cell (`h-full` on both the wrapper and the card
-              // div it holds) so every card in a row shares the row's height and
-              // the rows stop looking ragged. A required-but-empty sensor renders
-              // the orange placeholder instead of its own (empty) card.
-              const withFlag = (
-                key: string,
-                node: React.ReactNode,
-                className = "",
-              ) => {
-                const config = platformSensors.find((s) => s.key === key);
-                const content =
-                  flagRequired(key) && config ? (
-                    <RequiredEmptyCard config={config} />
-                  ) : (
-                    node
-                  );
-                return (
-                  <div
-                    key={key}
-                    className={`h-full [&>div]:h-full ${className}`.trim()}
-                  >
-                    {content}
-                  </div>
-                );
-              };
-              const visibleSharedSensors = sharedSensors.filter((sensor) =>
-                shouldShowSensor(sensor.key),
+                sensorDataKeys(config.key).some((k) => requiredSet.has(k)) &&
+                !anyLoading(config) &&
+                tileCount(config) === 0;
+
+              const tileConfigs = platformSensors.filter(
+                (s) => !FOLDED_KEYS.has(s.key),
               );
-              const locationSensor = visibleSharedSensors.find(
-                (s) => s.key === "locations",
+              const visibleConfigs = tileConfigs.filter(configVisible);
+              const sharedTiles = visibleConfigs.filter(
+                (s) => s.platform === "shared",
               );
-              const BATTERY_KEYS = [
-                "battery",
-                "battery-charges",
-                "battery-discharges",
-              ];
-              const shouldShowBatteryCard = groupVisible(BATTERY_KEYS);
-              const sharedChartSensors = visibleSharedSensors.filter(
-                (s) =>
-                  !["locations", "network", ...BATTERY_KEYS].includes(s.key),
-              );
-              const showNetwork = shouldShowSensor("network");
-              const APP_SUB_KEYS = new Set([
-                "applications-crashes",
-                "applications-history",
-                "applications-notifications",
-              ]);
-              const ALL_APP_KEYS = [
-                "applications",
-                "applications-crashes",
-                "applications-history",
-                "applications-notifications",
-              ];
-              const shouldShowApplications = groupVisible(ALL_APP_KEYS);
-              const specificSensors = platformSensors.filter(
-                (s) =>
-                  s.platform !== "shared" &&
-                  !APP_SUB_KEYS.has(s.key) &&
-                  (s.key === "applications"
-                    ? shouldShowApplications
-                    : shouldShowSensor(s.key)),
+              const specificTiles = visibleConfigs.filter(
+                (s) => s.platform !== "shared",
               );
               const specificLabel =
                 selected.platform === "android"
                   ? "Android only"
                   : "iPhone only";
-              const showSharedSection =
-                sharedChartSensors.length > 0 ||
-                locationSensor != null ||
-                showNetwork ||
-                shouldShowBatteryCard;
-              const visibleSensorCount =
-                sharedChartSensors.length +
-                (locationSensor ? 1 : 0) +
-                (showNetwork ? 1 : 0) +
-                (shouldShowBatteryCard ? 1 : 0) +
-                specificSensors.length;
+
+              const renderTile = (config: SensorConfig) => (
+                <SensorTile
+                  key={config.key}
+                  config={config}
+                  count={tileCount(config)}
+                  lastSeen={tileLastSeen(config)}
+                  required={flagRequired(config)}
+                  onOpen={() => setOpenConfig(config)}
+                />
+              );
 
               return (
                 <>
@@ -590,7 +548,7 @@ export default function DeviceDetailPage() {
                         ? `No deployed ${selected.platform} config was found to derive sensor requirements from.`
                         : "Loading sensor requirements…"}
                     </div>
-                  ) : visibleSensorCount === 0 && view !== "all" ? (
+                  ) : visibleConfigs.length === 0 && view !== "all" ? (
                     <div className="rounded-2xl border border-wire bg-card p-6 text-center text-[13px] text-sage shadow-card">
                       {view === "required"
                         ? "The deployed config requires no sensors this dashboard can show."
@@ -598,275 +556,24 @@ export default function DeviceDetailPage() {
                     </div>
                   ) : null}
 
-                  {showSharedSection ? (
+                  {sharedTiles.length > 0 ? (
                     <>
                       <div className="text-[11px] font-semibold uppercase tracking-[0.6px] text-sage px-1">
                         Shared
                       </div>
-                      <div className="grid grid-flow-dense grid-cols-1 gap-4 lg:grid-cols-2">
-                        {sharedChartSensors.map((config) =>
-                          withFlag(
-                            config.key,
-                            config.key === "calls" ? (
-                              <CallsRecordsCard
-                                key={config.key}
-                                records={
-                                  currentSensorState.sensorData[config.key] ?? []
-                                }
-                                loading={pendingSensorKeys.has(config.key)}
-                                exportHref={selectedSensorExportHref(config.key)}
-                              />
-                            ) : config.key === "accelerometer" ? (
-                              <AccelerometerRecordsCard
-                                key={config.key}
-                                records={
-                                  currentSensorState.sensorData[config.key] ?? []
-                                }
-                                loading={pendingSensorKeys.has(config.key)}
-                                exportHref={selectedSensorExportHref(config.key)}
-                              />
-                            ) : config.key === "bluetooth" ? (
-                              <BluetoothRecordsCard
-                                key={config.key}
-                                records={
-                                  currentSensorState.sensorData[config.key] ?? []
-                                }
-                                loading={pendingSensorKeys.has(config.key)}
-                                exportHref={selectedSensorExportHref(config.key)}
-                              />
-                            ) : config.key === "gyroscope" ? (
-                              <GyroscopeRecordsCard
-                                key={config.key}
-                                records={
-                                  currentSensorState.sensorData[config.key] ?? []
-                                }
-                                loading={pendingSensorKeys.has(config.key)}
-                                exportHref={selectedSensorExportHref(config.key)}
-                              />
-                            ) : config.key === "linear-accelerometer" ? (
-                              <LinearAccelerometerRecordsCard
-                                key={config.key}
-                                records={
-                                  currentSensorState.sensorData[config.key] ?? []
-                                }
-                                loading={pendingSensorKeys.has(config.key)}
-                                exportHref={selectedSensorExportHref(config.key)}
-                              />
-                            ) : config.key === "timezone" ? (
-                              <TimezoneRecordsCard
-                                key={config.key}
-                                records={
-                                  currentSensorState.sensorData[config.key] ?? []
-                                }
-                                loading={pendingSensorKeys.has(config.key)}
-                                exportHref={selectedSensorExportHref(config.key)}
-                              />
-                            ) : config.key === "wifi" ? (
-                              <WifiRecordsCard
-                                key={config.key}
-                                groups={[
-                                  {
-                                    label: selected.platform,
-                                    records:
-                                      currentSensorState.sensorData[
-                                        config.key
-                                      ] ?? [],
-                                  },
-                                ]}
-                                loading={pendingSensorKeys.has(config.key)}
-                                exportHref={selectedSensorExportHref(config.key)}
-                              />
-                            ) : config.key === "processor" ? (
-                              <ProcessorCard
-                                key={config.key}
-                                records={
-                                  currentSensorState.sensorData[config.key] ?? []
-                                }
-                                loading={pendingSensorKeys.has(config.key)}
-                                exportHref={selectedSensorExportHref(config.key)}
-                              />
-                            ) : config.key === "plugin-ambient-noise" ? (
-                              <AmbientNoiseCard
-                                key={config.key}
-                                records={
-                                  currentSensorState.sensorData[config.key] ?? []
-                                }
-                                loading={pendingSensorKeys.has(config.key)}
-                                exportHref={selectedSensorExportHref(config.key)}
-                              />
-                            ) : (
-                              <SensorTimeSeriesCard
-                                key={config.key}
-                                config={config}
-                                records={
-                                  currentSensorState.sensorData[config.key] ?? []
-                                }
-                                loading={pendingSensorKeys.has(config.key)}
-                                exportHref={selectedSensorExportHref(config.key)}
-                              />
-                            ),
-                            ["bluetooth", "wifi"].includes(config.key)
-                              ? "col-span-full"
-                              : "",
-                          ),
-                        )}
-                        {showNetwork
-                          ? withFlag(
-                              "network",
-                              <NetworkTypeCard
-                                records={sensorRecords("network")}
-                                loading={sensorLoading("network")}
-                                platform={selected.platform}
-                                exportHref={selectedSensorExportHref("network")}
-                              />,
-                            )
-                          : null}
-                        {shouldShowBatteryCard ? (
-                          <div className="col-span-full">
-                            <BatteryEventsCard
-                              batteryRecords={sensorRecords("battery")}
-                              batteryLoading={sensorLoading("battery")}
-                              batteryExportHref={selectedSensorExportHref(
-                                "battery",
-                              )}
-                              chargesRecords={sensorRecords("battery-charges")}
-                              dischargesRecords={sensorRecords(
-                                "battery-discharges",
-                              )}
-                              chargesLoading={sensorLoading("battery-charges")}
-                              dischargesLoading={sensorLoading(
-                                "battery-discharges",
-                              )}
-                              chargesExportHref={selectedSensorExportHref(
-                                "battery-charges",
-                              )}
-                              dischargesExportHref={selectedSensorExportHref(
-                                "battery-discharges",
-                              )}
-                            />
-                          </div>
-                        ) : null}
+                      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+                        {sharedTiles.map(renderTile)}
                       </div>
-
-                      {locationSensor
-                        ? withFlag(
-                            locationSensor.key,
-                            <LocationRecordsCard
-                              records={
-                                currentSensorState.sensorData[
-                                  locationSensor.key
-                                ] ?? []
-                              }
-                              loading={pendingSensorKeys.has(
-                                locationSensor.key,
-                              )}
-                              exportHref={selectedSensorExportHref(
-                                locationSensor.key,
-                              )}
-                            />,
-                            "col-span-full",
-                          )
-                        : null}
                     </>
                   ) : null}
 
-                  {specificSensors.length > 0 ? (
+                  {specificTiles.length > 0 ? (
                     <>
                       <div className="text-[11px] font-semibold uppercase tracking-[0.6px] text-sage px-1 mt-2">
                         {specificLabel}
                       </div>
-                      <div className="grid grid-flow-dense grid-cols-1 gap-4 lg:grid-cols-2">
-                        {specificSensors.map((config) =>
-                          withFlag(
-                            config.key,
-                            config.key === "studentlife-audio" ? (
-                              <ConversationRecordsCard
-                                key={config.key}
-                                records={
-                                  currentSensorState.sensorData[config.key] ?? []
-                                }
-                                loading={pendingSensorKeys.has(config.key)}
-                                exportHref={selectedSensorExportHref(config.key)}
-                              />
-                            ) : config.key === "fused-location" ? (
-                              <LocationRecordsCard
-                                key={config.key}
-                                title="Fused Location"
-                                color="#16a34a"
-                                records={
-                                  currentSensorState.sensorData[config.key] ?? []
-                                }
-                                loading={pendingSensorKeys.has(config.key)}
-                                exportHref={selectedSensorExportHref(config.key)}
-                              />
-                            ) : config.key === "device-usage" ? (
-                              <DeviceUsageRecordsCard
-                                key={config.key}
-                                records={
-                                  currentSensorState.sensorData[config.key] ?? []
-                                }
-                                loading={pendingSensorKeys.has(config.key)}
-                                exportHref={selectedSensorExportHref(config.key)}
-                              />
-                            ) : config.key === "activity" ? (
-                              <ActivityCard
-                                key={config.key}
-                                records={
-                                  currentSensorState.sensorData[config.key] ?? []
-                                }
-                                loading={pendingSensorKeys.has(config.key)}
-                                exportHref={selectedSensorExportHref(config.key)}
-                              />
-                            ) : config.key === "applications" ? (
-                              <div key={config.key} className="col-span-full">
-                                <ApplicationsCard
-                                  foregroundRecords={sensorRecords(
-                                    "applications",
-                                  )}
-                                  crashRecords={sensorRecords(
-                                    "applications-crashes",
-                                  )}
-                                  historyRecords={sensorRecords(
-                                    "applications-history",
-                                  )}
-                                  notificationRecords={sensorRecords(
-                                    "applications-notifications",
-                                  )}
-                                  foregroundLoading={sensorLoading(
-                                    "applications",
-                                  )}
-                                  crashLoading={sensorLoading(
-                                    "applications-crashes",
-                                  )}
-                                  historyLoading={sensorLoading(
-                                    "applications-history",
-                                  )}
-                                  notificationLoading={sensorLoading(
-                                    "applications-notifications",
-                                  )}
-                                  exportHref={selectedSensorExportHref(
-                                    config.key,
-                                  )}
-                                />
-                              </div>
-                            ) : (
-                              <SensorTimeSeriesCard
-                                key={config.key}
-                                config={config}
-                                records={
-                                  currentSensorState.sensorData[config.key] ?? []
-                                }
-                                loading={pendingSensorKeys.has(config.key)}
-                                exportHref={selectedSensorExportHref(config.key)}
-                              />
-                            ),
-                            ["applications", "fused-location"].includes(
-                              config.key,
-                            )
-                              ? "col-span-full"
-                              : "",
-                          ),
-                        )}
+                      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+                        {specificTiles.map(renderTile)}
                       </div>
                     </>
                   ) : null}
@@ -881,6 +588,22 @@ export default function DeviceDetailPage() {
             })()}
         </>
       )}
+
+      {openConfig && selected ? (
+        <SensorModal
+          config={openConfig}
+          platform={selected.platform}
+          deviceId={selected.device_id}
+          totalCount={sensorDataKeys(openConfig.key).reduce(
+            (sum, key) =>
+              sum +
+              (currentDetail?.streams.find((s) => s.key === key)?.count ??
+                (currentSensorState.sensorData[key]?.length ?? 0)),
+            0,
+          )}
+          onClose={() => setOpenConfig(null)}
+        />
+      ) : null}
     </div>
   );
 }

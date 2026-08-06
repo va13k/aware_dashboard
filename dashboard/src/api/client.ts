@@ -49,9 +49,15 @@ export const fetchSensor = (
   platform: "android" | "ios",
   deviceId: string,
   sensor: string,
-  limit = 500,
-): Promise<SensorRecord[]> =>
-  get(`/${platform}/${encodeURIComponent(deviceId)}/${sensor}?limit=${limit}`);
+  opts: { limit?: number; fromTs?: number; toTs?: number } = {},
+): Promise<SensorRecord[]> => {
+  const params = new URLSearchParams({ limit: String(opts.limit ?? 500) });
+  if (opts.fromTs != null) params.set("from_ts", String(Math.floor(opts.fromTs)));
+  if (opts.toTs != null) params.set("to_ts", String(Math.floor(opts.toTs)));
+  return get(
+    `/${platform}/${encodeURIComponent(deviceId)}/${sensor}?${params.toString()}`,
+  );
+};
 
 export const exportAllHref = (): string => `${BASE}/export/all.zip`;
 
