@@ -135,7 +135,7 @@
     "dashboard/src/components/ProcessorCard.tsx": "723f2ab00cd379fe368724755872bd690a382d8e2c2fcfc15787d06946aed9ab",
     "dashboard/src/components/RequiredByConfig.tsx": "dfab7ca973bc0dbac2f6d18fa217f9633894e14e2385872c372ff7a2163aa450",
     "dashboard/src/components/SensorChart.tsx": "aa65d5494ffad71c2c84e6867bd60748c7213c2501e488981412a874641326b4",
-    "dashboard/src/components/SensorModal.tsx": "76419d53098d8f6df14b77417ad3db958a1ad27ff80066deeca8a4982b7b49dc",
+    "dashboard/src/components/SensorModal.tsx": "7e9f05ad7dc3d3eed8355b6c12d5527b7d3a55b4eec4e32edd1cf1cbd62d51f8",
     "dashboard/src/components/SensorStatCard.tsx": "6a2bc61545781c68a933c85c9eae792682e3cb91d1fa610e299d52994b8e93c3",
     "dashboard/src/components/SensorTile.tsx": "446b6f2f65c0b8d0345d4a795a1ead40f6860e91f8406801348f01bd3b017324",
     "dashboard/src/components/SensorTimeSeriesCard.tsx": "910fed63b5763bb310cf632e16b23559e07808bb0d99ebfe585bf6cbce755faa",
@@ -147,7 +147,7 @@
     "dashboard/src/components/WifiRecordsCard.tsx": "2a4b03fb96ce10de7b283ba7f705c1bf45f017e81339c4d5abbd2d1297394603",
     "dashboard/src/config/sensors.ts": "6b2d533d0e88fcad684415f8c12bf003c43312cc866b5ddbc85101fe6b17cccc",
     "dashboard/src/main.tsx": "717427d5d64470f97e4bb18e907ab095427e2aa9a6800fe3390b43bede6e9b35",
-    "dashboard/src/pages/DeviceDetailPage.tsx": "5ef1a968fbf630ddf59f347d98565d36077026809a02f95391bd368a1ff50fb2",
+    "dashboard/src/pages/DeviceDetailPage.tsx": "3497e8334a5de59de473dbba29d179256da3f4aafefdd069b6b36c756cdb1eea",
     "dashboard/src/pages/DevicesPage.tsx": "aa15e8cf5d0bf27a539bce47b014368ff27a18b4d42ac450890befb70213593c",
     "dashboard/src/pages/ManifestPage.tsx": "bc1932f4fd5a18cb32c4a3cce885d354deeddd90672d927affdcaaa1c3dfd4a9",
     "dashboard/src/pages/OverviewPage.tsx": "0924f5966d588459cecc336968baa9da9b658181796f2907922bfd528c9fc7cb",
@@ -186,11 +186,11 @@
     "shared_config/source_store.py": "ceaf715a4f7aa1198409553bed5ab30ab761f23c6f6db02140ee2e84148aa1f9",
     "shared_config/test_serializers.py": "d7614beeadecc7e75fcf9671fbc58ae7c8d9ce338a9cc21480128038ccd23fdb"
   },
-  "indexed_at_commit": "6235a6cce5085ef4fb61447b7a9c461d435a07a6",
-  "indexed_at_timestamp": "2026-08-06T11:16:17.846237+00:00",
+  "indexed_at_commit": "e0f0f6a13c547ad70b130d9acce98c0100c8a95a",
+  "indexed_at_timestamp": "2026-08-06T11:31:32.261738+00:00",
   "schema_version": 3,
   "stats": {
-    "total_edges": 1830,
+    "total_edges": 1832,
     "total_files": 185,
     "total_nodes": 1681
   },

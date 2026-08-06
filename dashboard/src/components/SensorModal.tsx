@@ -26,12 +26,19 @@ export default function SensorModal({
   platform,
   deviceId,
   totalCount,
+  anchorTs,
   onClose,
 }: {
   config: SensorConfig;
   platform: "android" | "ios";
   deviceId: string;
   totalCount: number;
+  /**
+   * The sensor's most recent upload (ms). Presets are measured back from here,
+   * not from "now" - a study phone that last uploaded days ago should still
+   * show its last hour/week of data rather than an empty recent window.
+   */
+  anchorTs: number | null;
   onClose: () => void;
 }) {
   const [range, setRange] = useState<RangeKey | "custom">(DEFAULT_RANGE);
@@ -67,10 +74,10 @@ export default function SensorModal({
       setLoading(true);
       const fromTs =
         range === "custom"
-          ? (localInputToTs(customFrom) ?? undefined)
-          : rangeFromTs(range, Date.now());
+          ? localInputToTs(customFrom) ?? undefined
+          : rangeFromTs(range, anchorTs ?? Date.now());
       const toTs =
-        range === "custom" ? (localInputToTs(customTo) ?? undefined) : undefined;
+        range === "custom" ? localInputToTs(customTo) ?? undefined : undefined;
 
       Promise.all(
         keys.map((key) =>
@@ -98,7 +105,7 @@ export default function SensorModal({
     return () => {
       cancelled = true;
     };
-  }, [keys, platform, deviceId, range, customFrom, customTo]);
+  }, [keys, platform, deviceId, range, customFrom, customTo, anchorTs]);
 
   // The plot cannot render a whole window at full resolution; downsample it.
   const plotData = useMemo<SensorData>(() => {
@@ -114,7 +121,7 @@ export default function SensorModal({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/40 p-4 backdrop-blur-sm"
+      className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-black/40 p-4 backdrop-blur-sm"
       onClick={onClose}
     >
       <div

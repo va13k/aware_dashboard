@@ -589,21 +589,41 @@ export default function DeviceDetailPage() {
         </>
       )}
 
-      {openConfig && selected ? (
-        <SensorModal
-          config={openConfig}
-          platform={selected.platform}
-          deviceId={selected.device_id}
-          totalCount={sensorDataKeys(openConfig.key).reduce(
-            (sum, key) =>
-              sum +
-              (currentDetail?.streams.find((s) => s.key === key)?.count ??
-                (currentSensorState.sensorData[key]?.length ?? 0)),
-            0,
-          )}
-          onClose={() => setOpenConfig(null)}
-        />
-      ) : null}
+      {openConfig && selected
+        ? (() => {
+            const keys = sensorDataKeys(openConfig.key);
+            const totalCount = keys.reduce(
+              (sum, key) =>
+                sum +
+                (currentDetail?.streams.find((s) => s.key === key)?.count ??
+                  (currentSensorState.sensorData[key]?.length ?? 0)),
+              0,
+            );
+            // Anchor the preset windows on the sensor's most recent upload -
+            // the newest of its stream `last_seen` and any fetched record.
+            const anchorTs = latestTimestamp([
+              ...keys.map(
+                (key) =>
+                  currentDetail?.streams.find((s) => s.key === key)?.last_seen,
+              ),
+              ...keys.flatMap((key) =>
+                (currentSensorState.sensorData[key] ?? []).map(
+                  (r) => r.timestamp,
+                ),
+              ),
+            ]);
+            return (
+              <SensorModal
+                config={openConfig}
+                platform={selected.platform}
+                deviceId={selected.device_id}
+                totalCount={totalCount}
+                anchorTs={anchorTs}
+                onClose={() => setOpenConfig(null)}
+              />
+            );
+          })()
+        : null}
     </div>
   );
 }
