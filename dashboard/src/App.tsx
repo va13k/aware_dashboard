@@ -17,12 +17,31 @@ import { HeaderSlotContext, useHeaderSlot } from "./utils/headerSlot";
 function Layout() {
   const { pathname } = useLocation();
   // On a device detail route (/devices/<id> or /devices/<platform>/<id>) the
-  // quick link goes back to the device list instead of the overview.
+  // quick link goes back to the device list. Everywhere else it leaves the SPA
+  // for the platform landing page, which lives above our /dashboard basename
+  // and so needs a real navigation rather than a router link.
   const onDeviceDetail = /^\/devices\/[^/]+/.test(pathname);
   const backLink = onDeviceDetail
-    ? { to: "/devices", label: "All devices" }
-    : { to: "/", label: "Main page" };
+    ? { to: "/devices", label: "All devices", external: false }
+    : { to: "/", label: "Main page", external: true };
   const { center } = useHeaderSlot();
+
+  const backLinkClass =
+    "flex items-center gap-1 text-[12px] font-medium text-sage hover:text-ink transition-colors no-underline px-2.5 py-1 rounded-lg hover:bg-teal-soft/50";
+  const backLinkBody = (
+    <>
+      <svg width="13" height="13" viewBox="0 0 16 16" fill="none">
+        <path
+          d="M10 12L6 8l4-4"
+          stroke="currentColor"
+          strokeWidth="1.5"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+      </svg>
+      {backLink.label}
+    </>
+  );
 
   return (
     <div className="min-h-screen bg-page text-ink font-sans flex flex-col">
@@ -36,21 +55,15 @@ function Layout() {
           <span className="font-bold text-[15px] tracking-tight">
             AWARE Dashboard
           </span>
-          <Link
-            to={backLink.to}
-            className="flex items-center gap-1 text-[12px] font-medium text-sage hover:text-ink transition-colors no-underline px-2.5 py-1 rounded-lg hover:bg-teal-soft/50"
-          >
-            <svg width="13" height="13" viewBox="0 0 16 16" fill="none">
-              <path
-                d="M10 12L6 8l4-4"
-                stroke="currentColor"
-                strokeWidth="1.5"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            </svg>
-            {backLink.label}
-          </Link>
+          {backLink.external ? (
+            <a href={backLink.to} className={backLinkClass}>
+              {backLinkBody}
+            </a>
+          ) : (
+            <Link to={backLink.to} className={backLinkClass}>
+              {backLinkBody}
+            </Link>
+          )}
         </div>
         <nav className="flex gap-1">
           {[
