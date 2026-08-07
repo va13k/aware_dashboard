@@ -1,62 +1,30 @@
 import type { SensorConfig } from "../config/sensors";
-import type { SensorRecord } from "../types";
-import { min, max, fmt } from "../utils/stats";
+import type { SensorManifestEntry } from "../types";
+import { absoluteDate } from "../utils/time";
 import ExportLink from "./ExportLink";
 
 interface Props {
   config: SensorConfig;
-  androidRecords: SensorRecord[];
-  iosRecords: SensorRecord[];
+  /** Manifest stats for each platform, or null when the sensor has no data. */
+  android: SensorManifestEntry | null;
+  ios: SensorManifestEntry | null;
   loading: boolean;
   className?: string;
   androidExportHref?: string;
   iosExportHref?: string;
 }
 
-interface PlatformStats {
-  count: number;
-  last: number;
-  min: number;
-  max: number;
+function hasRows(entry: SensorManifestEntry | null): entry is SensorManifestEntry {
+  return !!entry && entry.row_count > 0;
 }
 
-function platformStats(
-  config: SensorConfig,
-  records: SensorRecord[],
-): PlatformStats | null {
-  if (config.countOnly) {
-    if (!records.length) return null;
-    const latest = records.reduce((a, b) =>
-      b.timestamp > a.timestamp ? b : a,
-    );
-    return {
-      count: records.length,
-      last: latest.timestamp,
-      min: latest.timestamp,
-      max: latest.timestamp,
-    };
-  }
-
-  const pairs = records
-    .map((r) => ({ ts: r.timestamp, v: config.extract(r) }))
-    .filter((x): x is { ts: number; v: number } => x.v !== null);
-  if (!pairs.length) return null;
-  const values = pairs.map((p) => p.v);
-  const latest = pairs.reduce((a, b) => (b.ts > a.ts ? b : a));
-  return {
-    count: values.length,
-    last: latest.v,
-    min: min(values),
-    max: max(values),
-  };
-}
-
-interface StatItemProps {
+function StatItem({
+  label,
+  children,
+}: {
   label: string;
   children: React.ReactNode;
-}
-
-function StatItem({ label, children }: StatItemProps) {
+}) {
   return (
     <div className="flex flex-col gap-0.5">
       <span className="text-[10px] uppercase tracking-[0.5px] text-sage">
@@ -69,25 +37,55 @@ function StatItem({ label, children }: StatItemProps) {
   );
 }
 
-function formatStatValue(config: SensorConfig, value: number): string {
-  if (config.countOnly) return new Date(value).toLocaleDateString();
-  return config.enumLabels?.[value] ?? fmt(value);
+function PlatformStats({
+  label,
+  entry,
+}: {
+  label: string;
+  entry: SensorManifestEntry;
+}) {
+  return (
+    <div className="flex-1">
+      <p className="text-[10px] uppercase tracking-[0.5px] text-sage mb-3">
+        {label}
+      </p>
+      <div className="grid grid-cols-2 gap-x-4 gap-y-3">
+        <StatItem label="records">{entry.row_count.toLocaleString()}</StatItem>
+        <StatItem label="devices">
+          {entry.devices_with_data.toLocaleString()}
+        </StatItem>
+        <StatItem label="first">
+          {entry.first_timestamp != null
+            ? absoluteDate(entry.first_timestamp)
+            : "—"}
+        </StatItem>
+        <StatItem label="last">
+          {entry.last_timestamp != null
+            ? absoluteDate(entry.last_timestamp)
+            : "—"}
+        </StatItem>
+      </div>
+    </div>
+  );
 }
 
+/**
+ * Study-wide coverage for one sensor: absolute record counts and devices with
+ * data per platform, from the (cache-backed) manifest. Per-value stats live on
+ * the device charts, so the overview stays a counts-and-coverage view.
+ */
 export default function SensorStatCard({
   config,
-  androidRecords,
-  iosRecords,
+  android,
+  ios,
   loading,
   className = "",
   androidExportHref,
   iosExportHref,
 }: Props) {
-  const android = platformStats(config, androidRecords);
-  const ios = platformStats(config, iosRecords);
-  const hasData = android || ios;
-  const androidEmpty = !loading && androidRecords.length === 0;
-  const iosEmpty = !loading && iosRecords.length === 0;
+  const androidHasRows = hasRows(android);
+  const iosHasRows = hasRows(ios);
+  const hasData = androidHasRows || iosHasRows;
 
   return (
     <div
@@ -112,13 +110,13 @@ export default function SensorStatCard({
               href={androidExportHref}
               label="↓ Android"
               title="Download Android records as CSV ZIP"
-              disabled={androidEmpty}
+              disabled={!loading && !androidHasRows}
             />
             <ExportLink
               href={iosExportHref}
               label="↓ iOS"
               title="Download iOS records as CSV ZIP"
-              disabled={iosEmpty}
+              disabled={!loading && !iosHasRows}
             />
           </>
         ) : androidExportHref ? (
@@ -126,14 +124,14 @@ export default function SensorStatCard({
             href={androidExportHref}
             label="↓ Export"
             title="Download records as CSV ZIP"
-            disabled={androidEmpty}
+            disabled={!loading && !androidHasRows}
           />
         ) : iosExportHref ? (
           <ExportLink
             href={iosExportHref}
             label="↓ Export"
             title="Download records as CSV ZIP"
-            disabled={iosEmpty}
+            disabled={!loading && !iosHasRows}
           />
         ) : null}
       </div>
@@ -146,73 +144,11 @@ export default function SensorStatCard({
         </div>
       ) : (
         <div className="flex gap-6">
-          {android && (
-            <div className="flex-1">
-              <p className="text-[10px] uppercase tracking-[0.5px] text-sage mb-3">
-                Android
-              </p>
-              <div className="grid grid-cols-2 gap-x-4 gap-y-3">
-                <StatItem label="records">
-                  {android.count.toLocaleString()}
-                </StatItem>
-                {config.countOnly ? (
-                  <StatItem label="last">
-                    <span style={{ color: config.color }}>
-                      {formatStatValue(config, android.last)}
-                    </span>
-                  </StatItem>
-                ) : (
-                  <>
-                    <StatItem label="last">
-                      <span style={{ color: config.color }}>
-                        {formatStatValue(config, android.last)}
-                      </span>
-                    </StatItem>
-                    <StatItem label="min">
-                      {formatStatValue(config, android.min)}
-                    </StatItem>
-                    <StatItem label="max">
-                      {formatStatValue(config, android.max)}
-                    </StatItem>
-                  </>
-                )}
-              </div>
-            </div>
+          {androidHasRows && <PlatformStats label="Android" entry={android!} />}
+          {androidHasRows && iosHasRows && (
+            <div className="w-px bg-wire self-stretch" />
           )}
-          {android && ios && <div className="w-px bg-wire self-stretch" />}
-          {ios && (
-            <div className="flex-1">
-              <p className="text-[10px] uppercase tracking-[0.5px] text-sage mb-3">
-                iOS
-              </p>
-              <div className="grid grid-cols-2 gap-x-4 gap-y-3">
-                <StatItem label="records">
-                  {ios.count.toLocaleString()}
-                </StatItem>
-                {config.countOnly ? (
-                  <StatItem label="last">
-                    <span style={{ color: config.color }}>
-                      {formatStatValue(config, ios.last)}
-                    </span>
-                  </StatItem>
-                ) : (
-                  <>
-                    <StatItem label="last">
-                      <span style={{ color: config.color }}>
-                        {formatStatValue(config, ios.last)}
-                      </span>
-                    </StatItem>
-                    <StatItem label="min">
-                      {formatStatValue(config, ios.min)}
-                    </StatItem>
-                    <StatItem label="max">
-                      {formatStatValue(config, ios.max)}
-                    </StatItem>
-                  </>
-                )}
-              </div>
-            </div>
-          )}
+          {iosHasRows && <PlatformStats label="iOS" entry={ios!} />}
         </div>
       )}
     </div>

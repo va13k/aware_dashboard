@@ -4,21 +4,11 @@ from sqlalchemy.exc import ProgrammingError, OperationalError, SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import get_android_db, get_ios_db
 from app.services import record_counts
+from app.routers.android import _EXPORT_MODELS as _ANDROID_EXPORT_MODELS
 from app.models import (
     AndroidRecordCount,
     IosRecordCount,
-    AndroidAccelerometer,
-    AndroidBattery,
-    AndroidBluetooth,
-    AndroidCalls,
-    AndroidApplicationsForeground,
     AndroidDevice,
-    AndroidGyroscope,
-    AndroidLight,
-    AndroidLocations,
-    AndroidNetwork,
-    AndroidScreen,
-    AndroidWifi,
     IosAccelerometer,
     IosBarometer,
     IosBattery,
@@ -98,19 +88,12 @@ DEVICE_METADATA_FIELDS = (
     "label",
 )
 
-ANDROID_STREAMS = {
-    "accelerometer": AndroidAccelerometer,
-    "battery": AndroidBattery,
-    "bluetooth": AndroidBluetooth,
-    "calls": AndroidCalls,
-    "gyroscope": AndroidGyroscope,
-    "light": AndroidLight,
-    "locations": AndroidLocations,
-    "network": AndroidNetwork,
-    "screen": AndroidScreen,
-    "wifi": AndroidWifi,
-    "applications": AndroidApplicationsForeground,
-}
+# Every android sensor gets a stream summary (count + last_seen) so the device
+# grid can build a tile per sensor from the detail response alone. Counts come
+# from the record-count cache (see _stream_summary), so summarising them all is
+# cheap. Derived from the export map — the canonical android sensor registry —
+# to stay in sync with it automatically.
+ANDROID_STREAMS = {slug: entry[0] for slug, entry in _ANDROID_EXPORT_MODELS.items()}
 
 IOS_STREAMS = {
     "accelerometer": IosAccelerometer,

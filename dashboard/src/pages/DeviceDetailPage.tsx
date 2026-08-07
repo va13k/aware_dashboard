@@ -5,7 +5,6 @@ import {
   exportDeviceHref,
   fetchDeviceDetail,
   fetchDevices,
-  fetchSensor,
   fetchStudyRequirements,
 } from "../api/client";
 import type { SensorConfig } from "../config/sensors";
@@ -36,23 +35,10 @@ import type {
   Device,
   DeviceDetail,
   DevicesResponse,
-  SensorRecord,
   StudyRequirements,
 } from "../types";
 
 const POLL_INTERVAL_MS = 60_000;
-
-interface DeviceSensorState {
-  key: string | null;
-  sensorData: Record<string, SensorRecord[]>;
-  loadingKeys: Set<string>;
-}
-
-const EMPTY_SENSOR_STATE: DeviceSensorState = {
-  key: null,
-  sensorData: {},
-  loadingKeys: new Set(),
-};
 
 function formatValue(label: string, value: unknown): string {
   if (value == null || value === "") return "-";
@@ -223,8 +209,6 @@ export default function DeviceDetailPage() {
   const { setCenter } = useHeaderSlot();
   const [devices, setDevices] = useState<DevicesResponse | null>(null);
   const [detail, setDetail] = useState<DeviceDetail | null>(null);
-  const [sensorState, setSensorState] =
-    useState<DeviceSensorState>(EMPTY_SENSOR_STATE);
   const [error, setError] = useState<string | null>(null);
   const [lastUpdated, setLastUpdated] = useState<number | null>(null);
   const [view, setView] = useSensorView();
@@ -272,15 +256,12 @@ export default function DeviceDetailPage() {
     detail.device_id === selected.device_id
       ? detail
       : null;
-  const currentSensorState =
-    sensorState.key === selectedKey ? sensorState : EMPTY_SENSOR_STATE;
   const platformSensors = selected
     ? deviceSensorsForPlatform(selected.platform)
     : SENSOR_CONFIGS;
-  const pendingSensorKeys =
-    currentSensorState.key === selectedKey
-      ? currentSensorState.loadingKeys
-      : new Set(platformSensors.map((s) => s.key));
+  // Counts and last-seen come from the detail endpoint's stream summaries; the
+  // grid needs nothing fetched per sensor on load.
+  const detailLoading = Boolean(selected && !currentDetail);
 
   // Tick every 10 s to keep the "updated X ago" label current.
   useEffect(() => {
@@ -288,76 +269,24 @@ export default function DeviceDetailPage() {
     return () => clearInterval(id);
   }, []);
 
+  // Only the detail endpoint is fetched (and polled); it carries every sensor's
+  // count and last-seen. Per-sensor rows load on demand when a modal opens.
   useEffect(() => {
     if (!selected) return;
     let cancelled = false;
-    const isFirstRun = { value: true };
 
-    const sensors = deviceSensorsForPlatform(selected.platform);
-    const initialLoadingKeys = new Set(sensors.map((s) => s.key));
-
-    const makeEmpty = (): DeviceSensorState => ({
-      key: selectedKey,
-      sensorData: {},
-      loadingKeys: initialLoadingKeys,
-    });
-
-    const fetchAll = () => {
-      const initial = isFirstRun.value;
-      isFirstRun.value = false;
-
-      if (initial) {
-        setLastUpdated(null);
-        setSensorState(makeEmpty());
-      }
-
+    const load = () => {
       fetchDeviceDetail(selected.platform, selected.device_id)
         .then((data) => {
-          if (!cancelled) setDetail(data);
+          if (cancelled) return;
+          setDetail(data);
+          setLastUpdated(Date.now());
         })
         .catch(() => {});
-
-      for (const sensor of sensors) {
-        fetchSensor(selected.platform, selected.device_id, sensor.key)
-          .then((records) => {
-            if (cancelled) return;
-            setSensorState((prev) => {
-              const base = prev.key === selectedKey ? prev : makeEmpty();
-              const updated: DeviceSensorState = {
-                ...base,
-                sensorData: { ...base.sensorData, [sensor.key]: records },
-              };
-              if (initial) {
-                const keys = new Set(base.loadingKeys);
-                keys.delete(sensor.key);
-                updated.loadingKeys = keys;
-              }
-              return updated;
-            });
-          })
-          .catch(() => {
-            if (cancelled) return;
-            setSensorState((prev) => {
-              const base = prev.key === selectedKey ? prev : makeEmpty();
-              const updated: DeviceSensorState = {
-                ...base,
-                sensorData: { ...base.sensorData, [sensor.key]: [] },
-              };
-              if (initial) {
-                const keys = new Set(base.loadingKeys);
-                keys.delete(sensor.key);
-                updated.loadingKeys = keys;
-              }
-              return updated;
-            });
-          });
-      }
-
-      if (!cancelled) setLastUpdated(Date.now());
     };
 
-    fetchAll();
-    const pollId = setInterval(fetchAll, POLL_INTERVAL_MS);
+    load();
+    const pollId = setInterval(load, POLL_INTERVAL_MS);
 
     return () => {
       cancelled = true;
@@ -447,9 +376,6 @@ export default function DeviceDetailPage() {
 
           {selected &&
             (() => {
-              const records = (key: string) =>
-                currentSensorState.sensorData[key] ?? [];
-              const loadingKey = (key: string) => pendingSensorKeys.has(key);
               const requiredLookup = platformRequirements(
                 requirements,
                 selected.platform,
@@ -467,42 +393,36 @@ export default function DeviceDetailPage() {
                 "applications-notifications",
               ]);
 
-              // The device's true, unbounded per-sensor total comes from the
-              // detail endpoint's stream counts; the sensors it does not expose
-              // fall back to the (capped) fetched length.
-              const streamCount = (key: string) =>
-                currentDetail?.streams.find((s) => s.key === key)?.count;
+              // Count and last-seen come straight from the detail endpoint's
+              // per-stream summaries (unbounded counts, no page-load fetch).
+              const stream = (key: string) =>
+                currentDetail?.streams.find((s) => s.key === key);
+              const streamCount = (key: string) => stream(key)?.count ?? 0;
               const tileCount = (config: SensorConfig) =>
                 sensorDataKeys(config.key).reduce(
-                  (sum, key) => sum + (streamCount(key) ?? records(key).length),
+                  (sum, key) => sum + streamCount(key),
                   0,
                 );
               const tileLastSeen = (config: SensorConfig) =>
                 latestTimestamp(
-                  sensorDataKeys(config.key).flatMap((key) =>
-                    records(key).map((r) => r.timestamp),
-                  ),
+                  sensorDataKeys(config.key).map((key) => stream(key)?.last_seen),
                 );
-              const anyLoading = (config: SensorConfig) =>
-                sensorDataKeys(config.key).some(loadingKey);
-              // A tile shows when any of its streams has data or is still
-              // loading; the required view also keeps a required-but-empty
-              // sensor so the gap stays visible.
+              // While the detail is still loading, show everything; once loaded,
+              // "recording" keeps sensors with data and "required" also keeps
+              // required-but-empty ones so the gap stays visible.
               const configVisible = (config: SensorConfig) => {
-                if (view === "all") return true;
+                if (view === "all" || detailLoading) return true;
                 const keys = sensorDataKeys(config.key);
-                if (keys.some((k) => loadingKey(k) || records(k).length > 0))
-                  return true;
+                if (keys.some((k) => streamCount(k) > 0)) return true;
                 return (
                   view === "required" && keys.some((k) => requiredSet.has(k))
                 );
               };
-              // Required by the config, done loading, still empty - the tile
-              // flags this in orange.
+              // Required by the config, loaded, still empty - flagged orange.
               const flagRequired = (config: SensorConfig) =>
                 view === "required" &&
+                !detailLoading &&
                 sensorDataKeys(config.key).some((k) => requiredSet.has(k)) &&
-                !anyLoading(config) &&
                 tileCount(config) === 0;
 
               const tileConfigs = platformSensors.filter(
@@ -631,19 +551,14 @@ export default function DeviceDetailPage() {
             const totalCount = streamCounts.every((c) => c != null)
               ? streamCounts.reduce((sum, c) => sum + (c ?? 0), 0)
               : null;
-            // Anchor the preset windows on the sensor's most recent upload -
-            // the newest of its stream `last_seen` and any fetched record.
-            const anchorTs = latestTimestamp([
-              ...keys.map(
+            // Anchor the preset windows on the sensor's most recent upload,
+            // from the detail endpoint's per-stream `last_seen`.
+            const anchorTs = latestTimestamp(
+              keys.map(
                 (key) =>
                   currentDetail?.streams.find((s) => s.key === key)?.last_seen,
               ),
-              ...keys.flatMap((key) =>
-                (currentSensorState.sensorData[key] ?? []).map(
-                  (r) => r.timestamp,
-                ),
-              ),
-            ]);
+            );
             return (
               <SensorModal
                 config={openConfig}

@@ -79,7 +79,7 @@
     "analytics_api/app/routers/auth.py": "0468f635685bbd89149626a5be8f60baf6a60e406032cef2a12205195214f023",
     "analytics_api/app/routers/backup.py": "25d68e37169c804ba9bab0a04f2ed1f32083cfc18596e8e0a39aaea6d8ea998f",
     "analytics_api/app/routers/counts.py": "4b780561ed7bec171cef1b090288d9589287e3a3bfa0f6281eef8e3ee16a8e3e",
-    "analytics_api/app/routers/devices.py": "b093aec2f7411644de06ad3f9e77948535205e67615127c53e8b19dec29a6836",
+    "analytics_api/app/routers/devices.py": "5fe5f9f887f46c39dcf7e07bbb8c5c73dc9be7d0c61da4450a78b93bed1dac0d",
     "analytics_api/app/routers/export.py": "a33e743a257f193845fcc4146e172d7de7e597dc6eadd58d4df5f873560153fb",
     "analytics_api/app/routers/health.py": "b73deddbf308a63dfd83b1618d524fd90a9ac8855f1400cddde828f7e5384c74",
     "analytics_api/app/routers/ios.py": "bf3afe5463226f462b25b7f83f64115cc16d1644aea475a28d0b1c3fbfd23136",
@@ -145,7 +145,7 @@
     "dashboard/src/components/RequiredByConfig.tsx": "dfab7ca973bc0dbac2f6d18fa217f9633894e14e2385872c372ff7a2163aa450",
     "dashboard/src/components/SensorChart.tsx": "0307ed6d4d71b36e98194d0fff62e8a2d25eb84a2e8213b7241a7a3a36b72299",
     "dashboard/src/components/SensorModal.tsx": "677775495bb4cf11258752fd474589813ea59266bbd32733e99c61174f77b1ed",
-    "dashboard/src/components/SensorStatCard.tsx": "6a2bc61545781c68a933c85c9eae792682e3cb91d1fa610e299d52994b8e93c3",
+    "dashboard/src/components/SensorStatCard.tsx": "dc09a7ee5f85193c066d0b12f4717da468395de04d2e6e5bc539604f2c5cb9e9",
     "dashboard/src/components/SensorTile.tsx": "446b6f2f65c0b8d0345d4a795a1ead40f6860e91f8406801348f01bd3b017324",
     "dashboard/src/components/SensorTimeSeriesCard.tsx": "910fed63b5763bb310cf632e16b23559e07808bb0d99ebfe585bf6cbce755faa",
     "dashboard/src/components/SensorViewFilter.tsx": "1f59a67fcc238550534e968a5c814d8d5d9a542083bc937b1000454b3d561a06",
@@ -157,11 +157,11 @@
     "dashboard/src/components/WifiRecordsCard.tsx": "2a4b03fb96ce10de7b283ba7f705c1bf45f017e81339c4d5abbd2d1297394603",
     "dashboard/src/config/sensors.ts": "93d574515d4341d264f33d9fce008db84875340a80672562e28e6c266162ab11",
     "dashboard/src/main.tsx": "717427d5d64470f97e4bb18e907ab095427e2aa9a6800fe3390b43bede6e9b35",
-    "dashboard/src/pages/DeviceDetailPage.tsx": "e4171e0180af5ac7f5c734c5a90f95a80ae32dc25791907de867f00a14470e62",
+    "dashboard/src/pages/DeviceDetailPage.tsx": "1699aa8ff6934124e6ea105b06e1508e9fe3e4442b420f22995ab563ffdabee6",
     "dashboard/src/pages/DevicesPage.tsx": "aa15e8cf5d0bf27a539bce47b014368ff27a18b4d42ac450890befb70213593c",
     "dashboard/src/pages/LogsPage.tsx": "48156099ff9a58bff08e00507989ba3e05db211fb0f22fcc6101fdf0654d9e01",
     "dashboard/src/pages/ManifestPage.tsx": "bc1932f4fd5a18cb32c4a3cce885d354deeddd90672d927affdcaaa1c3dfd4a9",
-    "dashboard/src/pages/OverviewPage.tsx": "ec93034df90b6db5a301065aee534faf97678a9f1183a499a745ea8f9d4b624d",
+    "dashboard/src/pages/OverviewPage.tsx": "3589186027de4b71b953898d3c457d2b803cf4ce6850c24c38fa89eccb5a2c44",
     "dashboard/src/types.ts": "b3f743ed2aa82cc8076bd27d2cf1d916ccab6831bd13e21990a05a8855d53740",
     "dashboard/src/utils/devices.ts": "ff66b853ae9258a86215895c182f6c411ac7bc519c37e9f356f6e54808f0463c",
     "dashboard/src/utils/headerSlot.ts": "15ebb004e26cb060ed37b793971c08d2ba7b60fd8b2ed4ff94d6a3ceec93a689",
@@ -180,7 +180,7 @@
     "db/ios-tables.sql": "5d2c64467ca2c00f458d505f4817e238f522db6da621620f465781479519def3",
     "db/zz-participant-password.sh": "6e179c0205f9851a72862409939477294a2767f3dd74ee73c8799488876d5055",
     "docs/dashboard-performance-realtime-plan.md": "f6601ae22f816a507ce9e230a27d5038c9181cb6b1d9125c3150945f17873e0f",
-    "docs/device-view-timescale-plan.md": "2aaf38a1ab7911764c61c0f4b56513ce5f229c2925a31dbdb6e60612cb681963",
+    "docs/device-view-timescale-plan.md": "16ce5016b3daa4b80e81da4c14bcaccfb0ed63bcbee441f4981a00449587134e",
     "setup.sh": "718c47a315a28f57fabd178295196fbaee7d4a2c7a79ac936190d517aac2c3c4",
     "setup/Dockerfile": "7a809ccc1ba7fadfc0524360987c979487391833c60c5a6d46bb4620c6d13e39",
     "setup/deploy.sh": "d63de94fbe1fe0ce60d75d76d69cdd40230df5383543f20f5b30522d47727d1e",
@@ -198,13 +198,13 @@
     "shared_config/source_store.py": "ceaf715a4f7aa1198409553bed5ab30ab761f23c6f6db02140ee2e84148aa1f9",
     "shared_config/test_serializers.py": "d7614beeadecc7e75fcf9671fbc58ae7c8d9ce338a9cc21480128038ccd23fdb"
   },
-  "indexed_at_commit": "dd87632440f1b827d517b397bce5c4093ada0325",
-  "indexed_at_timestamp": "2026-08-07T15:07:00.340059+00:00",
+  "indexed_at_commit": "410cf28c64ce3b8ae6dd6171cb63380a8c22604b",
+  "indexed_at_timestamp": "2026-08-07T15:30:28.107746+00:00",
   "schema_version": 3,
   "stats": {
-    "total_edges": 2116,
+    "total_edges": 2114,
     "total_files": 197,
-    "total_nodes": 1792
+    "total_nodes": 1787
   },
   "vexp_version": "2.5.2"
 }

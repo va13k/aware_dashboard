@@ -4,7 +4,7 @@ import {
   exportAllHref,
   exportSensorZipHref,
   fetchDevices,
-  fetchSensor,
+  fetchManifest,
   fetchStudyRequirements,
 } from "../api/client";
 import {
@@ -15,7 +15,6 @@ import {
   type SensorConfig,
 } from "../config/sensors";
 import SensorStatCard from "../components/SensorStatCard";
-import WifiRecordsCard from "../components/WifiRecordsCard";
 import ExportLink from "../components/ExportLink";
 import SensorViewFilter from "../components/SensorViewFilter";
 import { useSensorView } from "../utils/sensorView";
@@ -29,24 +28,13 @@ import { deviceLabel } from "../utils/devices";
 import type {
   Device,
   DevicesResponse,
-  SensorRecord,
+  Manifest,
+  SensorManifestEntry,
   StudyRequirements,
 } from "../types";
 
-type SensorData = Record<
-  string,
-  { android: SensorRecord[]; ios: SensorRecord[] }
->;
-
 const REFRESH_INTERVAL_MS = 60000;
 const CLOCK_INTERVAL_MS = 10000;
-
-function recordsForSensor(
-  sensorData: SensorData,
-  key: string,
-): { android: SensorRecord[]; ios: SensorRecord[] } {
-  return sensorData[key] ?? { android: [], ios: [] };
-}
 
 interface Section {
   title: string;
@@ -55,10 +43,7 @@ interface Section {
 
 export default function OverviewPage() {
   const [devices, setDevices] = useState<DevicesResponse | null>(null);
-  const [sensorData, setSensorData] = useState<SensorData>({});
-  const [loadingKeys, setLoadingKeys] = useState<Set<string>>(
-    new Set(SENSOR_CONFIGS.map((s) => s.key)),
-  );
+  const [manifest, setManifest] = useState<Manifest | null>(null);
   const [view, setView] = useSensorView();
   const [requirements, setRequirements] = useState<StudyRequirements | null>(
     null,
@@ -66,67 +51,24 @@ export default function OverviewPage() {
   const [error, setError] = useState<string | null>(null);
   const [now, setNow] = useState(() => Date.now());
 
+  // Per-sensor totals come from the manifest (absolute, cache-backed) in one
+  // request — no per-device row fetching just to count. Devices are still
+  // fetched for the "last upload" banner.
   useEffect(() => {
     let cancelled = false;
-    let loading = false;
 
     async function load() {
-      if (loading) return;
-
-      loading = true;
       try {
-        const loadedDevices = await fetchDevices();
-
+        const [loadedDevices, loadedManifest] = await Promise.all([
+          fetchDevices(),
+          fetchManifest(),
+        ]);
         if (cancelled) return;
-
         setDevices(loadedDevices);
+        setManifest(loadedManifest);
         setError(null);
-
-        for (const sensor of SENSOR_CONFIGS) {
-          const fetchAndroid =
-            sensor.platform === "shared" || sensor.platform === "android";
-          const fetchIos =
-            sensor.platform === "shared" || sensor.platform === "ios";
-          const [androidResults, iosResults] = await Promise.all([
-            fetchAndroid
-              ? Promise.all(
-                  loadedDevices.android.map((d) =>
-                    fetchSensor("android", d.device_id, sensor.key).catch(
-                      () => [] as SensorRecord[],
-                    ),
-                  ),
-                )
-              : Promise.resolve([] as SensorRecord[][]),
-            fetchIos
-              ? Promise.all(
-                  loadedDevices.ios.map((d) =>
-                    fetchSensor("ios", d.device_id, sensor.key).catch(
-                      () => [] as SensorRecord[],
-                    ),
-                  ),
-                )
-              : Promise.resolve([] as SensorRecord[][]),
-          ]);
-
-          if (cancelled) return;
-
-          setSensorData((prev) => ({
-            ...prev,
-            [sensor.key]: {
-              android: androidResults.flat(),
-              ios: iosResults.flat(),
-            },
-          }));
-          setLoadingKeys((prev) => {
-            const next = new Set(prev);
-            next.delete(sensor.key);
-            return next;
-          });
-        }
       } catch (e) {
         if (!cancelled) setError(String(e));
-      } finally {
-        loading = false;
       }
     }
 
@@ -172,10 +114,15 @@ export default function OverviewPage() {
     return "Checking uploads...";
   })();
 
-  const hasSensorRecords = (key: string) => {
-    const records = recordsForSensor(sensorData, key);
-    return records.android.length + records.ios.length > 0;
-  };
+  const loading = !manifest;
+  const entryFor = (
+    platform: "android" | "ios",
+    key: string,
+  ): SensorManifestEntry | null =>
+    manifest?.platforms[platform].sensors[key] ?? null;
+  const hasSensorRecords = (key: string) =>
+    (entryFor("android", key)?.row_count ?? 0) > 0 ||
+    (entryFor("ios", key)?.row_count ?? 0) > 0;
 
   const required = combinedRequirements(requirements);
 
@@ -206,7 +153,7 @@ export default function OverviewPage() {
     }
 
     const shouldShow = (key: string) =>
-      view === "all" || loadingKeys.has(key) || hasSensorRecords(key);
+      view === "all" || loading || hasSensorRecords(key);
     return base
       .map((section) => ({
         ...section,
@@ -220,42 +167,25 @@ export default function OverviewPage() {
     0,
   );
 
-  const renderCard = (config: SensorConfig) =>
-    config.key === "wifi" ? (
-      <WifiRecordsCard
-        groups={[
-          {
-            label: "Android",
-            records: sensorData[config.key]?.android ?? [],
-          },
-          {
-            label: "iOS",
-            records: sensorData[config.key]?.ios ?? [],
-          },
-        ]}
-        loading={loadingKeys.has(config.key)}
-        className="h-full overflow-hidden"
-        tableClassName="max-h-[138px]"
-      />
-    ) : (
-      <SensorStatCard
-        config={config}
-        androidRecords={sensorData[config.key]?.android ?? []}
-        iosRecords={sensorData[config.key]?.ios ?? []}
-        loading={loadingKeys.has(config.key)}
-        className="h-full overflow-hidden"
-        androidExportHref={
-          config.platform === "shared" || config.platform === "android"
-            ? exportSensorZipHref("android", config.key)
-            : undefined
-        }
-        iosExportHref={
-          config.platform === "shared" || config.platform === "ios"
-            ? exportSensorZipHref("ios", config.key)
-            : undefined
-        }
-      />
-    );
+  const renderCard = (config: SensorConfig) => (
+    <SensorStatCard
+      config={config}
+      android={entryFor("android", config.key)}
+      ios={entryFor("ios", config.key)}
+      loading={loading}
+      className="h-full overflow-hidden"
+      androidExportHref={
+        config.platform === "shared" || config.platform === "android"
+          ? exportSensorZipHref("android", config.key)
+          : undefined
+      }
+      iosExportHref={
+        config.platform === "shared" || config.platform === "ios"
+          ? exportSensorZipHref("ios", config.key)
+          : undefined
+      }
+    />
+  );
 
   if (error)
     return (
@@ -362,7 +292,7 @@ export default function OverviewPage() {
               const flagged =
                 view === "required" &&
                 required.required.has(config.key) &&
-                !loadingKeys.has(config.key) &&
+                !loading &&
                 !hasSensorRecords(config.key);
               return (
                 <div key={config.key} className="h-full">
