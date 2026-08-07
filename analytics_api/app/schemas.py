@@ -10,6 +10,16 @@ class _Base(BaseModel):
     device_id: str
 
 
+class SeriesBucketSchema(BaseModel):
+    """One bucket of a server-aggregated sensor series (see services/series.py)."""
+
+    t: float
+    avg: float | None = None
+    lo: float | None = None
+    hi: float | None = None
+    n: int
+
+
 # ---------------------------------------------------------------------------
 # Android schemas — flat columns, no JSON blob to resolve
 # ---------------------------------------------------------------------------

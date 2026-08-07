@@ -6,6 +6,7 @@ from sqlalchemy import select
 from sqlalchemy.exc import OperationalError, ProgrammingError
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import get_ios_db
+from app.services.series import clamp_window
 from app.models import (
     IosAccelerometer,
     IosBarometer,
@@ -793,15 +794,20 @@ async def export_csv(
         raise HTTPException(status_code=404, detail=f"Unknown sensor: {sensor}")
 
     models = model if isinstance(model, tuple) else (model,)
+    # Always bound the scan: an open export would range-scan the whole table for
+    # a high-rate sensor. The full selected period is still exported; only a
+    # literal "all time" request is capped (to the most recent year).
+    from_ts, to_ts = clamp_window(from_ts, to_ts)
     rows = []
     for m in models:
         try:
-            q = select(m).where(m.device_id == device_id)
-            if from_ts is not None:
-                q = q.where(m.timestamp >= from_ts)
-            if to_ts is not None:
-                q = q.where(m.timestamp <= to_ts)
-            q = q.order_by(m.timestamp.asc())
+            q = (
+                select(m)
+                .where(m.device_id == device_id)
+                .where(m.timestamp >= from_ts)
+                .where(m.timestamp <= to_ts)
+                .order_by(m.timestamp.asc())
+            )
             result = await db.execute(q)
             rows.extend(
                 IosSchema.model_validate(row).model_dump()

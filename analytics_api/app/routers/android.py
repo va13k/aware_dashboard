@@ -2,9 +2,15 @@ import csv
 import io
 from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import get_android_db
+from app.services.series import (
+    DEFAULT_BUCKETS,
+    MAX_BUCKETS,
+    bucketed_series,
+    clamp_window,
+)
 from app.models import (
     AndroidAccelerometer,
     AndroidApplicationsCrashes,
@@ -80,6 +86,7 @@ from app.schemas import (
     AndroidTimezoneSchema,
     AndroidTouchSchema,
     AndroidWifiSchema,
+    SeriesBucketSchema,
 )
 
 router = APIRouter(prefix="/android/{device_id}", tags=["android"])
@@ -623,6 +630,103 @@ async def get_wifi(
 
 
 # ---------------------------------------------------------------------------
+# Bucketed series — consistent point density for any window
+# ---------------------------------------------------------------------------
+
+
+def _magnitude(*columns):
+    """√(x²+y²+z²) over a vector sensor's component columns."""
+    return func.sqrt(sum(column * column for column in columns))
+
+
+# sensor key -> (model, value expression). Keyed by the same hyphenated keys the
+# dashboard uses. Only numeric *continuous* sensors belong here; event sensors
+# (calls, screen, timezone, …) and enum sensors (significant-motion) keep the
+# raw-record view. Vector sensors aggregate their magnitude.
+_SERIES_TARGETS: dict[str, tuple] = {
+    "accelerometer": (
+        AndroidAccelerometer,
+        _magnitude(
+            AndroidAccelerometer.double_values_0,
+            AndroidAccelerometer.double_values_1,
+            AndroidAccelerometer.double_values_2,
+        ),
+    ),
+    "gyroscope": (
+        AndroidGyroscope,
+        _magnitude(
+            AndroidGyroscope.double_values_0,
+            AndroidGyroscope.double_values_1,
+            AndroidGyroscope.double_values_2,
+        ),
+    ),
+    "linear-accelerometer": (
+        AndroidLinearAccelerometer,
+        _magnitude(
+            AndroidLinearAccelerometer.double_values_0,
+            AndroidLinearAccelerometer.double_values_1,
+            AndroidLinearAccelerometer.double_values_2,
+        ),
+    ),
+    "magnetometer": (
+        AndroidMagnetometer,
+        _magnitude(
+            AndroidMagnetometer.double_values_0,
+            AndroidMagnetometer.double_values_1,
+            AndroidMagnetometer.double_values_2,
+        ),
+    ),
+    "gravity": (
+        AndroidGravity,
+        _magnitude(
+            AndroidGravity.double_values_0,
+            AndroidGravity.double_values_1,
+            AndroidGravity.double_values_2,
+        ),
+    ),
+    "rotation": (
+        AndroidRotation,
+        _magnitude(
+            AndroidRotation.double_values_0,
+            AndroidRotation.double_values_1,
+            AndroidRotation.double_values_2,
+        ),
+    ),
+    "barometer": (AndroidBarometer, AndroidBarometer.double_values_0),
+    "light": (AndroidLight, AndroidLight.double_light_lux),
+    "temperature": (AndroidTemperature, AndroidTemperature.temperature_celsius),
+    "plugin-ambient-noise": (
+        AndroidPluginAmbientNoise,
+        AndroidPluginAmbientNoise.double_decibels,
+    ),
+    "network-traffic": (
+        AndroidNetworkTraffic,
+        AndroidNetworkTraffic.double_sent_bytes,
+    ),
+}
+
+
+@router.get("/{sensor}/series", response_model=list[SeriesBucketSchema])
+async def get_series(
+    sensor: str,
+    device_id: str,
+    from_ts: float | None = Query(None),
+    to_ts: float | None = Query(None),
+    buckets: int = Query(DEFAULT_BUCKETS, ge=1, le=MAX_BUCKETS),
+    db: AsyncSession = Depends(get_android_db),
+):
+    target = _SERIES_TARGETS.get(sensor)
+    if target is None:
+        raise HTTPException(
+            status_code=404, detail=f"No plottable series for sensor '{sensor}'"
+        )
+    model, value_expr = target
+    return await bucketed_series(
+        db, model, value_expr, device_id, from_ts, to_ts, buckets
+    )
+
+
+# ---------------------------------------------------------------------------
 # CSV export — all rows, no pagination limit
 # ---------------------------------------------------------------------------
 
@@ -682,12 +786,17 @@ async def export_csv(
         raise HTTPException(status_code=404, detail=f"Unknown sensor: {sensor}")
     model, schema = entry
 
-    q = select(model).where(model.device_id == device_id)
-    if from_ts is not None:
-        q = q.where(model.timestamp >= from_ts)
-    if to_ts is not None:
-        q = q.where(model.timestamp <= to_ts)
-    q = q.order_by(model.timestamp.asc())
+    # Always bound the scan: an open export would range-scan the whole table
+    # for a high-rate sensor. The full selected period is still exported; only a
+    # literal "all time" request is capped (to the most recent year).
+    from_ts, to_ts = clamp_window(from_ts, to_ts)
+    q = (
+        select(model)
+        .where(model.device_id == device_id)
+        .where(model.timestamp >= from_ts)
+        .where(model.timestamp <= to_ts)
+        .order_by(model.timestamp.asc())
+    )
 
     result = await db.execute(q)
     rows = result.scalars().all()
