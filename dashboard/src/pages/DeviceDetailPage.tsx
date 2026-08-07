@@ -124,24 +124,25 @@ function DeviceDetailPanel({
   detail,
   loading,
   exportHref,
+  deviceName,
 }: {
   detail: DeviceDetail | null;
   loading: boolean;
   exportHref?: string;
+  deviceName?: string;
 }) {
   const activeStreams = detail?.streams.filter((s) => s.count > 0) ?? [];
-  const latest = activeStreams[0]?.latest ?? detail?.device ?? null;
-  const latestEntries = latest
-    ? Object.entries(latest).filter(
-        ([key]) => !["id", "device_id"].includes(key),
-      )
-    : [];
 
   return (
     <section className="bg-card backdrop-blur-xl border border-wire rounded-3xl shadow-card p-5">
       <div className="flex items-start justify-between gap-4 mb-4">
         <div>
-          <h2 className="text-[15px] font-bold text-ink">Device info</h2>
+          <div className="text-[11px] uppercase tracking-[0.5px] text-sage">
+            Device info
+          </div>
+          <h2 className="text-[15px] font-bold text-ink">
+            {deviceName || "Unknown device"}
+          </h2>
         </div>
         {detail && (
           <div className="flex items-center gap-2">
@@ -181,21 +182,43 @@ function DeviceDetailPanel({
               value={activeStreams.reduce((sum, s) => sum + s.count, 0)}
             />
           </div>
-
-          {latestEntries.length > 0 && (
-            <div>
-              <div className="text-[10px] uppercase tracking-[0.5px] text-sage mb-2">
-                Latest payload
-              </div>
-              <div className="grid grid-cols-[repeat(auto-fit,minmax(150px,1fr))] gap-2">
-                {latestEntries.map(([key, value]) => (
-                  <DetailField key={key} label={key} value={value} />
-                ))}
-              </div>
-            </div>
-          )}
         </div>
       )}
+    </section>
+  );
+}
+
+/**
+ * The most recent record the device uploaded, shown as labelled fields with the
+ * sensor it came from. Lives beside the study status rather than cluttering the
+ * device summary; rendered for both platforms (the study panel is Android-only).
+ */
+function LatestPayloadPanel({ detail }: { detail: DeviceDetail }) {
+  const withData = detail.streams.filter((s) => s.count > 0 && s.latest);
+  if (withData.length === 0) return null;
+  const source = withData.reduce((a, b) =>
+    (b.last_seen ?? 0) > (a.last_seen ?? 0) ? b : a,
+  );
+  const entries = source.latest
+    ? Object.entries(source.latest).filter(
+        ([key]) => !["id", "device_id"].includes(key),
+      )
+    : [];
+  if (entries.length === 0) return null;
+
+  return (
+    <section className="bg-card backdrop-blur-xl border border-wire rounded-3xl shadow-card p-5">
+      <div className="mb-4 flex items-center gap-2">
+        <h2 className="text-[15px] font-bold text-ink">Latest payload</h2>
+        <span className="rounded-md bg-[rgba(48,67,54,0.07)] px-1.5 py-0.5 text-[11px] font-semibold text-sage">
+          from {source.key}
+        </span>
+      </div>
+      <div className="grid grid-cols-[repeat(auto-fit,minmax(150px,1fr))] gap-2">
+        {entries.map(([key, value]) => (
+          <DetailField key={key} label={key} value={value} />
+        ))}
+      </div>
     </section>
   );
 }
@@ -357,6 +380,7 @@ export default function DeviceDetailPage() {
             detail={currentDetail}
             loading={Boolean(!devices || (selected && !currentDetail))}
             exportHref={selectedDeviceExportHref}
+            deviceName={selected ? deviceLabel(selected) : undefined}
           />
 
           {currentDetail?.study ? (
@@ -365,6 +389,8 @@ export default function DeviceDetailPage() {
               configDiff={currentDetail.config_diff}
             />
           ) : null}
+
+          {currentDetail ? <LatestPayloadPanel detail={currentDetail} /> : null}
 
           {currentDetail?.config_diff ? (
             <ConfigDiffPanel diff={currentDetail.config_diff} />
