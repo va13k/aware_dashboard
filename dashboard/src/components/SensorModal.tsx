@@ -38,7 +38,9 @@ export default function SensorModal({
   config: SensorConfig;
   platform: "android" | "ios";
   deviceId: string;
-  totalCount: number;
+  /** The device's true total for this sensor, or null when it isn't known
+   *  (the detail endpoint doesn't summarise every sensor). */
+  totalCount: number | null;
   /**
    * The sensor's most recent upload (ms). Presets are measured back from here,
    * not from "now" - a study phone that last uploaded days ago should still
@@ -190,10 +192,16 @@ export default function SensorModal({
             <div>
               <h2 className="text-[15px] font-bold text-ink">{config.label}</h2>
               <p className="text-[11px] text-sage">
-                {totalCount.toLocaleString()} records total
-                {!loading
-                  ? ` · showing ${fetchedCount.toLocaleString()} in range`
-                  : ""}
+                {[
+                  totalCount != null
+                    ? `${totalCount.toLocaleString()} records total`
+                    : null,
+                  !loading
+                    ? `showing ${fetchedCount.toLocaleString()} in range`
+                    : null,
+                ]
+                  .filter(Boolean)
+                  .join(" · ") || "Loading…"}
               </p>
             </div>
           </div>

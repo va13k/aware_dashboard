@@ -68,6 +68,17 @@ class AndroidAwareLog(AndroidBase):
     log_message = Column(Text)
 
 
+class AndroidRecordCount(AndroidBase):
+    """Dashboard cache of exact per-(sensor, device) row counts (see
+    services/record_counts.py). Written only by the incremental refresh."""
+
+    __tablename__ = "record_counts"
+    sensor = Column(String(64), primary_key=True)
+    device_id = Column(String(150), primary_key=True)
+    count = Column(BigInteger, default=0)
+    last_id = Column(BigInteger, default=0)
+
+
 class AndroidAccelerometer(AndroidBase):
     __tablename__ = "accelerometer"
     _id = Column(BigInteger, primary_key=True, autoincrement=True)
@@ -501,6 +512,16 @@ class AndroidWifi(AndroidBase):
 # iOS models — all tables share (_id, timestamp, device_id, data JSON).
 # A factory avoids repeating the same 4 columns for every table.
 # ---------------------------------------------------------------------------
+
+
+class IosRecordCount(IosBase):
+    """iOS twin of AndroidRecordCount, in the iOS database."""
+
+    __tablename__ = "record_counts"
+    sensor = Column(String(64), primary_key=True)
+    device_id = Column(String(150), primary_key=True)
+    count = Column(BigInteger, default=0)
+    last_id = Column(BigInteger, default=0)
 
 
 def _ios_model(table_name: str):

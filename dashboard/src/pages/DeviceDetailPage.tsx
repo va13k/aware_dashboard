@@ -620,14 +620,17 @@ export default function DeviceDetailPage() {
       {openConfig && selected
         ? (() => {
             const keys = sensorDataKeys(openConfig.key);
-            const totalCount = keys.reduce(
-              (sum, key) =>
-                sum +
-                (currentDetail?.streams.find((s) => s.key === key)?.count ??
-                  currentSensorState.sensorData[key]?.length ??
-                  0),
-              0,
+            // A trustworthy total comes only from the detail endpoint's
+            // unbounded stream counts. If any of the sensor's streams isn't
+            // summarised there, the true total is unknown — pass null rather
+            // than the page-load fetch length, which is capped and would read
+            // as smaller than the in-range count.
+            const streamCounts = keys.map(
+              (key) => currentDetail?.streams.find((s) => s.key === key)?.count,
             );
+            const totalCount = streamCounts.every((c) => c != null)
+              ? streamCounts.reduce((sum, c) => sum + (c ?? 0), 0)
+              : null;
             // Anchor the preset windows on the sensor's most recent upload -
             // the newest of its stream `last_seen` and any fetched record.
             const anchorTs = latestTimestamp([

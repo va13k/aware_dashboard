@@ -11,9 +11,11 @@ from sqlalchemy.exc import OperationalError, ProgrammingError, SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_android_db, get_ios_db
+from app.models import AndroidRecordCount, IosRecordCount
 from app.routers.android import _EXPORT_MODELS as ANDROID_EXPORT_MODELS
 from app.routers.ios import _EXPORT_MODELS as IOS_EXPORT_MODELS
 from app.schemas import IosSchema
+from app.services import record_counts
 
 router = APIRouter(prefix="/export", tags=["export"])
 
@@ -158,7 +160,14 @@ async def _ios_records_for_sensor(
     return sorted(records, key=lambda record: (str(record["device_id"]), record["timestamp"]))
 
 
-async def _sensor_stats(db: AsyncSession, models: tuple) -> dict:
+async def _sensor_stats(db: AsyncSession, models: tuple, cached=None) -> dict:
+    """Per-sensor manifest stats.
+
+    ``cached`` is the ``(row_count, devices_with_data)`` from the record-count
+    cache when available; it replaces the O(rows) ``COUNT`` + ``DISTINCT
+    device_id`` scans. First/last timestamps stay live — ``MIN``/``MAX`` on the
+    indexed ``timestamp`` is cheap — and a cache miss falls back to live counts.
+    """
     row_count = 0
     device_ids: set[str] = set()
     first_timestamp = None
@@ -168,14 +177,11 @@ async def _sensor_stats(db: AsyncSession, models: tuple) -> dict:
         try:
             stats = await db.execute(
                 select(
-                    func.count().label("row_count"),
                     func.min(model.timestamp).label("first_timestamp"),
                     func.max(model.timestamp).label("last_timestamp"),
                 )
             )
             row = stats.one()
-            row_count += int(row.row_count or 0)
-
             if row.first_timestamp is not None:
                 first_timestamp = (
                     row.first_timestamp
@@ -189,18 +195,28 @@ async def _sensor_stats(db: AsyncSession, models: tuple) -> dict:
                     else max(last_timestamp, row.last_timestamp)
                 )
 
-            device_result = await db.execute(select(model.device_id).distinct())
-            device_ids.update(
-                str(item[0])
-                for item in device_result.all()
-                if item[0] not in (None, "")
-            )
+            if cached is None:
+                count_row = await db.execute(
+                    select(func.count()).select_from(model)
+                )
+                row_count += int(count_row.scalar() or 0)
+                device_result = await db.execute(select(model.device_id).distinct())
+                device_ids.update(
+                    str(item[0])
+                    for item in device_result.all()
+                    if item[0] not in (None, "")
+                )
         except (OperationalError, ProgrammingError, SQLAlchemyError):
             await _rollback_after_table_error(db)
 
+    if cached is not None:
+        row_count, devices_with_data = cached
+    else:
+        devices_with_data = len(device_ids)
+
     return {
         "row_count": row_count,
-        "devices_with_data": len(device_ids),
+        "devices_with_data": devices_with_data,
         "first_timestamp": first_timestamp,
         "last_timestamp": last_timestamp,
     }
@@ -281,16 +297,21 @@ async def export_manifest(
         },
     }
 
+    # Exact counts come from the cache in one lookup per platform; the manifest
+    # only adds cheap MIN/MAX timestamps on top (see _sensor_stats).
+    android_totals = await record_counts.sensor_totals(android_db, AndroidRecordCount)
+    ios_totals = await record_counts.sensor_totals(ios_db, IosRecordCount)
+
     for sensor, (model, schema) in ANDROID_EXPORT_MODELS.items():
         platforms["android"]["sensors"][sensor] = {
-            **await _sensor_stats(android_db, (model,)),
+            **await _sensor_stats(android_db, (model,), android_totals.get(sensor)),
             "fields": list(dict.fromkeys(schema.model_fields.keys())),
         }
 
     for sensor, model_entry in IOS_EXPORT_MODELS.items():
         models = _ios_models(model_entry)
         platforms["ios"]["sensors"][sensor] = {
-            **await _sensor_stats(ios_db, models),
+            **await _sensor_stats(ios_db, models, ios_totals.get(sensor)),
             "fields": await _ios_fields(ios_db, models),
         }
 

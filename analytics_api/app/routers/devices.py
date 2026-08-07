@@ -3,7 +3,10 @@ from sqlalchemy import select, func
 from sqlalchemy.exc import ProgrammingError, OperationalError, SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import get_android_db, get_ios_db
+from app.services import record_counts
 from app.models import (
+    AndroidRecordCount,
+    IosRecordCount,
     AndroidAccelerometer,
     AndroidBattery,
     AndroidBluetooth,
@@ -345,11 +348,18 @@ def _last_seen_sort_key(device):
     return (last_seen is not None, last_seen or 0)
 
 
-async def _stream_summary(db: AsyncSession, key: str, model, device_id: str):
-    count_result = await db.execute(
-        select(func.count()).select_from(model).where(model.device_id == device_id)
-    )
-    count = int(count_result.scalar() or 0)
+async def _stream_summary(
+    db: AsyncSession, key: str, model, device_id: str, cached_count: int | None = None
+):
+    # Prefer the cached count; fall back to a live COUNT only on a cache miss
+    # (a cold cache, or a sensor with zero rows the refresh never recorded).
+    if cached_count is not None:
+        count = cached_count
+    else:
+        count_result = await db.execute(
+            select(func.count()).select_from(model).where(model.device_id == device_id)
+        )
+        count = int(count_result.scalar() or 0)
     latest = await _latest_row(db, model, device_id)
     return {
         "key": key,
@@ -366,9 +376,16 @@ async def _device_detail(platform: str, device_id: str, db: AsyncSession):
     device_dict = _flatten_device_row(device)
     stream_details = []
 
+    # One lookup gives every cached per-sensor count for this device; sensors
+    # missing from it fall back to a live COUNT inside `_stream_summary`.
+    count_model = AndroidRecordCount if platform == "android" else IosRecordCount
+    cached_counts = await record_counts.counts_for_device(db, count_model, device_id)
+
     for key, model in streams.items():
         try:
-            stream_details.append(await _stream_summary(db, key, model, device_id))
+            stream_details.append(
+                await _stream_summary(db, key, model, device_id, cached_counts.get(key))
+            )
         except (ProgrammingError, OperationalError, SQLAlchemyError):
             await _rollback_after_table_error(db)
             stream_details.append(
