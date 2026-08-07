@@ -36,6 +36,8 @@ def render() -> str:
     boot = (DB / "00-bootstrap.sql").read_text(encoding="utf-8").rstrip()
     android = (DB / "android-tables.sql").read_text(encoding="utf-8").strip()
     ios = (DB / "ios-tables.sql").read_text(encoding="utf-8").strip()
+    # Self-contained (carries its own USE statements), appended last.
+    dashboard = (DB / "dashboard-tables.sql").read_text(encoding="utf-8").strip()
     return (
         BANNER
         + boot
@@ -43,6 +45,8 @@ def render() -> str:
         + android
         + "\n\nUSE `aware_ios`;\n\n"
         + ios
+        + "\n\n"
+        + dashboard
         + "\n"
     )
 
