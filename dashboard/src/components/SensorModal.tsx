@@ -18,6 +18,7 @@ import {
 } from "../utils/timeRange";
 import SensorChart from "./SensorChart";
 import SeriesChart from "./SeriesChart";
+import ExportLink from "./ExportLink";
 
 /**
  * On-demand chart for a single sensor.
@@ -69,6 +70,28 @@ export default function SensorModal({
 
   const keys = useMemo(() => sensorDataKeys(config.key), [config.key]);
 
+  // Fallback anchor for a sensor with no last-upload timestamp, captured once at
+  // mount so the window stays stable across re-renders.
+  const [mountNow] = useState(() => Date.now());
+
+  // The selected window, shared by the data fetch and the CSV export so the
+  // download covers exactly the range on screen (preset back from the sensor's
+  // last upload, or the custom bounds). "All" leaves both open.
+  const bounds = useMemo<{ fromTs?: number; toTs?: number }>(() => {
+    if (range === "custom") {
+      return {
+        fromTs: localInputToTs(customFrom) ?? undefined,
+        toTs: localInputToTs(customTo) ?? undefined,
+      };
+    }
+    const anchor = anchorTs ?? mountNow;
+    const fromTs = rangeFromTs(range, anchor);
+    // Presets bound the top at the sensor's latest upload so the CSV covers the
+    // same window as the chart — a 1 h chart yields the last hour of data.
+    // "All" leaves both ends open.
+    return { fromTs, toTs: fromTs == null ? undefined : anchor };
+  }, [range, customFrom, customTo, anchorTs, mountNow]);
+
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       if (event.key === "Escape") onClose();
@@ -82,12 +105,7 @@ export default function SensorModal({
 
     const load = () => {
       setLoading(true);
-      const fromTs =
-        range === "custom"
-          ? localInputToTs(customFrom) ?? undefined
-          : rangeFromTs(range, anchorTs ?? Date.now());
-      const toTs =
-        range === "custom" ? localInputToTs(customTo) ?? undefined : undefined;
+      const { fromTs, toTs } = bounds;
 
       if (useSeries) {
         fetchSensorSeries(platform, deviceId, config.key, {
@@ -136,17 +154,7 @@ export default function SensorModal({
     return () => {
       cancelled = true;
     };
-  }, [
-    keys,
-    platform,
-    deviceId,
-    config.key,
-    useSeries,
-    range,
-    customFrom,
-    customTo,
-    anchorTs,
-  ]);
+  }, [keys, platform, deviceId, config.key, useSeries, bounds]);
 
   // The plot cannot render a whole window at full resolution; downsample it.
   const plotData = useMemo<SensorData>(() => {
@@ -159,6 +167,10 @@ export default function SensorModal({
     `cursor-pointer rounded-[10px] px-3 py-1.5 text-[12px] font-semibold transition-colors ${
       active ? "bg-teal-soft text-teal" : "text-sage hover:text-ink"
     }`;
+
+  // Every raw row in the selected window, at full resolution — the chart draws
+  // ~1500 bucketed points of the same window, this downloads all of it.
+  const csvHref = exportSensorHref(platform, deviceId, config.key, bounds);
 
   return (
     <div
@@ -185,29 +197,31 @@ export default function SensorModal({
               </p>
             </div>
           </div>
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label="Close"
-            className="shrink-0 cursor-pointer rounded-lg border border-wire bg-card-strong px-2.5 py-1 text-[13px] font-semibold text-sage transition-colors hover:border-teal hover:text-teal"
-          >
-            ✕
-          </button>
+          <div className="flex shrink-0 items-center gap-2">
+            <ExportLink
+              href={csvHref}
+              label="Download CSV"
+              title="Download every raw row in the selected range (CSV)"
+              disabled={loading || fetchedCount === 0}
+            />
+            <button
+              type="button"
+              onClick={onClose}
+              aria-label="Close"
+              className="cursor-pointer rounded-lg border border-wire bg-card-strong px-2.5 py-1 text-[13px] font-semibold text-sage transition-colors hover:border-teal hover:text-teal"
+            >
+              ✕
+            </button>
+          </div>
         </div>
 
         {useSeries ? (
-          <SeriesChart
-            config={config}
-            buckets={series}
-            loading={loading}
-            exportHref={exportSensorHref(platform, deviceId, config.key)}
-          />
+          <SeriesChart config={config} buckets={series} loading={loading} />
         ) : (
           <SensorChart
             config={config}
             data={plotData}
             loading={loading}
-            exportHref={exportSensorHref(platform, deviceId, config.key)}
             platform={platform}
           />
         )}

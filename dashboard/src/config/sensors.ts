@@ -677,6 +677,36 @@ export function sensorHasSeries(
   return platform === "android" && ANDROID_SERIES_KEYS.has(key);
 }
 
+/**
+ * Event/tabular sensors that open the logs view: their meaning lives in the
+ * individual rows (enum states, scan lists, call/text events), which a paged
+ * table shows directly. `countOnly` sensors resolve to logs via
+ * `sensorViewType`; this set adds the row-valued sensors the plan names
+ * ("wifi/bluetooth/calls") and the enum-state sensors (screen, motion).
+ */
+export const LOG_SENSOR_KEYS = new Set<string>([
+  "wifi",
+  "sensor_wifi",
+  "bluetooth",
+  "calls",
+  "screen",
+  "significant-motion",
+]);
+
+/** How a sensor is presented on demand: a chart ("plot") or a raw table ("log"). */
+export type SensorViewType = "plot" | "log";
+
+/**
+ * The single source of truth for the plot-vs-log split. Steps that open a
+ * sensor on demand (tile → modal) use this to choose the plot modal (numeric,
+ * charted) or the logs modal (raw rows + CSV). Within the plot modal,
+ * `sensorHasSeries` further decides a bucketed series vs the raw-record card.
+ */
+export function sensorViewType(config: SensorConfig): SensorViewType {
+  if (config.countOnly) return "log";
+  return LOG_SENSOR_KEYS.has(config.key) ? "log" : "plot";
+}
+
 /** A sensor's already-fetched records, keyed by the data key they belong to. */
 export type SensorData = Record<string, SensorRecord[]>;
 

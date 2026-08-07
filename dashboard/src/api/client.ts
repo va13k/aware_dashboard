@@ -100,10 +100,10 @@ export const exportSensorZipHref = (
   `${BASE}/export/sensor/${platform}/${encodeURIComponent(sensor)}.zip`;
 
 /**
- * CSV download URL for one sensor over a window. The chart shows ~1500 bucketed
- * points; this export returns every raw row in the same `from`/`to` window, so
- * it is the full-resolution counterpart to the plot, not a copy of it. Omitting
- * the bounds falls back to the server's default window (see `clamp_window`).
+ * CSV download URL for one sensor over a window. Returns every raw row in the
+ * `from`/`to` window at full resolution (the chart shows ~1500 bucketed points
+ * of the same window). Omitting the bounds uses the server's default window
+ * (see `clamp_window`).
  */
 export const exportSensorHref = (
   platform: "android" | "ios",

@@ -18,9 +18,10 @@ import BatteryEventsCard from "./BatteryEventsCard";
 import AmbientNoiseCard from "./AmbientNoiseCard";
 
 /**
- * Renders the right card for a sensor, given its already-fetched data. This is
- * the single place that maps a sensor key to its chart, shared by the on-demand
- * modal (and anywhere else a sensor needs to be plotted).
+ * Maps a sensor key to its card and renders it from the sensor's already-fetched
+ * rows. This is the raw-record view for "plot" sensors that read from raw rows;
+ * `SensorModal` chooses this over `SeriesChart` based on `sensorHasSeries`, and
+ * picks between plot and logs based on `sensorViewType` (see `config/sensors.ts`).
  */
 export default function SensorChart({
   config,
