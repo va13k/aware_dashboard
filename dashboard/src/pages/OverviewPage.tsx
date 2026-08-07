@@ -284,6 +284,12 @@ export default function OverviewPage() {
               >
                 Manifest
               </Link>
+              <Link
+                to="/logs"
+                className="inline-flex h-9 items-center justify-center rounded-lg border border-wire bg-card-strong px-3 text-[10px] font-semibold uppercase tracking-[0.4px] text-sage transition-colors hover:border-teal hover:text-teal"
+              >
+                Logs
+              </Link>
               <ExportLink
                 href={exportAllHref()}
                 label="Export all"
@@ -307,6 +313,12 @@ export default function OverviewPage() {
                 className="inline-flex h-9 items-center justify-center rounded-lg border border-wire bg-card-strong px-3 text-[10px] font-semibold uppercase tracking-[0.4px] text-sage transition-colors hover:border-teal hover:text-teal"
               >
                 Manifest
+              </Link>
+              <Link
+                to="/logs"
+                className="inline-flex h-9 items-center justify-center rounded-lg border border-wire bg-card-strong px-3 text-[10px] font-semibold uppercase tracking-[0.4px] text-sage transition-colors hover:border-teal hover:text-teal"
+              >
+                Logs
               </Link>
               <ExportLink
                 href={exportAllHref()}

@@ -16,6 +16,7 @@ import {
 } from "../config/sensors";
 import SensorTile from "../components/SensorTile";
 import SensorModal from "../components/SensorModal";
+import LogsModal from "../components/LogsModal";
 import ExportLink from "../components/ExportLink";
 import StudyStatusPanel from "../components/StudyStatusPanel";
 import ConfigDiffPanel from "../components/ConfigDiffPanel";
@@ -232,6 +233,9 @@ export default function DeviceDetailPage() {
   );
   // The sensor whose time-range chart modal is open, or null when closed.
   const [openConfig, setOpenConfig] = useState<SensorConfig | null>(null);
+  // The device's client-logs section is collapsed until opened, so it only
+  // fetches when a researcher asks for it.
+  const [showLogs, setShowLogs] = useState(false);
   // Ticks every 10 s so the "X ago" label stays fresh without re-fetching.
   const [, setTick] = useState(0);
 
@@ -583,6 +587,33 @@ export default function DeviceDetailPage() {
                 </>
               );
             })()}
+
+          {selected && selected.platform === "android" ? (
+            <button
+              type="button"
+              onClick={() => setShowLogs(true)}
+              className="flex w-full cursor-pointer items-center justify-between gap-4 rounded-2xl border border-wire bg-card p-5 text-left shadow-card transition-colors hover:border-teal hover:bg-teal-soft/40"
+            >
+              <div>
+                <h2 className="text-[15px] font-bold text-ink">Client logs</h2>
+                <p className="mt-0.5 text-[11px] text-sage">
+                  This device's operation logs — click to open, then filter by
+                  type, window or text.
+                </p>
+              </div>
+              <span className="shrink-0 text-sage" aria-hidden>
+                <svg width="18" height="18" viewBox="0 0 16 16" fill="none">
+                  <path
+                    d="M6 4l4 4-4 4"
+                    stroke="currentColor"
+                    strokeWidth="1.5"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+              </span>
+            </button>
+          ) : null}
         </>
       )}
 
@@ -622,6 +653,14 @@ export default function DeviceDetailPage() {
             );
           })()
         : null}
+
+      {showLogs && selected && selected.platform === "android" ? (
+        <LogsModal
+          deviceId={selected.device_id}
+          title={deviceLabel(selected)}
+          onClose={() => setShowLogs(false)}
+        />
+      ) : null}
     </div>
   );
 }

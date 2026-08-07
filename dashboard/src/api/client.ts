@@ -1,5 +1,6 @@
 import type {
   AndroidStudyEvent,
+  AwareLogPage,
   DeviceDetail,
   DevicesResponse,
   Manifest,
@@ -80,6 +81,45 @@ export const fetchSensorSeries = (
     `/${platform}/${encodeURIComponent(deviceId)}/${sensor}/series?${params.toString()}`,
   );
 };
+
+/** Filters shared by the log list, its export URL, and paging. */
+export interface AndroidLogQuery {
+  deviceId?: string;
+  logType?: string;
+  fromTs?: number;
+  toTs?: number;
+  q?: string;
+  limit?: number;
+  offset?: number;
+}
+
+function logParams(opts: AndroidLogQuery, includePaging = true): URLSearchParams {
+  const params = new URLSearchParams();
+  if (opts.deviceId) params.set("device_id", opts.deviceId);
+  // An empty `logType` is a real filter (rows with no type); only `undefined`
+  // means "any type", so send the param whenever it is defined.
+  if (opts.logType != null) params.set("log_type", opts.logType);
+  if (opts.fromTs != null) params.set("from_ts", String(Math.floor(opts.fromTs)));
+  if (opts.toTs != null) params.set("to_ts", String(Math.floor(opts.toTs)));
+  if (opts.q) params.set("q", opts.q);
+  if (includePaging) {
+    if (opts.limit != null) params.set("limit", String(opts.limit));
+    if (opts.offset != null) params.set("offset", String(opts.offset));
+  }
+  return params;
+}
+
+/** A page of Android client logs (`aware_log`) matching the filters. */
+export const fetchAndroidLogs = (opts: AndroidLogQuery = {}): Promise<AwareLogPage> =>
+  get(`/logs/android?${logParams(opts).toString()}`);
+
+/** The distinct `log_type` values, for the "stream to track" filter. */
+export const fetchAndroidLogTypes = (): Promise<string[]> =>
+  get("/logs/android/log-types");
+
+/** CSV download URL for the logs matching the filters (all rows, no paging). */
+export const androidLogsExportHref = (opts: AndroidLogQuery = {}): string =>
+  `${BASE}/logs/android/export?${logParams(opts, false).toString()}`;
 
 export const exportAllHref = (): string => `${BASE}/export/all.zip`;
 

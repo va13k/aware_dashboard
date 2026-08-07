@@ -37,6 +37,11 @@ class AndroidDeviceSchema(_Base):
     sdk: str | None = None
 
 
+class AndroidAwareLogSchema(_Base):
+    log_type: str | None = None
+    log_message: str | None = None
+
+
 class AndroidAccelerometerSchema(_Base):
     double_values_0: float = 0
     double_values_1: float = 0

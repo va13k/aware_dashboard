@@ -177,6 +177,21 @@ export interface SeriesBucket {
   n: number;
 }
 
+/** One client operation-log line (`aware_log`). */
+export interface AwareLogRow {
+  id: number;
+  timestamp: number;
+  device_id: string;
+  log_type: string | null;
+  log_message: string | null;
+}
+
+/** A page of log lines with the total matching the active filters. */
+export interface AwareLogPage {
+  total: number;
+  rows: AwareLogRow[];
+}
+
 export interface SensorManifestEntry {
   row_count: number;
   devices_with_data: number;

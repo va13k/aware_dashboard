@@ -56,6 +56,16 @@ export function absoluteTime(value: unknown): string {
   }).format(new Date(timestamp));
 }
 
+/** Date and time down to the second, for logs where the exact moment matters. */
+export function absoluteTimeWithSeconds(value: unknown): string {
+  const timestamp = normalizeTimestamp(value);
+  if (timestamp == null) return "—";
+  return new Intl.DateTimeFormat(undefined, {
+    dateStyle: "medium",
+    timeStyle: "medium",
+  }).format(new Date(timestamp));
+}
+
 /** Date only, for spans where the time of day carries no meaning. */
 export function absoluteDate(value: unknown): string {
   const timestamp = normalizeTimestamp(value);

@@ -52,6 +52,22 @@ class AndroidAwareStudy(AndroidBase):
     study_compliance = Column(Text)
 
 
+class AndroidAwareLog(AndroidBase):
+    """Free-form log lines the client emits about its own operation.
+
+    One row per log line, grouped by `log_type` (e.g. sync, diagnostics,
+    scheduler, lifecycle, context). `log_message` is the human-readable line.
+    Android only for now; an iOS equivalent is expected later.
+    """
+
+    __tablename__ = "aware_log"
+    _id = Column(BigInteger, primary_key=True, autoincrement=True)
+    timestamp = Column(Double, default=0)
+    device_id = Column(String(150), default="")
+    log_type = Column(String(32), default="")
+    log_message = Column(Text)
+
+
 class AndroidAccelerometer(AndroidBase):
     __tablename__ = "accelerometer"
     _id = Column(BigInteger, primary_key=True, autoincrement=True)

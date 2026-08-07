@@ -12,18 +12,23 @@ import OverviewPage from "./pages/OverviewPage";
 import DevicesPage from "./pages/DevicesPage";
 import DeviceDetailPage from "./pages/DeviceDetailPage";
 import ManifestPage from "./pages/ManifestPage";
+import LogsPage from "./pages/LogsPage";
 import { HeaderSlotContext, useHeaderSlot } from "./utils/headerSlot";
 
 function Layout() {
   const { pathname } = useLocation();
   // On a device detail route (/devices/<id> or /devices/<platform>/<id>) the
-  // quick link goes back to the device list. Everywhere else it leaves the SPA
+  // quick link goes back to the device list. The dashboard sub-pages (manifest,
+  // logs) go back to the dashboard overview. Everywhere else it leaves the SPA
   // for the platform landing page, which lives above our /dashboard basename
   // and so needs a real navigation rather than a router link.
   const onDeviceDetail = /^\/devices\/[^/]+/.test(pathname);
+  const onSubPage = /^\/(manifest|logs)(\/|$)/.test(pathname);
   const backLink = onDeviceDetail
     ? { to: "/devices", label: "All devices", external: false }
-    : { to: "/", label: "Main page", external: true };
+    : onSubPage
+      ? { to: "/", label: "Dashboard", external: false }
+      : { to: "/", label: "Main page", external: true };
   const { center } = useHeaderSlot();
 
   const backLinkClass =
@@ -96,6 +101,7 @@ function Layout() {
           />
           <Route path="devices/:deviceId" element={<DeviceDetailPage />} />
           <Route path="manifest" element={<ManifestPage />} />
+          <Route path="logs" element={<LogsPage />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </main>
