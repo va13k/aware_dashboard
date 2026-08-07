@@ -74,6 +74,7 @@
     "analytics_api/app/database.py": "d1f132c400343e280275261c365e52ed0cc514fdbc526e6729f53102411ffe2b",
     "analytics_api/app/main.py": "63754b53be7945b5187442f81179904156e45bd3d2f6930f0b27a68a26cd6903",
     "analytics_api/app/models.py": "152a28357fa0a7ecd9bb31d2478ff475241b5b8d44dac7b283e58cc529c98662",
+    "analytics_api/app/refresh_counts.py": "8bfa02eeae85cc0a190360df031e23045666c7dfd3b94e789b668245c00ead75",
     "analytics_api/app/routers/__init__.py": "af1349b9f5f9a1a6a0404dea36dcc9499bcb25c9adc112b7cc9a93cae41f3262",
     "analytics_api/app/routers/android.py": "8a7d014ca2810af829562e3ae10a2e02cc51dd02c0d6eff1398e1c0fc853ffdd",
     "analytics_api/app/routers/auth.py": "0468f635685bbd89149626a5be8f60baf6a60e406032cef2a12205195214f023",
@@ -157,7 +158,7 @@
     "dashboard/src/components/WifiRecordsCard.tsx": "2a4b03fb96ce10de7b283ba7f705c1bf45f017e81339c4d5abbd2d1297394603",
     "dashboard/src/config/sensors.ts": "93d574515d4341d264f33d9fce008db84875340a80672562e28e6c266162ab11",
     "dashboard/src/main.tsx": "717427d5d64470f97e4bb18e907ab095427e2aa9a6800fe3390b43bede6e9b35",
-    "dashboard/src/pages/DeviceDetailPage.tsx": "1699aa8ff6934124e6ea105b06e1508e9fe3e4442b420f22995ab563ffdabee6",
+    "dashboard/src/pages/DeviceDetailPage.tsx": "e23b0eddef5845c96048bc673b625ddb547049f9711a0eebcef6b415ed2798c7",
     "dashboard/src/pages/DevicesPage.tsx": "aa15e8cf5d0bf27a539bce47b014368ff27a18b4d42ac450890befb70213593c",
     "dashboard/src/pages/LogsPage.tsx": "48156099ff9a58bff08e00507989ba3e05db211fb0f22fcc6101fdf0654d9e01",
     "dashboard/src/pages/ManifestPage.tsx": "bc1932f4fd5a18cb32c4a3cce885d354deeddd90672d927affdcaaa1c3dfd4a9",
@@ -180,7 +181,7 @@
     "db/ios-tables.sql": "5d2c64467ca2c00f458d505f4817e238f522db6da621620f465781479519def3",
     "db/zz-participant-password.sh": "6e179c0205f9851a72862409939477294a2767f3dd74ee73c8799488876d5055",
     "docs/dashboard-performance-realtime-plan.md": "f6601ae22f816a507ce9e230a27d5038c9181cb6b1d9125c3150945f17873e0f",
-    "docs/device-view-timescale-plan.md": "16ce5016b3daa4b80e81da4c14bcaccfb0ed63bcbee441f4981a00449587134e",
+    "docs/device-view-timescale-plan.md": "e566b5c9b9edc46fab5ce78a911934a66b2cc18fbfc3c11e346b2e013b432e4d",
     "setup.sh": "718c47a315a28f57fabd178295196fbaee7d4a2c7a79ac936190d517aac2c3c4",
     "setup/Dockerfile": "7a809ccc1ba7fadfc0524360987c979487391833c60c5a6d46bb4620c6d13e39",
     "setup/deploy.sh": "d63de94fbe1fe0ce60d75d76d69cdd40230df5383543f20f5b30522d47727d1e",
@@ -198,13 +199,13 @@
     "shared_config/source_store.py": "ceaf715a4f7aa1198409553bed5ab30ab761f23c6f6db02140ee2e84148aa1f9",
     "shared_config/test_serializers.py": "d7614beeadecc7e75fcf9671fbc58ae7c8d9ce338a9cc21480128038ccd23fdb"
   },
-  "indexed_at_commit": "410cf28c64ce3b8ae6dd6171cb63380a8c22604b",
-  "indexed_at_timestamp": "2026-08-07T15:30:28.107746+00:00",
+  "indexed_at_commit": "58c514cdc0d11ccb1264a52952ec75ab66376a17",
+  "indexed_at_timestamp": "2026-08-07T15:59:55.762678+00:00",
   "schema_version": 3,
   "stats": {
-    "total_edges": 2114,
-    "total_files": 197,
-    "total_nodes": 1787
+    "total_edges": 2116,
+    "total_files": 198,
+    "total_nodes": 1790
   },
   "vexp_version": "2.5.2"
 }
