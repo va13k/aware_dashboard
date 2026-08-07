@@ -2,7 +2,11 @@ import { useEffect, useMemo, useState } from "react";
 import type { SensorConfig, SensorData } from "../config/sensors";
 import { sensorDataKeys, sensorHasSeries } from "../config/sensors";
 import type { SensorRecord, SeriesBucket } from "../types";
-import { fetchSensor, fetchSensorSeries, exportSensorHref } from "../api/client";
+import {
+  fetchSensor,
+  fetchSensorSeries,
+  exportSensorHref,
+} from "../api/client";
 import {
   DEFAULT_RANGE,
   RANGE_PRESETS,

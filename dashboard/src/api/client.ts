@@ -99,11 +99,20 @@ export const exportSensorZipHref = (
 ): string =>
   `${BASE}/export/sensor/${platform}/${encodeURIComponent(sensor)}.zip`;
 
+/**
+ * CSV download URL for one sensor over a window. The chart shows ~1500 bucketed
+ * points; this export returns every raw row in the same `from`/`to` window, so
+ * it is the full-resolution counterpart to the plot, not a copy of it. Omitting
+ * the bounds falls back to the server's default window (see `clamp_window`).
+ */
 export const exportSensorHref = (
   platform: "android" | "ios",
   deviceId: string,
   sensor: string,
+  opts: { fromTs?: number; toTs?: number } = {},
 ): string => {
   const params = new URLSearchParams({ sensor });
+  if (opts.fromTs != null) params.set("from_ts", String(Math.floor(opts.fromTs)));
+  if (opts.toTs != null) params.set("to_ts", String(Math.floor(opts.toTs)));
   return `${BASE}/${platform}/${encodeURIComponent(deviceId)}/export?${params.toString()}`;
 };
