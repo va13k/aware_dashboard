@@ -9,6 +9,7 @@ from fastapi.testclient import TestClient
 
 from app.main import app
 from app.routers import android as android_router
+from app.routers import ios as ios_router
 from app.services.series import MAX_WINDOW_MS, clamp_window
 
 
@@ -54,6 +55,19 @@ def client_with_rows():
     app.dependency_overrides.clear()
 
 
+@pytest.fixture
+def ios_client_with_rows():
+    def make(mappings):
+        async def session():
+            yield _FakeSession(mappings)
+
+        app.dependency_overrides[ios_router.get_ios_db] = session
+        return TestClient(app)
+
+    yield make
+    app.dependency_overrides.clear()
+
+
 def test_series_maps_buckets_to_evenly_spaced_timestamps(client_with_rows):
     # width = (2500 - 1000) / 3 = 500; t = from_ts + bucket * width
     rows = [
@@ -78,6 +92,33 @@ def test_series_404_for_non_series_sensor(client_with_rows):
     # `calls` is an event sensor with no plottable value column.
     client = client_with_rows([])
     resp = client.get("/android/dev-1/calls/series", params={"from_ts": 0, "to_ts": 10})
+    assert resp.status_code == 404
+
+
+def test_ios_series_buckets_json_extracted_values(ios_client_with_rows):
+    # The iOS value column comes out of the `data` JSON blob, but the wiring and
+    # bucket math are identical to Android once the SQL has run.
+    rows = [
+        {"bucket": 0, "n": 4, "avg": 9.8, "lo": 9.5, "hi": 10.1},
+        {"bucket": 1, "n": 6, "avg": 9.9, "lo": 9.6, "hi": 10.2},
+    ]
+    client = ios_client_with_rows(rows)
+
+    resp = client.get(
+        "/ios/dev-1/accelerometer/series",
+        params={"from_ts": 0, "to_ts": 2000, "buckets": 2},
+    )
+
+    assert resp.status_code == 200
+    data = resp.json()
+    assert [b["t"] for b in data] == [0.0, 1000.0]
+    assert data[0] == {"t": 0.0, "avg": 9.8, "lo": 9.5, "hi": 10.1, "n": 4}
+
+
+def test_ios_series_404_for_non_series_sensor(ios_client_with_rows):
+    # `calendar` is an event sensor with no plottable value column.
+    client = ios_client_with_rows([])
+    resp = client.get("/ios/dev-1/calendar/series", params={"from_ts": 0, "to_ts": 10})
     assert resp.status_code == 404
 
 

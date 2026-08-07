@@ -2,11 +2,16 @@ import csv
 import io
 from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.exc import OperationalError, ProgrammingError
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import get_ios_db
-from app.services.series import clamp_window
+from app.services.series import (
+    DEFAULT_BUCKETS,
+    MAX_BUCKETS,
+    bucketed_series,
+    clamp_window,
+)
 from app.models import (
     IosAccelerometer,
     IosBarometer,
@@ -54,7 +59,7 @@ from app.models import (
     IosTimezone,
     IosWifi,
 )
-from app.schemas import IosSchema
+from app.schemas import IosSchema, SeriesBucketSchema
 
 router = APIRouter(prefix="/ios/{device_id}", tags=["ios"])
 
@@ -725,6 +730,145 @@ async def get_wifi(
 ):
     return await _sensor_rows(
         db, (IosSensorWifi, IosWifi), device_id, from_ts, to_ts, limit, offset
+    )
+
+
+# ---------------------------------------------------------------------------
+# Bucketed series — consistent point density for any window
+# ---------------------------------------------------------------------------
+#
+# iOS keeps every reading in an opaque ``data`` JSON blob (see models.py), so
+# the value column is extracted at query time with ``data[key].as_float()``
+# (MySQL ``JSON_EXTRACT`` + a null-safe numeric cast). The candidate-key lists
+# mirror the dashboard's ``firstNumber``/``vectorMagnitude`` fallbacks in
+# ``config/sensors.ts`` so a plotted series matches the raw-record view: iOS may
+# store vector components as ``double_values_N`` or ``x/y/z`` (rotation also
+# roll/pitch/yaw, headphone-motion also acceleration_*), hence the COALESCE.
+
+
+def _num(model, *keys):
+    """First present numeric JSON key — mirrors the FE ``firstNumber`` fallback."""
+    exprs = [model.data[key].as_float() for key in keys]
+    return exprs[0] if len(exprs) == 1 else func.coalesce(*exprs)
+
+
+def _magnitude(model, *components):
+    """√(Σ cᵢ²) where each component is the first present of its candidate keys."""
+    squares = []
+    for keys in components:
+        component = _num(model, *keys)
+        squares.append(component * component)
+    return func.sqrt(sum(squares))
+
+
+_XYZ = (
+    ("double_values_0", "x"),
+    ("double_values_1", "y"),
+    ("double_values_2", "z"),
+)
+
+
+# sensor slug -> (model, value expression). Only numeric *continuous* sensors
+# belong here; event/tabular sensors keep the raw-record + logs view. Slugs with
+# a "/" (health-kit/quantity, …) are intentionally absent: the `{sensor}` path
+# param cannot capture a slash.
+_SERIES_TARGETS: dict[str, tuple] = {
+    "accelerometer": (IosAccelerometer, _magnitude(IosAccelerometer, *_XYZ)),
+    "gyroscope": (IosGyroscope, _magnitude(IosGyroscope, *_XYZ)),
+    "linear-accelerometer": (
+        IosLinearAccelerometer,
+        _magnitude(IosLinearAccelerometer, *_XYZ),
+    ),
+    "magnetometer": (IosMagnetometer, _magnitude(IosMagnetometer, *_XYZ)),
+    "rotation": (
+        IosRotation,
+        _magnitude(
+            IosRotation,
+            ("double_values_0", "x", "roll"),
+            ("double_values_1", "y", "pitch"),
+            ("double_values_2", "z", "yaw"),
+        ),
+    ),
+    "headphone-motion": (
+        IosPluginHeadphoneMotion,
+        _magnitude(
+            IosPluginHeadphoneMotion,
+            ("double_values_0", "x", "acceleration_x"),
+            ("double_values_1", "y", "acceleration_y"),
+            ("double_values_2", "z", "acceleration_z"),
+        ),
+    ),
+    "barometer": (IosBarometer, _num(IosBarometer, "pressure", "double_values_0")),
+    "battery": (IosBattery, _num(IosBattery, "battery_level", "level", "batteryLevel")),
+    "bluetooth": (IosBluetooth, _num(IosBluetooth, "bt_rssi", "rssi")),
+    "locations": (
+        IosLocations,
+        _num(IosLocations, "double_speed", "speed", "horizontal_accuracy"),
+    ),
+    "fused-location": (
+        IosGoogleFusedLocation,
+        _num(IosGoogleFusedLocation, "accuracy", "horizontal_accuracy", "speed"),
+    ),
+    "ambient-noise": (
+        IosPluginAmbientNoise,
+        _num(IosPluginAmbientNoise, "double_decibels", "decibels"),
+    ),
+    "plugin-ambient-noise": (
+        IosPluginAmbientNoise,
+        _num(IosPluginAmbientNoise, "double_decibels", "decibels"),
+    ),
+    "processor": (
+        IosProcessor,
+        _num(
+            IosProcessor,
+            "double_last_user",
+            "double_user_load",
+            "double_last_system",
+            "double_system_load",
+            "load",
+            "processor_load",
+            "usage",
+            "value",
+        ),
+    ),
+    "ble-heartrate": (
+        IosPluginBleHeartrate,
+        _num(IosPluginBleHeartrate, "heart_rate", "heartrate", "bpm", "value"),
+    ),
+    "memory": (IosMemory, _num(IosMemory, "used", "free", "total", "value")),
+    "ntptime": (
+        IosPluginNtptime,
+        _num(IosPluginNtptime, "offset", "delay", "latency", "value"),
+    ),
+    "pedometer": (
+        IosPedometer,
+        _num(IosPedometer, "step_count", "steps", "number_of_steps", "distance"),
+    ),
+    "openweather": (
+        IosPluginOpenweather,
+        _num(IosPluginOpenweather, "temperature", "temp", "value"),
+    ),
+    "health-kit": (IosHealthKit, _num(IosHealthKit, "value", "quantity")),
+}
+
+
+@router.get("/{sensor}/series", response_model=list[SeriesBucketSchema])
+async def get_series(
+    sensor: str,
+    device_id: str,
+    from_ts: float | None = Query(None),
+    to_ts: float | None = Query(None),
+    buckets: int = Query(DEFAULT_BUCKETS, ge=1, le=MAX_BUCKETS),
+    db: AsyncSession = Depends(get_ios_db),
+):
+    target = _SERIES_TARGETS.get(sensor)
+    if target is None:
+        raise HTTPException(
+            status_code=404, detail=f"No plottable series for sensor '{sensor}'"
+        )
+    model, value_expr = target
+    return await bucketed_series(
+        db, model, value_expr, device_id, from_ts, to_ts, buckets
     )
 
 
