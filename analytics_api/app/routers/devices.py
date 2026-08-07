@@ -90,8 +90,8 @@ DEVICE_METADATA_FIELDS = (
 
 # Every android sensor gets a stream summary (count + last_seen) so the device
 # grid can build a tile per sensor from the detail response alone. Counts come
-# from the record-count cache (see _stream_summary), so summarising them all is
-# cheap. Derived from the export map — the canonical android sensor registry —
+# from the record-count cache (see services/record_counts.py), so summarising
+# them all is cheap. Derived from the export map — the canonical android registry —
 # to stay in sync with it automatically.
 ANDROID_STREAMS = {slug: entry[0] for slug, entry in _ANDROID_EXPORT_MODELS.items()}
 
@@ -184,13 +184,6 @@ async def _rollback_after_table_error(db: AsyncSession):
         await db.rollback()
     except SQLAlchemyError:
         pass
-
-
-async def _latest_row(db: AsyncSession, model, device_id: str):
-    result = await db.execute(
-        select(model).where(model.device_id == device_id).order_by(model.timestamp.desc()).limit(1)
-    )
-    return result.scalars().first()
 
 
 async def _best_device_row(db: AsyncSession, model, device_id: str):
@@ -331,22 +324,6 @@ def _last_seen_sort_key(device):
     return (last_seen is not None, last_seen or 0)
 
 
-async def _stream_summary(db: AsyncSession, key: str, model, device_id: str):
-    """Live per-stream summary — the fallback for sensors not in the cache (a
-    cold cache, or a zero-row sensor the refresh never recorded)."""
-    count_result = await db.execute(
-        select(func.count()).select_from(model).where(model.device_id == device_id)
-    )
-    count = int(count_result.scalar() or 0)
-    latest = await _latest_row(db, model, device_id)
-    return {
-        "key": key,
-        "count": count,
-        "last_seen": getattr(latest, "timestamp", None) if latest else None,
-        "latest": _row_to_dict(latest),
-    }
-
-
 async def _latest_payload_by_id(db: AsyncSession, model, last_id: int):
     """The newest row for a stream, fetched by primary key — an O(1) point
     lookup instead of an `ORDER BY timestamp` scan."""
@@ -365,31 +342,25 @@ async def _device_detail(platform: str, device_id: str, db: AsyncSession):
     device_dict = _flatten_device_row(device)
     stream_details = []
 
-    # One lookup gives every cached (count, last_seen, last_id) for this device,
-    # so cached streams need no per-sensor query; only misses fall back to a
-    # live summary.
+    # One lookup gives every cached (count, last_seen, last_id) for this device.
+    # A sensor absent from the cache has no rows for this device — the refresh
+    # records every sensor/device that does — so a miss is zero with *no* query.
+    # That keeps the page O(1) no matter how many sensors a device lacks (a live
+    # "latest row" probe on a table the device never wrote would scan the whole
+    # timestamp index). A cold cache simply reads zero until the refresh runs.
     count_model = AndroidRecordCount if platform == "android" else IosRecordCount
     cached = await record_counts.counts_for_device(db, count_model, device_id)
 
-    for key, model in streams.items():
+    for key in streams:
         entry = cached.get(key)
-        if entry is not None:
-            stream_details.append(
-                {
-                    "key": key,
-                    "count": entry["count"],
-                    "last_seen": entry["last_ts"] or None,
-                    "latest": None,
-                }
-            )
-            continue
-        try:
-            stream_details.append(await _stream_summary(db, key, model, device_id))
-        except (ProgrammingError, OperationalError, SQLAlchemyError):
-            await _rollback_after_table_error(db)
-            stream_details.append(
-                {"key": key, "count": 0, "last_seen": None, "latest": None}
-            )
+        stream_details.append(
+            {
+                "key": key,
+                "count": entry["count"] if entry else 0,
+                "last_seen": (entry["last_ts"] or None) if entry else None,
+                "latest": None,
+            }
+        )
 
     # The "latest payload" panel shows one stream, so fetch only the most-recent
     # cached stream's newest row (by primary key) rather than one per sensor.

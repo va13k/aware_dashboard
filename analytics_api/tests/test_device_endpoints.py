@@ -107,17 +107,14 @@ def _database(monkeypatch):
     async def best_device_row(db, model, device_id):
         return None
 
-    async def stream_summary(db, key, model, device_id, cached_count=None):
-        return {"key": key, "count": 0, "last_seen": None, "latest": None}
-
     async def counts_for_device(db, count_model, device_id):
+        # Empty cache → every stream reads as zero with no per-sensor query.
         return {}
 
     monkeypatch.setattr(devices_router, "_combined_last_seen_by_device", last_seen)
     monkeypatch.setattr(devices_router, "_device_metadata_by_device", metadata)
     monkeypatch.setattr(devices_router, "_android_study_rows", study_rows)
     monkeypatch.setattr(devices_router, "_best_device_row", best_device_row)
-    monkeypatch.setattr(devices_router, "_stream_summary", stream_summary)
     monkeypatch.setattr(
         devices_router.record_counts, "counts_for_device", counts_for_device
     )
