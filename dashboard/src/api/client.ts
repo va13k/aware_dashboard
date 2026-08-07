@@ -4,6 +4,7 @@ import type {
   DevicesResponse,
   Manifest,
   SensorRecord,
+  SeriesBucket,
   StudyRequirements,
 } from "../types";
 
@@ -56,6 +57,27 @@ export const fetchSensor = (
   if (opts.toTs != null) params.set("to_ts", String(Math.floor(opts.toTs)));
   return get(
     `/${platform}/${encodeURIComponent(deviceId)}/${sensor}?${params.toString()}`,
+  );
+};
+
+/**
+ * Server-bucketed sensor series: the window is aggregated into ~`buckets`
+ * evenly-spaced points so density stays consistent for any range. Use this for
+ * numeric sensors instead of pulling raw rows (which a wide window would cap to
+ * an unrepresentative slice).
+ */
+export const fetchSensorSeries = (
+  platform: "android" | "ios",
+  deviceId: string,
+  sensor: string,
+  opts: { fromTs?: number; toTs?: number; buckets?: number } = {},
+): Promise<SeriesBucket[]> => {
+  const params = new URLSearchParams({ buckets: String(opts.buckets ?? 1500) });
+  if (opts.fromTs != null)
+    params.set("from_ts", String(Math.floor(opts.fromTs)));
+  if (opts.toTs != null) params.set("to_ts", String(Math.floor(opts.toTs)));
+  return get(
+    `/${platform}/${encodeURIComponent(deviceId)}/${sensor}/series?${params.toString()}`,
   );
 };
 

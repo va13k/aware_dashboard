@@ -96,43 +96,40 @@ function DeviceSwitcher({
     <label className="flex items-center gap-2 text-[11px] text-sage">
       Device
       <select
-          aria-label="Switch device"
-          value={selectedKey ?? ""}
-          onChange={(event) => {
-            const value = event.target.value;
-            const separator = value.indexOf(":");
-            if (separator < 0) return;
-            onSwitch(value.slice(0, separator), value.slice(separator + 1));
-          }}
-          className="min-w-[200px] cursor-pointer rounded-lg border border-wire bg-card-strong px-2.5 py-1.5 text-[12px] font-semibold text-ink"
-        >
-          {selectedKey ? null : <option value="">Select a device</option>}
-          {devices.android.length > 0 ? (
-            <optgroup label="Android">
-              {devices.android.map((device) => (
-                <option
-                  key={device.device_id}
-                  value={`android:${device.device_id}`}
-                >
-                  {deviceLabel(device)}
-                </option>
-              ))}
-            </optgroup>
-          ) : null}
-          {devices.ios.length > 0 ? (
-            <optgroup label="iOS">
-              {devices.ios.map((device) => (
-                <option
-                  key={device.device_id}
-                  value={`ios:${device.device_id}`}
-                >
-                  {deviceLabel(device)}
-                </option>
-              ))}
-            </optgroup>
-          ) : null}
-        </select>
-      </label>
+        aria-label="Switch device"
+        value={selectedKey ?? ""}
+        onChange={(event) => {
+          const value = event.target.value;
+          const separator = value.indexOf(":");
+          if (separator < 0) return;
+          onSwitch(value.slice(0, separator), value.slice(separator + 1));
+        }}
+        className="min-w-[200px] cursor-pointer rounded-lg border border-wire bg-card-strong px-2.5 py-1.5 text-[12px] font-semibold text-ink"
+      >
+        {selectedKey ? null : <option value="">Select a device</option>}
+        {devices.android.length > 0 ? (
+          <optgroup label="Android">
+            {devices.android.map((device) => (
+              <option
+                key={device.device_id}
+                value={`android:${device.device_id}`}
+              >
+                {deviceLabel(device)}
+              </option>
+            ))}
+          </optgroup>
+        ) : null}
+        {devices.ios.length > 0 ? (
+          <optgroup label="iOS">
+            {devices.ios.map((device) => (
+              <option key={device.device_id} value={`ios:${device.device_id}`}>
+                {deviceLabel(device)}
+              </option>
+            ))}
+          </optgroup>
+        ) : null}
+      </select>
+    </label>
   );
 }
 
@@ -596,7 +593,8 @@ export default function DeviceDetailPage() {
               (sum, key) =>
                 sum +
                 (currentDetail?.streams.find((s) => s.key === key)?.count ??
-                  (currentSensorState.sensorData[key]?.length ?? 0)),
+                  currentSensorState.sensorData[key]?.length ??
+                  0),
               0,
             );
             // Anchor the preset windows on the sensor's most recent upload -

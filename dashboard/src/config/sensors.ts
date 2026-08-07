@@ -649,6 +649,34 @@ export function deviceSensorsForPlatform(
   return sensorsForPlatform(platform);
 }
 
+/**
+ * Sensors the backend can aggregate into a bucketed numeric series. Currently
+ * Android only: iOS stores values in an opaque JSON blob whose keys aren't
+ * asserted in the repo, so its series is deferred and iOS keeps the raw view.
+ * Must stay in sync with `_SERIES_TARGETS` in `routers/android.py`.
+ */
+export const ANDROID_SERIES_KEYS = new Set<string>([
+  "accelerometer",
+  "gyroscope",
+  "linear-accelerometer",
+  "magnetometer",
+  "gravity",
+  "rotation",
+  "barometer",
+  "light",
+  "temperature",
+  "plugin-ambient-noise",
+  "network-traffic",
+]);
+
+/** Whether this sensor should be plotted from a server-bucketed series. */
+export function sensorHasSeries(
+  platform: "android" | "ios",
+  key: string,
+): boolean {
+  return platform === "android" && ANDROID_SERIES_KEYS.has(key);
+}
+
 /** A sensor's already-fetched records, keyed by the data key they belong to. */
 export type SensorData = Record<string, SensorRecord[]>;
 

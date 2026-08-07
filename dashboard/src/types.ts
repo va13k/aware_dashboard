@@ -164,6 +164,19 @@ export type SensorRecord = Record<string, unknown> & {
   device_id: string;
 };
 
+/**
+ * One bucket of a server-aggregated sensor series: the bucket start `t` (ms),
+ * the mean `avg` with `lo`/`hi` extent, and the raw row count `n`. `avg/lo/hi`
+ * are null for buckets of an event sensor that only reports counts.
+ */
+export interface SeriesBucket {
+  t: number;
+  avg: number | null;
+  lo: number | null;
+  hi: number | null;
+  n: number;
+}
+
 export interface SensorManifestEntry {
   row_count: number;
   devices_with_data: number;

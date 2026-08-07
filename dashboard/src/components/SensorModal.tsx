@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import type { SensorConfig, SensorData } from "../config/sensors";
-import { sensorDataKeys } from "../config/sensors";
-import type { SensorRecord } from "../types";
-import { fetchSensor, exportSensorHref } from "../api/client";
+import { sensorDataKeys, sensorHasSeries } from "../config/sensors";
+import type { SensorRecord, SeriesBucket } from "../types";
+import { fetchSensor, fetchSensorSeries, exportSensorHref } from "../api/client";
 import {
   DEFAULT_RANGE,
   RANGE_PRESETS,
@@ -13,6 +13,7 @@ import {
   type RangeKey,
 } from "../utils/timeRange";
 import SensorChart from "./SensorChart";
+import SeriesChart from "./SeriesChart";
 
 /**
  * On-demand chart for a single sensor.
@@ -45,8 +46,13 @@ export default function SensorModal({
   const [customFrom, setCustomFrom] = useState("");
   const [customTo, setCustomTo] = useState("");
   const [raw, setRaw] = useState<SensorData>({});
+  const [series, setSeries] = useState<SeriesBucket[]>([]);
   const [fetchedCount, setFetchedCount] = useState(0);
   const [loading, setLoading] = useState(true);
+
+  // Numeric sensors are drawn from a server-bucketed series (consistent point
+  // density at any zoom); event/enum sensors keep the raw-record cards.
+  const useSeries = sensorHasSeries(platform, config.key);
 
   // Seed the custom fields with the last 24 h the first time custom is picked,
   // so the chart has something to show before the user narrows it.
@@ -79,6 +85,27 @@ export default function SensorModal({
       const toTs =
         range === "custom" ? localInputToTs(customTo) ?? undefined : undefined;
 
+      if (useSeries) {
+        fetchSensorSeries(platform, deviceId, config.key, {
+          fromTs,
+          toTs,
+          buckets: 1500,
+        })
+          .then((data) => {
+            if (cancelled) return;
+            setSeries(data);
+            setFetchedCount(data.reduce((sum, bucket) => sum + bucket.n, 0));
+            setLoading(false);
+          })
+          .catch(() => {
+            if (cancelled) return;
+            setSeries([]);
+            setFetchedCount(0);
+            setLoading(false);
+          });
+        return;
+      }
+
       Promise.all(
         keys.map((key) =>
           fetchSensor(platform, deviceId, key, {
@@ -105,7 +132,17 @@ export default function SensorModal({
     return () => {
       cancelled = true;
     };
-  }, [keys, platform, deviceId, range, customFrom, customTo, anchorTs]);
+  }, [
+    keys,
+    platform,
+    deviceId,
+    config.key,
+    useSeries,
+    range,
+    customFrom,
+    customTo,
+    anchorTs,
+  ]);
 
   // The plot cannot render a whole window at full resolution; downsample it.
   const plotData = useMemo<SensorData>(() => {
@@ -154,13 +191,22 @@ export default function SensorModal({
           </button>
         </div>
 
-        <SensorChart
-          config={config}
-          data={plotData}
-          loading={loading}
-          exportHref={exportSensorHref(platform, deviceId, config.key)}
-          platform={platform}
-        />
+        {useSeries ? (
+          <SeriesChart
+            config={config}
+            buckets={series}
+            loading={loading}
+            exportHref={exportSensorHref(platform, deviceId, config.key)}
+          />
+        ) : (
+          <SensorChart
+            config={config}
+            data={plotData}
+            loading={loading}
+            exportHref={exportSensorHref(platform, deviceId, config.key)}
+            platform={platform}
+          />
+        )}
 
         <div className="mt-4 flex flex-wrap items-center gap-2">
           <span className="text-[11px] font-semibold uppercase tracking-[0.5px] text-sage">
