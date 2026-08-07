@@ -72,6 +72,9 @@ def config_json(**overrides) -> str:
     [
         ("updated study", study_state.UPDATED),
         ("quit study", study_state.LEFT),
+        # "attempt to quit study" contains "quit study" but is not an exit.
+        ("attempt to quit study", study_state.OTHER),
+        ("Attempt to quit study", study_state.OTHER),
         ("joined study", study_state.JOINED),
         (REJOIN, study_state.REJOINED),
         (LEGACY_REJOIN, study_state.REJOINED),
@@ -126,6 +129,49 @@ def test_a_consent_event_may_decline_everything():
 
     assert approved == []
     assert declined == ["Location", "Wi-Fi"]
+
+
+# The exact `study_compliance` strings observed in the production backups, so a
+# future tweak to CONSENT_PATTERN cannot silently stop capturing real consent.
+@pytest.mark.parametrize(
+    "message,approved,declined,context",
+    [
+        (
+            "consent given (study update): enabled=[Location, Wi-Fi, Bluetooth, "
+            "Telephony, Calls & messages, Applications usage, Keyboard masked text, "
+            "Screenshots, Ambient Noise plugin, OpenWeather plugin] declined=[]",
+            [
+                "Location",
+                "Wi-Fi",
+                "Bluetooth",
+                "Telephony",
+                "Calls & messages",
+                "Applications usage",
+                "Keyboard masked text",
+                "Screenshots",
+                "Ambient Noise plugin",
+                "OpenWeather plugin",
+            ],
+            [],
+            study_state.CONSENT_STUDY_UPDATE,
+        ),
+        (
+            "consent given: enabled=[] declined=[Location]",
+            [],
+            ["Location"],
+            study_state.CONSENT_INITIAL,
+        ),
+        (
+            "consent given: enabled=[] declined=[]",
+            [],
+            [],
+            study_state.CONSENT_INITIAL,
+        ),
+    ],
+)
+def test_real_consent_messages_are_captured(message, approved, declined, context):
+    parsed = study_state.parse_consent(message)
+    assert parsed == (approved, declined, context)
 
 
 @pytest.mark.parametrize(
@@ -237,6 +283,20 @@ def test_a_phone_that_joined_and_quit_has_left():
     assert state.summary.enrollment_status == study_state.LEFT_STUDY
     assert state.summary.last_exit_at == 2_000.0
     assert state.summary.last_join_at == 1_000.0
+
+
+def test_an_attempt_to_quit_does_not_mark_the_phone_as_left():
+    state = study_state.derive_study_state(
+        [
+            row(_id=1, timestamp=1_000.0, study_compliance="joined study",
+                double_join=1_000.0),
+            row(_id=2, timestamp=2_000.0,
+                study_compliance="attempt to quit study"),
+        ]
+    )
+
+    assert state.summary.enrollment_status == study_state.IN_STUDY
+    assert state.summary.last_exit_at is None
 
 
 @pytest.mark.parametrize(

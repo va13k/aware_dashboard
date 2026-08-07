@@ -34,6 +34,10 @@ CONSENT_INITIAL = "initial"
 CONSENT_STUDY_UPDATE = "study_update"
 
 QUIT_MESSAGE = "quit study"
+# The client logs this when a quit was initiated but not completed. It contains
+# "quit study" as a substring, so it has to be recognised before the quit check
+# or a mere attempt would read as an actual exit and mark the phone as left.
+QUIT_ATTEMPT_MESSAGE = "attempt to quit study"
 UPDATE_MESSAGE = "updated study"
 JOIN_MESSAGE = "joined study"
 REJOIN_MARKER = "rejoin"
@@ -114,6 +118,8 @@ def classify(message: str, exited: float | None, joined: float | None) -> str:
     """
     lowered = message.lower()
 
+    if QUIT_ATTEMPT_MESSAGE in lowered:
+        return OTHER
     if QUIT_MESSAGE in lowered:
         return LEFT
     if lowered.startswith("consent given"):

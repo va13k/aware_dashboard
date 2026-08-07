@@ -91,7 +91,7 @@
     "analytics_api/app/services/sensor_requirements.py": "affcbad4b0808afd964d257dae8aeec5e3658bcc6e21738f0f7d8d564870d7b1",
     "analytics_api/app/services/series.py": "234f61395643565682b47b246f97b0de0b4d10ca029a34c3ba2c8a11c9ea57d4",
     "analytics_api/app/services/study_config.py": "6c7704f565bbf0842e0ef96b45c1047596ff404f39f318dce47c65a3ba829104",
-    "analytics_api/app/services/study_state.py": "14190a47857462005e2d3d8d84e812d7d45f69343c37c637c7ed8584c6800bbc",
+    "analytics_api/app/services/study_state.py": "be2827a6d78eb0ae0d3995af850a673a8b5e9b72ccc60ce13b3c400ae35da273",
     "analytics_api/conftest.py": "9e5fe4e8dc356c6eae8592a9eb7fc33b19b657eeefe0d9dd15c48b9ab0d99a17",
     "analytics_api/tests/test_config_diff.py": "d11daf0e3746c385848349a5120e38c4a1ba201af332227f1d1b352ca9f44d1e",
     "analytics_api/tests/test_device_endpoints.py": "2d99da4b52f9d3f43a774e2163378e421105cb7c53aa01c0ee3c6ec2164df5ae",
@@ -101,7 +101,7 @@
     "analytics_api/tests/test_sensor_requirements.py": "a00a098052a1933c01c2a1e023e4e392326a2c16f4c9df6db726d83876b05d1e",
     "analytics_api/tests/test_series.py": "f98c43dd8fd3f77f62f39f253ce3e7d257b602a5a482865f1c9822042354a928",
     "analytics_api/tests/test_study_config.py": "690748e54884ee270f89c5bc256e7e1ece18f26cbf0694e04872dbe0eba534ce",
-    "analytics_api/tests/test_study_state.py": "df0ef16b19deb69bcf093bf2d0967bda834af14c8604015970546c4f4751fa8c",
+    "analytics_api/tests/test_study_state.py": "784ac1006c27cd35414d7fc8ae2ce1f18d032d14ebdd23e3fc54fa5412de13d0",
     "aware-micro-server/Dockerfile": "7ff96951d7318c21aa9242c73ebbf6dd80562bbc79a6e365fcdc23e08baa00f9",
     "aware-micro-server/build.gradle": "cc7d89d00b032cf4670e67c33d7d3727230cd9b13143df3b58e2c17ef1506f0a",
     "aware-micro-server/entrypoint.sh": "76305b4ae80203427b070f25bed27d2a9ff66fdf84dea8947d92b316a2c9c9f5",
@@ -171,7 +171,7 @@
     "db/ios-tables.sql": "5d2c64467ca2c00f458d505f4817e238f522db6da621620f465781479519def3",
     "db/zz-participant-password.sh": "6e179c0205f9851a72862409939477294a2767f3dd74ee73c8799488876d5055",
     "docs/dashboard-performance-realtime-plan.md": "f6601ae22f816a507ce9e230a27d5038c9181cb6b1d9125c3150945f17873e0f",
-    "docs/device-view-timescale-plan.md": "d29a0c75f0c552cfe3046b93730cb6f2ac0f797b0380a44d24f04d5b7ae61150",
+    "docs/device-view-timescale-plan.md": "196c3f8329f23e35b519d9b850f02d9007ef6eefcaabf19c4d9201188922e719",
     "setup.sh": "718c47a315a28f57fabd178295196fbaee7d4a2c7a79ac936190d517aac2c3c4",
     "setup/Dockerfile": "7a809ccc1ba7fadfc0524360987c979487391833c60c5a6d46bb4620c6d13e39",
     "setup/deploy.sh": "d63de94fbe1fe0ce60d75d76d69cdd40230df5383543f20f5b30522d47727d1e",
@@ -189,13 +189,13 @@
     "shared_config/source_store.py": "ceaf715a4f7aa1198409553bed5ab30ab761f23c6f6db02140ee2e84148aa1f9",
     "shared_config/test_serializers.py": "d7614beeadecc7e75fcf9671fbc58ae7c8d9ce338a9cc21480128038ccd23fdb"
   },
-  "indexed_at_commit": "26dd83f248db407a6689a8e5d00fa3a176928d21",
-  "indexed_at_timestamp": "2026-08-07T09:31:11.327590+00:00",
+  "indexed_at_commit": "890e19bf484b5e43b22bc107ed7faec5f53999c6",
+  "indexed_at_timestamp": "2026-08-07T09:43:55.036348+00:00",
   "schema_version": 3,
   "stats": {
-    "total_edges": 1963,
+    "total_edges": 1966,
     "total_files": 188,
-    "total_nodes": 1720
+    "total_nodes": 1722
   },
   "vexp_version": "2.5.2"
 }
