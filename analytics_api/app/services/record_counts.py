@@ -49,6 +49,7 @@ async def refresh(db: AsyncSession, count_model, source_models: dict) -> dict:
                         model.device_id,
                         func.count().label("d"),
                         func.max(model._id).label("m"),
+                        func.max(model.timestamp).label("ts"),
                     )
                     .where(model._id > watermark)
                     .group_by(model.device_id)
@@ -59,15 +60,19 @@ async def refresh(db: AsyncSession, count_model, source_models: dict) -> dict:
             continue
 
         gained = 0
-        for device_id, d, m in rows:
+        for device_id, d, m, ts in rows:
             if device_id is None:
                 continue
             d, m = int(d), int(m)
+            ts = float(ts) if ts is not None else 0.0
             stmt = mysql_insert(count_model).values(
-                sensor=sensor, device_id=device_id, count=d, last_id=m
+                sensor=sensor, device_id=device_id, count=d, last_id=m, last_ts=ts
             )
             stmt = stmt.on_duplicate_key_update(
-                count=count_model.count + d, last_id=m
+                count=count_model.count + d,
+                last_id=m,
+                # Never let last_ts regress if a batch arrives slightly out of order.
+                last_ts=func.greatest(count_model.last_ts, ts),
             )
             await db.execute(stmt)
             gained += d
@@ -82,19 +87,27 @@ async def refresh(db: AsyncSession, count_model, source_models: dict) -> dict:
 
 
 async def counts_for_device(db: AsyncSession, count_model, device_id: str) -> dict:
-    """``{sensor: count}`` for one device — one query for a whole device page."""
+    """``{sensor: {count, last_ts, last_id}}`` for one device — one query that
+    lets the device page render every tile (count + last-seen) with no per-sensor
+    lookups, and fetch a single latest payload by ``last_id`` (a PK lookup)."""
     try:
         rows = (
             await db.execute(
-                select(count_model.sensor, count_model.count).where(
-                    count_model.device_id == device_id
-                )
+                select(
+                    count_model.sensor,
+                    count_model.count,
+                    count_model.last_ts,
+                    count_model.last_id,
+                ).where(count_model.device_id == device_id)
             )
         ).all()
     except (ProgrammingError, OperationalError, SQLAlchemyError):
         await _rollback(db)
         return {}
-    return {sensor: int(count) for sensor, count in rows}
+    return {
+        sensor: {"count": int(count), "last_ts": float(last_ts), "last_id": int(last_id)}
+        for sensor, count, last_ts, last_id in rows
+    }
 
 
 async def sensor_totals(db: AsyncSession, count_model) -> dict:

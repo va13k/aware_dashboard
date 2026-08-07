@@ -52,9 +52,14 @@ class _FakeSession:
 
 @pytest.mark.asyncio
 async def test_counts_for_device_maps_rows():
-    db = _FakeSession(read_rows=[("accelerometer", 10), ("battery", 3)])
+    db = _FakeSession(
+        read_rows=[("accelerometer", 10, 1000.0, 5), ("battery", 3, 900.0, 2)]
+    )
     result = await record_counts.counts_for_device(db, AndroidRecordCount, "dev-1")
-    assert result == {"accelerometer": 10, "battery": 3}
+    assert result == {
+        "accelerometer": {"count": 10, "last_ts": 1000.0, "last_id": 5},
+        "battery": {"count": 3, "last_ts": 900.0, "last_id": 2},
+    }
 
 
 @pytest.mark.asyncio
@@ -69,7 +74,7 @@ async def test_refresh_scans_since_watermark_and_upserts():
     # Two devices gained rows since the watermark; each becomes one upsert.
     db = _FakeSession(
         watermark=100,
-        scan_rows=[("dev-1", 5, 130), ("dev-2", 2, 128)],
+        scan_rows=[("dev-1", 5, 130, 1700.0), ("dev-2", 2, 128, 1650.0)],
     )
     added = await record_counts.refresh(
         db, AndroidRecordCount, {"accelerometer": AndroidAccelerometer}

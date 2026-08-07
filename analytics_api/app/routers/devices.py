@@ -331,18 +331,13 @@ def _last_seen_sort_key(device):
     return (last_seen is not None, last_seen or 0)
 
 
-async def _stream_summary(
-    db: AsyncSession, key: str, model, device_id: str, cached_count: int | None = None
-):
-    # Prefer the cached count; fall back to a live COUNT only on a cache miss
-    # (a cold cache, or a sensor with zero rows the refresh never recorded).
-    if cached_count is not None:
-        count = cached_count
-    else:
-        count_result = await db.execute(
-            select(func.count()).select_from(model).where(model.device_id == device_id)
-        )
-        count = int(count_result.scalar() or 0)
+async def _stream_summary(db: AsyncSession, key: str, model, device_id: str):
+    """Live per-stream summary — the fallback for sensors not in the cache (a
+    cold cache, or a zero-row sensor the refresh never recorded)."""
+    count_result = await db.execute(
+        select(func.count()).select_from(model).where(model.device_id == device_id)
+    )
+    count = int(count_result.scalar() or 0)
     latest = await _latest_row(db, model, device_id)
     return {
         "key": key,
@@ -352,6 +347,17 @@ async def _stream_summary(
     }
 
 
+async def _latest_payload_by_id(db: AsyncSession, model, last_id: int):
+    """The newest row for a stream, fetched by primary key — an O(1) point
+    lookup instead of an `ORDER BY timestamp` scan."""
+    try:
+        result = await db.execute(select(model).where(model._id == last_id).limit(1))
+        return _row_to_dict(result.scalars().first())
+    except (ProgrammingError, OperationalError, SQLAlchemyError):
+        await _rollback_after_table_error(db)
+        return None
+
+
 async def _device_detail(platform: str, device_id: str, db: AsyncSession):
     device_model = AndroidDevice if platform == "android" else IosDevice
     streams = ANDROID_STREAMS if platform == "android" else IOS_STREAMS
@@ -359,26 +365,51 @@ async def _device_detail(platform: str, device_id: str, db: AsyncSession):
     device_dict = _flatten_device_row(device)
     stream_details = []
 
-    # One lookup gives every cached per-sensor count for this device; sensors
-    # missing from it fall back to a live COUNT inside `_stream_summary`.
+    # One lookup gives every cached (count, last_seen, last_id) for this device,
+    # so cached streams need no per-sensor query; only misses fall back to a
+    # live summary.
     count_model = AndroidRecordCount if platform == "android" else IosRecordCount
-    cached_counts = await record_counts.counts_for_device(db, count_model, device_id)
+    cached = await record_counts.counts_for_device(db, count_model, device_id)
 
     for key, model in streams.items():
-        try:
-            stream_details.append(
-                await _stream_summary(db, key, model, device_id, cached_counts.get(key))
-            )
-        except (ProgrammingError, OperationalError, SQLAlchemyError):
-            await _rollback_after_table_error(db)
+        entry = cached.get(key)
+        if entry is not None:
             stream_details.append(
                 {
                     "key": key,
-                    "count": 0,
-                    "last_seen": None,
+                    "count": entry["count"],
+                    "last_seen": entry["last_ts"] or None,
                     "latest": None,
                 }
             )
+            continue
+        try:
+            stream_details.append(await _stream_summary(db, key, model, device_id))
+        except (ProgrammingError, OperationalError, SQLAlchemyError):
+            await _rollback_after_table_error(db)
+            stream_details.append(
+                {"key": key, "count": 0, "last_seen": None, "latest": None}
+            )
+
+    # The "latest payload" panel shows one stream, so fetch only the most-recent
+    # cached stream's newest row (by primary key) rather than one per sensor.
+    newest = max(
+        (
+            (key, entry)
+            for key, entry in cached.items()
+            if entry["last_id"] and entry["last_ts"] and key in streams
+        ),
+        key=lambda item: item[1]["last_ts"],
+        default=None,
+    )
+    if newest is not None:
+        key, entry = newest
+        latest = await _latest_payload_by_id(db, streams[key], entry["last_id"])
+        if latest is not None:
+            for summary in stream_details:
+                if summary["key"] == key:
+                    summary["latest"] = latest
+                    break
 
     detail = {
         "platform": platform,

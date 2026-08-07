@@ -77,6 +77,7 @@ class AndroidRecordCount(AndroidBase):
     device_id = Column(String(150), primary_key=True)
     count = Column(BigInteger, default=0)
     last_id = Column(BigInteger, default=0)
+    last_ts = Column(Double, default=0)
 
 
 class AndroidAccelerometer(AndroidBase):
@@ -522,6 +523,7 @@ class IosRecordCount(IosBase):
     device_id = Column(String(150), primary_key=True)
     count = Column(BigInteger, default=0)
     last_id = Column(BigInteger, default=0)
+    last_ts = Column(Double, default=0)
 
 
 def _ios_model(table_name: str):
