@@ -133,6 +133,7 @@ services:
     volumes:
       - ./nginx/index.html:/usr/share/nginx/html/index.html:ro
       - ./nginx/backup.html:/usr/share/nginx/html/backup.html:ro
+      - ./nginx/assets:/usr/share/nginx/html/assets:ro
       - ./nginx/configurator-loading.html:/usr/share/nginx/html/configurator-loading.html:ro
       - ./nginx/setup-loading.html:/usr/share/nginx/html/setup-loading.html:ro
       - ./nginx/${PROTOCOL:-http}.conf:/etc/nginx/conf.d/default.conf:ro
@@ -170,11 +171,16 @@ services:
       # studyConfig.json holds the Android settings; the settings iPhones
       # receive come from the micro-server config.
       MICRO_SERVER_CONFIG_PATH: /app/aware-config.json
+      # The same directory the scheduled dump writes to, so the backup page can
+      # offer those archives as import sources. A study-scale restore is far too
+      # large to travel through the browser, so it is read from here instead.
+      BACKUP_DIR: /backups
     expose:
       - "8000"
     volumes:
       - ./studies:/app/studies:ro
       - ./aware-micro-server/aware-config.json:/app/aware-config.json:ro
+      - ${MYSQL_BACKUP_HOST_DIR:-./backups/mysql}:/backups:ro
     depends_on:
       mysql:
         condition: service_healthy
