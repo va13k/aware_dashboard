@@ -1,0 +1,251 @@
+:root {
+  --bg: #f3efe6;
+  --surface: rgba(255, 253, 248, 0.88);
+  --surface-strong: #fffdf8;
+  --border: rgba(48, 67, 54, 0.14);
+  --text: #193229;
+  --muted: #5f746b;
+  --accent: rgb(31, 179, 223);
+  --accent-soft: rgba(31, 179, 223, 0.16);
+  --shadow: 0 20px 60px rgba(25, 50, 41, 0.12);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  font-family: "Avenir Next", Avenir, "Segoe UI", sans-serif;
+  color: var(--text);
+  background:
+    radial-gradient(
+      circle at top left,
+      rgba(31, 179, 223, 0.2),
+      transparent 28%
+    ),
+    radial-gradient(
+      circle at bottom right,
+      rgba(182, 140, 76, 0.18),
+      transparent 30%
+    ),
+    linear-gradient(160deg, #f7f3ea 0%, #efe7da 100%);
+}
+
+main {
+  width: min(1080px, calc(100% - 32px));
+  margin: 0 auto;
+  padding: 48px 0 64px;
+}
+
+.hero {
+  display: grid;
+  gap: 18px;
+  margin-bottom: 30px;
+}
+
+.eyebrow {
+  margin: 0;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+h1 {
+  margin: 0;
+  max-width: 12ch;
+  font-size: clamp(2.8rem, 6vw, 5.6rem);
+  line-height: 0.95;
+  font-weight: 700;
+}
+
+.subtitle {
+  margin: 0;
+  max-width: 720px;
+  font-size: 1.08rem;
+  line-height: 1.6;
+  color: var(--muted);
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  gap: 18px;
+}
+
+.card {
+  display: grid;
+  gap: 18px;
+  padding: 24px;
+  border-radius: 24px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow);
+  backdrop-filter: blur(18px);
+  text-decoration: none;
+  color: inherit;
+  transition:
+    transform 0.18s ease,
+    border-color 0.18s ease,
+    box-shadow 0.18s ease;
+}
+
+.card:hover {
+  transform: translateY(-3px);
+  border-color: rgba(31, 179, 223, 0.5);
+  box-shadow: 0 24px 70px rgba(31, 179, 223, 0.14);
+}
+
+.card h2 {
+  margin: 0;
+  font-size: 1.35rem;
+  line-height: 1.2;
+}
+
+.card p {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.6;
+}
+
+.card-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 700;
+  color: var(--accent);
+}
+
+.card-link::after {
+  content: "->";
+}
+
+.footer-note {
+  margin-top: 18px;
+  font-size: 0.95rem;
+  color: var(--muted);
+}
+
+code {
+  font-family: "SFMono-Regular", Consolas, monospace;
+  font-size: 0.95em;
+}
+
+.sensor-note {
+  margin-top: 32px;
+  padding: 20px 24px;
+  border-radius: 16px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  overflow-x: auto;
+}
+
+.sensor-note-title {
+  text-align: center;
+  margin: 0 0 30px;
+  font-weight: 700;
+  font-size: 1.5rem;
+}
+
+.sensor-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 1rem;
+}
+
+.sensor-table th {
+  text-align: left;
+  padding: 7px 24px 7px 0;
+  font-weight: 600;
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--accent);
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+
+.sensor-table td {
+  padding: 7px 24px 7px 0;
+  color: var(--muted);
+  border-bottom: 1px solid var(--border);
+  vertical-align: middle;
+}
+
+.sensor-table tr:last-child td {
+  border-bottom: none;
+}
+
+.sensor-table td:first-child {
+  color: var(--text);
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.badge {
+  display: inline-block;
+  font-size: 0.9rem;
+  font-weight: 600;
+  padding: 2px 10px;
+  border-radius: 20px;
+}
+
+.badge-yes {
+  background: rgba(31, 179, 223, 0.14);
+  color: rgb(20, 140, 180);
+}
+
+.badge-no {
+  background: rgba(0, 0, 0, 0.05);
+  color: #aaa;
+}
+
+.has-tip {
+  position: relative;
+  cursor: default;
+  text-decoration: underline dotted var(--muted);
+  text-underline-offset: 3px;
+}
+
+.has-tip .info-tooltip {
+  display: none;
+  position: absolute;
+  left: 0;
+  top: calc(100% + 6px);
+  background: var(--surface-strong);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 12px;
+  font-size: 0.82rem;
+  font-weight: 400;
+  color: var(--muted);
+  white-space: nowrap;
+  box-shadow: 0 4px 16px rgba(25, 50, 41, 0.1);
+  z-index: 10;
+}
+
+.has-tip:hover .info-tooltip {
+  display: block;
+}
+
+.sensor-table .section-row td {
+  padding: 15px 10px 5px;
+  font-weight: 700;
+  font-size: 0.9rem;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--text);
+  border-bottom: 2px solid var(--border);
+}
+
+@media (max-width: 640px) {
+  main {
+    padding-top: 28px;
+  }
+
+  .card {
+    padding: 20px;
+  }
+}
