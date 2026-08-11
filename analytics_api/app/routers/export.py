@@ -5,12 +5,12 @@ import zipfile
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException
-from fastapi.responses import Response
+from fastapi.responses import StreamingResponse
 from sqlalchemy import func, select
 from sqlalchemy.exc import OperationalError, ProgrammingError, SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.database import get_android_db, get_ios_db
+from app.database import AndroidSessionLocal, IosSessionLocal, get_android_db, get_ios_db
 from app.models import AndroidRecordCount, IosRecordCount
 from app.routers.android import _EXPORT_MODELS as ANDROID_EXPORT_MODELS
 from app.routers.ios import _EXPORT_MODELS as IOS_EXPORT_MODELS
@@ -27,13 +27,82 @@ def _safe_path_part(value: str) -> str:
     return cleaned or "unknown"
 
 
-def _csv_response(records: list[dict]) -> str:
+#: Rows read per round trip while an archive is being produced. One batch and
+#: its rendered CSV is the whole of what an export holds at a time, so this
+#: bounds the memory a download costs no matter how many rows it covers.
+EXPORT_BATCH = 5_000
+
+
+
+class _Sink:
+    """Catches what ``ZipFile`` writes so a generator can hand it onward.
+
+    Deliberately offers neither ``tell`` nor ``seek``: ``ZipFile`` then treats
+    the target as a stream and records each member's size in a trailing data
+    descriptor instead of seeking back to patch its header. That is what makes an
+    archive producible without holding it, which a study-scale export needs —
+    assembling one in memory first costs a multiple of the data itself.
+    """
+
+    def __init__(self) -> None:
+        self._parts: list[bytes] = []
+
+    def write(self, data) -> int:
+        self._parts.append(bytes(data))
+        return len(data)
+
+    def flush(self) -> None:
+        pass
+
+    def drain(self) -> bytes:
+        joined = b"".join(self._parts)
+        self._parts.clear()
+        return joined
+
+
+def _csv_rows(fields: list[str], records: list[dict], header: bool = False) -> bytes:
+    """One batch of rows as CSV bytes, ready to write into an archive member."""
     buf = io.StringIO()
-    fieldnames = list(dict.fromkeys(key for record in records for key in record))
-    writer = csv.DictWriter(buf, fieldnames=fieldnames, extrasaction="ignore", restval="")
-    writer.writeheader()
+    writer = csv.DictWriter(buf, fieldnames=fields, extrasaction="ignore", restval="")
+    if header:
+        writer.writeheader()
     writer.writerows(records)
-    return buf.getvalue()
+    return buf.getvalue().encode("utf-8")
+
+
+async def _paged(db: AsyncSession, model, device_id: str | None, render):
+    """Walk a table in ``_id`` order, yielding one rendered batch at a time.
+
+    Paging on the primary key rather than ``OFFSET`` keeps each round trip an
+    indexed seek, and means the rows a batch held can be released before the next
+    one is read.
+    """
+    last_id = 0
+    while True:
+        query = select(model).where(model._id > last_id)
+        if device_id is not None:
+            query = query.where(model.device_id == device_id)
+        try:
+            result = await db.execute(query.order_by(model._id.asc()).limit(EXPORT_BATCH))
+            rows = result.scalars().all()
+        except (OperationalError, ProgrammingError, SQLAlchemyError):
+            await _rollback_after_table_error(db)
+            return
+        if not rows:
+            return
+        yield [render(row) for row in rows]
+        last_id = rows[-1]._id
+
+
+async def _has_rows(db: AsyncSession, model, device_id: str | None = None) -> bool:
+    query = select(model._id)
+    if device_id is not None:
+        query = query.where(model.device_id == device_id)
+    try:
+        return (await db.execute(query.limit(1))).first() is not None
+    except (OperationalError, ProgrammingError, SQLAlchemyError):
+        await _rollback_after_table_error(db)
+        return False
 
 
 async def _rollback_after_table_error(db: AsyncSession):
@@ -80,84 +149,8 @@ def _ios_models(model_entry: object) -> tuple:
     return model_entry if isinstance(model_entry, tuple) else (model_entry,)
 
 
-async def _android_records(
-    db: AsyncSession,
-    model,
-    schema,
-    device_id: str,
-) -> list[dict]:
-    try:
-        result = await db.execute(
-            select(model).where(model.device_id == device_id).order_by(model.timestamp.asc())
-        )
-    except (OperationalError, ProgrammingError, SQLAlchemyError):
-        await _rollback_after_table_error(db)
-        return []
-
-    return [schema.model_validate(row).model_dump() for row in result.scalars().all()]
 
 
-async def _ios_records(
-    db: AsyncSession,
-    models: tuple,
-    device_id: str,
-) -> list[dict]:
-    records = []
-    for model in models:
-        try:
-            result = await db.execute(
-                select(model).where(model.device_id == device_id).order_by(model.timestamp.asc())
-            )
-        except (OperationalError, ProgrammingError, SQLAlchemyError):
-            await _rollback_after_table_error(db)
-            continue
-
-        records.extend(
-            IosSchema.model_validate(row).model_dump()
-            for row in result.scalars().all()
-        )
-    return sorted(records, key=lambda record: record["timestamp"])
-
-
-async def _android_records_for_sensor(
-    db: AsyncSession,
-    model,
-    schema,
-    device_id: str | None = None,
-) -> list[dict]:
-    try:
-        q = select(model)
-        if device_id is not None:
-            q = q.where(model.device_id == device_id)
-        result = await db.execute(q.order_by(model.device_id.asc(), model.timestamp.asc()))
-    except (OperationalError, ProgrammingError, SQLAlchemyError):
-        await _rollback_after_table_error(db)
-        return []
-
-    return [schema.model_validate(row).model_dump() for row in result.scalars().all()]
-
-
-async def _ios_records_for_sensor(
-    db: AsyncSession,
-    models: tuple,
-    device_id: str | None = None,
-) -> list[dict]:
-    records = []
-    for model in models:
-        try:
-            q = select(model)
-            if device_id is not None:
-                q = q.where(model.device_id == device_id)
-            result = await db.execute(q.order_by(model.device_id.asc(), model.timestamp.asc()))
-        except (OperationalError, ProgrammingError, SQLAlchemyError):
-            await _rollback_after_table_error(db)
-            continue
-
-        records.extend(
-            IosSchema.model_validate(row).model_dump()
-            for row in result.scalars().all()
-        )
-    return sorted(records, key=lambda record: (str(record["device_id"]), record["timestamp"]))
 
 
 async def _sensor_stats(db: AsyncSession, models: tuple, cached=None) -> dict:
@@ -222,63 +215,144 @@ async def _sensor_stats(db: AsyncSession, models: tuple, cached=None) -> dict:
     }
 
 
-async def _ios_fields(db: AsyncSession, models: tuple) -> list[str]:
+
+def _android_fields(schema) -> list[str]:
+    """CSV columns for an android sensor, from the schema rather than from a row,
+    so the header can be written before anything has been read."""
+    return list(schema.model_fields)
+
+
+async def _ios_field_union(db: AsyncSession, models: tuple) -> list[str]:
+    """Every key iOS rows carry for this sensor.
+
+    iOS payloads are JSON, so the columns are only known once the rows have been
+    looked at — but they are looked at a batch at a time and only the key names
+    are kept, so the pass costs a scan rather than the table.
+    """
     fields = ["id", "timestamp", "device_id"]
     for model in models:
-        try:
-            result = await db.execute(select(model))
-        except (OperationalError, ProgrammingError, SQLAlchemyError):
-            await _rollback_after_table_error(db)
-            continue
-
-        for row in result.scalars().all():
-            record = IosSchema.model_validate(row).model_dump()
-            fields.extend(record.keys())
-
+        async for batch in _paged(db, model, None, lambda row: IosSchema.model_validate(row).model_dump()):
+            for record in batch:
+                fields.extend(record.keys())
+            fields = list(dict.fromkeys(fields))
     return list(dict.fromkeys(fields))
 
 
-async def _write_platform_device_csvs(
-    archive: zipfile.ZipFile,
-    platform: str,
-    db: AsyncSession,
-    device_id: str,
-) -> int:
-    files_written = 0
-    safe_device_id = _safe_path_part(device_id)
+def _member(archive: zipfile.ZipFile, name: str):
+    """A new archive member, sized by a trailing descriptor.
 
-    if platform == "android":
-        for sensor, (model, schema) in ANDROID_EXPORT_MODELS.items():
-            records = await _android_records(db, model, schema, device_id)
-            if not records:
-                continue
-            archive.writestr(
-                f"android/{safe_device_id}/{_safe_path_part(sensor)}.csv",
-                _csv_response(records),
-            )
-            files_written += 1
-        return files_written
-
-    for sensor, model_entry in IOS_EXPORT_MODELS.items():
-        records = await _ios_records(db, _ios_models(model_entry), device_id)
-        if not records:
-            continue
-        archive.writestr(
-            f"ios/{safe_device_id}/{_safe_path_part(sensor)}.csv",
-            _csv_response(records),
-        )
-        files_written += 1
-
-    return files_written
+    ``force_zip64`` because a member's length is not known when its header is
+    written and a single sensor's CSV can pass the 4 GiB the classic format holds.
+    """
+    info = zipfile.ZipInfo(name, date_time=datetime.now(timezone.utc).timetuple()[:6])
+    info.compress_type = zipfile.ZIP_DEFLATED
+    return archive.open(info, "w", force_zip64=True)
 
 
-def _zip_response(zip_buf: io.BytesIO, filename: str) -> Response:
-    zip_buf.seek(0)
-    return Response(
-        content=zip_buf.getvalue(),
+async def _stream_archive(members):
+    """Produce a ZIP as it is read.
+
+    `members` is an async iterable of ``(name, fields, batches)``, where
+    `batches` yields lists of rendered rows. Nothing larger than one batch and
+    the compressor's own buffers is held at a time.
+    """
+    sink = _Sink()
+    with zipfile.ZipFile(sink, "w", compression=zipfile.ZIP_DEFLATED) as archive:
+        async for name, fields, batches in members:
+            with _member(archive, name) as member:
+                member.write(_csv_rows(fields, [], header=True))
+                async for batch in batches:
+                    member.write(_csv_rows(fields, batch))
+                    if chunk := sink.drain():
+                        yield chunk
+            if chunk := sink.drain():
+                yield chunk
+    if chunk := sink.drain():
+        yield chunk
+
+
+def _zip_streaming_response(members, filename: str) -> StreamingResponse:
+    return StreamingResponse(
+        _stream_archive(members),
         media_type="application/zip",
-        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+        headers={
+            "Content-Disposition": f'attachment; filename="{filename}"',
+            # Produced as it is sent, so no intermediary should collect it first.
+            "X-Accel-Buffering": "no",
+        },
     )
+
+
+async def _chained(db: AsyncSession, models: tuple, device_ids: list[str], render):
+    """Every device's rows for one sensor, in turn, as batches.
+
+    Walking device by device keeps the CSV grouped the way it has always been —
+    all of one phone's rows together — while still only holding a batch at a time.
+    """
+    for model in models:
+        for device_id in device_ids:
+            async for batch in _paged(db, model, device_id, render):
+                yield batch
+
+
+async def _sensor_members(platform: str, sensor: str, model_entry):
+    """One sensor across every phone, as a single CSV inside the archive."""
+    name = f"{platform}_{_safe_path_part(sensor)}.csv"
+    session = AndroidSessionLocal if platform == "android" else IosSessionLocal
+    async with session() as db:
+        if _is_android_export_entry(model_entry):
+            model, schema = model_entry
+            devices = sorted(await _device_ids_for_model(db, model))
+            yield (
+                name,
+                _android_fields(schema),
+                _chained(db, (model,), devices, lambda row: schema.model_validate(row).model_dump()),
+            )
+            return
+
+        models = _ios_models(model_entry)
+        devices: set[str] = set()
+        for model in models:
+            devices |= await _device_ids_for_model(db, model)
+        yield (
+            name,
+            await _ios_field_union(db, models),
+            _chained(
+                db,
+                models,
+                sorted(devices),
+                lambda row: IosSchema.model_validate(row).model_dump(),
+            ),
+        )
+
+
+async def _device_members(platform: str, device_id: str):
+    """Every sensor this phone has data for, one archive member each."""
+    safe_device = _safe_path_part(device_id)
+    session = AndroidSessionLocal if platform == "android" else IosSessionLocal
+    async with session() as db:
+        if platform == "android":
+            for sensor, (model, schema) in ANDROID_EXPORT_MODELS.items():
+                if not await _has_rows(db, model, device_id):
+                    continue
+                yield (
+                    f"android/{safe_device}/{_safe_path_part(sensor)}.csv",
+                    _android_fields(schema),
+                    _paged(db, model, device_id, lambda row, s=schema: s.model_validate(row).model_dump()),
+                )
+            return
+
+        for sensor, model_entry in IOS_EXPORT_MODELS.items():
+            models = _ios_models(model_entry)
+            if not any([await _has_rows(db, model, device_id) for model in models]):
+                continue
+            fields = await _ios_field_union(db, models)
+            for model in models:
+                yield (
+                    f"ios/{safe_device}/{_safe_path_part(sensor)}.csv",
+                    fields,
+                    _paged(db, model, device_id, lambda row: IosSchema.model_validate(row).model_dump()),
+                )
 
 
 @router.get("/manifest")
@@ -312,13 +386,28 @@ async def export_manifest(
         models = _ios_models(model_entry)
         platforms["ios"]["sensors"][sensor] = {
             **await _sensor_stats(ios_db, models, ios_totals.get(sensor)),
-            "fields": await _ios_fields(ios_db, models),
+            "fields": await _ios_field_union(ios_db, models),
         }
 
     return {
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "platforms": platforms,
     }
+
+
+async def _any_sensor_has_rows(db: AsyncSession, platform: str, device_id: str) -> bool:
+    """Whether this phone wrote anything at all.
+
+    Settled before the response begins: once a streaming body is under way its
+    status can no longer become a 404.
+    """
+    exports = _platform_exports(platform)
+    for entry in exports.values():
+        models = (entry[0],) if _is_android_export_entry(entry) else _ios_models(entry)
+        for model in models:
+            if await _has_rows(db, model, device_id):
+                return True
+    return False
 
 
 @router.get("/device/{platform}/{device_id}.zip")
@@ -330,18 +419,17 @@ async def export_device_csv_zip(
 ):
     _platform_exports(platform)
     db = android_db if platform == "android" else ios_db
-    zip_buf = io.BytesIO()
 
-    with zipfile.ZipFile(zip_buf, "w", compression=zipfile.ZIP_DEFLATED) as archive:
-        files_written = await _write_platform_device_csvs(archive, platform, db, device_id)
-
-    if files_written == 0:
+    if not await _any_sensor_has_rows(db, platform, device_id):
         raise HTTPException(
             status_code=404,
             detail=f"No sensor data found for {platform} device: {device_id}",
         )
 
-    return _zip_response(zip_buf, f"{platform}_{_safe_path_part(device_id)}.zip")
+    return _zip_streaming_response(
+        _device_members(platform, device_id),
+        f"{platform}_{_safe_path_part(device_id)}.zip",
+    )
 
 
 @router.get("/sensor/{platform}/{sensor:path}.zip")
@@ -357,27 +445,30 @@ async def export_sensor_csv_zip(
         raise HTTPException(status_code=404, detail=f"Unknown sensor: {sensor}")
 
     db = android_db if platform == "android" else ios_db
+    models = (model_entry[0],) if _is_android_export_entry(model_entry) else _ios_models(model_entry)
 
-    if platform == "android":
-        model, schema = model_entry
-        records = await _android_records_for_sensor(db, model, schema)
-    else:
-        records = await _ios_records_for_sensor(db, _ios_models(model_entry))
-
-    if not records:
+    if not any([await _has_rows(db, model) for model in models]):
         raise HTTPException(
             status_code=404,
             detail=f"No data found for {platform} sensor: {sensor}",
         )
 
     safe_sensor = _safe_path_part(sensor)
-    csv_name = f"{platform}_{safe_sensor}.csv"
-    zip_buf = io.BytesIO()
+    return _zip_streaming_response(
+        _sensor_members(platform, sensor, model_entry),
+        f"{platform}_{safe_sensor}.zip",
+    )
 
-    with zipfile.ZipFile(zip_buf, "w", compression=zipfile.ZIP_DEFLATED) as archive:
-        archive.writestr(csv_name, _csv_response(records))
 
-    return _zip_response(zip_buf, f"{platform}_{safe_sensor}.zip")
+async def _all_members():
+    """Every sensor of every phone on both platforms."""
+    for platform in ("android", "ios"):
+        session = AndroidSessionLocal if platform == "android" else IosSessionLocal
+        exports = ANDROID_EXPORT_MODELS if platform == "android" else IOS_EXPORT_MODELS
+        async with session() as db:
+            for device_id in await _platform_device_ids(db, exports):
+                async for entry in _device_members(platform, device_id):
+                    yield entry
 
 
 @router.get("/all.zip")
@@ -385,43 +476,9 @@ async def export_all_csv_zip(
     android_db: AsyncSession = Depends(get_android_db),
     ios_db: AsyncSession = Depends(get_ios_db),
 ):
-    zip_buf = io.BytesIO()
-    files_written = 0
-
-    with zipfile.ZipFile(zip_buf, "w", compression=zipfile.ZIP_DEFLATED) as archive:
-        android_device_ids = await _platform_device_ids(android_db, ANDROID_EXPORT_MODELS)
-        for device_id in android_device_ids:
-            safe_device_id = _safe_path_part(device_id)
-            for sensor, (model, schema) in ANDROID_EXPORT_MODELS.items():
-                records = await _android_records(android_db, model, schema, device_id)
-                if not records:
-                    continue
-                archive.writestr(
-                    f"android/{safe_device_id}/{_safe_path_part(sensor)}.csv",
-                    _csv_response(records),
-                )
-                files_written += 1
-
-        ios_device_ids = await _platform_device_ids(ios_db, IOS_EXPORT_MODELS)
-        for device_id in ios_device_ids:
-            safe_device_id = _safe_path_part(device_id)
-            for sensor, model_entry in IOS_EXPORT_MODELS.items():
-                models = model_entry if isinstance(model_entry, tuple) else (model_entry,)
-                records = await _ios_records(ios_db, models, device_id)
-                if not records:
-                    continue
-                archive.writestr(
-                    f"ios/{safe_device_id}/{_safe_path_part(sensor)}.csv",
-                    _csv_response(records),
-                )
-                files_written += 1
-
-    if files_written == 0:
+    android = await _platform_device_ids(android_db, ANDROID_EXPORT_MODELS)
+    ios = await _platform_device_ids(ios_db, IOS_EXPORT_MODELS)
+    if not android and not ios:
         raise HTTPException(status_code=404, detail="No sensor data found to export")
 
-    zip_buf.seek(0)
-    return Response(
-        content=zip_buf.getvalue(),
-        media_type="application/zip",
-        headers={"Content-Disposition": 'attachment; filename="all.zip"'},
-    )
+    return _zip_streaming_response(_all_members(), "all.zip")
