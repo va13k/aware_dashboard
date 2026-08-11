@@ -851,13 +851,18 @@ async def _stream_export(device_id, sensor, model, schema, from_ts, to_ts, job):
                 last_id = rows[-1]._id
                 if job is not None:
                     jobs.advance(job, add=len(rows), phase=f"Exporting {sensor}")
+        if job is not None:
+            jobs.finish(job, {"sensor": sensor})
     except Exception as error:  # noqa: BLE001 - the response has already begun
         if job is not None:
             jobs.fail(job, str(error))
         raise
-
-    if job is not None:
-        jobs.finish(job, {"sensor": sensor})
+    finally:
+        # A cancelled download closes this generator, which arrives as
+        # GeneratorExit — a BaseException, so it misses the handler above. Left
+        # unresolved the job would read as running until it aged out.
+        if job is not None:
+            jobs.cancel(job)
 
 
 def _progress_job(job_id: str | None, sensor: str):

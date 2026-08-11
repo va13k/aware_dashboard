@@ -205,6 +205,70 @@ def test_an_unknown_or_absent_job_id_simply_means_no_reporting():
     assert android_router._progress_job(None, "accelerometer") is None
 
 
+def test_progress_stops_claiming_a_percentage_once_the_estimate_is_passed():
+    """The total is a row count from the record-count cache, which lags whatever
+    arrived since its last refresh. Pinning the bar at 100% would tell a
+    researcher the download had finished while it was still being written."""
+    job = backup_jobs.create("export-zip")
+    backup_jobs.advance(job, total=1000, done=500)
+    assert job.snapshot()["percent"] == 50.0
+
+    backup_jobs.advance(job, done=1500)
+    assert job.snapshot()["percent"] is None
+    assert job.snapshot()["done"] == 1500  # still moving, still reported
+
+
+def test_a_finished_job_reads_as_complete_even_after_overrunning():
+    job = backup_jobs.create("export-zip")
+    backup_jobs.advance(job, total=1000, done=1500)
+    assert job.snapshot()["percent"] is None
+
+    backup_jobs.finish(job)
+    assert job.snapshot()["percent"] == 100.0
+    assert job.snapshot()["state"] == backup_jobs.DONE
+
+
+@pytest.mark.asyncio
+async def test_abandoning_a_download_marks_its_job_cancelled(monkeypatch):
+    """Closing a streaming response raises GeneratorExit, which is a
+    BaseException and so slips past `except Exception`. Without the finally the
+    record would read as running until it aged out, and the page watching it
+    would spin for a quarter of an hour over a download the user stopped."""
+    session = _BatchSession([[sensor_row(i, 1_785_929_738_186)] for i in range(1, 20)])
+    monkeypatch.setattr(android_router, "AndroidSessionLocal", lambda: session)
+    job = backup_jobs.create("export-csv")
+    backup_jobs.advance(job, total=1000)
+
+    model, schema, from_ts, to_ts = android_router._export_window("accelerometer", None, None)
+    stream = android_router._stream_export(
+        DEVICE, "accelerometer", model, schema, from_ts, to_ts, job
+    )
+    await stream.__anext__()  # header
+    await stream.__anext__()  # one batch
+    await stream.aclose()     # the reader goes away
+
+    assert job.snapshot()["state"] == backup_jobs.CANCELLED
+    assert job.snapshot()["phase"] == "Cancelled"
+
+
+def test_cancelling_leaves_an_already_finished_job_alone():
+    job = backup_jobs.create("export-csv")
+    backup_jobs.advance(job, total=10, done=10)
+    backup_jobs.finish(job)
+
+    backup_jobs.cancel(job)
+    assert job.snapshot()["state"] == backup_jobs.DONE
+
+
+def test_cancelling_leaves_a_failed_job_alone():
+    job = backup_jobs.create("export-csv")
+    backup_jobs.fail(job, "table is full")
+
+    backup_jobs.cancel(job)
+    assert job.snapshot()["state"] == backup_jobs.ERROR
+    assert job.snapshot()["error"] == "table is full"
+
+
 def test_an_unknown_job_is_a_404():
     with TestClient(app) as client:
         assert client.get("/jobs/does-not-exist").status_code == 404

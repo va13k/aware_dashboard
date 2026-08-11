@@ -25,6 +25,10 @@ RETENTION_SECONDS = 15 * 60
 RUNNING = "running"
 DONE = "done"
 ERROR = "error"
+#: The reader went away — a cancelled download, a closed tab, a dropped
+#: connection. Not a failure: nothing went wrong and there is nothing to report
+#: beyond the fact that the work is no longer running.
+CANCELLED = "cancelled"
 
 
 @dataclass
@@ -56,8 +60,14 @@ class Job:
         """A plain dict for the status endpoint."""
         elapsed = (self.finished_at or time.monotonic()) - self.started_at
         percent = None
-        if self.total > 0:
-            percent = min(100.0, round(self.done * 100.0 / self.total, 1))
+        if self.total > 0 and self.done <= self.total:
+            percent = round(self.done * 100.0 / self.total, 1)
+        elif self.state == DONE:
+            percent = 100.0
+        # Past the total the estimate has been overrun — a row count taken from
+        # the count cache lags whatever has arrived since its last refresh. No
+        # percentage is reported rather than one pinned at 100, which would claim
+        # a download had finished while it was still being written.
         return {
             "id": self.id,
             "kind": self.kind,
@@ -150,6 +160,23 @@ def finish(job: Job, result: dict | None = None) -> None:
             job.done = job.total
         if result:
             job.result.update(result)
+
+
+def cancel(job: Job) -> None:
+    """Mark a job whose reader disappeared.
+
+    Closing a streaming response raises ``GeneratorExit``, which is a
+    ``BaseException`` and so passes straight through ``except Exception``. Left
+    alone the record would stay ``running`` until it aged out, and the page
+    watching it would spin for a quarter of an hour over a download the user
+    deliberately stopped.
+    """
+    with _lock:
+        if job.state != RUNNING:
+            return
+        job.state = CANCELLED
+        job.phase = "Cancelled"
+        job.finished_at = time.monotonic()
 
 
 def fail(job: Job, message: str) -> None:

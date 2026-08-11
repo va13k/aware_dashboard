@@ -4,7 +4,7 @@ import re
 import zipfile
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import StreamingResponse
 from sqlalchemy import func, select
 from sqlalchemy.exc import OperationalError, ProgrammingError, SQLAlchemyError
@@ -15,6 +15,7 @@ from app.models import AndroidRecordCount, IosRecordCount
 from app.routers.android import _EXPORT_MODELS as ANDROID_EXPORT_MODELS
 from app.routers.ios import _EXPORT_MODELS as IOS_EXPORT_MODELS
 from app.schemas import IosSchema
+from app.services import backup_jobs as jobs
 from app.services import record_counts
 
 router = APIRouter(prefix="/export", tags=["export"])
@@ -249,7 +250,7 @@ def _member(archive: zipfile.ZipFile, name: str):
     return archive.open(info, "w", force_zip64=True)
 
 
-async def _stream_archive(members):
+async def _stream_archive(members, job=None):
     """Produce a ZIP as it is read.
 
     `members` is an async iterable of ``(name, fields, batches)``, where
@@ -257,23 +258,79 @@ async def _stream_archive(members):
     the compressor's own buffers is held at a time.
     """
     sink = _Sink()
-    with zipfile.ZipFile(sink, "w", compression=zipfile.ZIP_DEFLATED) as archive:
-        async for name, fields, batches in members:
-            with _member(archive, name) as member:
-                member.write(_csv_rows(fields, [], header=True))
-                async for batch in batches:
-                    member.write(_csv_rows(fields, batch))
-                    if chunk := sink.drain():
-                        yield chunk
-            if chunk := sink.drain():
-                yield chunk
-    if chunk := sink.drain():
-        yield chunk
+    try:
+        with zipfile.ZipFile(sink, "w", compression=zipfile.ZIP_DEFLATED) as archive:
+            async for name, fields, batches in members:
+                if job is not None:
+                    jobs.advance(job, phase=f"Writing {name.rsplit('/', 1)[-1]}")
+                with _member(archive, name) as member:
+                    member.write(_csv_rows(fields, [], header=True))
+                    async for batch in batches:
+                        member.write(_csv_rows(fields, batch))
+                        if job is not None:
+                            jobs.advance(job, add=len(batch))
+                        if chunk := sink.drain():
+                            yield chunk
+                if chunk := sink.drain():
+                    yield chunk
+        if chunk := sink.drain():
+            yield chunk
+        if job is not None:
+            jobs.finish(job)
+    except Exception as error:  # noqa: BLE001 - the response has already begun
+        if job is not None:
+            jobs.fail(job, str(error))
+        raise
+    finally:
+        # A cancelled download closes this generator, which arrives as
+        # GeneratorExit — a BaseException, so it misses the handler above. Left
+        # unresolved the job would read as running until it aged out.
+        if job is not None:
+            jobs.cancel(job)
 
 
-def _zip_streaming_response(members, filename: str) -> StreamingResponse:
+def _progress_job(job_id: str | None, scope: str):
+    """The job this download may report into, or nothing.
+
+    The id arrives in the query string, so it is whatever the caller put there.
+    One belonging to something else must not be advanced or finished here: the
+    page watching it would be told the wrong thing about work still running.
+    """
+    if not job_id:
+        return None
+    job = jobs.get(job_id)
+    if job is None or job.kind != "export-zip":
+        return None
+    if job.result.get("scope") != scope:
+        return None
+    return job
+
+
+async def _start_zip_job(scope: str, filename: str, total: int):
+    job = jobs.create("export-zip")
+    jobs.advance(job, total=total, phase="Starting export")
+    jobs.describe(job, filename=filename, scope=scope, unit="rows")
+    return {"id": job.id, "filename": filename, "rows": total}
+
+
+async def _sensor_row_total(db: AsyncSession, count_model, sensor: str) -> int:
+    totals = await record_counts.sensor_totals(db, count_model)
+    return int(totals.get(sensor, (0, 0))[0])
+
+
+async def _device_row_total(db: AsyncSession, count_model, device_id: str) -> int:
+    cached = await record_counts.counts_for_device(db, count_model, device_id)
+    return sum(entry["count"] for entry in cached.values())
+
+
+async def _platform_row_total(db: AsyncSession, count_model) -> int:
+    totals = await record_counts.sensor_totals(db, count_model)
+    return sum(count for count, _ in totals.values())
+
+
+def _zip_streaming_response(members, filename: str, job=None) -> StreamingResponse:
     return StreamingResponse(
-        _stream_archive(members),
+        _stream_archive(members, job),
         media_type="application/zip",
         headers={
             "Content-Disposition": f'attachment; filename="{filename}"',
@@ -410,10 +467,34 @@ async def _any_sensor_has_rows(db: AsyncSession, platform: str, device_id: str) 
     return False
 
 
+@router.post("/device/{platform}/{device_id}.zip")
+async def start_device_csv_zip(
+    platform: str,
+    device_id: str,
+    android_db: AsyncSession = Depends(get_android_db),
+    ios_db: AsyncSession = Depends(get_ios_db),
+):
+    """Register the export so the page can show progress while it downloads."""
+    _platform_exports(platform)
+    db = android_db if platform == "android" else ios_db
+    if not await _any_sensor_has_rows(db, platform, device_id):
+        raise HTTPException(
+            status_code=404,
+            detail=f"No sensor data found for {platform} device: {device_id}",
+        )
+    model = AndroidRecordCount if platform == "android" else IosRecordCount
+    return await _start_zip_job(
+        f"device:{platform}:{device_id}",
+        f"{platform}_{_safe_path_part(device_id)}.zip",
+        await _device_row_total(db, model, device_id),
+    )
+
+
 @router.get("/device/{platform}/{device_id}.zip")
 async def export_device_csv_zip(
     platform: str,
     device_id: str,
+    job: str | None = Query(None),
     android_db: AsyncSession = Depends(get_android_db),
     ios_db: AsyncSession = Depends(get_ios_db),
 ):
@@ -429,6 +510,33 @@ async def export_device_csv_zip(
     return _zip_streaming_response(
         _device_members(platform, device_id),
         f"{platform}_{_safe_path_part(device_id)}.zip",
+        _progress_job(job, f"device:{platform}:{device_id}"),
+    )
+
+
+@router.post("/sensor/{platform}/{sensor:path}.zip")
+async def start_sensor_csv_zip(
+    platform: str,
+    sensor: str,
+    android_db: AsyncSession = Depends(get_android_db),
+    ios_db: AsyncSession = Depends(get_ios_db),
+):
+    """Register the export so the page can show progress while it downloads."""
+    export_models = _platform_exports(platform)
+    model_entry = export_models.get(sensor)
+    if not model_entry:
+        raise HTTPException(status_code=404, detail=f"Unknown sensor: {sensor}")
+    db = android_db if platform == "android" else ios_db
+    models = (model_entry[0],) if _is_android_export_entry(model_entry) else _ios_models(model_entry)
+    if not any([await _has_rows(db, model) for model in models]):
+        raise HTTPException(
+            status_code=404, detail=f"No data found for {platform} sensor: {sensor}"
+        )
+    count_model = AndroidRecordCount if platform == "android" else IosRecordCount
+    return await _start_zip_job(
+        f"sensor:{platform}:{sensor}",
+        f"{platform}_{_safe_path_part(sensor)}.zip",
+        await _sensor_row_total(db, count_model, sensor),
     )
 
 
@@ -436,6 +544,7 @@ async def export_device_csv_zip(
 async def export_sensor_csv_zip(
     platform: str,
     sensor: str,
+    job: str | None = Query(None),
     android_db: AsyncSession = Depends(get_android_db),
     ios_db: AsyncSession = Depends(get_ios_db),
 ):
@@ -457,6 +566,7 @@ async def export_sensor_csv_zip(
     return _zip_streaming_response(
         _sensor_members(platform, sensor, model_entry),
         f"{platform}_{safe_sensor}.zip",
+        _progress_job(job, f"sensor:{platform}:{sensor}"),
     )
 
 
@@ -471,8 +581,25 @@ async def _all_members():
                     yield entry
 
 
+@router.post("/all.zip")
+async def start_all_csv_zip(
+    android_db: AsyncSession = Depends(get_android_db),
+    ios_db: AsyncSession = Depends(get_ios_db),
+):
+    """Register the export so the page can show progress while it downloads."""
+    android = await _platform_device_ids(android_db, ANDROID_EXPORT_MODELS)
+    ios = await _platform_device_ids(ios_db, IOS_EXPORT_MODELS)
+    if not android and not ios:
+        raise HTTPException(status_code=404, detail="No sensor data found to export")
+
+    total = await _platform_row_total(android_db, AndroidRecordCount)
+    total += await _platform_row_total(ios_db, IosRecordCount)
+    return await _start_zip_job("all", "all.zip", total)
+
+
 @router.get("/all.zip")
 async def export_all_csv_zip(
+    job: str | None = Query(None),
     android_db: AsyncSession = Depends(get_android_db),
     ios_db: AsyncSession = Depends(get_ios_db),
 ):
@@ -481,4 +608,4 @@ async def export_all_csv_zip(
     if not android and not ios:
         raise HTTPException(status_code=404, detail="No sensor data found to export")
 
-    return _zip_streaming_response(_all_members(), "all.zip")
+    return _zip_streaming_response(_all_members(), "all.zip", _progress_job(job, "all"))
