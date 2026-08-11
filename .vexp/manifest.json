@@ -77,7 +77,7 @@
     "analytics_api/app/models.py": "a59d0087dc668b7b95412ebf9a37302a68205326662ff650fca485db670075a5",
     "analytics_api/app/refresh_counts.py": "8bfa02eeae85cc0a190360df031e23045666c7dfd3b94e789b668245c00ead75",
     "analytics_api/app/routers/__init__.py": "af1349b9f5f9a1a6a0404dea36dcc9499bcb25c9adc112b7cc9a93cae41f3262",
-    "analytics_api/app/routers/android.py": "f45a70622f5aee3813c83d21724e4cb23039f212efbcf2518aab604ddd3a8f83",
+    "analytics_api/app/routers/android.py": "e5b599b7e6c4ba7ac67ce674517a406c5d373f840a7749e40668a12b3fe569a9",
     "analytics_api/app/routers/auth.py": "0468f635685bbd89149626a5be8f60baf6a60e406032cef2a12205195214f023",
     "analytics_api/app/routers/backup.py": "3df23d705f68097e5ccf12b9644e31a3729d2196984a7b274e6d386f7975d453",
     "analytics_api/app/routers/counts.py": "4b780561ed7bec171cef1b090288d9589287e3a3bfa0f6281eef8e3ee16a8e3e",
@@ -213,8 +213,8 @@
     "shared_config/source_store.py": "ceaf715a4f7aa1198409553bed5ab30ab761f23c6f6db02140ee2e84148aa1f9",
     "shared_config/test_serializers.py": "d7614beeadecc7e75fcf9671fbc58ae7c8d9ce338a9cc21480128038ccd23fdb"
   },
-  "indexed_at_commit": "943cd14b1ec2e3435a8013a548f260a34eadff16",
-  "indexed_at_timestamp": "2026-08-11T15:18:09.992968+00:00",
+  "indexed_at_commit": "08d3443f8cbfea03365cb39ca9fcbd3674d77990",
+  "indexed_at_timestamp": "2026-08-11T15:21:51.571653+00:00",
   "schema_version": 3,
   "stats": {
     "total_edges": 2330,

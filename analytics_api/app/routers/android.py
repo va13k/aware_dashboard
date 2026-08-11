@@ -2,9 +2,11 @@ import csv
 import io
 from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
+from fastapi.responses import StreamingResponse
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
-from app.database import get_android_db
+from app.database import AndroidSessionLocal, get_android_db
+from app.services import backup_jobs as jobs
 from app.services.series import (
     DEFAULT_BUCKETS,
     MAX_BUCKETS,
@@ -773,55 +775,186 @@ _EXPORT_MODELS: dict[str, tuple] = {
 }
 
 
-@router.get("/export")
-async def export_csv(
+# Rows fetched per round trip while streaming an export. Large enough that the
+# query count stays small on a multi-million-row sensor, small enough that a
+# batch and its rendered CSV are a bounded amount of memory.
+EXPORT_BATCH = 5_000
+
+
+def _export_window(sensor: str, from_ts: float | None, to_ts: float | None):
+    entry = _EXPORT_MODELS.get(sensor)
+    if not entry:
+        raise HTTPException(status_code=404, detail=f"Unknown sensor: {sensor}")
+    # Always bound the scan: an open export would range-scan the whole table
+    # for a high-rate sensor. The full selected period is still exported; only a
+    # literal "all time" request is capped (to the most recent year).
+    return (*entry, *clamp_window(from_ts, to_ts))
+
+
+def _export_fields(schema) -> list[str]:
+    """CSV columns, in the order the schema declares them.
+
+    Taken from the schema rather than from the first row, so the header can be
+    written before any row has been read. ``device_id`` is left out because the
+    file is already per-device.
+    """
+    return [name for name in schema.model_fields if name != "device_id"]
+
+
+def _export_row(row, schema) -> dict:
+    record = schema.model_validate(row).model_dump()
+    stamp = record["timestamp"]
+    record["timestamp"] = datetime.fromtimestamp(
+        stamp / 1000 if stamp >= 1e11 else stamp, tz=timezone.utc
+    ).strftime("%Y-%m-%d %H:%M:%S UTC")
+    del record["device_id"]
+    return record
+
+
+async def _stream_export(device_id, sensor, model, schema, from_ts, to_ts, job):
+    """Yield the CSV a batch at a time, never holding the whole result.
+
+    Rows are walked in ``_id`` order and paged by the last id seen, so each round
+    trip is an indexed seek rather than a growing OFFSET, and the file comes out
+    in the same order as before. The session is opened here rather than injected:
+    a streaming response outlives the request that returned it, and a
+    dependency-scoped session would already be closed by the first batch.
+    """
+    fields = _export_fields(schema)
+    buffer = io.StringIO()
+    writer = csv.DictWriter(buffer, fieldnames=fields, extrasaction="ignore")
+    writer.writeheader()
+    yield buffer.getvalue()
+
+    last_id = 0
+    try:
+        async with AndroidSessionLocal() as db:
+            while True:
+                result = await db.execute(
+                    select(model)
+                    .where(model.device_id == device_id)
+                    .where(model.timestamp >= from_ts)
+                    .where(model.timestamp <= to_ts)
+                    .where(model._id > last_id)
+                    .order_by(model._id.asc())
+                    .limit(EXPORT_BATCH)
+                )
+                rows = result.scalars().all()
+                if not rows:
+                    break
+
+                buffer = io.StringIO()
+                writer = csv.DictWriter(buffer, fieldnames=fields, extrasaction="ignore")
+                writer.writerows(_export_row(row, schema) for row in rows)
+                yield buffer.getvalue()
+
+                last_id = rows[-1]._id
+                if job is not None:
+                    jobs.advance(job, add=len(rows), phase=f"Exporting {sensor}")
+    except Exception as error:  # noqa: BLE001 - the response has already begun
+        if job is not None:
+            jobs.fail(job, str(error))
+        raise
+
+    if job is not None:
+        jobs.finish(job, {"sensor": sensor})
+
+
+def _progress_job(job_id: str | None, sensor: str):
+    """The job this download may report into, or nothing.
+
+    The id arrives in the query string, so it is whatever the caller put there.
+    An id belonging to something else — a backup import, say — must never be
+    advanced or finished by a CSV download: the page watching that job would be
+    told an import had completed while it was still running. A mismatch simply
+    yields no reporting; the download itself is unaffected either way.
+    """
+    if not job_id:
+        return None
+    job = jobs.get(job_id)
+    if job is None or job.kind != "export-csv":
+        return None
+    if job.result.get("sensor") != sensor:
+        return None
+    return job
+
+
+async def _export_total(db, model, device_id, from_ts, to_ts) -> int:
+    """Rows the export will produce, counted from the index alone."""
+    return int(
+        (
+            await db.execute(
+                select(func.count())
+                .select_from(model)
+                .where(model.device_id == device_id)
+                .where(model.timestamp >= from_ts)
+                .where(model.timestamp <= to_ts)
+            )
+        ).scalar()
+        or 0
+    )
+
+
+@router.post("/export")
+async def start_export_csv(
     device_id: str,
     sensor: str = Query(..., description="Sensor slug, e.g. 'accelerometer'"),
     from_ts: float | None = Query(None),
     to_ts: float | None = Query(None),
     db: AsyncSession = Depends(get_android_db),
 ):
-    entry = _EXPORT_MODELS.get(sensor)
-    if not entry:
-        raise HTTPException(status_code=404, detail=f"Unknown sensor: {sensor}")
-    model, schema = entry
+    """Register an export so the page can show progress while it downloads.
 
-    # Always bound the scan: an open export would range-scan the whole table
-    # for a high-rate sensor. The full selected period is still exported; only a
-    # literal "all time" request is capped (to the most recent year).
-    from_ts, to_ts = clamp_window(from_ts, to_ts)
-    q = (
-        select(model)
-        .where(model.device_id == device_id)
-        .where(model.timestamp >= from_ts)
-        .where(model.timestamp <= to_ts)
-        .order_by(model.timestamp.asc())
-    )
+    The row count is settled here rather than mid-stream, so the bar has a real
+    denominator from the first chunk. The GET below streams with or without a
+    job; this only attaches the reporting.
+    """
+    model, schema, from_ts, to_ts = _export_window(sensor, from_ts, to_ts)
+    total = await _export_total(db, model, device_id, from_ts, to_ts)
+    if not total:
+        raise HTTPException(status_code=404, detail=f"No data found for sensor: {sensor}")
 
-    result = await db.execute(q)
-    rows = result.scalars().all()
-    if not rows:
-        raise HTTPException(
-            status_code=404,
-            detail=f"No data found for sensor: {sensor}",
+    job = jobs.create("export-csv")
+    filename = f"{device_id}_{sensor}.csv"
+    jobs.advance(job, total=total, phase=f"Exporting {sensor}")
+    jobs.describe(job, filename=filename, sensor=sensor, unit="rows")
+    return {"id": job.id, "filename": filename, "rows": total}
+
+
+@router.get("/export")
+async def export_csv(
+    device_id: str,
+    sensor: str = Query(..., description="Sensor slug, e.g. 'accelerometer'"),
+    from_ts: float | None = Query(None),
+    to_ts: float | None = Query(None),
+    job: str | None = Query(None, description="Job id from POST, to report progress"),
+    db: AsyncSession = Depends(get_android_db),
+):
+    model, schema, from_ts, to_ts = _export_window(sensor, from_ts, to_ts)
+
+    # Settle emptiness before the response starts: once a streaming body is
+    # under way its status can no longer become a 404.
+    exists = (
+        await db.execute(
+            select(model._id)
+            .where(model.device_id == device_id)
+            .where(model.timestamp >= from_ts)
+            .where(model.timestamp <= to_ts)
+            .limit(1)
         )
-
-    buf = io.StringIO()
-    records = [schema.model_validate(r).model_dump() for r in rows]
-    for r in records:
-        ts = r["timestamp"]
-        r["timestamp"] = datetime.fromtimestamp(
-            ts / 1000 if ts >= 1e11 else ts, tz=timezone.utc
-        ).strftime("%Y-%m-%d %H:%M:%S UTC")
-        del r["device_id"]
-    records.sort(key=lambda r: r["id"])
-    writer = csv.DictWriter(buf, fieldnames=records[0].keys())
-    writer.writeheader()
-    writer.writerows(records)
+    ).first()
+    if exists is None:
+        raise HTTPException(status_code=404, detail=f"No data found for sensor: {sensor}")
 
     filename = f"{device_id}_{sensor}.csv"
-    return Response(
-        content=buf.getvalue(),
+    return StreamingResponse(
+        _stream_export(
+            device_id, sensor, model, schema, from_ts, to_ts, _progress_job(job, sensor)
+        ),
         media_type="text/csv",
-        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+        headers={
+            "Content-Disposition": f'attachment; filename="{filename}"',
+            # Produced as it is sent, so no intermediary should collect it first.
+            "X-Accel-Buffering": "no",
+        },
     )
