@@ -82,7 +82,7 @@ def _deployed_config(monkeypatch, tmp_path):
 def _database(monkeypatch):
     """Replace every query helper the device router uses."""
 
-    async def last_seen(db, models):
+    async def last_seen(db, models, count_model=None):
         if models and models[0] is devices_router.AndroidDevice:
             return {ANDROID_DEVICE: 5_000.0}
         return {IOS_DEVICE: 9_000.0}

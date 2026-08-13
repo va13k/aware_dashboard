@@ -221,9 +221,45 @@ async def _max_timestamps_by_device(db: AsyncSession, model):
     }
 
 
-async def _combined_last_seen_by_device(db: AsyncSession, models):
-    last_seen_by_device = {}
+async def _cached_last_seen_by_device(db: AsyncSession, count_model):
+    """The newest timestamp per device, from the record-count cache.
 
+    The cache carries `last_ts` per sensor and device, so the answer is one
+    grouped read of a small table. Scanning the sensor tables for it means a
+    `MAX(timestamp)` over every one of them, which costs seconds per request at
+    study scale. The figure trails the refresh interval, which a "last seen"
+    reading can afford.
+    """
+    try:
+        result = await db.execute(
+            select(
+                count_model.device_id,
+                func.max(count_model.last_ts).label("last_seen"),
+            ).group_by(count_model.device_id)
+        )
+    except (ProgrammingError, OperationalError, SQLAlchemyError):
+        await _rollback_after_table_error(db)
+        return {}
+
+    return {
+        str(row.device_id): row.last_seen
+        for row in result.all()
+        if row.device_id is not None and row.last_seen
+    }
+
+
+async def _combined_last_seen_by_device(db: AsyncSession, models, count_model=None):
+    """Newest upload per device: from the cache, falling back to the tables.
+
+    A cache that has never been refreshed answers for no device, so the scan
+    remains for a deployment whose first refresh has not run.
+    """
+    if count_model is not None:
+        cached = await _cached_last_seen_by_device(db, count_model)
+        if cached:
+            return cached
+
+    last_seen_by_device = {}
     for model in models:
         timestamps = await _max_timestamps_by_device(db, model)
         for device_id, last_seen in timestamps.items():
@@ -402,6 +438,7 @@ async def list_android_devices(db: AsyncSession = Depends(get_android_db)):
     last_seen_by_device = await _combined_last_seen_by_device(
         db,
         [AndroidDevice, *ANDROID_STREAMS.values()],
+        AndroidRecordCount,
     )
     metadata_by_device = await _device_metadata_by_device(db, AndroidDevice)
     study_states = await _android_study_states(db)
@@ -436,6 +473,7 @@ async def list_ios_devices(db: AsyncSession = Depends(get_ios_db)):
     last_seen_by_device = await _combined_last_seen_by_device(
         db,
         [IosDevice, *IOS_STREAMS.values()],
+        IosRecordCount,
     )
 
     metadata_by_device = await _device_metadata_by_device(db, IosDevice)
