@@ -58,7 +58,7 @@ const vectorMagnitude = (r: SensorRecord) =>
   magnitude(r, "double_values_0", "double_values_1", "double_values_2") ??
   magnitude(r, "x", "y", "z");
 
-export const SHARED_SENSOR_CONFIGS: SensorConfig[] = [
+const ALL_SENSOR_CONFIGS: SensorConfig[] = [
   {
     key: "accelerometer",
     label: "Accelerometer",
@@ -214,9 +214,6 @@ export const SHARED_SENSOR_CONFIGS: SensorConfig[] = [
     platform: "shared",
     extract: (r) => firstNumber(r, ["rssi", "wifi_rssi"]),
   },
-];
-
-export const ANDROID_SENSOR_CONFIGS: SensorConfig[] = [
   {
     key: "applications",
     label: "Applications",
@@ -386,9 +383,6 @@ export const ANDROID_SENSOR_CONFIGS: SensorConfig[] = [
     extract: eventPresence,
     countOnly: true,
   },
-];
-
-export const IOS_SENSOR_CONFIGS: SensorConfig[] = [
   {
     key: "activity",
     label: "Activity Recognition",
@@ -629,11 +623,22 @@ export const IOS_SENSOR_CONFIGS: SensorConfig[] = [
   },
 ];
 
-export const SENSOR_CONFIGS: SensorConfig[] = [
-  ...SHARED_SENSOR_CONFIGS,
-  ...ANDROID_SENSOR_CONFIGS,
-  ...IOS_SENSOR_CONFIGS,
-];
+export const SENSOR_CONFIGS: SensorConfig[] = ALL_SENSOR_CONFIGS;
+
+/** The sensors both platforms collect. */
+export const SHARED_SENSOR_CONFIGS: SensorConfig[] = ALL_SENSOR_CONFIGS.filter(
+  (s) => s.platform === "shared",
+);
+
+/** The sensors only an Android phone collects. */
+export const ANDROID_SENSOR_CONFIGS: SensorConfig[] = ALL_SENSOR_CONFIGS.filter(
+  (s) => s.platform === "android",
+);
+
+/** The sensors only an iPhone collects. */
+export const IOS_SENSOR_CONFIGS: SensorConfig[] = ALL_SENSOR_CONFIGS.filter(
+  (s) => s.platform === "ios",
+);
 
 export function sensorsForPlatform(
   platform: "android" | "ios",
