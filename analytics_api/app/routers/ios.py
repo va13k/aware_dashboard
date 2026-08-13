@@ -14,6 +14,7 @@ from app.services.series import (
 )
 from app.models import (
     IosAccelerometer,
+    IosAwareLog,
     IosBarometer,
     IosBattery,
     IosBatteryCharges,
@@ -56,6 +57,7 @@ from app.models import (
     IosScreen,
     IosSensorWifi,
     IosSignificantMotion,
+    IosStatusMonitor,
     IosTimezone,
     IosWifi,
 )
@@ -706,6 +708,34 @@ async def get_studentlife_audio(
     return result.scalars().all()
 
 
+@router.get("/aware-log", response_model=list[IosSchema])
+async def get_aware_log(
+    device_id: str,
+    from_ts: float | None = Query(None),
+    to_ts: float | None = Query(None),
+    limit: int = Query(100, le=MAX_RECORD_LIMIT),
+    offset: int = Query(0),
+    db: AsyncSession = Depends(get_ios_db),
+):
+    result = await db.execute(_base_query(IosAwareLog, device_id, from_ts, to_ts, limit, offset))
+    return result.scalars().all()
+
+
+@router.get("/status-monitor", response_model=list[IosSchema])
+async def get_status_monitor(
+    device_id: str,
+    from_ts: float | None = Query(None),
+    to_ts: float | None = Query(None),
+    limit: int = Query(100, le=MAX_RECORD_LIMIT),
+    offset: int = Query(0),
+    db: AsyncSession = Depends(get_ios_db),
+):
+    result = await db.execute(
+        _base_query(IosStatusMonitor, device_id, from_ts, to_ts, limit, offset)
+    )
+    return result.scalars().all()
+
+
 @router.get("/timezone", response_model=list[IosSchema])
 async def get_timezone(
     device_id: str,
@@ -922,6 +952,8 @@ _EXPORT_MODELS: dict[str, object] = {
     "studentlife-audio": IosPluginStudentlifeAudio,
     "timezone": IosTimezone,
     "wifi": (IosSensorWifi, IosWifi),
+    "aware-log": IosAwareLog,
+    "status-monitor": IosStatusMonitor,
 }
 
 

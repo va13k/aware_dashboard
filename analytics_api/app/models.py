@@ -564,6 +564,11 @@ IosSensorWifi = _ios_model("sensor_wifi")
 IosTimezone = _ios_model("timezone")
 IosWifi = _ios_model("wifi")
 
+# The client's own logs: the events it emits about its operation, and a periodic
+# snapshot of the device's state (battery, connectivity, low-power, storage).
+IosAwareLog = _ios_model("ios_aware_log")
+IosStatusMonitor = _ios_model("ios_status_monitor")
+
 # System / device tables
 IosDevice = _ios_model("aware_device")
 IosPushNotification = _ios_model("push_notification")
