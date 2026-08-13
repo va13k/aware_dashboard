@@ -136,6 +136,28 @@ class AndroidCallsSchema(_Base):
     trace: str | None = None
 
 
+class AndroidSchedulerSchema(_Base):
+    schedule_id: str | None = None
+    schedule: str | None = None
+    last_triggered: float = 0
+    package_name: str | None = None
+
+
+class AndroidScreenshotSchema(_Base):
+    package_name: str | None = None
+    application_name: str | None = None
+
+
+class AndroidAwareStudySchema(_Base):
+    study_url: str | None = None
+    study_title: str | None = None
+    study_description: str | None = None
+    double_join: float = 0
+    double_updated: float = 0
+    double_exit: float = 0
+    study_compliance: str | None = None
+
+
 class AndroidEsmsSchema(_Base):
     esm_json: str | None = None
     esm_status: int = 0

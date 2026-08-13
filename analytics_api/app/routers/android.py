@@ -21,6 +21,9 @@ from app.models import (
     AndroidApplicationsNotifications,
     AndroidBarometer,
     AndroidProcessor,
+    AndroidScheduler,
+    AndroidScreenshot,
+    AndroidAwareStudy,
     AndroidBattery,
     AndroidBatteryCharges,
     AndroidBatteryDischarges,
@@ -60,6 +63,9 @@ from app.schemas import (
     AndroidApplicationsNotificationsSchema,
     AndroidBarometerSchema,
     AndroidProcessorSchema,
+    AndroidSchedulerSchema,
+    AndroidScreenshotSchema,
+    AndroidAwareStudySchema,
     AndroidBatterySchema,
     AndroidBatteryChargesSchema,
     AndroidBatteryDischargesSchema,
@@ -184,6 +190,81 @@ async def get_applications_notifications(
 ):
     result = await db.execute(
         _base_query(AndroidApplicationsNotifications, device_id, from_ts, to_ts, limit, offset)
+    )
+    return result.scalars().all()
+
+
+@router.get("/esm", response_model=list[AndroidEsmsSchema])
+async def get_esm(
+    device_id: str,
+    from_ts: float | None = Query(None),
+    to_ts: float | None = Query(None),
+    limit: int = Query(100, le=MAX_RECORD_LIMIT),
+    offset: int = Query(0),
+    db: AsyncSession = Depends(get_android_db),
+):
+    result = await db.execute(
+        _base_query(AndroidEsms, device_id, from_ts, to_ts, limit, offset)
+    )
+    return result.scalars().all()
+
+
+@router.get("/esm-scheduler", response_model=list[AndroidSchedulerSchema])
+async def get_esm_scheduler(
+    device_id: str,
+    from_ts: float | None = Query(None),
+    to_ts: float | None = Query(None),
+    limit: int = Query(100, le=MAX_RECORD_LIMIT),
+    offset: int = Query(0),
+    db: AsyncSession = Depends(get_android_db),
+):
+    result = await db.execute(
+        _base_query(AndroidScheduler, device_id, from_ts, to_ts, limit, offset)
+    )
+    return result.scalars().all()
+
+
+@router.get("/openweather", response_model=list[AndroidPluginOpenweatherSchema])
+async def get_openweather(
+    device_id: str,
+    from_ts: float | None = Query(None),
+    to_ts: float | None = Query(None),
+    limit: int = Query(100, le=MAX_RECORD_LIMIT),
+    offset: int = Query(0),
+    db: AsyncSession = Depends(get_android_db),
+):
+    result = await db.execute(
+        _base_query(AndroidPluginOpenweather, device_id, from_ts, to_ts, limit, offset)
+    )
+    return result.scalars().all()
+
+
+@router.get("/study-events", response_model=list[AndroidAwareStudySchema])
+async def get_study_events(
+    device_id: str,
+    from_ts: float | None = Query(None),
+    to_ts: float | None = Query(None),
+    limit: int = Query(100, le=MAX_RECORD_LIMIT),
+    offset: int = Query(0),
+    db: AsyncSession = Depends(get_android_db),
+):
+    result = await db.execute(
+        _base_query(AndroidAwareStudy, device_id, from_ts, to_ts, limit, offset)
+    )
+    return result.scalars().all()
+
+
+@router.get("/screenshot", response_model=list[AndroidScreenshotSchema])
+async def get_screenshot(
+    device_id: str,
+    from_ts: float | None = Query(None),
+    to_ts: float | None = Query(None),
+    limit: int = Query(100, le=MAX_RECORD_LIMIT),
+    offset: int = Query(0),
+    db: AsyncSession = Depends(get_android_db),
+):
+    result = await db.execute(
+        _base_query(AndroidScreenshot, device_id, from_ts, to_ts, limit, offset)
     )
     return result.scalars().all()
 
@@ -766,7 +847,8 @@ _EXPORT_MODELS: dict[str, tuple] = {
     "battery-discharges": (AndroidBatteryDischarges, AndroidBatteryDischargesSchema),
     "bluetooth": (AndroidBluetooth, AndroidBluetoothSchema),
     "calls": (AndroidCalls, AndroidCallsSchema),
-    "esms": (AndroidEsms, AndroidEsmsSchema),
+    "esm": (AndroidEsms, AndroidEsmsSchema),
+    "esm-scheduler": (AndroidScheduler, AndroidSchedulerSchema),
     "gravity": (AndroidGravity, AndroidGravitySchema),
     "gyroscope": (AndroidGyroscope, AndroidGyroscopeSchema),
     "installations": (AndroidInstallations, AndroidInstallationsSchema),
@@ -780,7 +862,9 @@ _EXPORT_MODELS: dict[str, tuple] = {
     "network-traffic": (AndroidNetworkTraffic, AndroidNetworkTrafficSchema),
     "notes": (AndroidNotes, AndroidNotesSchema),
     "plugin-ambient-noise": (AndroidPluginAmbientNoise, AndroidPluginAmbientNoiseSchema),
-    "plugin-openweather": (AndroidPluginOpenweather, AndroidPluginOpenweatherSchema),
+    "openweather": (AndroidPluginOpenweather, AndroidPluginOpenweatherSchema),
+    "screenshot": (AndroidScreenshot, AndroidScreenshotSchema),
+    "study-events": (AndroidAwareStudy, AndroidAwareStudySchema),
     "proximity": (AndroidProximity, AndroidProximitySchema),
     "rotation": (AndroidRotation, AndroidRotationSchema),
     "screen": (AndroidScreen, AndroidScreenSchema),

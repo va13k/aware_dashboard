@@ -153,6 +153,35 @@ class AndroidBarometer(AndroidBase):
     label = Column(Text)
 
 
+class AndroidScheduler(AndroidBase):
+    """When the client is due to trigger a scheduled task, such as an ESM."""
+
+    __tablename__ = "scheduler"
+    _id = Column(BigInteger, primary_key=True, autoincrement=True)
+    timestamp = Column(Double, default=0)
+    device_id = Column(String(150), default="")
+    schedule_id = Column(Text)
+    schedule = Column(Text)
+    last_triggered = Column(Double, default=0)
+    package_name = Column(Text)
+
+
+class AndroidScreenshot(AndroidBase):
+    """A captured screen, with the image left in the database.
+
+    `image_data` holds the picture itself. It is deliberately absent from this
+    model: reading a row would otherwise carry a longblob of the participant's
+    screen into every response and export that touches the table.
+    """
+
+    __tablename__ = "screenshot"
+    _id = Column(BigInteger, primary_key=True, autoincrement=True)
+    timestamp = Column(Double, default=0)
+    device_id = Column(String(150), default="")
+    package_name = Column(Text)
+    application_name = Column(Text)
+
+
 class AndroidProcessor(AndroidBase):
     __tablename__ = "processor"
     _id = Column(BigInteger, primary_key=True, autoincrement=True)
