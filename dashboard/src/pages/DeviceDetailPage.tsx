@@ -25,7 +25,7 @@ import SensorViewFilter from "../components/SensorViewFilter";
 import { useSensorView } from "../utils/sensorView";
 import { RequiredStreamNote } from "../components/RequiredByConfig";
 import { platformRequirements } from "../utils/requirements";
-import { deviceLabel } from "../utils/devices";
+import { deviceLabel, deviceOsVersion } from "../utils/devices";
 import {
   absoluteTime,
   latestTimestamp,
@@ -123,16 +123,19 @@ function DeviceSwitcher({
 
 function DeviceDetailPanel({
   detail,
+  selected,
   loading,
   exportHref,
   deviceName,
 }: {
   detail: DeviceDetail | null;
+  selected?: Device | null;
   loading: boolean;
   exportHref?: string;
   deviceName?: string;
 }) {
   const activeStreams = detail?.streams.filter((s) => s.count > 0) ?? [];
+  const osVersion = selected ? deviceOsVersion(selected) : null;
 
   return (
     <section className="bg-card backdrop-blur-xl border border-wire rounded-3xl shadow-card p-5">
@@ -182,6 +185,15 @@ function DeviceDetailPanel({
               label="records"
               value={activeStreams.reduce((sum, s) => sum + s.count, 0)}
             />
+            {/* What the phone says about itself. A device that has not reported
+                its description yet leaves these out rather than showing gaps. */}
+            {selected?.manufacturer ? (
+              <DetailField label="make" value={selected.manufacturer} />
+            ) : null}
+            {selected?.hardware ? (
+              <DetailField label="hardware" value={selected.hardware} />
+            ) : null}
+            {osVersion ? <DetailField label="os" value={osVersion} /> : null}
           </div>
         </div>
       )}
@@ -379,6 +391,7 @@ export default function DeviceDetailPage() {
         <>
           <DeviceDetailPanel
             detail={currentDetail}
+            selected={selected}
             loading={Boolean(!devices || (selected && !currentDetail))}
             exportHref={selectedDeviceExportHref}
             deviceName={selected ? deviceLabel(selected) : undefined}
