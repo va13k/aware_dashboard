@@ -64,10 +64,19 @@ def test_every_table_the_client_writes_exists_in_the_schema():
     )
 
 
-def test_the_client_logs_are_readable_through_the_api():
-    """The point of collecting them is being able to look at them."""
-    for table in ("ios_aware_log", "ios_status_monitor"):
-        assert table in api_tables(), f"{table} has no model, so nothing can read it"
+def test_the_event_log_is_readable_through_the_api():
+    """The point of collecting it is being able to look at it."""
+    assert "ios_aware_log" in api_tables(), "nothing can read the client's event log"
+
+
+def test_the_status_monitor_is_stored_without_being_offered():
+    """It records how the device is doing rather than what the study measures.
+
+    The table keeps receiving, so the data is there for a question that needs it;
+    the dashboard does not carry a card nobody reads.
+    """
+    assert "ios_status_monitor" in schema_tables()
+    assert "ios_status_monitor" not in api_tables()
 
 
 def test_both_wifi_tables_are_covered():
