@@ -77,7 +77,7 @@
     "analytics_api/app/models.py": "a59d0087dc668b7b95412ebf9a37302a68205326662ff650fca485db670075a5",
     "analytics_api/app/refresh_counts.py": "8bfa02eeae85cc0a190360df031e23045666c7dfd3b94e789b668245c00ead75",
     "analytics_api/app/routers/__init__.py": "af1349b9f5f9a1a6a0404dea36dcc9499bcb25c9adc112b7cc9a93cae41f3262",
-    "analytics_api/app/routers/android.py": "e5b599b7e6c4ba7ac67ce674517a406c5d373f840a7749e40668a12b3fe569a9",
+    "analytics_api/app/routers/android.py": "ea3f9b77e52c510c2cab974d1c38b1d1e857f357580d76cc2f3dfc0866fc3556",
     "analytics_api/app/routers/auth.py": "0468f635685bbd89149626a5be8f60baf6a60e406032cef2a12205195214f023",
     "analytics_api/app/routers/backup.py": "3df23d705f68097e5ccf12b9644e31a3729d2196984a7b274e6d386f7975d453",
     "analytics_api/app/routers/counts.py": "4b780561ed7bec171cef1b090288d9589287e3a3bfa0f6281eef8e3ee16a8e3e",
@@ -168,7 +168,7 @@
     "dashboard/src/components/StudyStatusPanel.tsx": "010ff42901c06d1d8ec74723b551f419ed6597804ce9560a7817f19573b63e0a",
     "dashboard/src/components/TimezoneRecordsCard.tsx": "1a392f0e9f2cb039f699e840192989b99b7563641136785674213aa90839dcaf",
     "dashboard/src/components/WifiRecordsCard.tsx": "2a4b03fb96ce10de7b283ba7f705c1bf45f017e81339c4d5abbd2d1297394603",
-    "dashboard/src/config/sensors.ts": "93d574515d4341d264f33d9fce008db84875340a80672562e28e6c266162ab11",
+    "dashboard/src/config/sensors.ts": "0e179825dd27539d4721e5bc9c88a3c085c46e8f2c56ba326be260b2e9a7679d",
     "dashboard/src/main.tsx": "717427d5d64470f97e4bb18e907ab095427e2aa9a6800fe3390b43bede6e9b35",
     "dashboard/src/pages/DeviceDetailPage.tsx": "e23b0eddef5845c96048bc673b625ddb547049f9711a0eebcef6b415ed2798c7",
     "dashboard/src/pages/DevicesPage.tsx": "aa15e8cf5d0bf27a539bce47b014368ff27a18b4d42ac450890befb70213593c",
@@ -213,13 +213,13 @@
     "shared_config/source_store.py": "ceaf715a4f7aa1198409553bed5ab30ab761f23c6f6db02140ee2e84148aa1f9",
     "shared_config/test_serializers.py": "d7614beeadecc7e75fcf9671fbc58ae7c8d9ce338a9cc21480128038ccd23fdb"
   },
-  "indexed_at_commit": "26a5fec82396875bbe6ad5304a110ed4324af2f2",
-  "indexed_at_timestamp": "2026-08-13T13:44:37.100677+00:00",
+  "indexed_at_commit": "f81c5e85d006b7a9fc685c20573dd6720c69c9b9",
+  "indexed_at_timestamp": "2026-08-13T13:57:25.369908+00:00",
   "schema_version": 3,
   "stats": {
-    "total_edges": 2264,
+    "total_edges": 2253,
     "total_files": 212,
-    "total_nodes": 2013
+    "total_nodes": 2014
   },
   "vexp_version": "2.5.2"
 }

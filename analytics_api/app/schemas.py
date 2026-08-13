@@ -91,6 +91,15 @@ class AndroidBarometerSchema(_Base):
     label: str | None = None
 
 
+class AndroidProcessorSchema(_Base):
+    double_last_user: float = 0
+    double_last_system: float = 0
+    double_last_idle: float = 0
+    double_user_load: float = 0
+    double_system_load: float = 0
+    double_idle_load: float = 0
+
+
 class AndroidBatterySchema(_Base):
     battery_status: int = 0
     battery_level: int = 0

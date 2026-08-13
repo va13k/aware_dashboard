@@ -153,6 +153,19 @@ class AndroidBarometer(AndroidBase):
     label = Column(Text)
 
 
+class AndroidProcessor(AndroidBase):
+    __tablename__ = "processor"
+    _id = Column(BigInteger, primary_key=True, autoincrement=True)
+    timestamp = Column(Double, default=0)
+    device_id = Column(String(150), default="")
+    double_last_user = Column(Double, default=0)
+    double_last_system = Column(Double, default=0)
+    double_last_idle = Column(Double, default=0)
+    double_user_load = Column(Double, default=0)
+    double_system_load = Column(Double, default=0)
+    double_idle_load = Column(Double, default=0)
+
+
 class AndroidBattery(AndroidBase):
     __tablename__ = "battery"
     _id = Column(BigInteger, primary_key=True, autoincrement=True)

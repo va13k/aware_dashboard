@@ -20,6 +20,7 @@ from app.models import (
     AndroidApplicationsHistory,
     AndroidApplicationsNotifications,
     AndroidBarometer,
+    AndroidProcessor,
     AndroidBattery,
     AndroidBatteryCharges,
     AndroidBatteryDischarges,
@@ -58,6 +59,7 @@ from app.schemas import (
     AndroidApplicationsHistorySchema,
     AndroidApplicationsNotificationsSchema,
     AndroidBarometerSchema,
+    AndroidProcessorSchema,
     AndroidBatterySchema,
     AndroidBatteryChargesSchema,
     AndroidBatteryDischargesSchema,
@@ -182,6 +184,21 @@ async def get_applications_notifications(
 ):
     result = await db.execute(
         _base_query(AndroidApplicationsNotifications, device_id, from_ts, to_ts, limit, offset)
+    )
+    return result.scalars().all()
+
+
+@router.get("/processor", response_model=list[AndroidProcessorSchema])
+async def get_processor(
+    device_id: str,
+    from_ts: float | None = Query(None),
+    to_ts: float | None = Query(None),
+    limit: int = Query(100, le=MAX_RECORD_LIMIT),
+    offset: int = Query(0),
+    db: AsyncSession = Depends(get_android_db),
+):
+    result = await db.execute(
+        _base_query(AndroidProcessor, device_id, from_ts, to_ts, limit, offset)
     )
     return result.scalars().all()
 
@@ -695,6 +712,7 @@ _SERIES_TARGETS: dict[str, tuple] = {
         ),
     ),
     "barometer": (AndroidBarometer, AndroidBarometer.double_values_0),
+    "processor": (AndroidProcessor, AndroidProcessor.double_user_load),
     "light": (AndroidLight, AndroidLight.double_light_lux),
     "temperature": (AndroidTemperature, AndroidTemperature.temperature_celsius),
     "plugin-ambient-noise": (
@@ -742,6 +760,7 @@ _EXPORT_MODELS: dict[str, tuple] = {
         AndroidApplicationsNotificationsSchema,
     ),
     "barometer": (AndroidBarometer, AndroidBarometerSchema),
+    "processor": (AndroidProcessor, AndroidProcessorSchema),
     "battery": (AndroidBattery, AndroidBatterySchema),
     "battery-charges": (AndroidBatteryCharges, AndroidBatteryChargesSchema),
     "battery-discharges": (AndroidBatteryDischarges, AndroidBatteryDischargesSchema),
