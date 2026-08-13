@@ -39,3 +39,9 @@ aware-micro-server/output/*.jar
 
 # macOS
 .DS_Store
+
+# Planning documents, not part of the software
+docs/plans/
+
+# Internal java version file
+.java-version
