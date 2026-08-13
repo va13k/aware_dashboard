@@ -10,6 +10,7 @@ from fastapi.testclient import TestClient
 
 from app.main import app
 from app.routers import logs as logs_router
+from app.schemas import AwareLogSchema
 
 
 class _Row:
@@ -115,3 +116,61 @@ def test_export_renders_csv_with_formatted_timestamp(client):
     assert "STUDY-SYNC: installations" in text
     # epoch-ms 3000 is tiny, so it is treated as seconds → 1970 UTC
     assert "1970-01-01" in text
+
+
+def test_both_platforms_answer_with_the_same_fields():
+    """The page renders one table for either platform, so the rows must match.
+
+    An iPhone's log is a JSON blob and Android's is a set of columns; they only
+    look alike because the iOS route projects through the same schema. Building
+    that dictionary by hand once shipped `_id` where the page reads `id`, and the
+    table crashed on its first row.
+    """
+
+    class Record:
+        _id = 11
+        timestamp = 1_700_000_000_000.0
+        device_id = "phone-a"
+        data = {"log_message": '{"class": "AWARECore", "event": "sync"}'}
+
+    ios_row = logs_router._ios_row((Record(), "AWARECore"))
+    android_row = AwareLogSchema.model_validate(
+        {
+            "_id": 11,
+            "timestamp": 1_700_000_000_000.0,
+            "device_id": "phone-a",
+            "log_type": "sync",
+            "log_message": "anything",
+        }
+    ).model_dump()
+
+    assert ios_row.keys() == android_row.keys()
+    assert ios_row["id"] == 11
+    assert ios_row["log_type"] == "AWARECore"
+    assert ios_row["log_message"] == '{"class": "AWARECore", "event": "sync"}'
+
+
+def test_a_log_message_that_is_not_json_still_yields_its_text():
+    class Record:
+        _id = 3
+        timestamp = 1.0
+        device_id = "phone-a"
+        data = {"log_message": "plain text, no braces"}
+
+    row = logs_router._ios_row((Record(), None))
+
+    assert row["log_message"] == "plain text, no braces"
+    assert row["log_type"] == ""
+
+
+def test_a_row_with_no_payload_does_not_break_the_page():
+    class Record:
+        _id = 4
+        timestamp = 1.0
+        device_id = "phone-a"
+        data = None
+
+    row = logs_router._ios_row((Record(), None))
+
+    assert row["id"] == 4
+    assert row["log_message"] == ""

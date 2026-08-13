@@ -121,6 +121,17 @@ export const fetchAndroidLogTypes = (): Promise<string[]> =>
 export const androidLogsExportHref = (opts: AndroidLogQuery = {}): string =>
   `${BASE}/logs/android/export?${logParams(opts, false).toString()}`;
 
+/** The same three calls against an iPhone's logs, which the API projects into
+ *  the Android shape so one panel renders both. */
+export const fetchIosLogs = (opts: AndroidLogQuery = {}): Promise<AwareLogPage> =>
+  get(`/logs/ios?${logParams(opts).toString()}`);
+
+export const fetchIosLogTypes = (): Promise<string[]> =>
+  get("/logs/ios/log-types");
+
+export const iosLogsExportHref = (opts: AndroidLogQuery = {}): string =>
+  `${BASE}/logs/ios/export?${logParams(opts, false).toString()}`;
+
 export const exportAllHref = (): string => `${BASE}/export/all.zip`;
 
 export const fetchManifest = (): Promise<Manifest> => get("/export/manifest");

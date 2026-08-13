@@ -8,10 +8,12 @@ import LogsPanel from "./LogsPanel";
  */
 export default function LogsModal({
   deviceId,
+  platform,
   title,
   onClose,
 }: {
   deviceId: string;
+  platform: "android" | "ios";
   title?: string;
   onClose: () => void;
 }) {
@@ -48,7 +50,7 @@ export default function LogsModal({
         </div>
 
         <div className="min-h-0 flex-1 overflow-y-auto">
-          <LogsPanel deviceId={deviceId} pageSize={50} />
+          <LogsPanel deviceId={deviceId} platform={platform} pageSize={50} />
         </div>
       </div>
     </div>

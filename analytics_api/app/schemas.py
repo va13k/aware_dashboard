@@ -37,9 +37,16 @@ class AndroidDeviceSchema(_Base):
     sdk: str | None = None
 
 
-class AndroidAwareLogSchema(_Base):
+class AwareLogSchema(_Base):
+    """A client log line. Android stores these fields as columns; the iOS routes
+    project their JSON blob into the same shape, so one panel renders both."""
+
     log_type: str | None = None
     log_message: str | None = None
+
+
+#: The Android routes named it after their platform before the iOS ones existed.
+AndroidAwareLogSchema = AwareLogSchema
 
 
 class AndroidAccelerometerSchema(_Base):
