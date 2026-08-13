@@ -84,7 +84,7 @@
     "analytics_api/app/routers/devices.py": "895e17557e02f1fb84f6a912d3de7395d548f0ab7642cdb909d395fb3529a2ea",
     "analytics_api/app/routers/export.py": "3d5a75ac05be10d95f94ea7371519236cf7d59fea9f0be8eaa016604eb05d9d1",
     "analytics_api/app/routers/health.py": "b73deddbf308a63dfd83b1618d524fd90a9ac8855f1400cddde828f7e5384c74",
-    "analytics_api/app/routers/ios.py": "7ac8f23990344248a254eab9baaf6d9fbae40f7ac962dc69b941bb4b29b9086d",
+    "analytics_api/app/routers/ios.py": "21dd8abff21337b69dc1adc12e97d0e804312e3dbf3fc7673c8bf295c2b3f89b",
     "analytics_api/app/routers/jobs.py": "ad609026a17ad9a512cca0775f5840468191496f6bf29a0c2a4bd6181f097b55",
     "analytics_api/app/routers/logs.py": "ceb6ff774bd056496a6c8ca696499f2840bfc388356ad6ea26d1027b08affd1b",
     "analytics_api/app/routers/study.py": "c97a4b601a95c97519caa1f01920d8e065083dda36f14685fac28fafecd7acdd",
@@ -170,13 +170,13 @@
     "dashboard/src/components/WifiRecordsCard.tsx": "2a4b03fb96ce10de7b283ba7f705c1bf45f017e81339c4d5abbd2d1297394603",
     "dashboard/src/config/sensors.ts": "15600f1bdb1d5932bf9f616047c700fc7953a0338bb1091579498b1ae4f6ac18",
     "dashboard/src/main.tsx": "717427d5d64470f97e4bb18e907ab095427e2aa9a6800fe3390b43bede6e9b35",
-    "dashboard/src/pages/DeviceDetailPage.tsx": "e23b0eddef5845c96048bc673b625ddb547049f9711a0eebcef6b415ed2798c7",
+    "dashboard/src/pages/DeviceDetailPage.tsx": "3544291e1d54644747ffb7734c0e29d86bcb0b3a4cea3c248848e48f74bfa533",
     "dashboard/src/pages/DevicesPage.tsx": "aa15e8cf5d0bf27a539bce47b014368ff27a18b4d42ac450890befb70213593c",
     "dashboard/src/pages/LogsPage.tsx": "c7b60aff5d997824aaca373ce362910c64e91a31fe1dc09a5d7f4fabb452da41",
     "dashboard/src/pages/ManifestPage.tsx": "bc1932f4fd5a18cb32c4a3cce885d354deeddd90672d927affdcaaa1c3dfd4a9",
     "dashboard/src/pages/OverviewPage.tsx": "94969009717b21d2d01797b2327ceb9743301487b471fe6cb4ff64c7d86f7c8d",
     "dashboard/src/types.ts": "b3f743ed2aa82cc8076bd27d2cf1d916ccab6831bd13e21990a05a8855d53740",
-    "dashboard/src/utils/devices.ts": "ff66b853ae9258a86215895c182f6c411ac7bc519c37e9f356f6e54808f0463c",
+    "dashboard/src/utils/devices.ts": "c272275eaa86fc7193ca98cda049311fd0a4c3066917d9eafb90ad8617b8c641",
     "dashboard/src/utils/headerSlot.ts": "15ebb004e26cb060ed37b793971c08d2ba7b60fd8b2ed4ff94d6a3ceec93a689",
     "dashboard/src/utils/requirements.ts": "e1d9460ddb313bc32c801db62868b2d91800e261a9d3a0e9e7fb2a13171bc0ee",
     "dashboard/src/utils/sensorView.ts": "686dd3767064f13a3415f5e603e75c9103b4f5c7fafcb1d368b8ff766e061de1",
@@ -213,15 +213,13 @@
     "shared_config/source_store.py": "ceaf715a4f7aa1198409553bed5ab30ab761f23c6f6db02140ee2e84148aa1f9",
     "shared_config/test_serializers.py": "d7614beeadecc7e75fcf9671fbc58ae7c8d9ce338a9cc21480128038ccd23fdb"
   },
-  "indexed_at_commit": "1160ff1d54263f0d880f31dbedd7f404611314ed",
-  "indexed_at_timestamp": "2026-08-13T15:35:42.317721+00:00",
-  "indexed_at_commit": "f9b1f40b5fbf6d4766f0fe4949adb6868890b50a",
-  "indexed_at_timestamp": "2026-08-13T15:32:54.989212+00:00",
+  "indexed_at_commit": "eec22076bf918343c29eff342c30a71d287decda",
+  "indexed_at_timestamp": "2026-08-13T15:51:30.290055+00:00",
   "schema_version": 3,
   "stats": {
-    "total_edges": 2237,
+    "total_edges": 2243,
     "total_files": 212,
-    "total_nodes": 2031
+    "total_nodes": 2032
   },
   "vexp_version": "2.5.2"
 }

@@ -21,6 +21,7 @@ from app.models import (
     IosBatteryDischarges,
     IosBluetooth,
     IosCalls,
+    IosDevice,
     IosEsm,
     IosFitbitData,
     IosFitbitDevice,
@@ -320,8 +321,10 @@ async def get_esm(
     offset: int = Query(0),
     db: AsyncSession = Depends(get_ios_db),
 ):
-    result = await db.execute(_base_query(IosEsm, device_id, from_ts, to_ts, limit, offset))
-    return result.scalars().all()
+    """The questionnaires this device was shown, from both tables that hold them."""
+    return await _sensor_rows(
+        db, (IosPluginIosEsm, IosEsm), device_id, from_ts, to_ts, limit, offset
+    )
 
 
 @router.get("/esm-scheduler", response_model=list[IosSchema])
@@ -707,6 +710,20 @@ async def get_studentlife_audio(
     return result.scalars().all()
 
 
+@router.get("/device", response_model=list[IosSchema])
+async def get_device(
+    device_id: str,
+    from_ts: float | None = Query(None),
+    to_ts: float | None = Query(None),
+    limit: int = Query(100, le=MAX_RECORD_LIMIT),
+    offset: int = Query(0),
+    db: AsyncSession = Depends(get_ios_db),
+):
+    """What the phone reports about itself: make, hardware, OS."""
+    result = await db.execute(_base_query(IosDevice, device_id, from_ts, to_ts, limit, offset))
+    return result.scalars().all()
+
+
 @router.get("/aware-log", response_model=list[IosSchema])
 async def get_aware_log(
     device_id: str,
@@ -906,7 +923,7 @@ _EXPORT_MODELS: dict[str, object] = {
     "calls": IosCalls,
     "contacts": IosPluginContacts,
     "device-usage": IosPluginDeviceUsage,
-    "esm": IosPluginIosEsm,
+    "esm": (IosPluginIosEsm, IosEsm),
     "fitbit": IosPluginFitbit,
     "fitbit-data": IosFitbitData,
     "fitbit-device": IosFitbitDevice,
@@ -936,6 +953,7 @@ _EXPORT_MODELS: dict[str, object] = {
     "timezone": IosTimezone,
     "wifi": (IosSensorWifi, IosWifi),
     "aware-log": IosAwareLog,
+    "device": IosDevice,
 }
 
 

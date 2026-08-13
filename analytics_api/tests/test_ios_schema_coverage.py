@@ -96,3 +96,25 @@ def test_uncovered_tables_stay_recorded(table):
     assert table not in schema_tables(), (
         f"{table} now has a table; move it out of KNOWN_UNCOVERED"
     )
+
+
+def test_both_esm_tables_are_read():
+    """The client writes the questionnaire to both, so one card covers both.
+
+    `plugin_ios_esm` comes from the ESM plugin and `esm` from the core, with the
+    same `esm_json` payload in each. Reading only one of them leaves real answers
+    invisible.
+    """
+    for table in ("plugin_ios_esm", "esm"):
+        assert table in schema_tables()
+        assert table in api_tables(), f"{table} holds ESM answers nothing can read"
+
+
+def test_the_device_description_is_readable():
+    """`aware_device` is what the phone says about itself: make, hardware, OS.
+
+    It is written on enrolment and read for the device page, so a study can tell
+    two phones apart. It is also the registry the device gate checks.
+    """
+    assert "aware_device" in schema_tables()
+    assert "aware_device" in api_tables()

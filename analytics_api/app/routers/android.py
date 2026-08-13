@@ -24,6 +24,7 @@ from app.models import (
     AndroidScheduler,
     AndroidScreenshot,
     AndroidAwareStudy,
+    AndroidDevice,
     AndroidBattery,
     AndroidBatteryCharges,
     AndroidBatteryDischarges,
@@ -66,6 +67,7 @@ from app.schemas import (
     AndroidSchedulerSchema,
     AndroidScreenshotSchema,
     AndroidAwareStudySchema,
+    AndroidDeviceSchema,
     AndroidBatterySchema,
     AndroidBatteryChargesSchema,
     AndroidBatteryDischargesSchema,
@@ -265,6 +267,22 @@ async def get_screenshot(
 ):
     result = await db.execute(
         _base_query(AndroidScreenshot, device_id, from_ts, to_ts, limit, offset)
+    )
+    return result.scalars().all()
+
+
+@router.get("/device", response_model=list[AndroidDeviceSchema])
+async def get_device(
+    device_id: str,
+    from_ts: float | None = Query(None),
+    to_ts: float | None = Query(None),
+    limit: int = Query(100, le=MAX_RECORD_LIMIT),
+    offset: int = Query(0),
+    db: AsyncSession = Depends(get_android_db),
+):
+    """What the phone reports about itself: make, model, OS."""
+    result = await db.execute(
+        _base_query(AndroidDevice, device_id, from_ts, to_ts, limit, offset)
     )
     return result.scalars().all()
 
@@ -865,6 +883,7 @@ _EXPORT_MODELS: dict[str, tuple] = {
     "openweather": (AndroidPluginOpenweather, AndroidPluginOpenweatherSchema),
     "screenshot": (AndroidScreenshot, AndroidScreenshotSchema),
     "study-events": (AndroidAwareStudy, AndroidAwareStudySchema),
+    "device": (AndroidDevice, AndroidDeviceSchema),
     "proximity": (AndroidProximity, AndroidProximitySchema),
     "rotation": (AndroidRotation, AndroidRotationSchema),
     "screen": (AndroidScreen, AndroidScreenSchema),
