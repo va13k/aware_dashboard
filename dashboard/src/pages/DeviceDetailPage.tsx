@@ -10,6 +10,7 @@ import {
 import type { SensorConfig } from "../config/sensors";
 import {
   SENSOR_CONFIGS,
+  sensorPlatform,
   deviceSensorsForPlatform,
   sensorDataKeys,
 } from "../config/sensors";
@@ -456,10 +457,10 @@ export default function DeviceDetailPage() {
               );
               const visibleConfigs = tileConfigs.filter(configVisible);
               const sharedTiles = visibleConfigs.filter(
-                (s) => s.platform === "shared",
+                (s) => sensorPlatform(s) === "shared",
               );
               const specificTiles = visibleConfigs.filter(
-                (s) => s.platform !== "shared",
+                (s) => sensorPlatform(s) !== "shared",
               );
               const specificLabel =
                 selected.platform === "android"

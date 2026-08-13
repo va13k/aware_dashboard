@@ -1,13 +1,12 @@
-"""Each sensor's declared platform matches the platform that can serve it.
+"""A sensor is one capability, and it names the table serving it on each platform.
 
-The dashboard groups sensors into Shared / Android only / iPhone only from the
-`platform` field in `config/sensors.ts`. A sensor labelled for one platform while
-both collect it hides half the study; one labelled shared while only one platform
-can answer shows a card that stays empty forever.
+The dashboard groups sensors into Shared / Android only / iPhone only from those
+names alone, so a table named on a platform whose schema lacks it would move a
+sensor under the wrong heading, and a capability stored under different names on
+the two platforms would otherwise appear twice, each half looking exclusive.
 
-Ground truth is the schema: a sensor can only be served by a platform whose
-database actually has its table. The API's export maps supply the key-to-table
-mapping, since a sensor key and its table name often differ.
+These check the names against the schemas, which is where the answer actually
+lives, and against the API, which has to serve what the card offers.
 """
 
 import pathlib
@@ -25,23 +24,24 @@ SCHEMA = {
     "ios": ROOT / "db" / "ios-tables.sql",
 }
 
-#: Sensors the dashboard shows for which no table exists on either platform, so
-#: the card can only ever read zero. Recorded rather than hidden: each is either
-#: a card to remove or a table to add.
-UNSERVED = {
-    "esms",           # android ESM lives in several tables, exported via /export
-    "installations",
-    "memory",         # no table in either schema; the iOS client does not register it
-    "notes",
-    "screentext",
-    "telephony",
-    "touch",
+#: Capabilities both platforms collect under different table names. Listed so a
+#: split back into two platform-specific cards fails rather than passing quietly.
+SHARED_UNDER_DIFFERENT_NAMES = {
+    "esm": ("esms", "plugin_ios_esm"),
+    "esm-scheduler": ("scheduler", "plugin_calendar_esm_scheduler"),
+    "significant-motion": ("significant", "significant_motion"),
 }
 
 
-def declared() -> list[tuple[str, str]]:
+def declared() -> dict[str, dict[str, str]]:
+    """Each sensor key and the table it names per platform."""
     text = CONFIG.read_text(encoding="utf-8")
-    return re.findall(r'key:\s*"([^"]+)"[\s\S]*?platform:\s*"(shared|android|ios)"', text)
+    found = {}
+    for key, tables in re.findall(
+        r'key:\s*"([^"]+)"[\s\S]*?tables:\s*\{([^}]*)\}', text
+    ):
+        found[key] = dict(re.findall(r'(android|ios):\s*"([a-z_0-9]+)"', tables))
+    return found
 
 
 def schema_tables(platform: str) -> set[str]:
@@ -49,7 +49,7 @@ def schema_tables(platform: str) -> set[str]:
     return set(re.findall(r"CREATE TABLE IF NOT EXISTS `([a-z_0-9]+)`", text))
 
 
-def tables_for(key: str, export_map: dict) -> set[str]:
+def api_tables(key: str, export_map: dict) -> set[str]:
     entry = export_map.get(key)
     if entry is None:
         return set()
@@ -57,57 +57,60 @@ def tables_for(key: str, export_map: dict) -> set[str]:
     return {m.__tablename__ for m in models if hasattr(m, "__tablename__")}
 
 
-def servable(key: str) -> str:
-    on_android = bool(tables_for(key, ANDROID) & schema_tables("android"))
-    on_ios = bool(tables_for(key, IOS) & schema_tables("ios"))
-    if on_android and on_ios:
-        return "shared"
-    if on_android:
-        return "android"
-    if on_ios:
-        return "ios"
-    return "unserved"
-
-
 def test_the_config_is_readable():
     """A parse that silently found nothing would make every test below pass."""
     assert len(declared()) > 40
 
 
-@pytest.mark.parametrize("key, platform", declared())
-def test_declared_platform_matches_what_can_serve_it(key, platform):
-    actual = servable(key)
-    if actual == "unserved":
-        assert key in UNSERVED, (
-            f"{key} is shown in the dashboard but no table on either platform holds it"
+def test_every_sensor_names_at_least_one_table():
+    """A sensor serving neither platform is a card that can only read zero."""
+    empty = sorted(key for key, tables in declared().items() if not tables)
+    assert not empty, f"{empty} name no table on either platform"
+
+
+@pytest.mark.parametrize("key, tables", sorted(declared().items()))
+def test_named_tables_exist_in_that_schema(key, tables):
+    for platform, table in tables.items():
+        assert table in schema_tables(platform), (
+            f"{key} names {table!r} on {platform}, which that schema does not create"
         )
-        return
-    assert platform == actual, (
-        f"{key} is declared {platform!r} but the API serves it on {actual!r}"
-    )
 
 
-def test_the_sections_are_derived_rather_than_listed():
-    """Two hand-kept lists are what let a sensor sit under the wrong heading."""
+@pytest.mark.parametrize("key, tables", sorted(declared().items()))
+def test_the_api_serves_every_platform_the_card_offers(key, tables):
+    """A card offering a platform the API cannot answer is a dead download."""
+    for platform, table in tables.items():
+        served = api_tables(key, ANDROID if platform == "android" else IOS)
+        assert table in served, (
+            f"{key} offers {platform}, but the API serves {served or 'nothing'} "
+            f"for that key rather than {table!r}"
+        )
+
+
+@pytest.mark.parametrize("key, expected", sorted(SHARED_UNDER_DIFFERENT_NAMES.items()))
+def test_capabilities_stored_under_different_names_stay_one_card(key, expected):
+    android_table, ios_table = expected
+    tables = declared()[key]
+    assert tables.get("android") == android_table
+    assert tables.get("ios") == ios_table
+
+
+def test_no_capability_is_offered_twice():
+    """Two keys reading one table is the duplicate this model exists to prevent."""
+    seen: dict[tuple[str, str], str] = {}
+    for key, tables in declared().items():
+        for platform, table in tables.items():
+            previous = seen.get((platform, table))
+            assert previous is None, (
+                f"{key} and {previous} both read {table} on {platform}"
+            )
+            seen[(platform, table)] = key
+
+
+def test_the_sections_are_derived_rather_than_declared():
     text = CONFIG.read_text(encoding="utf-8")
-    for name in ("SHARED_SENSOR_CONFIGS", "ANDROID_SENSOR_CONFIGS", "IOS_SENSOR_CONFIGS"):
-        assert f"export const {name}: SensorConfig[] = ALL_SENSOR_CONFIGS.filter" in text, (
-            f"{name} should be filtered from the single list, not maintained by hand"
+    assert "export function sensorPlatform(" in text
+    for name in ("SHARED", "ANDROID", "IOS"):
+        assert (
+            f"{name}_SENSOR_CONFIGS: SensorConfig[] = ALL_SENSOR_CONFIGS.filter" in text
         )
-
-
-def test_ambient_noise_and_processor_are_shared():
-    """Both tables exist in both databases; neither belongs to one platform."""
-    platforms = dict(declared())
-    assert platforms["plugin-ambient-noise"] == "shared"
-    assert platforms["processor"] == "shared"
-
-
-def test_proximity_is_android_until_ios_has_a_table():
-    """The iOS model points at a table the schema does not create.
-
-    The iPhone can collect proximity; this deployment does not store it, so an
-    iPhone section for it would promise data that cannot arrive.
-    """
-    assert dict(declared())["proximity"] == "android"
-    assert "proximity" not in schema_tables("ios")

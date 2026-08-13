@@ -2,16 +2,36 @@ import type { SensorRecord } from "../types";
 
 export type SensorPlatform = "shared" | "android" | "ios";
 
+/** The table serving a sensor on each platform it is collected on.
+ *
+ * The same capability is often stored under different names — an ESM answer is
+ * `esms` on Android and `plugin_ios_esm` on an iPhone — so naming the table per
+ * platform is what lets one card cover both. A side left out is a platform that
+ * does not collect it.
+ */
+export interface SensorTables {
+  android?: string;
+  ios?: string;
+}
+
 export interface SensorConfig {
   key: string;
   label: string;
   unit: string;
   color: string;
-  platform: SensorPlatform;
+  tables: SensorTables;
   extract: (r: SensorRecord) => number | null;
   enumLabels?: Record<number, string>;
   countOnly?: boolean;
   note?: string;
+}
+
+/** Which platforms collect a sensor, read from the tables that serve it. */
+export function sensorPlatform(sensor: SensorConfig): SensorPlatform {
+  const onAndroid = sensor.tables.android != null;
+  const onIos = sensor.tables.ios != null;
+  if (onAndroid && onIos) return "shared";
+  return onAndroid ? "android" : "ios";
 }
 
 function magnitude(
@@ -64,7 +84,7 @@ const ALL_SENSOR_CONFIGS: SensorConfig[] = [
     label: "Accelerometer",
     unit: "g",
     color: "#f59e0b",
-    platform: "shared",
+    tables: { android: "accelerometer", ios: "accelerometer" },
     extract: vectorMagnitude,
   },
   {
@@ -72,7 +92,7 @@ const ALL_SENSOR_CONFIGS: SensorConfig[] = [
     label: "Barometer",
     unit: "hPa",
     color: "#64748b",
-    platform: "shared",
+    tables: { android: "barometer", ios: "barometer" },
     extract: (r) => firstNumber(r, ["pressure", "double_values_0"]),
   },
   {
@@ -80,7 +100,7 @@ const ALL_SENSOR_CONFIGS: SensorConfig[] = [
     label: "Battery Level",
     unit: "%",
     color: "#22c55e",
-    platform: "shared",
+    tables: { android: "battery", ios: "battery" },
     extract: (r) => firstNumber(r, ["battery_level", "level", "batteryLevel"]),
     note: "iPhone battery values are approximate and are usually reported in 5% increments.",
   },
@@ -89,7 +109,7 @@ const ALL_SENSOR_CONFIGS: SensorConfig[] = [
     label: "Battery Charges",
     unit: "event",
     color: "#16a34a",
-    platform: "shared",
+    tables: { android: "battery_charges", ios: "battery_charges" },
     extract: eventPresence,
     countOnly: true,
   },
@@ -98,7 +118,7 @@ const ALL_SENSOR_CONFIGS: SensorConfig[] = [
     label: "Battery Discharges",
     unit: "event",
     color: "#65a30d",
-    platform: "shared",
+    tables: { android: "battery_discharges", ios: "battery_discharges" },
     extract: eventPresence,
     countOnly: true,
   },
@@ -107,7 +127,7 @@ const ALL_SENSOR_CONFIGS: SensorConfig[] = [
     label: "Bluetooth RSSI",
     unit: "dBm",
     color: "#06b6d4",
-    platform: "shared",
+    tables: { android: "bluetooth", ios: "bluetooth" },
     extract: (r) => firstNumber(r, ["bt_rssi", "rssi"]),
   },
   {
@@ -115,7 +135,7 @@ const ALL_SENSOR_CONFIGS: SensorConfig[] = [
     label: "Calls",
     unit: "event",
     color: "#f97316",
-    platform: "shared",
+    tables: { android: "calls", ios: "calls" },
     extract: (r) => firstNumber(r, ["call_duration"]) ?? eventPresence(r),
   },
   {
@@ -123,7 +143,7 @@ const ALL_SENSOR_CONFIGS: SensorConfig[] = [
     label: "Gyroscope",
     unit: "rad/s",
     color: "#ef4444",
-    platform: "shared",
+    tables: { android: "gyroscope", ios: "gyroscope" },
     extract: vectorMagnitude,
   },
   {
@@ -131,7 +151,7 @@ const ALL_SENSOR_CONFIGS: SensorConfig[] = [
     label: "Linear Accelerometer",
     unit: "g",
     color: "#84cc16",
-    platform: "shared",
+    tables: { android: "linear_accelerometer", ios: "linear_accelerometer" },
     extract: vectorMagnitude,
     note: "Movement-only acceleration with gravity removed. Values are approximate G-force units, so a still phone should be near 0 on all axes.",
   },
@@ -140,7 +160,7 @@ const ALL_SENSOR_CONFIGS: SensorConfig[] = [
     label: "Location Speed",
     unit: "m/s",
     color: "#10b981",
-    platform: "shared",
+    tables: { android: "locations", ios: "locations" },
     extract: (r) =>
       firstNumber(r, ["double_speed", "speed", "horizontal_accuracy"]),
   },
@@ -149,7 +169,7 @@ const ALL_SENSOR_CONFIGS: SensorConfig[] = [
     label: "Magnetometer",
     unit: "uT",
     color: "#a855f7",
-    platform: "shared",
+    tables: { android: "magnetometer", ios: "magnetometer" },
     extract: vectorMagnitude,
   },
   {
@@ -157,7 +177,7 @@ const ALL_SENSOR_CONFIGS: SensorConfig[] = [
     label: "Network",
     unit: "event",
     color: "#0891b2",
-    platform: "shared",
+    tables: { android: "network", ios: "network" },
     extract: eventPresence,
     countOnly: true,
   },
@@ -166,7 +186,7 @@ const ALL_SENSOR_CONFIGS: SensorConfig[] = [
     label: "Rotation",
     unit: "rad/s",
     color: "#f43f5e",
-    platform: "shared",
+    tables: { android: "rotation", ios: "rotation" },
     extract: (r) => vectorMagnitude(r) ?? magnitude(r, "roll", "pitch", "yaw"),
   },
   {
@@ -174,7 +194,7 @@ const ALL_SENSOR_CONFIGS: SensorConfig[] = [
     label: "Screen Status",
     unit: "",
     color: "#3b82f6",
-    platform: "shared",
+    tables: { android: "screen", ios: "screen" },
     extract: (r) => firstNumber(r, ["screen_status", "status"]),
     enumLabels: {
       0: "Screen off",
@@ -189,7 +209,7 @@ const ALL_SENSOR_CONFIGS: SensorConfig[] = [
     label: "Significant Motion",
     unit: "",
     color: "#2563eb",
-    platform: "shared",
+    tables: { android: "significant", ios: "significant_motion" },
     extract: motionState,
     enumLabels: {
       0: "Not moving",
@@ -202,7 +222,7 @@ const ALL_SENSOR_CONFIGS: SensorConfig[] = [
     label: "Timezone",
     unit: "event",
     color: "#14b8a6",
-    platform: "shared",
+    tables: { android: "timezone", ios: "timezone" },
     extract: eventPresence,
     countOnly: true,
   },
@@ -211,7 +231,7 @@ const ALL_SENSOR_CONFIGS: SensorConfig[] = [
     label: "WiFi",
     unit: "",
     color: "#8b5cf6",
-    platform: "shared",
+    tables: { android: "wifi", ios: "sensor_wifi" },
     extract: (r) => firstNumber(r, ["rssi", "wifi_rssi"]),
   },
   {
@@ -219,7 +239,7 @@ const ALL_SENSOR_CONFIGS: SensorConfig[] = [
     label: "Applications",
     unit: "event",
     color: "#9333ea",
-    platform: "android",
+    tables: { android: "applications_foreground" },
     extract: eventPresence,
     countOnly: true,
   },
@@ -228,7 +248,7 @@ const ALL_SENSOR_CONFIGS: SensorConfig[] = [
     label: "Application Crashes",
     unit: "event",
     color: "#dc2626",
-    platform: "android",
+    tables: { android: "applications_crashes" },
     extract: eventPresence,
     countOnly: true,
   },
@@ -237,7 +257,7 @@ const ALL_SENSOR_CONFIGS: SensorConfig[] = [
     label: "Application History",
     unit: "event",
     color: "#7c3aed",
-    platform: "android",
+    tables: { android: "applications_history" },
     extract: eventPresence,
     countOnly: true,
   },
@@ -246,16 +266,7 @@ const ALL_SENSOR_CONFIGS: SensorConfig[] = [
     label: "Application Notifications",
     unit: "event",
     color: "#a855f7",
-    platform: "android",
-    extract: eventPresence,
-    countOnly: true,
-  },
-  {
-    key: "esms",
-    label: "ESM/EMA",
-    unit: "event",
-    color: "#7c2d12",
-    platform: "android",
+    tables: { android: "applications_notifications" },
     extract: eventPresence,
     countOnly: true,
   },
@@ -264,7 +275,7 @@ const ALL_SENSOR_CONFIGS: SensorConfig[] = [
     label: "Gravity",
     unit: "g",
     color: "#84cc16",
-    platform: "android",
+    tables: { android: "gravity" },
     extract: vectorMagnitude,
   },
   {
@@ -272,7 +283,7 @@ const ALL_SENSOR_CONFIGS: SensorConfig[] = [
     label: "Installations",
     unit: "event",
     color: "#0284c7",
-    platform: "android",
+    tables: { android: "installations" },
     extract: eventPresence,
     countOnly: true,
   },
@@ -281,7 +292,7 @@ const ALL_SENSOR_CONFIGS: SensorConfig[] = [
     label: "Keyboard",
     unit: "event",
     color: "#334155",
-    platform: "android",
+    tables: { android: "keyboard" },
     extract: eventPresence,
     countOnly: true,
   },
@@ -290,7 +301,7 @@ const ALL_SENSOR_CONFIGS: SensorConfig[] = [
     label: "Light",
     unit: "lux",
     color: "#fbbf24",
-    platform: "android",
+    tables: { android: "light" },
     extract: (r) => firstNumber(r, ["double_light_lux", "light_lux", "value"]),
   },
   {
@@ -298,7 +309,7 @@ const ALL_SENSOR_CONFIGS: SensorConfig[] = [
     label: "Messages",
     unit: "event",
     color: "#fb923c",
-    platform: "android",
+    tables: { android: "messages" },
     extract: eventPresence,
     countOnly: true,
   },
@@ -307,7 +318,7 @@ const ALL_SENSOR_CONFIGS: SensorConfig[] = [
     label: "Network Traffic",
     unit: "bytes",
     color: "#0e7490",
-    platform: "android",
+    tables: { android: "network_traffic" },
     extract: (r) =>
       firstNumber(r, ["tx_bytes", "rx_bytes", "double_tx", "double_rx"]) ??
       eventPresence(r),
@@ -317,7 +328,7 @@ const ALL_SENSOR_CONFIGS: SensorConfig[] = [
     label: "Notes",
     unit: "event",
     color: "#ca8a04",
-    platform: "android",
+    tables: { android: "notes" },
     extract: eventPresence,
     countOnly: true,
   },
@@ -326,24 +337,15 @@ const ALL_SENSOR_CONFIGS: SensorConfig[] = [
     label: "Ambient Noise",
     unit: "dB",
     color: "#0ea5e9",
-    platform: "shared",
+    tables: { android: "plugin_ambient_noise", ios: "plugin_ambient_noise" },
     extract: (r) => firstNumber(r, ["double_decibels", "decibels"]),
-  },
-  {
-    key: "plugin-openweather",
-    label: "OpenWeather",
-    unit: "degC",
-    color: "#ca8a04",
-    platform: "android",
-    extract: (r) =>
-      firstNumber(r, ["temperature", "temp", "value"]) ?? eventPresence(r),
   },
   {
     key: "proximity",
     label: "Proximity",
     unit: "",
     color: "#0f766e",
-    platform: "android",
+    tables: { android: "proximity" },
     extract: (r) =>
       firstNumber(r, ["distance", "near", "value"]) ?? eventPresence(r),
   },
@@ -352,7 +354,7 @@ const ALL_SENSOR_CONFIGS: SensorConfig[] = [
     label: "Screen Text",
     unit: "event",
     color: "#1d4ed8",
-    platform: "android",
+    tables: { android: "screentext" },
     extract: eventPresence,
     countOnly: true,
   },
@@ -361,7 +363,7 @@ const ALL_SENSOR_CONFIGS: SensorConfig[] = [
     label: "Telephony",
     unit: "event",
     color: "#0f766e",
-    platform: "android",
+    tables: { android: "telephony" },
     extract: eventPresence,
     countOnly: true,
   },
@@ -370,7 +372,7 @@ const ALL_SENSOR_CONFIGS: SensorConfig[] = [
     label: "Temperature",
     unit: "degC",
     color: "#ea580c",
-    platform: "android",
+    tables: { android: "temperature" },
     extract: (r) =>
       firstNumber(r, ["double_temperature", "temperature", "value"]),
   },
@@ -379,7 +381,7 @@ const ALL_SENSOR_CONFIGS: SensorConfig[] = [
     label: "Touch",
     unit: "event",
     color: "#475569",
-    platform: "android",
+    tables: { android: "touch" },
     extract: eventPresence,
     countOnly: true,
   },
@@ -388,7 +390,7 @@ const ALL_SENSOR_CONFIGS: SensorConfig[] = [
     label: "Activity Recognition",
     unit: "event",
     color: "#2563eb",
-    platform: "ios",
+    tables: { ios: "plugin_ios_activity_recognition" },
     extract: eventPresence,
     countOnly: true,
   },
@@ -397,7 +399,7 @@ const ALL_SENSOR_CONFIGS: SensorConfig[] = [
     label: "Heart Rate (BLE)",
     unit: "bpm",
     color: "#dc2626",
-    platform: "ios",
+    tables: { ios: "plugin_ble_heartrate" },
     extract: (r) =>
       firstNumber(r, ["heart_rate", "heartrate", "bpm", "value"]) ??
       eventPresence(r),
@@ -407,16 +409,7 @@ const ALL_SENSOR_CONFIGS: SensorConfig[] = [
     label: "Calendar",
     unit: "event",
     color: "#0284c7",
-    platform: "ios",
-    extract: eventPresence,
-    countOnly: true,
-  },
-  {
-    key: "calendar-esm-scheduler",
-    label: "Google Calendar ESM",
-    unit: "event",
-    color: "#0369a1",
-    platform: "ios",
+    tables: { ios: "plugin_calendar" },
     extract: eventPresence,
     countOnly: true,
   },
@@ -425,7 +418,7 @@ const ALL_SENSOR_CONFIGS: SensorConfig[] = [
     label: "Contacts",
     unit: "event",
     color: "#0891b2",
-    platform: "ios",
+    tables: { ios: "plugin_contacts" },
     extract: eventPresence,
     countOnly: true,
   },
@@ -434,7 +427,7 @@ const ALL_SENSOR_CONFIGS: SensorConfig[] = [
     label: "Device Usage",
     unit: "event",
     color: "#9333ea",
-    platform: "ios",
+    tables: { ios: "plugin_device_usage" },
     extract: eventPresence,
     countOnly: true,
   },
@@ -443,7 +436,7 @@ const ALL_SENSOR_CONFIGS: SensorConfig[] = [
     label: "Mobile ESM/EMA",
     unit: "event",
     color: "#7c2d12",
-    platform: "ios",
+    tables: { android: "esms", ios: "plugin_ios_esm" },
     extract: eventPresence,
     countOnly: true,
   },
@@ -452,7 +445,7 @@ const ALL_SENSOR_CONFIGS: SensorConfig[] = [
     label: "ESM Scheduler",
     unit: "event",
     color: "#9a3412",
-    platform: "ios",
+    tables: { android: "scheduler", ios: "plugin_calendar_esm_scheduler" },
     extract: eventPresence,
     countOnly: true,
   },
@@ -461,7 +454,7 @@ const ALL_SENSOR_CONFIGS: SensorConfig[] = [
     label: "Fitbit",
     unit: "event",
     color: "#0d9488",
-    platform: "ios",
+    tables: { ios: "plugin_fitbit" },
     extract: eventPresence,
     countOnly: true,
   },
@@ -470,7 +463,7 @@ const ALL_SENSOR_CONFIGS: SensorConfig[] = [
     label: "Fitbit Data",
     unit: "",
     color: "#0f766e",
-    platform: "ios",
+    tables: { ios: "fitbit_data" },
     extract: (r) =>
       firstNumber(r, ["value", "steps", "heart_rate"]) ?? eventPresence(r),
   },
@@ -479,7 +472,7 @@ const ALL_SENSOR_CONFIGS: SensorConfig[] = [
     label: "Fitbit Device",
     unit: "event",
     color: "#115e59",
-    platform: "ios",
+    tables: { ios: "fitbit_device" },
     extract: eventPresence,
     countOnly: true,
   },
@@ -488,7 +481,7 @@ const ALL_SENSOR_CONFIGS: SensorConfig[] = [
     label: "Fused Location",
     unit: "m",
     color: "#16a34a",
-    platform: "ios",
+    tables: { ios: "google_fused_location" },
     extract: (r) =>
       firstNumber(r, ["accuracy", "horizontal_accuracy", "speed"]) ??
       eventPresence(r),
@@ -498,7 +491,7 @@ const ALL_SENSOR_CONFIGS: SensorConfig[] = [
     label: "Headphone Motion",
     unit: "m/s^2",
     color: "#db2777",
-    platform: "ios",
+    tables: { ios: "plugin_headphone_motion" },
     extract: (r) =>
       vectorMagnitude(r) ??
       magnitude(r, "acceleration_x", "acceleration_y", "acceleration_z") ??
@@ -509,7 +502,7 @@ const ALL_SENSOR_CONFIGS: SensorConfig[] = [
     label: "HealthKit",
     unit: "",
     color: "#e11d48",
-    platform: "ios",
+    tables: { ios: "health_kit" },
     extract: (r) => firstNumber(r, ["value", "quantity"]) ?? eventPresence(r),
   },
   {
@@ -517,7 +510,7 @@ const ALL_SENSOR_CONFIGS: SensorConfig[] = [
     label: "HealthKit Category",
     unit: "event",
     color: "#fb7185",
-    platform: "ios",
+    tables: { ios: "health_kit_category" },
     extract: eventPresence,
     countOnly: true,
   },
@@ -526,7 +519,7 @@ const ALL_SENSOR_CONFIGS: SensorConfig[] = [
     label: "HealthKit Quantity",
     unit: "",
     color: "#be123c",
-    platform: "ios",
+    tables: { ios: "health_kit_quantity" },
     extract: (r) => firstNumber(r, ["quantity", "value"]) ?? eventPresence(r),
   },
   {
@@ -534,7 +527,7 @@ const ALL_SENSOR_CONFIGS: SensorConfig[] = [
     label: "HealthKit Workout",
     unit: "event",
     color: "#9f1239",
-    platform: "ios",
+    tables: { ios: "health_kit_workout" },
     extract: (r) =>
       firstNumber(r, ["duration", "distance", "energy"]) ?? eventPresence(r),
   },
@@ -543,25 +536,16 @@ const ALL_SENSOR_CONFIGS: SensorConfig[] = [
     label: "Location Visit",
     unit: "event",
     color: "#15803d",
-    platform: "ios",
+    tables: { ios: "ios_location_visit" },
     extract: eventPresence,
     countOnly: true,
-  },
-  {
-    key: "memory",
-    label: "Memory",
-    unit: "",
-    color: "#475569",
-    platform: "ios",
-    extract: (r) =>
-      firstNumber(r, ["used", "free", "total", "value"]) ?? eventPresence(r),
   },
   {
     key: "ntptime",
     label: "NTP",
     unit: "ms",
     color: "#4f46e5",
-    platform: "ios",
+    tables: { ios: "plugin_ntptime" },
     extract: (r) =>
       firstNumber(r, ["offset", "delay", "latency", "value"]) ??
       eventPresence(r),
@@ -571,7 +555,7 @@ const ALL_SENSOR_CONFIGS: SensorConfig[] = [
     label: "OpenWeather",
     unit: "degC",
     color: "#ca8a04",
-    platform: "ios",
+    tables: { android: "plugin_openweather", ios: "plugin_openweather" },
     extract: (r) =>
       firstNumber(r, ["temperature", "temp", "value"]) ?? eventPresence(r),
   },
@@ -580,7 +564,7 @@ const ALL_SENSOR_CONFIGS: SensorConfig[] = [
     label: "Pedometer",
     unit: "steps",
     color: "#ec4899",
-    platform: "ios",
+    tables: { ios: "plugin_ios_pedometer" },
     extract: (r) =>
       firstNumber(r, ["step_count", "steps", "number_of_steps", "distance"]) ??
       eventPresence(r),
@@ -590,7 +574,7 @@ const ALL_SENSOR_CONFIGS: SensorConfig[] = [
     label: "Processor",
     unit: "%",
     color: "#475569",
-    platform: "shared",
+    tables: { android: "processor", ios: "processor" },
     extract: (r) =>
       firstNumber(r, [
         "double_last_user",
@@ -608,7 +592,7 @@ const ALL_SENSOR_CONFIGS: SensorConfig[] = [
     label: "Push Notification",
     unit: "event",
     color: "#ea580c",
-    platform: "ios",
+    tables: { ios: "push_notification" },
     extract: eventPresence,
     countOnly: true,
   },
@@ -617,35 +601,53 @@ const ALL_SENSOR_CONFIGS: SensorConfig[] = [
     label: "Conversation",
     unit: "event",
     color: "#7c3aed",
-    platform: "ios",
+    tables: { ios: "plugin_studentlife_audio" },
     extract: eventPresence,
     countOnly: true,
   },
+  {
+    key: "study-events",
+    label: "Study Events",
+    unit: "event",
+    color: "#0f766e",
+    tables: { android: "aware_studies" },
+    extract: eventPresence,
+    countOnly: true,
+  },
+  {
+    key: "screenshot",
+    label: "Screenshots",
+    unit: "event",
+    color: "#475569",
+    tables: { android: "screenshot" },
+    extract: eventPresence,
+    countOnly: true,
+    note: "Counts captures only. The images themselves stay in the database and are never read into a response.",
+  },
+
 ];
 
 export const SENSOR_CONFIGS: SensorConfig[] = ALL_SENSOR_CONFIGS;
 
 /** The sensors both platforms collect. */
 export const SHARED_SENSOR_CONFIGS: SensorConfig[] = ALL_SENSOR_CONFIGS.filter(
-  (s) => s.platform === "shared",
+  (s) => sensorPlatform(s) === "shared",
 );
 
 /** The sensors only an Android phone collects. */
 export const ANDROID_SENSOR_CONFIGS: SensorConfig[] = ALL_SENSOR_CONFIGS.filter(
-  (s) => s.platform === "android",
+  (s) => sensorPlatform(s) === "android",
 );
 
 /** The sensors only an iPhone collects. */
 export const IOS_SENSOR_CONFIGS: SensorConfig[] = ALL_SENSOR_CONFIGS.filter(
-  (s) => s.platform === "ios",
+  (s) => sensorPlatform(s) === "ios",
 );
 
 export function sensorsForPlatform(
   platform: "android" | "ios",
 ): SensorConfig[] {
-  return SENSOR_CONFIGS.filter(
-    (s) => s.platform === "shared" || s.platform === platform,
-  );
+  return SENSOR_CONFIGS.filter((s) => s.tables[platform] != null);
 }
 
 export function deviceSensorsForPlatform(

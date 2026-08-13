@@ -10,7 +10,6 @@ import {
 import {
   ANDROID_SENSOR_CONFIGS,
   IOS_SENSOR_CONFIGS,
-  SENSOR_CONFIGS,
   SHARED_SENSOR_CONFIGS,
   type SensorConfig,
 } from "../config/sensors";
@@ -144,12 +143,17 @@ export default function OverviewPage() {
           sensors: section.sensors.filter((s) => required.required.has(s.key)),
         }))
         .filter((section) => section.sensors.length > 0);
-      const notInConfig = SENSOR_CONFIGS.filter(
-        (s) => !required.required.has(s.key) && hasSensorRecords(s.key),
-      );
-      return notInConfig.length > 0
-        ? [...requiredSections, { title: "Not in config", sensors: notInConfig }]
-        : requiredSections;
+      // Unrequested data is grouped by platform too: which phones are sending
+      // it is the first thing to establish about a sensor nobody asked for.
+      const unrequested = base
+        .map((section) => ({
+          title: `${section.title} - not in config`,
+          sensors: section.sensors.filter(
+            (s) => !required.required.has(s.key) && hasSensorRecords(s.key),
+          ),
+        }))
+        .filter((section) => section.sensors.length > 0);
+      return [...requiredSections, ...unrequested];
     }
 
     const shouldShow = (key: string) =>
@@ -175,12 +179,12 @@ export default function OverviewPage() {
       loading={loading}
       className="h-full overflow-hidden"
       androidExportHref={
-        config.platform === "shared" || config.platform === "android"
+        config.tables.android != null
           ? exportSensorZipHref("android", config.key)
           : undefined
       }
       iosExportHref={
-        config.platform === "shared" || config.platform === "ios"
+        config.tables.ios != null
           ? exportSensorZipHref("ios", config.key)
           : undefined
       }
