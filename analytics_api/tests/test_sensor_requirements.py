@@ -154,14 +154,14 @@ def test_a_setting_the_config_omits_is_not_required():
 
 def test_an_enabled_setting_with_no_stream_is_reported():
     result = sensor_requirements.requirements_for(
-        ANDROID, {"status_processor": True, "status_screenshot": True}
+        ANDROID, {"status_mqtt": True, "status_plugin_fitbit": True}
     )
 
     assert result.required_without_stream == [
-        "status_processor",
-        "status_screenshot",
+        "status_mqtt",
+        "status_plugin_fitbit",
     ]
-    assert requirement(result, "processor") is None
+    assert requirement(result, "mqtt") is None
 
 
 def test_a_disabled_setting_with_no_stream_is_not_reported():
@@ -189,15 +189,31 @@ def test_a_stream_with_no_governing_setting_is_absent_from_the_response():
 
 
 def test_the_two_platforms_have_different_streams():
+    """The same setting can reach a stream on one platform and none on the other."""
     android = sensor_requirements.requirements_for(
-        ANDROID, {"status_processor": True, "status_plugin_contacts": True}
+        ANDROID, {"status_keyboard": True, "status_plugin_contacts": True}
     )
     ios = sensor_requirements.requirements_for(
-        IOS, {"status_processor": True, "status_plugin_contacts": True}
+        IOS, {"status_keyboard": True, "status_plugin_contacts": True}
     )
 
-    assert required_keys(android) == set()
-    assert required_keys(ios) == {"processor", "contacts"}
+    assert required_keys(android) == {"keyboard"}
+    assert required_keys(ios) == {"contacts"}
+
+
+def test_a_setting_both_platforms_serve_is_required_on_both():
+    """Processor has a table and a route on each side."""
+    for platform in (ANDROID, IOS):
+        result = sensor_requirements.requirements_for(
+            platform, {"status_processor": True}
+        )
+        assert required_keys(result) == {"processor"}
+
+
+def test_screenshots_are_required_when_the_study_asks_for_them():
+    result = sensor_requirements.requirements_for(ANDROID, {"status_screenshot": True})
+    assert required_keys(result) == {"screenshot"}
+    assert result.required_without_stream == []
 
 
 def test_an_absent_config_reports_nothing_rather_than_no_requirements():
