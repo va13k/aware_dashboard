@@ -215,6 +215,8 @@
   },
   "indexed_at_commit": "1160ff1d54263f0d880f31dbedd7f404611314ed",
   "indexed_at_timestamp": "2026-08-13T15:35:42.317721+00:00",
+  "indexed_at_commit": "f9b1f40b5fbf6d4766f0fe4949adb6868890b50a",
+  "indexed_at_timestamp": "2026-08-13T15:32:54.989212+00:00",
   "schema_version": 3,
   "stats": {
     "total_edges": 2237,
