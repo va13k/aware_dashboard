@@ -1,5 +1,6 @@
 import hashlib
 import hmac
+import logging
 import os
 import secrets
 import time
@@ -9,12 +10,44 @@ from fastapi import APIRouter, Form, Request
 from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from fastapi.templating import Jinja2Templates
 
+logger = logging.getLogger(__name__)
+
 router = APIRouter(prefix="/auth", tags=["auth"])
 
 templates = Jinja2Templates(directory=Path(__file__).parent.parent / "templates")
 
-_SECRET = secrets.token_bytes(32)
+SESSION_SECRET_ENV = "DASHBOARD_SESSION_SECRET"
+
+
+def _load_secret() -> bytes:
+    """The key sessions are signed with, from the deployment rather than the run.
+
+    A key minted per process makes every restart a logout: cookies issued before
+    it no longer verify, so a deploy signs everyone out mid-session. It also caps
+    the API at one worker, since two processes would reject each other's cookies.
+    Reading it from the environment - written once at deployment, alongside the
+    other credentials - fixes both, and makes signing everyone out a deliberate
+    rotation instead of a side effect of restarting.
+
+    Falling back to a random key keeps a deployment that has not set one working,
+    at the cost of the behaviour above; it is logged so it is not a surprise.
+    """
+    configured = os.environ.get(SESSION_SECRET_ENV, "").strip()
+    if configured:
+        return configured.encode()
+    logger.warning(
+        "%s is not set: signing sessions with a key generated for this process, "
+        "so restarting the API will log every researcher out and only one worker "
+        "can serve requests.",
+        SESSION_SECRET_ENV,
+    )
+    return secrets.token_bytes(32)
+
+
+_SECRET = _load_secret()
 _COOKIE = "aware_session"
+#: How long a session lasts. Enforced twice: the browser drops the cookie, and
+#: `_verify_token` rejects a token this much older than the time it carries.
 _MAX_AGE = 8 * 3600
 
 _USERNAME = os.environ.get("RESEARCHER_USERNAME", "")

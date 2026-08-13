@@ -105,6 +105,17 @@ def ensure_django_secret_key(env: dict[str, str]) -> None:
         env["DJANGO_SECRET_KEY"] = secrets.token_urlsafe(50)
 
 
+def ensure_session_secret(env: dict[str, str]) -> None:
+    """The key the dashboard signs session cookies with.
+
+    Generated once and kept in .env, so restarting the API does not invalidate
+    every researcher's cookie (see analytics_api/app/routers/auth.py).
+    """
+    session_secret = str(env.get("DASHBOARD_SESSION_SECRET", "")).strip()
+    if not session_secret or session_secret in PLACEHOLDER_SECRETS:
+        env["DASHBOARD_SESSION_SECRET"] = secrets.token_urlsafe(50)
+
+
 def ensure_study_key(env: dict[str, str]) -> None:
     study_key = str(env.get("STUDY_KEY", "")).strip()
     if not study_key or study_key in {"CHANGE_ME", "your_study_key"}:
@@ -139,6 +150,7 @@ def persist_env(env: dict[str, str]) -> None:
     ordered_keys = [
         "MYSQL_ROOT_PASSWORD",
         "DJANGO_SECRET_KEY",
+        "DASHBOARD_SESSION_SECRET",
         "STUDY_KEY",
         "STUDY_ID",
         "RESEARCHER_USERNAME",
@@ -328,6 +340,7 @@ def chown_generated_paths(env: dict[str, str]) -> None:
 def main() -> None:
     env = load_merged_env()
     ensure_django_secret_key(env)
+    ensure_session_secret(env)
     ensure_study_key(env)
     ensure_study_id(env)
     ensure_researcher_credentials(env)

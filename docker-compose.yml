@@ -165,6 +165,9 @@ services:
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-CHANGE_ME}
       RESEARCHER_USERNAME: ${RESEARCHER_USERNAME:-}
       RESEARCHER_PASSWORD: ${RESEARCHER_PASSWORD:-}
+      # Signs the researcher's session cookie. Written once at deployment, so a
+      # restart keeps everyone logged in and more than one worker can serve.
+      DASHBOARD_SESSION_SECRET: ${DASHBOARD_SESSION_SECRET:-}
       # The deployed study config, used to tell a phone's installed config apart
       # from the current one. Read-only: the API never writes study configs, and
       # it must never return the file itself - it holds participant credentials.
