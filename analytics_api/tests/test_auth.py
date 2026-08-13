@@ -103,8 +103,12 @@ def test_a_tampered_token_is_refused(monkeypatch):
     token = auth._make_token("researcher")
     message, signature = token.rsplit(":", 1)
 
+    # Flip the last character to one it certainly is not, so the tampered
+    # signature never happens to equal the original.
+    flipped = signature[:-1] + ("a" if signature[-1] != "a" else "b")
+
     assert auth._verify_token(f"{message}x:{signature}") is False
-    assert auth._verify_token(f"{message}:{signature[:-1]}0") is False
+    assert auth._verify_token(f"{message}:{flipped}") is False
     assert auth._verify_token("") is False
     assert auth._verify_token("not-a-token") is False
 

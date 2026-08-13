@@ -84,7 +84,7 @@
     "analytics_api/app/routers/devices.py": "fd8fe9e6b1c911efcfc46761d073b7b6eb9f5706645d307c8ed8338d0285cffb",
     "analytics_api/app/routers/export.py": "3d5a75ac05be10d95f94ea7371519236cf7d59fea9f0be8eaa016604eb05d9d1",
     "analytics_api/app/routers/health.py": "b73deddbf308a63dfd83b1618d524fd90a9ac8855f1400cddde828f7e5384c74",
-    "analytics_api/app/routers/ios.py": "bf3afe5463226f462b25b7f83f64115cc16d1644aea475a28d0b1c3fbfd23136",
+    "analytics_api/app/routers/ios.py": "d29ced76f47317169651c6e7896783ce9256b36c1d4310562d4e1be7d60e67bf",
     "analytics_api/app/routers/jobs.py": "ad609026a17ad9a512cca0775f5840468191496f6bf29a0c2a4bd6181f097b55",
     "analytics_api/app/routers/logs.py": "13a9305d446ce841a52a55228660c725ef43056b3f54de35958381b2a816b69a",
     "analytics_api/app/routers/study.py": "c97a4b601a95c97519caa1f01920d8e065083dda36f14685fac28fafecd7acdd",
@@ -189,8 +189,8 @@
     "db/build_init_all.py": "6dca4419ad3e821ca741da951ddc9f52c3790152a31d0bafa98e134c32652c7a",
     "db/client_schema.py": "696a5604acaf5338dc215bf125161713af23649061c086a5e4217c238e011fcf",
     "db/dashboard-tables.sql": "a085894311280160d13455b07a10ae7ccaa1b5e3e01ca7c5522aff9160883bf2",
-    "db/init_all.sql": "010de08adddcd2b331f746bfbb945c3d18fea89898bfb95d168d6212304495a6",
-    "db/ios-tables.sql": "5d2c64467ca2c00f458d505f4817e238f522db6da621620f465781479519def3",
+    "db/init_all.sql": "e6e59f4613127adc2830cfacbbe210ca6681d180f719e0cd80df0ab99680e168",
+    "db/ios-tables.sql": "4c026b8ff46e18eaef038a90cb83a50c38fec441b9886cc37dc135ec20d3d31f",
     "db/zz-participant-password.sh": "6e179c0205f9851a72862409939477294a2767f3dd74ee73c8799488876d5055",
     "docs/dashboard-performance-realtime-plan.md": "e88a7ace6a0901447b6e21a6f631d7a313e4a673a878da964bd0dc529323a554",
     "docs/device-view-timescale-plan.md": "189c905c11d04962612c69ab5146cc48a200ad26d89192be574a6e4b1cbe1992",
@@ -213,13 +213,13 @@
     "shared_config/source_store.py": "ceaf715a4f7aa1198409553bed5ab30ab761f23c6f6db02140ee2e84148aa1f9",
     "shared_config/test_serializers.py": "d7614beeadecc7e75fcf9671fbc58ae7c8d9ce338a9cc21480128038ccd23fdb"
   },
-  "indexed_at_commit": "b58a6727d18f687101dcaf7fd1f3c1c055931c9a",
-  "indexed_at_timestamp": "2026-08-13T11:58:33.891939+00:00",
+  "indexed_at_commit": "827fb5316a56564531c77288d7844b3fdfe5de95",
+  "indexed_at_timestamp": "2026-08-13T13:43:05.114071+00:00",
   "schema_version": 3,
   "stats": {
-    "total_edges": 2358,
+    "total_edges": 2264,
     "total_files": 212,
-    "total_nodes": 2005
+    "total_nodes": 2013
   },
   "vexp_version": "2.5.2"
 }
