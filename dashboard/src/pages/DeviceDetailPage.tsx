@@ -599,9 +599,10 @@ export default function DeviceDetailPage() {
           })()
         : null}
 
-      {showLogs && selected && selected.platform === "android" ? (
+      {showLogs && selected ? (
         <LogsModal
           deviceId={selected.device_id}
+          platform={selected.platform}
           title={deviceLabel(selected)}
           onClose={() => setShowLogs(false)}
         />
