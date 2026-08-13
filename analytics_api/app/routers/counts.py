@@ -8,7 +8,7 @@ new arrived, so calling it often is fine.
 from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.database import get_android_db, get_ios_db
+from app.database import android_engine, get_android_db, get_ios_db
 from app.models import AndroidRecordCount, IosRecordCount
 from app.routers.android import _EXPORT_MODELS as ANDROID_EXPORT_MODELS
 from app.routers.ios import _EXPORT_MODELS as IOS_EXPORT_MODELS
@@ -33,11 +33,19 @@ async def refresh_counts(
     android_db: AsyncSession = Depends(get_android_db),
     ios_db: AsyncSession = Depends(get_ios_db),
 ):
-    android = await record_counts.refresh(
-        android_db, AndroidRecordCount, ANDROID_SOURCES
-    )
-    ios = await record_counts.refresh(ios_db, IosRecordCount, IOS_SOURCES)
-    return {"android": android, "ios": ios}
+    """Fold in what has arrived, unless the scheduled refresher is mid-pass.
+
+    It shares the refresh lock with the scheduler, so a researcher pressing this
+    while a scheduled pass runs is answered rather than counted twice.
+    """
+    async with record_counts.single_writer(android_engine) as acquired:
+        if not acquired:
+            return {"status": "busy", "detail": "a refresh is already running"}
+        android = await record_counts.refresh(
+            android_db, AndroidRecordCount, ANDROID_SOURCES
+        )
+        ios = await record_counts.refresh(ios_db, IosRecordCount, IOS_SOURCES)
+        return {"android": android, "ios": ios}
 
 
 @router.post("/reset")

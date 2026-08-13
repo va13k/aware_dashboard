@@ -96,7 +96,7 @@
     "analytics_api/app/services/coverage.py": "9de98eab1640bc758ecfecd2ad7d36fbdf350bdb3a4e7292bda6f91c218fc41d",
     "analytics_api/app/services/dump_stream.py": "470fd2a5b90cdbaa1382f437ebc6fb0ecdc43195bcb9b580bf78b570c0231e1b",
     "analytics_api/app/services/micro_config.py": "4bceffa22aa8abb94f5d85576bb666617fc4b93328b546853f4dd350cf6d483d",
-    "analytics_api/app/services/record_counts.py": "3b6a38431f239c933e3aaeb5693f74390bcfc576ffa96e92f09eb1ec54563138",
+    "analytics_api/app/services/record_counts.py": "a59fb13671d4d5605701d132e3b2b745c144a7612ac044053805a21353982c71",
     "analytics_api/app/services/sensor_requirements.py": "affcbad4b0808afd964d257dae8aeec5e3658bcc6e21738f0f7d8d564870d7b1",
     "analytics_api/app/services/series.py": "234f61395643565682b47b246f97b0de0b4d10ca029a34c3ba2c8a11c9ea57d4",
     "analytics_api/app/services/study_config.py": "6c7704f565bbf0842e0ef96b45c1047596ff404f39f318dce47c65a3ba829104",
@@ -213,13 +213,13 @@
     "shared_config/source_store.py": "ceaf715a4f7aa1198409553bed5ab30ab761f23c6f6db02140ee2e84148aa1f9",
     "shared_config/test_serializers.py": "d7614beeadecc7e75fcf9671fbc58ae7c8d9ce338a9cc21480128038ccd23fdb"
   },
-  "indexed_at_commit": "ee23fefe8bd9e7241761c85300b84d7ca1ffc7a4",
-  "indexed_at_timestamp": "2026-08-13T11:34:56.450438+00:00",
+  "indexed_at_commit": "ca1c9348b4c49b1a14b528ccf131b623f156cbb1",
+  "indexed_at_timestamp": "2026-08-13T11:57:08.686063+00:00",
   "schema_version": 3,
   "stats": {
-    "total_edges": 2357,
+    "total_edges": 2358,
     "total_files": 212,
-    "total_nodes": 2004
+    "total_nodes": 2005
   },
   "vexp_version": "2.5.2"
 }

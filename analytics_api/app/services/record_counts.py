@@ -13,10 +13,45 @@ arrive out of order. If rows are ever purged, ``reset`` clears the cache so the
 next refresh rebuilds it from zero.
 """
 
-from sqlalchemy import func, select
+import contextlib
+
+from sqlalchemy import func, select, text
 from sqlalchemy.dialects.mysql import insert as mysql_insert
 from sqlalchemy.exc import OperationalError, ProgrammingError, SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
+
+#: Names the lock every refresher competes for. MySQL advisory locks are held per
+#: connection and scoped to the whole server, so one lock covers both platform
+#: schemas: they live on the same server.
+REFRESH_LOCK = "aware_record_counts_refresh"
+
+
+@contextlib.asynccontextmanager
+async def single_writer(engine, lock_name: str = REFRESH_LOCK):
+    """Yields True to the one caller holding the refresh lock, False to the rest.
+
+    The counts are folded in additively (``count = count + d``), so two refreshes
+    reading the same watermark would each add the same rows and leave a total
+    above the truth that only a reset can correct. Serialising on a lock the
+    database owns covers every refresher at once: the scheduled one, a run
+    started by hand, and the HTTP endpoint.
+
+    The lock lives on the connection that took it, so this holds one open for the
+    whole block and releases the lock as it closes.
+    """
+    async with engine.connect() as connection:
+        acquired = (
+            await connection.execute(
+                text("SELECT GET_LOCK(:name, 0)"), {"name": lock_name}
+            )
+        ).scalar()
+        try:
+            yield acquired == 1
+        finally:
+            if acquired == 1:
+                await connection.execute(
+                    text("SELECT RELEASE_LOCK(:name)"), {"name": lock_name}
+                )
 
 
 async def _rollback(db: AsyncSession) -> None:
