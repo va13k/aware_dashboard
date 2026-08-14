@@ -22,6 +22,7 @@ HOUR = 60 * 60 * 1000
 JOIN = "joined study"
 REJOIN = "rejoined study"
 QUIT = "quit study"
+UPDATED = "updated study"
 
 
 def row(
@@ -102,16 +103,78 @@ def test_a_join_reported_twice_is_still_one_window():
     )
 
 
-def test_the_window_follows_when_the_participant_acted():
-    """`double_join` and `double_exit` are the phone's own account of the
-    moment. A quit made offline reaches the server whenever the phone next
-    connects, and the window has to close on the day it actually closed."""
+def test_a_quit_closes_on_the_day_the_participant_acted():
+    """`double_exit` is written on the leaving event itself, so a withdrawal
+    made offline lands on the day it happened rather than the day it arrived."""
     (window,) = windows(
-        row(_id=1, timestamp=1_000, study_compliance=JOIN, double_join=900),
+        row(_id=1, timestamp=1_000, study_compliance=JOIN),
         row(_id=2, timestamp=9_000, study_compliance=QUIT, double_exit=5_000),
     )
 
-    assert (window.joined_at, window.left_at) == (900, 5_000)
+    assert (window.joined_at, window.left_at) == (1_000, 5_000)
+
+
+def test_a_rejoin_opens_where_it_happened_not_where_it_says_it_joined():
+    """`double_join` names the enrolment the phone believes it is in and rides
+    on every row, so after a quit a rejoin still reports the *original* join
+    time. Trusting it reopens a window that already closed — two windows with
+    one `joined_at`, which is the primary key. Live logs do this."""
+    first, second = windows(
+        row(_id=1, timestamp=1_000, study_compliance=JOIN, double_join=1_000),
+        row(_id=2, timestamp=5_000, study_compliance=QUIT, double_join=1_000, double_exit=5_000),
+        row(_id=3, timestamp=9_000, study_compliance=REJOIN, double_join=1_000),
+    )
+
+    assert (first.joined_at, first.left_at) == (1_000, 5_000)
+    assert (second.joined_at, second.left_at) == (9_000, None)
+
+
+def test_a_withdrawal_reported_more_than_once_closes_one_window():
+    """A phone repeats a quit it has already reported. Each repeat arrives with
+    nothing open, and must not open a window back at the device's first
+    record."""
+    (window,) = windows(
+        row(_id=1, timestamp=1_000, study_compliance=JOIN),
+        row(_id=2, timestamp=5_000, study_compliance=QUIT, double_exit=5_000),
+        row(_id=3, timestamp=6_000, study_compliance=QUIT, double_exit=6_000),
+        row(_id=4, timestamp=7_000, study_compliance=QUIT, double_exit=7_000),
+        first_data_at=500,
+    )
+
+    assert (window.joined_at, window.left_at) == (1_000, 5_000)
+
+
+def test_the_phone_reporting_itself_in_the_study_reopens_a_window():
+    """After a quit, the next config update is the phone saying it is back —
+    `study_state` already reads it that way for the enrolment badge."""
+    first, second = windows(
+        row(_id=1, timestamp=1_000, study_compliance=JOIN),
+        row(_id=2, timestamp=5_000, study_compliance=QUIT, double_exit=5_000),
+        row(_id=3, timestamp=9_000, study_compliance=UPDATED),
+    )
+
+    assert (first.joined_at, first.left_at) == (1_000, 5_000)
+    assert (second.joined_at, second.left_at) == (9_000, None)
+
+
+def test_the_windows_come_out_disjoint_and_in_order():
+    """The shape the heatmap depends on, and what a live log broke: overlapping
+    windows make an hour both expected and not."""
+    produced = windows(
+        row(_id=1, timestamp=1_000, study_compliance=REJOIN, double_join=1_000),
+        row(_id=2, timestamp=5_000, study_compliance=QUIT, double_join=1_000, double_exit=5_000),
+        row(_id=3, timestamp=6_000, study_compliance=REJOIN, double_join=1_000),
+        row(_id=4, timestamp=7_000, study_compliance=QUIT, double_join=1_000, double_exit=7_000),
+        row(_id=5, timestamp=8_000, study_compliance=QUIT, double_join=1_000, double_exit=8_000),
+        row(_id=6, timestamp=9_000, study_compliance=REJOIN, double_join=9_000),
+        first_data_at=100,
+    )
+
+    starts = [window.joined_at for window in produced]
+    assert starts == sorted(starts)
+    assert len(set(starts)) == len(starts)
+    for earlier, later in zip(produced, produced[1:]):
+        assert earlier.left_at is not None and earlier.left_at <= later.joined_at
 
 
 def test_a_device_that_never_reported_joining_gets_its_first_record():

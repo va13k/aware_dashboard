@@ -79,16 +79,37 @@ async def _rollback(db: AsyncSession) -> None:
         pass
 
 
-def _moment(reported, logged) -> int | None:
-    """When the participant acted, falling back to when the row was written.
+def _moment(*candidates) -> int | None:
+    """The first usable time among `candidates`.
 
-    `double_join` and `double_exit` are the client's own account of the moment,
-    and a row can carry one without the other, so each is resolved on its own.
+    The client's numeric columns default to 0 rather than to NULL, so a zero
+    means it reported nothing and the next candidate stands.
     """
-    for value in (reported, logged):
+    for value in candidates:
         if value is not None and value > 0:
             return int(value)
     return None
+
+
+def _opened_at(event) -> int | None:
+    """When a membership event put the phone in the study.
+
+    The row's own `timestamp`, not its `double_join`. `double_join` names the
+    enrolment the phone believes it is in and is carried on every row, so a
+    rejoin after a quit repeats the *original* join time — which would reopen a
+    window that already closed, and collide with it on the primary key.
+    """
+    return _moment(event.timestamp, event.joined_at)
+
+
+def _closed_at(event) -> int | None:
+    """When a quit took effect.
+
+    `double_exit` is written on the leaving event itself, so unlike the join
+    marker it does say when the participant acted — which is what makes a
+    withdrawal made offline land on the day it happened.
+    """
+    return _moment(event.exited_at, event.timestamp)
 
 
 def windows_for(
@@ -102,40 +123,52 @@ def windows_for(
     device that has data but never reported a join, and a log whose first
     decisive event is a quit.
 
-    Repeated joins with no quit between them describe one window, not several —
-    a phone re-reporting a join it already reported has not rejoined anything.
+    Real logs repeat themselves in both directions, and the windows have to come
+    out disjoint and in order regardless: a phone re-reports a join it already
+    made, and reports the same withdrawal several times over. So a window only
+    opens while none is open and only after the last one closed, and a quit with
+    nothing open is the client repeating itself rather than a new window.
     """
     windows: list[Window] = []
     open_at: int | None = None
     open_source = STUDY_EVENT
+    closed_at: int | None = None
     left_the_study = False
 
     for event in events:
-        if event.kind in study_state.JOIN_KINDS:
-            at = _moment(event.joined_at, event.timestamp)
-            if at is not None and open_at is None:
-                open_at, open_source = at, STUDY_EVENT
+        if event.kind in study_state.MEMBERSHIP_KINDS:
+            # Anything that says the phone was in the study when it happened
+            # reopens a window, not only a join: after a quit, the next config
+            # update or consent is the phone reporting itself back in.
+            at = _opened_at(event)
+            if at is None or open_at is not None:
+                continue
+            if closed_at is not None and at <= closed_at:
+                continue
+            open_at, open_source = at, STUDY_EVENT
             continue
 
         if event.kind != study_state.LEFT:
             continue
 
-        at = _moment(event.exited_at, event.timestamp)
+        at = _closed_at(event)
         if at is None:
             continue
         left_the_study = True
 
         if open_at is None:
-            # The log opens with a quit, so the join predates what the phone
-            # reported. Its first record is the earliest moment it can have
-            # been collecting, and the only evidence available.
-            if first_data_at is None or first_data_at > at:
+            # Nothing is open. Either this log begins with a quit — in which
+            # case the join predates what the phone reported, and its first
+            # record is the earliest moment it can have been collecting — or a
+            # window has already closed and this is the client repeating a
+            # withdrawal it has already reported. Only the first is a window.
+            if windows or first_data_at is None or first_data_at > at:
                 continue
             open_at, open_source = first_data_at, FIRST_DATA
 
         if at >= open_at:
             windows.append(Window(device_id, open_at, at, open_source, STUDY_EVENT))
-            open_at = None
+            open_at, closed_at = None, at
 
     if open_at is not None:
         windows.append(Window(device_id, open_at, None, open_source, None))
@@ -233,16 +266,25 @@ def derive(
 
     A device with a study log and no data still gets its windows: it joined and
     has yet to upload, which is a state the device list already shows.
+
+    `(device, joined_at)` is the primary key, so two windows sharing one would
+    fail the insert and take every other device's windows down with them. The
+    derivation is written not to produce that; this makes a log shape it did not
+    anticipate cost one window rather than the whole pass.
     """
     windows: list[Window] = []
+    seen: set[tuple[str, int]] = set()
     for device_id in sorted(set(events_by_device) | set(first_record)):
-        windows.extend(
-            windows_for(
-                device_id,
-                events_by_device.get(device_id, []),
-                first_record.get(device_id),
-            )
-        )
+        for window in windows_for(
+            device_id,
+            events_by_device.get(device_id, []),
+            first_record.get(device_id),
+        ):
+            key = (window.device_id, window.joined_at)
+            if key in seen:
+                continue
+            seen.add(key)
+            windows.append(window)
     return windows
 
 
