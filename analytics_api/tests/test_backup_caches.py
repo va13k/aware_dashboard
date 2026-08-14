@@ -42,13 +42,17 @@ def calls(backup, monkeypatch):
     performed: list[tuple[str, str, str]] = []
 
     def record(cache, action):
-        async def called(_db, model, argument=None):
+        async def called(_db, model, *_):
             database = "aware_ios" if "Ios" in model.__name__ else "aware_android"
             performed.append((cache, action, database))
 
         return called
 
-    for module, cache in ((backup.record_counts, "counts"), (backup.coverage_rollup, "coverage")):
+    for module, cache in (
+        (backup.record_counts, "counts"),
+        (backup.coverage_rollup, "coverage"),
+        (backup.enrolment, "enrolment"),
+    ):
         for action in ("reset", "refresh"):
             monkeypatch.setattr(module, action, record(cache, action))
 
@@ -57,8 +61,8 @@ def calls(backup, monkeypatch):
     return performed
 
 
-def test_a_replace_clears_both_caches_before_rebuilding(backup, calls):
-    """A restore drops and refills the tables both caches summarise, so every
+def test_a_replace_clears_every_cache_before_rebuilding(backup, calls):
+    """A restore drops and refills the tables the caches summarise, so every
     tally and watermark they hold describes rows that no longer exist."""
     asyncio.run(backup._refresh_counts(dump_stream.REPLACE))
 
@@ -68,7 +72,19 @@ def test_a_replace_clears_both_caches_before_rebuilding(backup, calls):
             assert performed == [(cache, "reset", database), (cache, "refresh", database)]
 
 
-def test_a_merge_rebuilds_both_caches_without_clearing_them(backup, calls):
+def test_a_replace_discards_enrolment_windows_a_researcher_entered(backup, calls):
+    """The derivation leaves researcher-owned devices alone by design, so a
+    replace has to clear them: they describe participants this database no
+    longer holds, and nothing else would ever revisit them."""
+    asyncio.run(backup._refresh_counts(dump_stream.REPLACE))
+
+    assert [entry for entry in calls if entry[0] == "enrolment"] == [
+        ("enrolment", "reset", "aware_android"),
+        ("enrolment", "refresh", "aware_android"),
+    ]
+
+
+def test_a_merge_rebuilds_every_cache_without_clearing_them(backup, calls):
     """Merged rows take fresh `_id` values above every watermark, so what is
     already counted stays counted and the incremental pass folds the rest in."""
     asyncio.run(backup._refresh_counts(dump_stream.MERGE))
@@ -79,7 +95,18 @@ def test_a_merge_rebuilds_both_caches_without_clearing_them(backup, calls):
         ("counts", "aware_ios"),
         ("coverage", "aware_android"),
         ("coverage", "aware_ios"),
+        ("enrolment", "aware_android"),
     }
+
+
+def test_enrolment_is_android_only(backup, calls):
+    """An iPhone keeps its study state on the phone and never uploads it, so
+    there is nothing on the iOS side to derive a window from."""
+    asyncio.run(backup._refresh_counts(dump_stream.MERGE))
+
+    assert not [
+        entry for entry in calls if entry[0] == "enrolment" and entry[2] == "aware_ios"
+    ]
 
 
 @pytest.mark.parametrize("mode", [dump_stream.REPLACE, dump_stream.MERGE])

@@ -31,13 +31,15 @@ from app.database import (
     ios_engine,
 )
 from app.models import (
+    AndroidAwareStudy,
     AndroidCoverageHourly,
+    AndroidDeviceEnrolment,
     AndroidRecordCount,
     IosCoverageHourly,
     IosRecordCount,
 )
 from app.routers.counts import ANDROID_SOURCES, IOS_SOURCES
-from app.services import coverage_rollup, record_counts
+from app.services import coverage_rollup, enrolment, record_counts
 
 logger = logging.getLogger("aware.refresh_counts")
 
@@ -81,6 +83,11 @@ async def refresh_all() -> dict:
             android_hours = await coverage_rollup.refresh(
                 db, AndroidCoverageHourly, "aware_android"
             )
+            # After the rollup, which is where the fallback join time is read
+            # from for a device that never reported joining.
+            android_enrolment = await enrolment.refresh(
+                db, AndroidDeviceEnrolment, AndroidCoverageHourly, AndroidAwareStudy
+            )
         async with IosSessionLocal() as db:
             ios = await record_counts.refresh(db, IosRecordCount, IOS_SOURCES)
             ios_hours = await coverage_rollup.refresh(
@@ -91,6 +98,7 @@ async def refresh_all() -> dict:
             "ios": ios,
             "android_hours": android_hours,
             "ios_hours": ios_hours,
+            "android_enrolment": android_enrolment,
         }
 
 
@@ -107,6 +115,15 @@ def _log_result(result: dict) -> None:
             len(counted),
             sum(hours.values()),
             len(hours),
+        )
+
+    windows = result.get("android_enrolment") or {}
+    if windows:
+        logger.info(
+            "android: %d enrolment windows over %d devices, %d left to a researcher",
+            windows.get("windows", 0),
+            windows.get("devices", 0),
+            windows.get("researcher_owned", 0),
         )
 
 

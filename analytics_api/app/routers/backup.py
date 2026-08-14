@@ -34,14 +34,23 @@ from sqlalchemy import text
 
 from app.database import AndroidSessionLocal, IosSessionLocal
 from app.models import (
+    AndroidAwareStudy,
     AndroidCoverageHourly,
+    AndroidDeviceEnrolment,
     AndroidRecordCount,
     IosCoverageHourly,
     IosRecordCount,
 )
 from app.routers.counts import ANDROID_SOURCES, IOS_SOURCES
 from app.services import backup_jobs as jobs
-from app.services import coverage, coverage_rollup, dump_stream, record_counts, watermarks
+from app.services import (
+    coverage,
+    coverage_rollup,
+    dump_stream,
+    enrolment,
+    record_counts,
+    watermarks,
+)
 
 router = APIRouter(prefix="/backup", tags=["backup"])
 
@@ -450,6 +459,9 @@ async def _refresh_counts(mode: str) -> None:
     half of that — an incremental refresh sees nothing new and never revisits it,
     so the imported data stays invisible for good. Neither refresh can notice, so
     both caches are cleared first and rebuilt from what actually arrived.
+
+    The enrolment windows are rebuilt whole either way, because they are derived
+    from the study log the import just changed rather than accumulated.
     """
     for session, model, sources, hourly, database in (
         (
@@ -467,6 +479,15 @@ async def _refresh_counts(mode: str) -> None:
                 await coverage_rollup.reset(db, hourly)
             await record_counts.refresh(db, model, sources)
             await coverage_rollup.refresh(db, hourly, database)
+
+    async with AndroidSessionLocal() as db:
+        if mode == dump_stream.REPLACE:
+            # Windows a researcher entered describe participants this database
+            # no longer holds, and the derivation leaves them alone by design.
+            await enrolment.reset(db, AndroidDeviceEnrolment)
+        await enrolment.refresh(
+            db, AndroidDeviceEnrolment, AndroidCoverageHourly, AndroidAwareStudy
+        )
 
 
 async def _build_watermarks(job: jobs.Job) -> dict:

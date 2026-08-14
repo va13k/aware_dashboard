@@ -1,0 +1,298 @@
+"""When each phone was in the study, as explicit windows.
+
+The heatmap has to tell an empty cell that means "nothing was expected" from one
+that means "expected and missing", and the device gate needs a reference for what
+the study knows about. Both are the same question — was this device enrolled at
+that moment — and neither can be answered from the data tables, which record only
+what arrived.
+
+Stored as one row per window rather than one per device, because a phone can quit
+and come back: `aware_studies` reports a rejoin as its own event, and the client
+keeps collecting nothing in between. A single window per device would span that
+gap and report every hour of it as missing data, which is the exact reading this
+table exists to prevent.
+
+Windows are derived rather than authored. `aware_studies` is the phone's own
+account of joining and leaving, which is the best source there is; a device that
+has data but never reported a join gets a window opened at its first record
+instead, so every device with data has a join time. `join_source` says which of
+those happened, and that is what separates a device that never enrolled from one
+that enrolled before anyone was recording it.
+
+Android only. An iPhone's study state lives in `NSUserDefaults` and is never
+uploaded, so there is nothing on the server to derive from and iOS devices are
+left without windows rather than given an invented join time.
+
+A window's start and end are taken from the client's own `double_join` and
+`double_exit` when it reported them, falling back to when the row was logged.
+Those two say when the participant *acted*, which is not when the message
+arrived — a quit recorded on a phone with no signal reaches the server whenever
+it next connects, and the window has to close on the day it actually closed.
+"""
+
+from dataclasses import dataclass
+
+from sqlalchemy import delete, func, select
+from sqlalchemy.exc import OperationalError, ProgrammingError, SQLAlchemyError
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.services import study_state
+
+#: The phone said so, in `aware_studies`.
+STUDY_EVENT = "study_event"
+#: Inferred from when data first arrived, because the phone never said.
+FIRST_DATA = "first_data"
+#: A researcher entered it. Nothing writes this yet; the derivation already
+#: leaves such a device alone so that the writer, when it arrives, does not have
+#: to teach it to.
+MANUAL = "manual"
+
+#: Rows per insert statement. The table holds a few windows per device, so this
+#: is one round trip for any study that fits on one server.
+WRITE_CHUNK = 500
+
+
+@dataclass(frozen=True)
+class Window:
+    """One stretch of time a device was in the study. `left_at` None means open."""
+
+    device_id: str
+    joined_at: int
+    left_at: int | None = None
+    join_source: str = STUDY_EVENT
+    left_source: str | None = None
+
+    def as_row(self) -> dict:
+        return {
+            "device_id": self.device_id,
+            "joined_at": self.joined_at,
+            "left_at": self.left_at,
+            "join_source": self.join_source,
+            "left_source": self.left_source,
+        }
+
+
+async def _rollback(db: AsyncSession) -> None:
+    try:
+        await db.rollback()
+    except SQLAlchemyError:
+        pass
+
+
+def _moment(reported, logged) -> int | None:
+    """When the participant acted, falling back to when the row was written.
+
+    `double_join` and `double_exit` are the client's own account of the moment,
+    and a row can carry one without the other, so each is resolved on its own.
+    """
+    for value in (reported, logged):
+        if value is not None and value > 0:
+            return int(value)
+    return None
+
+
+def windows_for(
+    device_id: str, events: list, first_data_at: int | None = None
+) -> list[Window]:
+    """The windows one device's study log describes, oldest first.
+
+    `events` is a deduplicated, chronological event list from
+    services/study_state.py. `first_data_at` is when this device's first record
+    arrived, and is used for the two cases the log cannot answer on its own: a
+    device that has data but never reported a join, and a log whose first
+    decisive event is a quit.
+
+    Repeated joins with no quit between them describe one window, not several —
+    a phone re-reporting a join it already reported has not rejoined anything.
+    """
+    windows: list[Window] = []
+    open_at: int | None = None
+    open_source = STUDY_EVENT
+    left_the_study = False
+
+    for event in events:
+        if event.kind in study_state.JOIN_KINDS:
+            at = _moment(event.joined_at, event.timestamp)
+            if at is not None and open_at is None:
+                open_at, open_source = at, STUDY_EVENT
+            continue
+
+        if event.kind != study_state.LEFT:
+            continue
+
+        at = _moment(event.exited_at, event.timestamp)
+        if at is None:
+            continue
+        left_the_study = True
+
+        if open_at is None:
+            # The log opens with a quit, so the join predates what the phone
+            # reported. Its first record is the earliest moment it can have
+            # been collecting, and the only evidence available.
+            if first_data_at is None or first_data_at > at:
+                continue
+            open_at, open_source = first_data_at, FIRST_DATA
+
+        if at >= open_at:
+            windows.append(Window(device_id, open_at, at, open_source, STUDY_EVENT))
+            open_at = None
+
+    if open_at is not None:
+        windows.append(Window(device_id, open_at, None, open_source, None))
+
+    if not windows and first_data_at is not None and not left_the_study:
+        # Data arrived from a device that never said anything about joining. It
+        # is in the study by the only evidence there is, and `first_data` says
+        # the join time is inferred. A device whose log *did* say it left is not
+        # covered here: opening a window from records it collected afterwards
+        # would overwrite the withdrawal with the data that violated it.
+        windows.append(Window(device_id, first_data_at, None, FIRST_DATA, None))
+
+    return windows
+
+
+async def first_record_by_device(db: AsyncSession, coverage_model) -> dict[str, int]:
+    """When each device's first record arrived, to the hour.
+
+    Read from the hourly rollup rather than the data tables: the rollup already
+    holds one row per hour a device wrote in, so the earliest is an aggregate
+    over a small table instead of a `MIN(timestamp)` across sixty large ones.
+    The hour it lands on is finer than any window this feeds.
+    """
+    try:
+        rows = (
+            await db.execute(
+                select(
+                    coverage_model.device_id,
+                    func.min(coverage_model.hour_start).label("first_hour"),
+                ).group_by(coverage_model.device_id)
+            )
+        ).all()
+    except (ProgrammingError, OperationalError, SQLAlchemyError):
+        await _rollback(db)
+        return {}
+
+    return {
+        str(row.device_id): int(row.first_hour)
+        for row in rows
+        if row.device_id and row.first_hour is not None
+    }
+
+
+async def _researcher_owned(db: AsyncSession, model) -> set[str]:
+    """Devices whose windows a researcher entered, which the derivation leaves.
+
+    Ownership is per device rather than per window: once someone has said when a
+    participant joined or left, rebuilding the rest of that device's windows
+    around their answer would mean guessing how the two accounts fit together.
+    """
+    try:
+        rows = (
+            await db.execute(
+                select(model.device_id).where(
+                    (model.join_source == MANUAL) | (model.left_source == MANUAL)
+                )
+            )
+        ).all()
+    except (ProgrammingError, OperationalError, SQLAlchemyError):
+        await _rollback(db)
+        return set()
+    return {str(device_id) for (device_id,) in rows if device_id}
+
+
+async def _study_events_by_device(db: AsyncSession, study_model) -> dict[str, list]:
+    """Each device's deduplicated study log, oldest first.
+
+    `derive_study_state` returns its events newest first, which is the order the
+    device page renders them in. Windows are read forwards, so they are turned
+    back here rather than at each use.
+    """
+    try:
+        result = await db.execute(
+            select(study_model).order_by(study_model.timestamp, study_model._id)
+        )
+    except (ProgrammingError, OperationalError, SQLAlchemyError):
+        await _rollback(db)
+        return {}
+
+    by_device: dict[str, list] = {}
+    for row in result.scalars().all():
+        if row.device_id:
+            by_device.setdefault(str(row.device_id), []).append(row)
+
+    return {
+        device: list(reversed(study_state.derive_study_state(device_rows).events))
+        for device, device_rows in by_device.items()
+    }
+
+
+def derive(
+    events_by_device: dict[str, list], first_record: dict[str, int]
+) -> list[Window]:
+    """Every window both sources describe, for every device either one names.
+
+    A device with a study log and no data still gets its windows: it joined and
+    has yet to upload, which is a state the device list already shows.
+    """
+    windows: list[Window] = []
+    for device_id in sorted(set(events_by_device) | set(first_record)):
+        windows.extend(
+            windows_for(
+                device_id,
+                events_by_device.get(device_id, []),
+                first_record.get(device_id),
+            )
+        )
+    return windows
+
+
+async def refresh(
+    db: AsyncSession, model, coverage_model, study_model
+) -> dict[str, int]:
+    """Rebuild the derived windows. Returns the counts a caller can log.
+
+    Rebuilt whole rather than incrementally: `aware_studies` holds a handful of
+    rows per phone, so re-reading it costs less than tracking what changed, and a
+    correction to an earlier event is picked up for free. Researcher-owned
+    devices are left exactly as they are.
+    """
+    owned = await _researcher_owned(db, model)
+    events_by_device = await _study_events_by_device(db, study_model)
+    first_record = await first_record_by_device(db, coverage_model)
+
+    windows = [
+        window
+        for window in derive(events_by_device, first_record)
+        if window.device_id not in owned
+    ]
+
+    discard = delete(model)
+    if owned:
+        discard = discard.where(model.device_id.notin_(owned))
+
+    try:
+        await db.execute(discard)
+        for start in range(0, len(windows), WRITE_CHUNK):
+            chunk = windows[start : start + WRITE_CHUNK]
+            await db.execute(
+                model.__table__.insert().values([window.as_row() for window in chunk])
+            )
+        await db.commit()
+    except (ProgrammingError, OperationalError, SQLAlchemyError):
+        await _rollback(db)
+        return {}
+
+    return {
+        "devices": len({window.device_id for window in windows}),
+        "windows": len(windows),
+        "researcher_owned": len(owned),
+    }
+
+
+async def reset(db: AsyncSession, model) -> None:
+    """Empty the table so the next pass rebuilds it, researcher rows included."""
+    try:
+        await db.execute(delete(model))
+        await db.commit()
+    except SQLAlchemyError:
+        await _rollback(db)

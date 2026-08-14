@@ -93,6 +93,22 @@ class AndroidCoverageHourly(AndroidBase):
     last_id = Column(BigInteger, default=0)
 
 
+class AndroidDeviceEnrolment(AndroidBase):
+    """When a phone was in the study, one row per window (see
+    services/enrolment.py). A device that joined, quit and rejoined has two, so
+    the gap between them reads as time nothing was expected.
+
+    Android only: an iPhone keeps its study state on the phone and never uploads
+    it, so there is nothing to derive a window from."""
+
+    __tablename__ = "device_enrolment"
+    device_id = Column(String(150), primary_key=True)
+    joined_at = Column(BigInteger, primary_key=True)
+    left_at = Column(BigInteger, nullable=True)
+    join_source = Column(String(16), default="first_data")
+    left_source = Column(String(16), nullable=True)
+
+
 class AndroidAccelerometer(AndroidBase):
     __tablename__ = "accelerometer"
     _id = Column(BigInteger, primary_key=True, autoincrement=True)

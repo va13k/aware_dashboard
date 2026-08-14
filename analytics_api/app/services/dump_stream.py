@@ -34,10 +34,17 @@ MERGE = "merge"
 #: elsewhere describes rows the target does not have. The import rebuilds both
 #: from what actually arrived instead.
 #:
-#: A period export leaves them out for a second reason: neither carries a
+#: A period export leaves them out for a second reason: none carries a
 #: `timestamp` column, and the single `--where` a ranged dump applies to every
 #: table would fail on them.
-CACHE_TABLES = frozenset({"record_counts", "coverage_hourly"})
+#:
+#: `device_enrolment` belongs here only while every window in it is derived from
+#: `aware_studies` and the rollup, both of which a dump does carry. The moment a
+#: researcher can enter a join or withdrawal by hand (EXIT-5), a window stops
+#: being reproducible from anything in the dump and this list would silently
+#: discard it on import — so that change has to take the table out of here and
+#: give the merge a rule for reconciling two deployments' windows.
+CACHE_TABLES = frozenset({"record_counts", "coverage_hourly", "device_enrolment"})
 
 _QUOTE = ord("'")
 _BACKSLASH = ord("\\")
