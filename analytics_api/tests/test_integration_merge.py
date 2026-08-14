@@ -117,17 +117,17 @@ def dump(server, tmp_path, ranged=False):
         f"--socket={server.socket_path}",
         "-uroot",
         "--single-transaction",
+        # The list production excludes, so a cache added there is left out here
+        # too and this dump keeps the shape the page actually produces.
+        *(
+            f"--ignore-table={db}.{table}"
+            for db in ("aware_android", "aware_ios")
+            for table in sorted(dump_stream.CACHE_TABLES)
+        ),
     ]
     env = {**os.environ, "MYSQL_PWD": server.password}
     if ranged:
         command.append("--where=timestamp >= 0 AND timestamp <= 9999")
-        # The list production uses, so a table added there is excluded here too
-        # rather than failing this test later.
-        command += [
-            f"--ignore-table={db}.{table}"
-            for db in ("aware_android", "aware_ios")
-            for table in sorted(dump_stream.MERGE_SKIP_TABLES)
-        ]
     command += ["--databases", "aware_android", "aware_ios"]
     produced = subprocess.run(command, capture_output=True, timeout=300, env=env)
     assert produced.returncode == 0, produced.stderr.decode()[-500:]

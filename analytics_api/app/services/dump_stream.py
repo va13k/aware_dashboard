@@ -27,12 +27,17 @@ import re
 REPLACE = "replace"
 MERGE = "merge"
 
-#: The dashboard's own caches are per-deployment bookkeeping, not study data.
-#: They are rebuilt from the merged rows afterwards, so a merge skips them rather
-#: than folding a foreign deployment's tallies into them. A period export leaves
-#: them out for a second reason: neither carries a `timestamp` column, and the
-#: single `--where` a ranged dump applies to every table would fail on them.
-MERGE_SKIP_TABLES = frozenset({"record_counts", "coverage_hourly"})
+#: The dashboard's own caches: per-deployment bookkeeping, not study data. They
+#: are never carried between deployments in either direction — no export dumps
+#: them and a merge drops them from the stream — because each summarises the
+#: `_id` values of the deployment that built it, and a watermark restored from
+#: elsewhere describes rows the target does not have. The import rebuilds both
+#: from what actually arrived instead.
+#:
+#: A period export leaves them out for a second reason: neither carries a
+#: `timestamp` column, and the single `--where` a ranged dump applies to every
+#: table would fail on them.
+CACHE_TABLES = frozenset({"record_counts", "coverage_hourly"})
 
 _QUOTE = ord("'")
 _BACKSLASH = ord("\\")
@@ -167,7 +172,7 @@ class DumpRewriter:
         match = _CREATE_TABLE.match(stripped)
         if match:
             table = match.group(1).decode()
-            if table in MERGE_SKIP_TABLES:
+            if table in CACHE_TABLES:
                 self._creating = ""
                 self._create_columns = []
                 return b""
@@ -199,7 +204,7 @@ class DumpRewriter:
 
     def _rewrite_insert(self, line: bytes, match: re.Match) -> bytes:
         table = match.group(1).decode()
-        if table in MERGE_SKIP_TABLES:
+        if table in CACHE_TABLES:
             return b""
 
         columns = self.columns.get((self.database, table), [])

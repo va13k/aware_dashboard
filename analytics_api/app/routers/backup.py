@@ -33,10 +33,15 @@ from fastapi.responses import StreamingResponse
 from sqlalchemy import text
 
 from app.database import AndroidSessionLocal, IosSessionLocal
-from app.models import AndroidRecordCount, IosRecordCount
+from app.models import (
+    AndroidCoverageHourly,
+    AndroidRecordCount,
+    IosCoverageHourly,
+    IosRecordCount,
+)
 from app.routers.counts import ANDROID_SOURCES, IOS_SOURCES
 from app.services import backup_jobs as jobs
-from app.services import coverage, dump_stream, record_counts, watermarks
+from app.services import coverage, coverage_rollup, dump_stream, record_counts, watermarks
 
 router = APIRouter(prefix="/backup", tags=["backup"])
 
@@ -198,9 +203,14 @@ def _dump_command(start: float | None, end: float | None) -> list[str]:
     """The mysqldump invocation for a whole-database or a period export.
 
     Every AWARE data table carries `timestamp`, so one ``--where`` bounds them
-    all. The count cache is the exception — it summarises rows rather than being
-    one, and has no timestamp to filter on — so a period export leaves it out and
-    the import's refresh rebuilds it from whatever arrives.
+    all. The dashboard's caches are the exception — they summarise rows rather
+    than being ones, and have no timestamp to filter on — so no export carries
+    them and the import rebuilds them from whatever arrives.
+
+    Leaving them out of a whole-database export too is what keeps the two import
+    modes honest. A cache describes the ``_id`` values of the deployment that
+    built it, so a dump that carried one would be restoring another deployment's
+    watermarks; rebuilding locally is the only form that is right in both modes.
     """
     command = [
         *_mysql_base_command("mysqldump"),
@@ -208,14 +218,14 @@ def _dump_command(start: float | None, end: float | None) -> list[str]:
         "--routines",
         "--triggers",
         "--verbose",
+        *(
+            f"--ignore-table={database}.{table}"
+            for database in DATABASES
+            for table in sorted(dump_stream.CACHE_TABLES)
+        ),
     ]
     if start is not None and end is not None:
         command.append(f"--where=timestamp >= {start:.0f} AND timestamp <= {end:.0f}")
-        command += [
-            f"--ignore-table={database}.{table}"
-            for database in DATABASES
-            for table in dump_stream.MERGE_SKIP_TABLES
-        ]
     return [*command, "--databases", *DATABASES]
 
 
@@ -427,25 +437,36 @@ def _feed_mysql(job: jobs.Job, path: Path, mode: str, marks: dict) -> None:
 
 
 async def _refresh_counts(mode: str) -> None:
-    """Bring the count cache back in line with what the databases now hold.
+    """Bring both caches back in line with what the databases now hold.
 
-    Merged rows carry fresh ``_id`` values above every sensor's watermark, so the
-    ordinary incremental refresh folds them in.
+    Merged rows carry fresh ``_id`` values above every watermark, so the ordinary
+    incremental refresh folds them in. It runs here rather than being left to the
+    next scheduled pass, so the page a study manager looks at once the import
+    reports done is describing what actually arrived.
 
-    A replace is different: it drops and rebuilds the tables the cache
-    summarises, leaving every tally and ``_id`` watermark describing rows that no
-    longer exist. The refresh is incremental and cannot notice, so the cache is
-    cleared first and rebuilt from what actually arrived — which is what
-    ``reset`` is for.
+    A replace is different: it drops and rebuilds the tables the caches
+    summarise, leaving every tally and ``_id`` watermark describing rows that no
+    longer exist. A watermark left above the restored ``_id`` values is the worse
+    half of that — an incremental refresh sees nothing new and never revisits it,
+    so the imported data stays invisible for good. Neither refresh can notice, so
+    both caches are cleared first and rebuilt from what actually arrived.
     """
-    for session, model, sources in (
-        (AndroidSessionLocal, AndroidRecordCount, ANDROID_SOURCES),
-        (IosSessionLocal, IosRecordCount, IOS_SOURCES),
+    for session, model, sources, hourly, database in (
+        (
+            AndroidSessionLocal,
+            AndroidRecordCount,
+            ANDROID_SOURCES,
+            AndroidCoverageHourly,
+            "aware_android",
+        ),
+        (IosSessionLocal, IosRecordCount, IOS_SOURCES, IosCoverageHourly, "aware_ios"),
     ):
         async with session() as db:
             if mode == dump_stream.REPLACE:
                 await record_counts.reset(db, model)
+                await coverage_rollup.reset(db, hourly)
             await record_counts.refresh(db, model, sources)
+            await coverage_rollup.refresh(db, hourly, database)
 
 
 async def _build_watermarks(job: jobs.Job) -> dict:
@@ -473,7 +494,7 @@ async def _run_import(job: jobs.Job, path: Path, mode: str, temporary: bool) -> 
             None, _feed_mysql, job, path, mode, marks
         )
 
-        jobs.advance(job, phase="Refreshing record counts")
+        jobs.advance(job, phase="Rebuilding the record counts and coverage")
         await _refresh_counts(mode)
         jobs.finish(job, {"mode": mode, "source": path.name})
     except Exception as error:  # noqa: BLE001 - surfaced through the job record

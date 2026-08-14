@@ -71,11 +71,10 @@ def test_periods_are_offered_shortest_first():
     assert lengths == sorted(lengths)
 
 
-def test_a_whole_database_export_dumps_everything(backup):
+def test_a_whole_database_export_bounds_nothing(backup):
     command = backup._dump_command(None, None)
     assert command[-3:] == ["--databases", "aware_android", "aware_ios"]
     assert not any(argument.startswith("--where") for argument in command)
-    assert not any(argument.startswith("--ignore-table") for argument in command)
 
 
 def test_a_period_export_bounds_every_table_on_timestamp(backup):
@@ -83,12 +82,25 @@ def test_a_period_export_bounds_every_table_on_timestamp(backup):
     assert "--where=timestamp >= 1000 AND timestamp <= 2000" in command
 
 
-def test_a_period_export_leaves_out_the_count_cache(backup):
-    """record_counts summarises rows rather than being one, and has no timestamp
-    to filter on, so a bounded dump would otherwise fail on it."""
-    command = backup._dump_command(1000.0, 2000.0)
-    assert "--ignore-table=aware_android.record_counts" in command
-    assert "--ignore-table=aware_ios.record_counts" in command
+@pytest.mark.parametrize("period", [(None, None), (1000.0, 2000.0)])
+def test_no_export_carries_the_dashboard_caches(backup, period):
+    """A cache summarises the `_id` values of the deployment that built it, so
+    carrying one to another deployment restores watermarks for rows the target
+    does not have. Every export leaves them behind, whole-database included."""
+    command = backup._dump_command(*period)
+    for database in ("aware_android", "aware_ios"):
+        for table in ("record_counts", "coverage_hourly"):
+            assert f"--ignore-table={database}.{table}" in command
+
+
+def test_the_excluded_tables_are_the_ones_the_merge_skips(backup):
+    """One list, so a cache added later is left out of both paths at once."""
+    excluded = {
+        argument.split(".", 1)[1]
+        for argument in backup._dump_command(None, None)
+        if argument.startswith("--ignore-table")
+    }
+    assert excluded == set(backup.dump_stream.CACHE_TABLES)
 
 
 def test_the_where_clause_carries_no_exponent_notation(backup):
