@@ -65,7 +65,7 @@ from app.schemas import (
     ConfigDiffSchema,
     strip_ios_data_metadata,
 )
-from app.services import config_diff, enrolment, study_state
+from app.services import config_diff, study_state
 
 router = APIRouter(prefix="/devices", tags=["devices"])
 
