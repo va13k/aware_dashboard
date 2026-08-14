@@ -911,6 +911,14 @@ CREATE TABLE IF NOT EXISTS `health_kit_workout` (`_id` INT UNSIGNED AUTO_INCREME
 -- `last_ts` (added after the initial release) is the newest row's `timestamp`
 -- per (sensor, device), so the device page reads last-seen from the cache
 -- instead of an `ORDER BY timestamp` scan per sensor.
+--
+-- `coverage_hourly` answers how much arrived per hour, which `record_counts`
+-- cannot: it holds totals only. It is keyed by *table* rather than by sensor,
+-- because each table carries its own `_id` sequence and so its own watermark —
+-- which is what lets a sensor stored across two tables (`esm`, `wifi`) be
+-- counted at all, and lets the builder walk every timestamped table instead of a
+-- registry. `last_id` rides on the row, so a table's watermark is
+-- `MAX(last_id)` for it and clearing the table clears its watermark.
 
 USE `aware_android`;
 
@@ -938,6 +946,19 @@ DEALLOCATE PREPARE _mig;
 
 GRANT SELECT, INSERT, UPDATE, DELETE ON `aware_android`.`record_counts` TO 'aware_analytics'@'%';
 
+CREATE TABLE IF NOT EXISTS `coverage_hourly` (
+  `table_name` varchar(64)     NOT NULL,
+  `device_id`  varchar(150)    NOT NULL,
+  `hour_start` bigint unsigned NOT NULL,
+  `records`    bigint unsigned NOT NULL DEFAULT 0,
+  `last_id`    bigint unsigned NOT NULL DEFAULT 0,
+  `updated_at` timestamp       NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`table_name`, `device_id`, `hour_start`),
+  KEY `hour_idx` (`hour_start`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+GRANT SELECT, INSERT, UPDATE, DELETE ON `aware_android`.`coverage_hourly` TO 'aware_analytics'@'%';
+
 USE `aware_ios`;
 
 CREATE TABLE IF NOT EXISTS `record_counts` (
@@ -963,5 +984,18 @@ EXECUTE _mig;
 DEALLOCATE PREPARE _mig;
 
 GRANT SELECT, INSERT, UPDATE, DELETE ON `aware_ios`.`record_counts` TO 'aware_analytics'@'%';
+
+CREATE TABLE IF NOT EXISTS `coverage_hourly` (
+  `table_name` varchar(64)     NOT NULL,
+  `device_id`  varchar(150)    NOT NULL,
+  `hour_start` bigint unsigned NOT NULL,
+  `records`    bigint unsigned NOT NULL DEFAULT 0,
+  `last_id`    bigint unsigned NOT NULL DEFAULT 0,
+  `updated_at` timestamp       NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`table_name`, `device_id`, `hour_start`),
+  KEY `hour_idx` (`hour_start`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+GRANT SELECT, INSERT, UPDATE, DELETE ON `aware_ios`.`coverage_hourly` TO 'aware_analytics'@'%';
 
 FLUSH PRIVILEGES;
