@@ -73,7 +73,7 @@
     "analytics_api/README.md": "f0a355959918221e2e20898f459f5c7263567b1fa409bd3f08d82af5d1b69a3f",
     "analytics_api/app/__init__.py": "af1349b9f5f9a1a6a0404dea36dcc9499bcb25c9adc112b7cc9a93cae41f3262",
     "analytics_api/app/database.py": "d1f132c400343e280275261c365e52ed0cc514fdbc526e6729f53102411ffe2b",
-    "analytics_api/app/main.py": "1237d54cc7c5dd6b9dbc66e125bb5c0df09e5abdf399a3a58b7e6898927387a1",
+    "analytics_api/app/main.py": "58ac0b36295697cd7f71800d5ec700c3ae5eb7b268eca9792565aeb6c5e721e7",
     "analytics_api/app/models.py": "283891cccfdc877780c79c47edcd0b866cd96fbb8c1f14c2b189514c879c0384",
     "analytics_api/app/refresh_counts.py": "f26cb41e77e62136e271b68d1b0d6fd6b6ccf53b1e2198e63a7b974e55930e07",
     "analytics_api/app/routers/__init__.py": "af1349b9f5f9a1a6a0404dea36dcc9499bcb25c9adc112b7cc9a93cae41f3262",
@@ -82,7 +82,7 @@
     "analytics_api/app/routers/backup.py": "3df23d705f68097e5ccf12b9644e31a3729d2196984a7b274e6d386f7975d453",
     "analytics_api/app/routers/counts.py": "22eef387d4ded8317d76f7e4010e3c98b508fea928abf387868a26e4db3aa4d5",
     "analytics_api/app/routers/devices.py": "895e17557e02f1fb84f6a912d3de7395d548f0ab7642cdb909d395fb3529a2ea",
-    "analytics_api/app/routers/export.py": "7c94a12939e1628402ad2ace28d580ef4daf85da5f5d05e68e4ff0eb255c3a33",
+    "analytics_api/app/routers/export.py": "97d926667ebc2ea76c67f9958a9836b7f82ba6844c6366e2bdc3dcdf1018d85e",
     "analytics_api/app/routers/health.py": "b73deddbf308a63dfd83b1618d524fd90a9ac8855f1400cddde828f7e5384c74",
     "analytics_api/app/routers/ios.py": "21dd8abff21337b69dc1adc12e97d0e804312e3dbf3fc7673c8bf295c2b3f89b",
     "analytics_api/app/routers/jobs.py": "ad609026a17ad9a512cca0775f5840468191496f6bf29a0c2a4bd6181f097b55",
@@ -213,13 +213,13 @@
     "shared_config/source_store.py": "ceaf715a4f7aa1198409553bed5ab30ab761f23c6f6db02140ee2e84148aa1f9",
     "shared_config/test_serializers.py": "d7614beeadecc7e75fcf9671fbc58ae7c8d9ce338a9cc21480128038ccd23fdb"
   },
-  "indexed_at_commit": "6db88551fbbe8802ad99b2849088693b9246dec5",
-  "indexed_at_timestamp": "2026-08-14T14:48:58.358337+00:00",
+  "indexed_at_commit": "ec553431665999f27604076badd54ea1ae0a97d7",
+  "indexed_at_timestamp": "2026-08-14T15:08:58.390727+00:00",
   "schema_version": 3,
   "stats": {
-    "total_edges": 2172,
+    "total_edges": 2159,
     "total_files": 212,
-    "total_nodes": 2058
+    "total_nodes": 2056
   },
   "vexp_version": "2.5.2"
 }

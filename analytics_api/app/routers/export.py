@@ -21,9 +21,17 @@ from app.routers.android import _EXPORT_MODELS as ANDROID_EXPORT_MODELS
 from app.routers.ios import _EXPORT_MODELS as IOS_EXPORT_MODELS
 from app.schemas import IosSchema
 from app.services import backup_jobs as jobs
-from app.services import coverage_rollup, record_counts
+from app.services import coverage_rollup, record_counts, sensor_tables
 
 router = APIRouter(prefix="/export", tags=["export"])
+
+#: Both platforms' export entries, by platform name.
+_EXPORT_MODELS_FOR = {"android": ANDROID_EXPORT_MODELS, "ios": IOS_EXPORT_MODELS}
+
+#: The two entry shapes are read in services/sensor_tables.py, because anything
+#: counting rows by sensor has to read them the same way this does.
+_is_android_export_entry = sensor_tables.is_android_entry
+_ios_models = sensor_tables.models_for
 
 _SAFE_PATH_PART = re.compile(r"[^A-Za-z0-9._-]+")
 
@@ -171,16 +179,9 @@ async def _device_ids_for_model(db: AsyncSession, model) -> set[str]:
 async def _platform_device_ids(db: AsyncSession, export_models: dict[str, object]) -> list[str]:
     device_ids: set[str] = set()
     for entry in export_models.values():
-        models = (entry[0],) if _is_android_export_entry(entry) else (
-            entry if isinstance(entry, tuple) else (entry,)
-        )
-        for model in models:
+        for model in _ios_models(entry):
             device_ids.update(await _device_ids_for_model(db, model))
     return sorted(device_ids)
-
-
-def _is_android_export_entry(entry: object) -> bool:
-    return isinstance(entry, tuple) and len(entry) == 2 and hasattr(entry[1], "model_fields")
 
 
 def _platform_exports(platform: str):
@@ -189,12 +190,6 @@ def _platform_exports(platform: str):
     if platform == "ios":
         return IOS_EXPORT_MODELS
     raise HTTPException(status_code=404, detail="Unknown platform")
-
-
-def _ios_models(model_entry: object) -> tuple:
-    return model_entry if isinstance(model_entry, tuple) else (model_entry,)
-
-
 
 
 
@@ -382,12 +377,7 @@ def _sensor_tables(platform: str, sensor: str) -> list[str]:
     sensor spread across two tables is missing from that map entirely, and
     counting it is the reason the rollup is keyed by table.
     """
-    export_models = ANDROID_EXPORT_MODELS if platform == "android" else IOS_EXPORT_MODELS
-    entry = export_models.get(sensor)
-    if entry is None:
-        return []
-    models = (entry[0],) if _is_android_export_entry(entry) else _ios_models(entry)
-    return [model.__tablename__ for model in models]
+    return sensor_tables.tables_for(_EXPORT_MODELS_FOR[platform], sensor)
 
 
 # The totals below are what a progress bar is measured against. Without a period
