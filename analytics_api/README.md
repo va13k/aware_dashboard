@@ -27,9 +27,11 @@ is for working on the service itself.
 | **Login**               | The session check Nginx calls before it lets anything through to `/api/`                                      |
 
 It only ever **reads** study data. The database user it connects as
-(`aware_analytics`) has `SELECT` on the sensor tables and write access to exactly
-one table, `record_counts`, which is the API's own cache. Phones write their data
-through the separate AWARE Micro server, not through this service.
+(`aware_analytics`) has `SELECT` on the sensor tables and write access to the
+API's own tables and no others: `record_counts`, `coverage_hourly` and
+`device_enrolment`, each derived from the study data rather than added to it.
+Phones write their data through the separate AWARE Micro server, not through this
+service.
 
 ---
 
@@ -39,7 +41,7 @@ through the separate AWARE Micro server, not through this service.
 phones ──▶ micro-server ──▶ MySQL ◀── analytics_api ◀── Nginx /api/ ◀── dashboard
                              │              │
                   aware_android         reads only, plus
-                  aware_ios             its own record_counts
+                  aware_ios             its own derived tables
 ```
 
 Everything under `/api/` sits behind researcher login: Nginx asks
@@ -106,6 +108,8 @@ The services, roughly in the order a newcomer meets them:
 | ------------------------ | --------------------------------------------------------------------- |
 | `series.py`              | Bucketed aggregation, and the window clamping every read goes through |
 | `record_counts.py`       | The per-sensor, per-phone count cache and its incremental refresh     |
+| `coverage_rollup.py`     | How many records arrived per table, per phone, per hour                |
+| `enrolment.py`           | When each phone was in the study, stored as windows (Android only)     |
 | `study_state.py`         | Derives enrolment from a phone's study event log                      |
 | `study_config.py`        | Reads study configs and redacts the credentials they contain          |
 | `config_diff.py`         | Compares the config a phone carries against the deployed one          |
