@@ -5,7 +5,11 @@ The refresh is deliberately off the request path: a scheduler or cron hits
 new arrived, so calling it often is fine.
 """
 
+import time
+
 from fastapi import APIRouter, Depends
+from sqlalchemy import text
+from sqlalchemy.exc import OperationalError, ProgrammingError, SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import android_engine, get_android_db, get_ios_db
@@ -57,3 +61,70 @@ async def reset_counts(
     await record_counts.reset(android_db, AndroidRecordCount)
     await record_counts.reset(ios_db, IosRecordCount)
     return {"status": "cleared"}
+
+
+#: Past this, the numbers on screen are old enough to say so. Three intervals of
+#: the refresh container's default, so an ordinary late pass is not called stale.
+STALE_AFTER_SECONDS = 180
+
+
+async def _last_refreshed(db: AsyncSession) -> float | None:
+    """When a refresh last wrote to this database, as epoch seconds.
+
+    Both caches stamp `updated_at` on write, so the newer of the two is when the
+    pass ran, whether or not the other had anything to add.
+    """
+    try:
+        result = await db.execute(
+            text(
+                "SELECT UNIX_TIMESTAMP(MAX(updated_at)) FROM ("
+                "  SELECT MAX(updated_at) AS updated_at FROM record_counts"
+                "  UNION ALL"
+                "  SELECT MAX(updated_at) FROM coverage_hourly"
+                ") AS both_caches"
+            )
+        )
+    except (ProgrammingError, OperationalError, SQLAlchemyError):
+        try:
+            await db.rollback()
+        except SQLAlchemyError:
+            pass
+        return None
+    stamped = result.scalar()
+    return float(stamped) if stamped is not None else None
+
+
+@router.get("/status")
+async def counts_status(
+    android_db: AsyncSession = Depends(get_android_db),
+    ios_db: AsyncSession = Depends(get_ios_db),
+):
+    """When the counts were last refreshed, so the page can say how fresh it is.
+
+    A dashboard whose refresher has died looks exactly like one whose study has
+    gone quiet. This is what tells the two apart.
+
+    Freshness is one figure across both platforms, not one each. A pass writes
+    only what changed, so a platform receiving no data leaves its `updated_at`
+    where it was and would read as stale while the refresher is perfectly
+    healthy. One refresher does both databases in the same pass, so the newest
+    write anywhere is when that pass ran.
+    """
+    now = time.time()
+    platforms = {}
+    for name, db in (("android", android_db), ("ios", ios_db)):
+        refreshed = await _last_refreshed(db)
+        platforms[name] = {
+            "last_refreshed": refreshed,
+            "age_seconds": (now - refreshed) if refreshed is not None else None,
+        }
+
+    stamps = [p["last_refreshed"] for p in platforms.values() if p["last_refreshed"]]
+    newest = max(stamps) if stamps else None
+    return {
+        "stale_after_seconds": STALE_AFTER_SECONDS,
+        "last_refreshed": newest,
+        "age_seconds": (now - newest) if newest is not None else None,
+        "stale": newest is None or (now - newest) > STALE_AFTER_SECONDS,
+        "platforms": platforms,
+    }
