@@ -32,9 +32,15 @@ def counted(monkeypatch):
             return dict(held)
         return {name: held[name] for name in tables if name in held}
 
+    async def bytes_per_row(db, database):
+        # A stored byte per row for every table, so a count of N estimates to
+        # N * CSV_ZIP_FACTOR bytes and the arithmetic is checkable by eye.
+        return {table: 1.0 for held in holdings.values() for table in held}
+
     monkeypatch.setattr(
         coverage_router.coverage_rollup, "records_by_table", records_by_table
     )
+    monkeypatch.setattr(coverage_router.export_size, "bytes_per_row", bytes_per_row)
     return holdings, asked
 
 
@@ -166,6 +172,23 @@ def test_an_empty_period_is_reported_as_unavailable(client):
 
     assert body["total"] == 0
     assert body["available"] is False
+
+
+def test_the_answer_estimates_what_the_download_will_weigh(client, counted):
+    """A record count does not say whether this is a few megabytes or a few
+    gigabytes, which is the decision the researcher is actually making."""
+    holdings, _ = counted
+    holdings["android"][android_table("accelerometer")] = 1_000_000
+
+    body = client.get("/coverage/counts?platform=android").json()
+
+    assert body["estimated_bytes"] == int(
+        1_000_000 * 1.0 * coverage_router.export_size.CSV_ZIP_FACTOR
+    )
+
+
+def test_an_empty_period_is_estimated_at_nothing(client):
+    assert client.get("/coverage/counts?from_ts=1&to_ts=2").json()["estimated_bytes"] == 0
 
 
 def test_the_answer_says_it_is_hour_granular(client, counted):

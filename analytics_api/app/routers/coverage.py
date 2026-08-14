@@ -30,7 +30,13 @@ from app.models import (
 )
 from app.routers.android import _EXPORT_MODELS as ANDROID_EXPORT_MODELS
 from app.routers.ios import _EXPORT_MODELS as IOS_EXPORT_MODELS
-from app.services import coverage, coverage_rollup, record_counts, sensor_tables
+from app.services import (
+    coverage,
+    coverage_rollup,
+    export_size,
+    record_counts,
+    sensor_tables,
+)
 
 router = APIRouter(prefix="/coverage", tags=["coverage"])
 
@@ -59,8 +65,12 @@ def _window(from_ts: float | None, to_ts: float | None) -> tuple:
 
 async def _platform_counts(
     db: AsyncSession, platform: str, window: tuple, sensor: str | None
-) -> tuple[int, dict[str, int]]:
-    """One platform's total for the window, and its split by sensor.
+) -> tuple[int, dict[str, int], dict[str, int]]:
+    """One platform's total for the window, its split by sensor, and by table.
+
+    The per-table figures come back too, because a size estimate is per table:
+    a million magnetometer rows and a million bluetooth rows are not the same
+    download.
 
     The rollup answers per table, so the sensors are recovered on the way back
     out. A table this platform's export does not claim is dropped rather than
@@ -74,7 +84,7 @@ async def _platform_counts(
     if sensor is not None:
         wanted = sensor_tables.tables_for(export_models, sensor)
         if not wanted:
-            return 0, {}
+            return 0, {}, {}
 
     counted = await coverage_rollup.records_by_table(
         db, _ROLLUP_FOR[platform], window, wanted
@@ -87,7 +97,7 @@ async def _platform_counts(
             continue
         by_sensor[name] = by_sensor.get(name, 0) + records
 
-    return sum(by_sensor.values()), by_sensor
+    return sum(by_sensor.values()), by_sensor, counted
 
 
 async def records_across(sessions: dict, window: tuple) -> list[int]:
@@ -200,12 +210,19 @@ async def coverage_counts(
     wanted = _requested_platforms(platform)
     sessions = {"android": android_db, "ios": ios_db}
 
+    databases = {"android": "aware_android", "ios": "aware_ios"}
+
     totals: dict[str, int] = {}
     sensors: dict[str, dict[str, int]] = {}
+    estimated = 0
     for name in wanted:
-        total, by_sensor = await _platform_counts(sessions[name], name, window, sensor)
+        db = sessions[name]
+        total, by_sensor, by_table = await _platform_counts(db, name, window, sensor)
         totals[name] = total
         sensors[name] = by_sensor
+        if by_table:
+            per_row = await export_size.bytes_per_row(db, databases[name])
+            estimated += export_size.estimate(by_table, per_row)
 
     return {
         "from": window[0],
@@ -213,6 +230,9 @@ async def coverage_counts(
         "total": sum(totals.values()),
         "platforms": totals,
         "sensors": sensors,
+        # Roughly what the download will weigh. A magnitude, not a promise —
+        # see services/export_size.py for how far it can be out.
+        "estimated_bytes": estimated,
         # What a dialog needs to decide whether the download is worth offering:
         # an empty period is a button that should not be pressed.
         "available": sum(totals.values()) > 0,

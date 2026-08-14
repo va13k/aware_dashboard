@@ -213,8 +213,8 @@
     "shared_config/source_store.py": "ceaf715a4f7aa1198409553bed5ab30ab761f23c6f6db02140ee2e84148aa1f9",
     "shared_config/test_serializers.py": "d7614beeadecc7e75fcf9671fbc58ae7c8d9ce338a9cc21480128038ccd23fdb"
   },
-  "indexed_at_commit": "ac01eca23191b03da797ece4a7c268c1f0dd0667",
-  "indexed_at_timestamp": "2026-08-14T17:00:46.612233+00:00",
+  "indexed_at_commit": "511836418902218025a1843a951e386d3bfa9ff0",
+  "indexed_at_timestamp": "2026-08-14T17:01:09.231545+00:00",
   "schema_version": 3,
   "stats": {
     "total_edges": 2178,
