@@ -919,6 +919,16 @@ CREATE TABLE IF NOT EXISTS `health_kit_workout` (`_id` INT UNSIGNED AUTO_INCREME
 -- counted at all, and lets the builder walk every timestamped table instead of a
 -- registry. `last_id` rides on the row, so a table's watermark is
 -- `MAX(last_id)` for it and clearing the table clears its watermark.
+--
+-- `device_enrolment` holds when each phone was in the study, as one row per
+-- window: a device that joined, quit and rejoined has two. The heatmap reads it
+-- to tell "nothing expected" from "expected and missing", which a single window
+-- per device would get wrong across exactly the gap a rejoin leaves behind.
+--
+-- Android only. An iPhone records its study state in NSUserDefaults and never
+-- uploads it, so there is nothing on the server to derive a window from; iOS
+-- devices are left without enrolment information rather than given an invented
+-- join time.
 
 USE `aware_android`;
 
@@ -958,6 +968,23 @@ CREATE TABLE IF NOT EXISTS `coverage_hourly` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 GRANT SELECT, INSERT, UPDATE, DELETE ON `aware_android`.`coverage_hourly` TO 'aware_analytics'@'%';
+
+-- `join_source` records how the window's start was established: `study_event`
+-- from the phone's own `aware_studies` row, `first_data` inferred from when data
+-- first arrived, `manual` entered by a researcher. It is what separates a device
+-- that never enrolled from one that enrolled before anyone was recording it.
+CREATE TABLE IF NOT EXISTS `device_enrolment` (
+  `device_id`    varchar(150)    NOT NULL,
+  `joined_at`    bigint unsigned NOT NULL,
+  `left_at`      bigint unsigned NULL DEFAULT NULL,
+  `join_source`  varchar(16)     NOT NULL DEFAULT 'first_data',
+  `left_source`  varchar(16)     NULL DEFAULT NULL,
+  `updated_at`   timestamp       NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`device_id`, `joined_at`),
+  KEY `joined_idx` (`joined_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+GRANT SELECT, INSERT, UPDATE, DELETE ON `aware_android`.`device_enrolment` TO 'aware_analytics'@'%';
 
 USE `aware_ios`;
 
