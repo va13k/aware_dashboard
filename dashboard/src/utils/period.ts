@@ -20,9 +20,10 @@ export function countKey(
   period: ChosenPeriod | null,
   platform: string | null,
   sensor: string | null,
+  device: string | null = null,
 ): string {
   if (!period) return "";
-  return `${period.from}:${period.to}:${platform ?? ""}:${sensor ?? ""}`;
+  return `${period.from}:${period.to}:${platform ?? ""}:${sensor ?? ""}:${device ?? ""}`;
 }
 
 /**

@@ -43,6 +43,7 @@ export default function PeriodPicker({
   onCount,
   platform = null,
   sensor = null,
+  device = null,
 }: {
   value: ChosenPeriod | null;
   onChange: (period: ChosenPeriod) => void;
@@ -50,6 +51,7 @@ export default function PeriodPicker({
   onCount?: (total: number | null) => void;
   platform?: "android" | "ios" | null;
   sensor?: string | null;
+  device?: string | null;
 }) {
   const [offer, setOffer] = useState<CoverageWindows | null>(null);
   const [failed, setFailed] = useState(false);
@@ -72,11 +74,11 @@ export default function PeriodPicker({
 
   // The count follows the selection and the scope, so a sensor dialog reports
   // that sensor rather than the study.
-  const key = countKey(value, platform, sensor);
+  const key = countKey(value, platform, sensor, device);
   useEffect(() => {
     if (!value) return;
     let cancelled = false;
-    fetchCoverageCounts({ from: value.from, to: value.to, platform, sensor })
+    fetchCoverageCounts({ from: value.from, to: value.to, platform, sensor, device })
       .then((body) => {
         if (cancelled) return;
         setCounted({ key, total: body.total, bytes: body.estimated_bytes ?? 0 });
@@ -95,7 +97,7 @@ export default function PeriodPicker({
     // `onCount` deliberately absent: a caller passing an inline arrow would
     // otherwise refetch on every render of its parent.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [key, value, platform, sensor]);
+  }, [key, value, platform, sensor, device]);
 
   const counting = Boolean(value) && counted?.key !== key;
   const count = counted?.key === key ? counted.total : null;

@@ -24,6 +24,7 @@ export default function ExportDialog({
   hasAndroid = true,
   hasIos = true,
   sensor = null,
+  device = null,
   onClose,
 }: {
   title: string;
@@ -33,6 +34,8 @@ export default function ExportDialog({
   hasAndroid?: boolean;
   hasIos?: boolean;
   sensor?: string | null;
+  /** Narrows the count to one phone, for a device's own export. */
+  device?: string | null;
   onClose: () => void;
 }) {
   // A scope only one platform ever collected has nothing to choose between, so
@@ -78,6 +81,11 @@ export default function ExportDialog({
           </button>
         </div>
 
+        {/* Asked only when there is something to choose. A device belongs to
+            one platform, and a sensor only one side collects has one answer —
+            in both cases three buttons with two dead ones is a worse control
+            than no control. */}
+        {hasAndroid && hasIos ? (
         <div className="mb-3">
           <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-[0.5px] text-sage">
             Platforms
@@ -114,6 +122,7 @@ export default function ExportDialog({
             ))}
           </div>
         </div>
+        ) : null}
 
         <PeriodPicker
           value={period}
@@ -126,6 +135,7 @@ export default function ExportDialog({
           // whole archive rather than one half of it.
           platform={platform === "all" ? null : platform}
           sensor={sensor}
+          device={device}
         />
 
         <div className="mt-4 flex items-center justify-end gap-2 border-t border-wire pt-3">

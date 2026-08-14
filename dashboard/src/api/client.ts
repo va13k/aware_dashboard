@@ -150,12 +150,14 @@ export const fetchCoverageCounts = (opts: {
   to?: number | null;
   platform?: "android" | "ios" | null;
   sensor?: string | null;
+  device?: string | null;
 } = {}): Promise<CoverageCounts> => {
   const params = new URLSearchParams();
   if (opts.from != null) params.set("from_ts", String(Math.round(opts.from)));
   if (opts.to != null) params.set("to_ts", String(Math.round(opts.to)));
   if (opts.platform) params.set("platform", opts.platform);
   if (opts.sensor) params.set("sensor", opts.sensor);
+  if (opts.device) params.set("device", opts.device);
   const query = params.toString();
   return get(`/coverage/counts${query ? `?${query}` : ""}`);
 };

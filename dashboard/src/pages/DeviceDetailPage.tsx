@@ -17,7 +17,7 @@ import {
 import SensorTile from "../components/SensorTile";
 import SensorModal from "../components/SensorModal";
 import LogsModal from "../components/LogsModal";
-import ExportLink from "../components/ExportLink";
+import ExportDialog from "../components/ExportDialog";
 import StudyStatusPanel from "../components/StudyStatusPanel";
 import ConfigDiffPanel from "../components/ConfigDiffPanel";
 import StudyEventsTimeline from "../components/StudyEventsTimeline";
@@ -125,13 +125,14 @@ function DeviceDetailPanel({
   detail,
   selected,
   loading,
-  exportHref,
+  onExport,
   deviceName,
 }: {
   detail: DeviceDetail | null;
   selected?: Device | null;
   loading: boolean;
-  exportHref?: string;
+  /** Opens the export dialog for this device. */
+  onExport?: () => void;
   deviceName?: string;
 }) {
   const activeStreams = detail?.streams.filter((s) => s.count > 0) ?? [];
@@ -150,12 +151,15 @@ function DeviceDetailPanel({
         </div>
         {detail && (
           <div className="flex items-center gap-2">
-            {exportHref && (
-              <ExportLink
-                href={exportHref}
-                label="ZIP"
-                title="Export device CSVs"
-              />
+            {onExport && (
+              <button
+                type="button"
+                onClick={onExport}
+                title="Choose a period, then export this phone's CSVs"
+                className="inline-flex h-7 items-center justify-center rounded-lg border border-wire bg-card-strong px-2 text-[10px] font-semibold uppercase tracking-[0.4px] text-sage transition-colors hover:border-teal hover:text-teal"
+              >
+                ↓ Export
+              </button>
             )}
             <span className="text-[11px] uppercase tracking-[0.5px] text-teal bg-teal-soft px-2 py-1 rounded-lg">
               {detail.platform}
@@ -256,6 +260,9 @@ export default function DeviceDetailPage() {
   // The device's client-logs section is collapsed until opened, so it only
   // fetches when a researcher asks for it.
   const [showLogs, setShowLogs] = useState(false);
+  // Which phone asked to export. Its dialog needs no platform question — a
+  // device belongs to one — but the count must be narrowed to it.
+  const [exportingDevice, setExportingDevice] = useState<Device | null>(null);
   // Ticks every 10 s so the "X ago" label stays fresh without re-fetching.
   const [, setTick] = useState(0);
 
@@ -282,9 +289,6 @@ export default function DeviceDetailPage() {
   const selectedKey = selected
     ? `${selected.platform}:${selected.device_id}`
     : null;
-  const selectedDeviceExportHref = selected
-    ? exportDeviceHref(selected.platform, selected.device_id)
-    : undefined;
   const currentDetail =
     detail &&
     selected &&
@@ -393,7 +397,7 @@ export default function DeviceDetailPage() {
             detail={currentDetail}
             selected={selected}
             loading={Boolean(!devices || (selected && !currentDetail))}
-            exportHref={selectedDeviceExportHref}
+            onExport={() => selected && setExportingDevice(selected)}
             deviceName={selected ? deviceLabel(selected) : undefined}
           />
 
@@ -618,6 +622,24 @@ export default function DeviceDetailPage() {
           platform={selected.platform}
           title={deviceLabel(selected)}
           onClose={() => setShowLogs(false)}
+        />
+      ) : null}
+
+      {exportingDevice ? (
+        <ExportDialog
+          title={`Export ${deviceLabel(exportingDevice)}`}
+          subtitle="Every sensor this phone has data for, over the period you choose."
+          href={(period) =>
+            exportDeviceHref(
+              exportingDevice.platform,
+              exportingDevice.device_id,
+              period,
+            )
+          }
+          hasAndroid={exportingDevice.platform === "android"}
+          hasIos={exportingDevice.platform === "ios"}
+          device={exportingDevice.device_id}
+          onClose={() => setExportingDevice(null)}
         />
       ) : null}
     </div>
