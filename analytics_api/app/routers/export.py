@@ -185,12 +185,48 @@ async def _platform_device_ids(db: AsyncSession, export_models: dict[str, object
     return sorted(device_ids)
 
 
+#: A sensor card spans both platforms, so its dialog offers one archive holding
+#: whichever of them actually serve the sensor.
+ALL_PLATFORMS = "all"
+
+
 def _platform_exports(platform: str):
     if platform == "android":
         return ANDROID_EXPORT_MODELS
     if platform == "ios":
         return IOS_EXPORT_MODELS
     raise HTTPException(status_code=404, detail="Unknown platform")
+
+
+def _requested_platforms(platform: str) -> tuple[str, ...]:
+    """The platforms one scope covers, in the order their members are written."""
+    if platform == ALL_PLATFORMS:
+        return ("android", "ios")
+    if platform in ("android", "ios"):
+        return (platform,)
+    raise HTTPException(status_code=404, detail="Unknown platform")
+
+
+def _sensor_entries(platforms: tuple[str, ...], sensor: str) -> list[tuple[str, object]]:
+    """`(platform, export entry)` for each platform that serves this sensor.
+
+    A sensor one platform does not collect is left out rather than refused, so
+    an all-platforms export of a shared sensor and of an Android-only one both
+    produce an archive holding exactly what exists.
+    """
+    found = []
+    for name in platforms:
+        entry = _EXPORT_MODELS_FOR[name].get(sensor)
+        if entry is not None:
+            found.append((name, entry))
+    return found
+
+
+async def _sensor_members_across(entries, sensor: str, window=ALL_TIME):
+    """One sensor's CSVs, one member per platform that serves it."""
+    for name, entry in entries:
+        async for member in _sensor_members(name, sensor, entry, window):
+            yield member
 
 
 
@@ -534,10 +570,22 @@ async def _chained(
 
 
 async def _sensor_members(platform: str, sensor: str, model_entry, window=ALL_TIME):
-    """One sensor across every phone, as a single CSV inside the archive."""
+    """One sensor across every phone, as a single CSV inside the archive.
+
+    A platform holding nothing inside the period contributes no member at all,
+    rather than a CSV of headers. That matters for an all-platforms export of a
+    sensor only one side collected: the archive then says what it has, and does
+    not imply the other side was asked and answered.
+    """
     name = f"{platform}_{_safe_path_part(sensor)}.csv"
     session = AndroidSessionLocal if platform == "android" else IosSessionLocal
     async with session() as db:
+        if not any([
+            await _has_rows(db, model, None, window)
+            for model in _ios_models(model_entry)
+        ]):
+            return
+
         if _is_android_export_entry(model_entry):
             model, schema = model_entry
             devices = sorted(await _device_ids_for_model(db, model))
@@ -743,22 +791,31 @@ async def start_sensor_csv_zip(
     ios_db: AsyncSession = Depends(get_ios_db),
 ):
     """Register the export so the page can show progress while it downloads."""
-    export_models = _platform_exports(platform)
-    model_entry = export_models.get(sensor)
-    if not model_entry:
+    entries = _sensor_entries(_requested_platforms(platform), sensor)
+    if not entries:
         raise HTTPException(status_code=404, detail=f"Unknown sensor: {sensor}")
-    db = android_db if platform == "android" else ios_db
-    models = (model_entry[0],) if _is_android_export_entry(model_entry) else _ios_models(model_entry)
+
     window = _window(from_ts, to_ts)
-    if not any([await _has_rows(db, model, None, window) for model in models]):
+    sessions = {"android": android_db, "ios": ios_db}
+    counts = {"android": AndroidRecordCount, "ios": IosRecordCount}
+
+    total = 0
+    holds_rows = False
+    for name, entry in entries:
+        db = sessions[name]
+        if any([await _has_rows(db, model, None, window) for model in _ios_models(entry)]):
+            holds_rows = True
+        total += await _sensor_row_total(db, name, counts[name], sensor, window)
+
+    if not holds_rows:
         raise HTTPException(
             status_code=404, detail=f"No data found for {platform} sensor: {sensor}"
         )
-    count_model = AndroidRecordCount if platform == "android" else IosRecordCount
+
     return await _start_zip_job(
         f"sensor:{platform}:{sensor}",
         _archive_name(f"{platform}-{_safe_path_part(sensor)}", window),
-        await _sensor_row_total(db, platform, count_model, sensor, window),
+        total,
     )
 
 
@@ -773,16 +830,25 @@ async def export_sensor_csv_zip(
     android_db: AsyncSession = Depends(get_android_db),
     ios_db: AsyncSession = Depends(get_ios_db),
 ):
-    export_models = _platform_exports(platform)
-    model_entry = export_models.get(sensor)
-    if not model_entry:
+    entries = _sensor_entries(_requested_platforms(platform), sensor)
+    if not entries:
         raise HTTPException(status_code=404, detail=f"Unknown sensor: {sensor}")
 
-    db = android_db if platform == "android" else ios_db
-    models = (model_entry[0],) if _is_android_export_entry(model_entry) else _ios_models(model_entry)
-
     window = _window(from_ts, to_ts)
-    if not any([await _has_rows(db, model, None, window) for model in models]):
+    sessions = {"android": android_db, "ios": ios_db}
+
+    # Settled before the response begins: once a streaming body is under way its
+    # status can no longer become a 404.
+    holds_rows = False
+    for name, entry in entries:
+        if any([
+            await _has_rows(sessions[name], model, None, window)
+            for model in _ios_models(entry)
+        ]):
+            holds_rows = True
+            break
+
+    if not holds_rows:
         raise HTTPException(
             status_code=404,
             detail=f"No data found for {platform} sensor: {sensor}",
@@ -790,18 +856,28 @@ async def export_sensor_csv_zip(
 
     scope = f"sensor:{platform}:{sensor}"
     return _zip_streaming_response(
-        _sensor_members(platform, sensor, model_entry, window),
+        _sensor_members_across(entries, sensor, window),
         _archive_name(f"{platform}-{_safe_path_part(sensor)}", window),
         _progress_job(job, scope),
         _export_manifest(scope, window),
     )
 
 
-async def _all_members(window=ALL_TIME):
-    """Every sensor of every phone on both platforms."""
-    for platform in ("android", "ios"):
+def _all_scope_name(platform: str) -> str:
+    """What a study-wide archive is called for this platform choice.
+
+    Both platforms stays plain `all`, so the name a researcher has been getting
+    does not change under them; one platform says which, because an archive
+    holding half the study should not be indistinguishable from one holding it.
+    """
+    return "all" if platform == ALL_PLATFORMS else f"all-{platform}"
+
+
+async def _all_members(window=ALL_TIME, platforms=("android", "ios")):
+    """Every sensor of every phone, on each platform asked for."""
+    for platform in platforms:
         session = AndroidSessionLocal if platform == "android" else IosSessionLocal
-        exports = ANDROID_EXPORT_MODELS if platform == "android" else IOS_EXPORT_MODELS
+        exports = _EXPORT_MODELS_FOR[platform]
         async with session() as db:
             for device_id in await _platform_device_ids(db, exports):
                 async for entry in _device_members(platform, device_id, window):
@@ -810,41 +886,61 @@ async def _all_members(window=ALL_TIME):
 
 @router.post("/all.zip")
 async def start_all_csv_zip(
+    platform: str = Query(ALL_PLATFORMS),
     from_ts: float | None = Query(None),
     to_ts: float | None = Query(None),
     android_db: AsyncSession = Depends(get_android_db),
     ios_db: AsyncSession = Depends(get_ios_db),
 ):
     """Register the export so the page can show progress while it downloads."""
-    android = await _platform_device_ids(android_db, ANDROID_EXPORT_MODELS)
-    ios = await _platform_device_ids(ios_db, IOS_EXPORT_MODELS)
-    if not android and not ios:
+    platforms = _requested_platforms(platform)
+    sessions = {"android": android_db, "ios": ios_db}
+    counts = {"android": AndroidRecordCount, "ios": IosRecordCount}
+    window = _window(from_ts, to_ts)
+
+    holds_rows = False
+    total = 0
+    for name in platforms:
+        if await _platform_device_ids(sessions[name], _EXPORT_MODELS_FOR[name]):
+            holds_rows = True
+        total += await _platform_row_total(sessions[name], name, counts[name], window)
+
+    if not holds_rows:
         raise HTTPException(status_code=404, detail="No sensor data found to export")
 
-    window = _window(from_ts, to_ts)
-    total = await _platform_row_total(android_db, "android", AndroidRecordCount, window)
-    total += await _platform_row_total(ios_db, "ios", IosRecordCount, window)
-    return await _start_zip_job("all", _archive_name("all", window), total)
+    return await _start_zip_job(
+        f"all:{platform}",
+        _archive_name(_all_scope_name(platform), window),
+        total,
+    )
 
 
 @router.get("/all.zip")
 async def export_all_csv_zip(
     job: str | None = Query(None),
+    platform: str = Query(ALL_PLATFORMS),
     from_ts: float | None = Query(None),
     to_ts: float | None = Query(None),
-
     android_db: AsyncSession = Depends(get_android_db),
     ios_db: AsyncSession = Depends(get_ios_db),
 ):
-    android = await _platform_device_ids(android_db, ANDROID_EXPORT_MODELS)
-    ios = await _platform_device_ids(ios_db, IOS_EXPORT_MODELS)
-    if not android and not ios:
+    platforms = _requested_platforms(platform)
+    sessions = {"android": android_db, "ios": ios_db}
+
+    holds_rows = False
+    for name in platforms:
+        if await _platform_device_ids(sessions[name], _EXPORT_MODELS_FOR[name]):
+            holds_rows = True
+            break
+
+    if not holds_rows:
         raise HTTPException(status_code=404, detail="No sensor data found to export")
 
     window = _window(from_ts, to_ts)
+    scope = f"all:{platform}"
     return _zip_streaming_response(
-        _all_members(window),
-        _archive_name("all", window),
-        _progress_job(job, "all"),
-        _export_manifest("all", window),
+        _all_members(window, platforms),
+        _archive_name(_all_scope_name(platform), window),
+        _progress_job(job, scope),
+        _export_manifest(scope, window),
     )

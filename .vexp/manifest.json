@@ -82,7 +82,7 @@
     "analytics_api/app/routers/backup.py": "1e9c665d5b7da7df01a5a3497bafa2ab056d203e447b44bf1f4be93ef33eb518",
     "analytics_api/app/routers/counts.py": "22eef387d4ded8317d76f7e4010e3c98b508fea928abf387868a26e4db3aa4d5",
     "analytics_api/app/routers/devices.py": "895e17557e02f1fb84f6a912d3de7395d548f0ab7642cdb909d395fb3529a2ea",
-    "analytics_api/app/routers/export.py": "6161a06a8b1969e2fb2bb96c5dccf8cad7789cfc0cd0f1b86af8dff4e66de5f0",
+    "analytics_api/app/routers/export.py": "3b4ac995b80a36b512fb90d630fccc9b12e805a77f6a82670eb2d82515a4a039",
     "analytics_api/app/routers/health.py": "b73deddbf308a63dfd83b1618d524fd90a9ac8855f1400cddde828f7e5384c74",
     "analytics_api/app/routers/ios.py": "21dd8abff21337b69dc1adc12e97d0e804312e3dbf3fc7673c8bf295c2b3f89b",
     "analytics_api/app/routers/jobs.py": "ad609026a17ad9a512cca0775f5840468191496f6bf29a0c2a4bd6181f097b55",
@@ -133,7 +133,7 @@
     "dashboard/README.md": "782f2c18441c4dfe79ec3c119f683ef8b4cc4b254ea3bfd1edd0b58233c3d7a0",
     "dashboard/eslint.config.js": "aca28c59ed36fcb61767d95ac0f53b32021918bef6550e61ae5830658834e643",
     "dashboard/src/App.tsx": "19eaba942405419092ebd9387a15c3637d676901f0849e38f450d79823e00f6d",
-    "dashboard/src/api/client.ts": "1f7741ed70efa74196e8546d6e583c4e2ce666bfacd0690003fad6b09e3064c6",
+    "dashboard/src/api/client.ts": "d8de48b612fea0ef1d32981c3b9f2b77c44de94f1c06d2fc1317e8faf82b1b73",
     "dashboard/src/components/AccelerometerRecordsCard.tsx": "a9fa79ff68c18431dde4c1e368577526924fc477681e1839b5a0c9cbec1058dd",
     "dashboard/src/components/ActivityCard.tsx": "4cce68f3ad3eee6316d45dc79436578d7a48d64f8ff44e9a6e8f3f21093b5afc",
     "dashboard/src/components/AmbientNoiseCard.tsx": "e99ad51c340f74eef90ac2c9ce09db29899f34c1bd610bdb4dfd1dc007705eee",
@@ -174,8 +174,8 @@
     "dashboard/src/pages/DevicesPage.tsx": "aa15e8cf5d0bf27a539bce47b014368ff27a18b4d42ac450890befb70213593c",
     "dashboard/src/pages/LogsPage.tsx": "c7b60aff5d997824aaca373ce362910c64e91a31fe1dc09a5d7f4fabb452da41",
     "dashboard/src/pages/ManifestPage.tsx": "bc1932f4fd5a18cb32c4a3cce885d354deeddd90672d927affdcaaa1c3dfd4a9",
-    "dashboard/src/pages/OverviewPage.tsx": "845e846b7083cd10a9d9d58f8d8952f728cb61ade0955f987a7bd666f3a2cc31",
-    "dashboard/src/types.ts": "b3f743ed2aa82cc8076bd27d2cf1d916ccab6831bd13e21990a05a8855d53740",
+    "dashboard/src/pages/OverviewPage.tsx": "bf697e3511042cc5beae3a780552c2926f16b3237b1c299fb837ae74bcf6fd08",
+    "dashboard/src/types.ts": "d7b4fc162e0012ef7c526838c4bc4b6fa4c14a6a984849da1e7b9806ed0d1456",
     "dashboard/src/utils/devices.ts": "c272275eaa86fc7193ca98cda049311fd0a4c3066917d9eafb90ad8617b8c641",
     "dashboard/src/utils/headerSlot.ts": "15ebb004e26cb060ed37b793971c08d2ba7b60fd8b2ed4ff94d6a3ceec93a689",
     "dashboard/src/utils/requirements.ts": "e1d9460ddb313bc32c801db62868b2d91800e261a9d3a0e9e7fb2a13171bc0ee",
@@ -213,13 +213,13 @@
     "shared_config/source_store.py": "ceaf715a4f7aa1198409553bed5ab30ab761f23c6f6db02140ee2e84148aa1f9",
     "shared_config/test_serializers.py": "d7614beeadecc7e75fcf9671fbc58ae7c8d9ce338a9cc21480128038ccd23fdb"
   },
-  "indexed_at_commit": "111edaf44dbbbc57d605db69e8020679b08ba633",
-  "indexed_at_timestamp": "2026-08-14T16:06:33.632949+00:00",
+  "indexed_at_commit": "ac01eca23191b03da797ece4a7c268c1f0dd0667",
+  "indexed_at_timestamp": "2026-08-14T17:00:46.612233+00:00",
   "schema_version": 3,
   "stats": {
-    "total_edges": 2170,
+    "total_edges": 2178,
     "total_files": 212,
-    "total_nodes": 2061
+    "total_nodes": 2075
   },
   "vexp_version": "2.5.2"
 }

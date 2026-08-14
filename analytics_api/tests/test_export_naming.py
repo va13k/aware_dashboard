@@ -168,3 +168,28 @@ async def test_an_archive_without_a_manifest_is_unchanged():
 
     with zipfile.ZipFile(io.BytesIO(body)) as archive:
         assert archive.namelist() == ["a.csv"]
+
+
+def test_all_is_a_platform_a_sensor_export_accepts():
+    """A sensor card spans both platforms, so its dialog offers one archive
+    holding whichever of them actually collected the sensor."""
+    assert export_router._requested_platforms("all") == ("android", "ios")
+    assert export_router._requested_platforms("android") == ("android",)
+    assert export_router._requested_platforms("ios") == ("ios",)
+
+
+def test_an_unknown_platform_is_still_refused():
+    import pytest as _pytest
+    from fastapi import HTTPException
+
+    with _pytest.raises(HTTPException):
+        export_router._requested_platforms("symbian")
+
+
+def test_a_sensor_only_one_platform_collects_names_only_that_platform():
+    """`all` must not fail on a sensor the other side has never heard of."""
+    entries = export_router._sensor_entries(("android", "ios"), "accelerometer")
+    assert {name for name, _ in entries} <= {"android", "ios"}
+    assert entries
+
+    assert export_router._sensor_entries(("android", "ios"), "not_a_sensor") == []
