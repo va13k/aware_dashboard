@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import {
   exportAllHref,
+  fetchCountsStatus,
   exportSensorZipHref,
   fetchDevices,
   fetchManifest,
@@ -25,6 +26,7 @@ import { combinedRequirements } from "../utils/requirements";
 import { absoluteTime, normalizeTimestamp, relativeAge } from "../utils/time";
 import { deviceLabel } from "../utils/devices";
 import type {
+  CountsStatus,
   Device,
   DevicesResponse,
   Manifest,
@@ -47,6 +49,7 @@ export default function OverviewPage() {
   const [requirements, setRequirements] = useState<StudyRequirements | null>(
     null,
   );
+  const [countsStatus, setCountsStatus] = useState<CountsStatus | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [now, setNow] = useState(() => Date.now());
 
@@ -80,6 +83,18 @@ export default function OverviewPage() {
     };
   }, []);
 
+  // How fresh the numbers on this page are. A refresher that has died leaves a
+  // dashboard that looks exactly like a study gone quiet, so the age is shown.
+  useEffect(() => {
+    const load = () =>
+      fetchCountsStatus()
+        .then(setCountsStatus)
+        .catch(() => setCountsStatus(null));
+    load();
+    const id = window.setInterval(load, REFRESH_INTERVAL_MS);
+    return () => window.clearInterval(id);
+  }, []);
+
   useEffect(() => {
     fetchStudyRequirements()
       .then((data) => setRequirements(data))
@@ -111,6 +126,30 @@ export default function OverviewPage() {
     if (latestUpload) return absoluteTime(latestUpload.last_seen);
     if (devices) return "No uploads yet";
     return "Checking uploads...";
+  })();
+
+  // Counts are read from a cache, so the page says how old that cache is. Past
+  // the server's threshold it says so plainly rather than showing a stale number
+  // as if it were current.
+  const countsFreshness = (() => {
+    if (!countsStatus) return null;
+    const age = countsStatus.age_seconds;
+    if (age == null) {
+      return { stale: true, text: "Counts have never been refreshed" };
+    }
+    const minutes = Math.round(age / 60);
+    const ago =
+      age < 90
+        ? "just now"
+        : minutes < 60
+          ? `${minutes} min ago`
+          : `${Math.round(minutes / 60)} h ago`;
+    return {
+      stale: countsStatus.stale,
+      text: countsStatus.stale
+        ? `Counts last refreshed ${ago}`
+        : `Counts refreshed ${ago}`,
+    };
   })();
 
   const loading = !manifest;
@@ -209,6 +248,16 @@ export default function OverviewPage() {
             <p className="mt-1 text-[20px] font-bold text-ink">
               {latestUploadText}
             </p>
+            {countsFreshness && (
+              <p
+                className={`mt-1 text-[11px] ${
+                  countsFreshness.stale ? "font-semibold text-amber-600" : "text-sage"
+                }`}
+                title="Record counts are cached and refreshed on a schedule"
+              >
+                {countsFreshness.text}
+              </p>
+            )}
           </div>
           {latestUpload && (
             <div className="flex items-center gap-2">

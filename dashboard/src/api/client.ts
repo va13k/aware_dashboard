@@ -1,5 +1,6 @@
 import type {
   AndroidStudyEvent,
+  CountsStatus,
   AwareLogPage,
   DeviceDetail,
   DevicesResponse,
@@ -131,6 +132,9 @@ export const fetchIosLogTypes = (): Promise<string[]> =>
 
 export const iosLogsExportHref = (opts: AndroidLogQuery = {}): string =>
   `${BASE}/logs/ios/export?${logParams(opts, false).toString()}`;
+
+/** When the counts were last refreshed, and whether that is too long ago. */
+export const fetchCountsStatus = (): Promise<CountsStatus> => get("/counts/status");
 
 export const exportAllHref = (): string => `${BASE}/export/all.zip`;
 

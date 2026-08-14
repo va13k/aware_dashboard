@@ -212,3 +212,16 @@ export interface Manifest {
     ios: PlatformManifest;
   };
 }
+
+/** How fresh the cached counts are, per platform. */
+export interface CountsStatus {
+  stale_after_seconds: number;
+  /** One figure for both platforms: a pass writes both databases. */
+  last_refreshed: number | null;
+  age_seconds: number | null;
+  stale: boolean;
+  platforms: Record<
+    "android" | "ios",
+    { last_refreshed: number | null; age_seconds: number | null }
+  >;
+}
