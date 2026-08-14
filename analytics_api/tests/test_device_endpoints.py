@@ -111,10 +111,16 @@ def _database(monkeypatch):
         # Empty cache → every stream reads as zero with no per-sensor query.
         return {}
 
+    async def enrolment_windows(db, device_id=None):
+        # No stored windows, which is the shape a deployment has before the
+        # first refresh. test_enrolment_endpoint.py covers the filled table.
+        return {}
+
     monkeypatch.setattr(devices_router, "_combined_last_seen_by_device", last_seen)
     monkeypatch.setattr(devices_router, "_device_metadata_by_device", metadata)
     monkeypatch.setattr(devices_router, "_android_study_rows", study_rows)
     monkeypatch.setattr(devices_router, "_best_device_row", best_device_row)
+    monkeypatch.setattr(devices_router, "_enrolment_windows", enrolment_windows)
     monkeypatch.setattr(
         devices_router.record_counts, "counts_for_device", counts_for_device
     )

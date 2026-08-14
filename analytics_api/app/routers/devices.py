@@ -9,6 +9,7 @@ from app.models import (
     AndroidRecordCount,
     IosRecordCount,
     AndroidDevice,
+    AndroidDeviceEnrolment,
     IosAccelerometer,
     IosBarometer,
     IosBattery,
@@ -64,7 +65,7 @@ from app.schemas import (
     ConfigDiffSchema,
     strip_ios_data_metadata,
 )
-from app.services import config_diff, study_state
+from app.services import config_diff, enrolment, study_state
 
 router = APIRouter(prefix="/devices", tags=["devices"])
 
@@ -301,6 +302,59 @@ async def _device_metadata_by_device(db: AsyncSession, model):
     return metadata_by_device
 
 
+async def _enrolment_windows(db: AsyncSession, device_id: str | None = None):
+    """The stored enrolment windows per device, oldest first.
+
+    Read from the table rather than re-derived from the study log: the log needs
+    parsing and deduplicating per device, and this is on the path of every device
+    list. The refresher keeps the table in step (services/enrolment.py).
+    """
+    query = select(AndroidDeviceEnrolment).order_by(
+        AndroidDeviceEnrolment.device_id, AndroidDeviceEnrolment.joined_at
+    )
+    if device_id is not None:
+        query = query.where(AndroidDeviceEnrolment.device_id == device_id)
+
+    try:
+        result = await db.execute(query)
+    except (ProgrammingError, OperationalError, SQLAlchemyError):
+        await _rollback_after_table_error(db)
+        return {}
+
+    windows: dict[str, list] = {}
+    for row in result.scalars().all():
+        windows.setdefault(str(row.device_id), []).append(
+            {
+                "joined_at": int(row.joined_at),
+                "left_at": int(row.left_at) if row.left_at is not None else None,
+                "join_source": row.join_source,
+                "left_source": row.left_source,
+            }
+        )
+    return windows
+
+
+def _enrolment_summary(windows: list | None) -> dict | None:
+    """What a device row shows about enrolment: the span, and how it is known.
+
+    `joined_at` is the first window's start and `left_at` the last one's end, so
+    a device that quit and came back reads as enrolled since it first joined and
+    still in the study. The windows themselves carry the gap, and the heatmap
+    reads those rather than this.
+
+    A device with no window at all returns None. That is the state worth seeing:
+    it wrote data without the study ever recording that it joined.
+    """
+    if not windows:
+        return None
+    return {
+        "joined_at": windows[0]["joined_at"],
+        "left_at": windows[-1]["left_at"],
+        "join_source": windows[0]["join_source"],
+        "window_count": len(windows),
+    }
+
+
 async def _android_study_rows(db: AsyncSession, device_id: str | None = None):
     query = select(AndroidAwareStudy).order_by(
         AndroidAwareStudy.timestamp, AndroidAwareStudy._id
@@ -430,6 +484,12 @@ async def _device_detail(platform: str, device_id: str, db: AsyncSession):
         state = states.get(device_id) or study_state.derive_study_state([])
         detail.update(_study_detail(state))
 
+        windows = (await _enrolment_windows(db, device_id)).get(device_id, [])
+        detail["enrolment"] = _enrolment_summary(windows)
+        # The windows themselves, because the gap between two of them is time
+        # this device was expected to send nothing.
+        detail["enrolment_windows"] = windows
+
     return detail
 
 
@@ -442,11 +502,12 @@ async def list_android_devices(db: AsyncSession = Depends(get_android_db)):
     )
     metadata_by_device = await _device_metadata_by_device(db, AndroidDevice)
     study_states = await _android_study_states(db)
+    enrolment_by_device = await _enrolment_windows(db)
 
     devices = []
     # A phone that joined but has not uploaded yet exists only in aware_studies,
     # and still belongs in the list.
-    for device_id in set(last_seen_by_device) | set(study_states):
+    for device_id in set(last_seen_by_device) | set(study_states) | set(enrolment_by_device):
         metadata = metadata_by_device.get(device_id, {})
         state = study_states.get(device_id)
         devices.append(
@@ -462,6 +523,9 @@ async def list_android_devices(db: AsyncSession = Depends(get_android_db)):
                 "last_seen": last_seen_by_device.get(device_id),
                 "platform": "android",
                 "study": _study_list_summary(state) if state else None,
+                # None for a device that wrote data the study never recorded a
+                # join for — the case worth being able to see.
+                "enrolment": _enrolment_summary(enrolment_by_device.get(device_id)),
             }
         )
 
