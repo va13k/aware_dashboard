@@ -1,5 +1,6 @@
 import csv
 import io
+import json
 import re
 import zipfile
 from datetime import datetime, timezone
@@ -21,7 +22,7 @@ from app.routers.android import _EXPORT_MODELS as ANDROID_EXPORT_MODELS
 from app.routers.ios import _EXPORT_MODELS as IOS_EXPORT_MODELS
 from app.schemas import IosSchema
 from app.services import backup_jobs as jobs
-from app.services import coverage_rollup, record_counts, sensor_tables
+from app.services import coverage_rollup, record_counts, sensor_tables, study_config
 
 router = APIRouter(prefix="/export", tags=["export"])
 
@@ -290,16 +291,25 @@ def _member(archive: zipfile.ZipFile, name: str):
     return archive.open(info, "w", force_zip64=True)
 
 
-async def _stream_archive(members, job=None):
+async def _stream_archive(members, job=None, manifest=None):
     """Produce a ZIP as it is read.
 
     `members` is an async iterable of ``(name, fields, batches)``, where
     `batches` yields lists of rendered rows. Nothing larger than one batch and
     the compressor's own buffers is held at a time.
+
+    `manifest` is written first, before any data, so an archive says what it is
+    even when the download was interrupted part-way through.
     """
     sink = _Sink()
     try:
         with zipfile.ZipFile(sink, "w", compression=zipfile.ZIP_DEFLATED) as archive:
+            if manifest is not None:
+                with _member(archive, MANIFEST_MEMBER) as member:
+                    member.write(json.dumps(manifest, indent=2).encode("utf-8"))
+                if chunk := sink.drain():
+                    yield chunk
+
             async for name, fields, batches in members:
                 if job is not None:
                     jobs.advance(job, phase=f"Writing {name.rsplit('/', 1)[-1]}")
@@ -351,6 +361,81 @@ async def _start_zip_job(scope: str, filename: str, total: int):
     jobs.advance(job, total=total, phase="Starting export")
     jobs.describe(job, filename=filename, scope=scope, unit="rows")
     return {"id": job.id, "filename": filename, "rows": total}
+
+
+#: Written first into every archive, so the file explains itself once it has
+#: left the dashboard and is sitting in someone's downloads folder.
+MANIFEST_MEMBER = "manifest.json"
+
+
+def _study_name() -> str:
+    """The study this deployment is running, for naming what it produces.
+
+    A deployment with no config yet is normal rather than an error — the file is
+    written at deployment time — so an archive still gets a name.
+    """
+    deployed = study_config.load_deployed_config()
+    title = (deployed.summary.get("study_title") if deployed else None) or "aware"
+    return _safe_path_part(str(title).strip()) or "aware"
+
+
+def _stamp(milliseconds: float) -> str:
+    """A window bound in a filename: UTC, sortable, minute precision."""
+    moment = datetime.fromtimestamp(milliseconds / 1000, tz=timezone.utc)
+    return moment.strftime("%Y%m%d-%H%M")
+
+
+def _utc(milliseconds: float | None) -> str | None:
+    if milliseconds is None:
+        return None
+    return datetime.fromtimestamp(milliseconds / 1000, tz=timezone.utc).isoformat()
+
+
+def _archive_name(scope: str, window: tuple) -> str:
+    """What the download is called: study, what it covers, and when.
+
+    Named after the study rather than ``all.zip``, because a researcher ends up
+    with several of these from several studies in one folder. The window is in
+    the name for the same reason the dialog shows resolved bounds: a relative
+    period whose instants are invisible cannot be reproduced later.
+    """
+    start, end = window
+    if start is None and end is None:
+        span = "all-time"
+    elif start is None:
+        span = f"to-{_stamp(end)}"
+    elif end is None:
+        span = f"from-{_stamp(start)}"
+    else:
+        span = f"{_stamp(start)}-to-{_stamp(end)}"
+    return f"{_study_name()}-{scope}-{span}.zip"
+
+
+def _export_manifest(scope: str, window: tuple) -> dict:
+    """What this archive holds, written into it as its first member.
+
+    Deliberately carries no expected row count. The only figure available
+    without re-reading the data is the rollup's, which is hour-granular at a
+    window's edges — and an approximate expectation sitting beside exact CSVs
+    reads as missing data rather than as a rounding. The rows in the archive are
+    the answer; the estimate belongs to the progress bar, where it is invisible.
+    """
+    start, end = window
+    return {
+        "study": _study_name(),
+        "scope": scope,
+        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "window": {
+            "all_time": window == ALL_TIME,
+            "from": start,
+            "to": end,
+            "from_utc": _utc(start),
+            "to_utc": _utc(end),
+            # Both ends are inclusive, which decides whether a boundary row
+            # belongs to this archive or the next one.
+            "bounds": "inclusive",
+        },
+    }
 
 
 def _window(from_ts: float | None, to_ts: float | None) -> tuple:
@@ -420,9 +505,11 @@ async def _platform_row_total(
     return await coverage_rollup.records_in(db, _rollup_model(platform), window)
 
 
-def _zip_streaming_response(members, filename: str, job=None) -> StreamingResponse:
+def _zip_streaming_response(
+    members, filename: str, job=None, manifest=None
+) -> StreamingResponse:
     return StreamingResponse(
-        _stream_archive(members, job),
+        _stream_archive(members, job, manifest),
         media_type="application/zip",
         headers={
             "Content-Disposition": f'attachment; filename="{filename}"',
@@ -611,7 +698,7 @@ async def start_device_csv_zip(
     model = AndroidRecordCount if platform == "android" else IosRecordCount
     return await _start_zip_job(
         f"device:{platform}:{device_id}",
-        f"{platform}_{_safe_path_part(device_id)}.zip",
+        _archive_name(f"{platform}-{_safe_path_part(device_id)}", window),
         await _device_row_total(db, platform, model, device_id, window),
     )
 
@@ -637,10 +724,12 @@ async def export_device_csv_zip(
             detail=f"No sensor data found for {platform} device: {device_id}",
         )
 
+    scope = f"device:{platform}:{device_id}"
     return _zip_streaming_response(
         _device_members(platform, device_id, window),
-        f"{platform}_{_safe_path_part(device_id)}.zip",
-        _progress_job(job, f"device:{platform}:{device_id}"),
+        _archive_name(f"{platform}-{_safe_path_part(device_id)}", window),
+        _progress_job(job, scope),
+        _export_manifest(scope, window),
     )
 
 
@@ -668,7 +757,7 @@ async def start_sensor_csv_zip(
     count_model = AndroidRecordCount if platform == "android" else IosRecordCount
     return await _start_zip_job(
         f"sensor:{platform}:{sensor}",
-        f"{platform}_{_safe_path_part(sensor)}.zip",
+        _archive_name(f"{platform}-{_safe_path_part(sensor)}", window),
         await _sensor_row_total(db, platform, count_model, sensor, window),
     )
 
@@ -699,11 +788,12 @@ async def export_sensor_csv_zip(
             detail=f"No data found for {platform} sensor: {sensor}",
         )
 
-    safe_sensor = _safe_path_part(sensor)
+    scope = f"sensor:{platform}:{sensor}"
     return _zip_streaming_response(
         _sensor_members(platform, sensor, model_entry, window),
-        f"{platform}_{safe_sensor}.zip",
-        _progress_job(job, f"sensor:{platform}:{sensor}"),
+        _archive_name(f"{platform}-{_safe_path_part(sensor)}", window),
+        _progress_job(job, scope),
+        _export_manifest(scope, window),
     )
 
 
@@ -734,7 +824,7 @@ async def start_all_csv_zip(
     window = _window(from_ts, to_ts)
     total = await _platform_row_total(android_db, "android", AndroidRecordCount, window)
     total += await _platform_row_total(ios_db, "ios", IosRecordCount, window)
-    return await _start_zip_job("all", "all.zip", total)
+    return await _start_zip_job("all", _archive_name("all", window), total)
 
 
 @router.get("/all.zip")
@@ -751,6 +841,10 @@ async def export_all_csv_zip(
     if not android and not ios:
         raise HTTPException(status_code=404, detail="No sensor data found to export")
 
+    window = _window(from_ts, to_ts)
     return _zip_streaming_response(
-        _all_members(_window(from_ts, to_ts)), "all.zip", _progress_job(job, "all")
+        _all_members(window),
+        _archive_name("all", window),
+        _progress_job(job, "all"),
+        _export_manifest("all", window),
     )
