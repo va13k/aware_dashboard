@@ -14,6 +14,7 @@ from app.routers import (
     study,
     logs,
     counts,
+    coverage,
     jobs,
 )
 
@@ -58,6 +59,7 @@ app.include_router(jobs.router)
 app.include_router(export.router)
 app.include_router(logs.router)
 app.include_router(counts.router)
+app.include_router(coverage.router)
 
 
 @app.get("/")
