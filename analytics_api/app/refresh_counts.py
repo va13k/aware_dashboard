@@ -30,9 +30,14 @@ from app.database import (
     android_engine,
     ios_engine,
 )
-from app.models import AndroidRecordCount, IosRecordCount
+from app.models import (
+    AndroidCoverageHourly,
+    AndroidRecordCount,
+    IosCoverageHourly,
+    IosRecordCount,
+)
 from app.routers.counts import ANDROID_SOURCES, IOS_SOURCES
-from app.services import record_counts
+from app.services import coverage_rollup, record_counts
 
 logger = logging.getLogger("aware.refresh_counts")
 
@@ -73,9 +78,20 @@ async def refresh_all() -> dict:
             android = await record_counts.refresh(
                 db, AndroidRecordCount, ANDROID_SOURCES
             )
+            android_hours = await coverage_rollup.refresh(
+                db, AndroidCoverageHourly, "aware_android"
+            )
         async with IosSessionLocal() as db:
             ios = await record_counts.refresh(db, IosRecordCount, IOS_SOURCES)
-        return {"android": android, "ios": ios}
+            ios_hours = await coverage_rollup.refresh(
+                db, IosCoverageHourly, "aware_ios"
+            )
+        return {
+            "android": android,
+            "ios": ios,
+            "android_hours": android_hours,
+            "ios_hours": ios_hours,
+        }
 
 
 def _log_result(result: dict) -> None:
@@ -83,11 +99,14 @@ def _log_result(result: dict) -> None:
         return
     for platform in ("android", "ios"):
         counted = result[platform]
+        hours = result.get(f"{platform}_hours", {})
         logger.info(
-            "%s: +%d rows across %d sensors",
+            "%s: +%d rows across %d sensors; coverage +%d records over %d tables",
             platform,
             sum(counted.values()),
             len(counted),
+            sum(hours.values()),
+            len(hours),
         )
 
 
