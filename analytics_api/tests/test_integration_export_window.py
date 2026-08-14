@@ -14,7 +14,7 @@ import pytest
 import pytest_asyncio
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
-from app.models import AndroidAccelerometer, AndroidCoverageHourly
+from app.models import AndroidAccelerometer, AndroidCoverageHourly, AndroidRecordCount
 from app.routers import export as export_router
 from app.services import coverage_rollup
 
@@ -231,3 +231,74 @@ async def test_the_window_narrows_the_has_rows_guard(android_session):
         assert not await export_router._has_rows(
             db, AndroidAccelerometer, DEVICE, (500, 900)
         )
+
+
+@pytest.mark.asyncio
+async def test_what_the_dialog_reports_and_what_the_export_refuses_agree(
+    android_session,
+):
+    """Two different questions asked of two different tables, and the interface
+    depends on them matching: the dialog greys the button out from the rollup's
+    count, and the endpoint refuses from a probe of the data. If they ever
+    disagree, one of them is lying to the researcher — either a download that
+    404s after being offered, or a period that looks empty and is not.
+    """
+    sessionmaker_, server = android_session
+    seed(server, [(HOUR + 10, 1.0), (HOUR + 20, 2.0)])
+    seed_buckets(server, [("accelerometer", HOUR, 2)])
+
+    async with sessionmaker_() as db:
+        for window, expected in (((HOUR, 2 * HOUR - 1), True), ((50 * HOUR, 60 * HOUR), False)):
+            counted = await coverage_rollup.records_in(
+                db, AndroidCoverageHourly, window
+            )
+            probed = await export_router._has_rows(
+                db, AndroidAccelerometer, DEVICE, window
+            )
+            assert (counted > 0) is expected
+            assert probed is expected
+
+
+@pytest.mark.asyncio
+async def test_the_job_total_matches_the_rows_a_ranged_export_writes(android_session):
+    """The progress bar is measured against the total registered when the job
+    starts. On an hour-aligned window the rollup is exact, so the two must come
+    out equal — a bar that runs past its own total, or stops short of it, is the
+    symptom of them being computed from different things.
+    """
+    sessionmaker_, server = android_session
+    rows = [(HOUR + index * 1000, float(index)) for index in range(25)]
+    seed(server, rows)
+    seed(server, [(5 * HOUR, 99.0)])  # outside the window, and must not count
+    seed_buckets(server, [("accelerometer", HOUR, 25), ("accelerometer", 5 * HOUR, 1)])
+
+    window = (HOUR, 2 * HOUR - 1)
+    async with sessionmaker_() as db:
+        total = await export_router._sensor_row_total(
+            db, "android", AndroidRecordCount, "accelerometer", window
+        )
+
+    written = len(await exported(sessionmaker_, window))
+
+    assert written == len(rows)
+    assert total == written
+
+
+@pytest.mark.asyncio
+async def test_an_all_time_job_total_still_comes_from_the_count_cache(android_session):
+    """Without a window the cache is authoritative and exact, so the unranged
+    path must not quietly start using the hour-granular rollup instead."""
+    sessionmaker_, server = android_session
+    seed(server, [(HOUR + index, float(index)) for index in range(7)])
+    server.run(
+        "INSERT INTO record_counts (sensor, device_id, count, last_id, last_ts) "
+        f"VALUES ('accelerometer', '{DEVICE}', 7, 7, {HOUR + 6})",
+        "aware_android",
+    )
+
+    async with sessionmaker_() as db:
+        total = await export_router._sensor_row_total(
+            db, "android", AndroidRecordCount, "accelerometer", export_router.ALL_TIME
+        )
+
+    assert total == 7

@@ -281,3 +281,69 @@ def test_a_known_job_reports_its_snapshot():
         body = client.get(f"/jobs/{job.id}").json()
     assert body["percent"] == 25.0
     assert body["phase"] == "Exporting accelerometer"
+
+
+@pytest.mark.asyncio
+async def test_the_archive_is_produced_before_its_last_member_is_read():
+    """The regression this guards against is silent and expensive.
+
+    Nothing about a buffered archive looks wrong from the outside — the file is
+    identical either way. It only shows up at study scale, as a request that
+    holds a multi-gigabyte ZIP in memory before sending a single byte, which is
+    the whole reason `_Sink` refuses to offer `seek`.
+
+    So this asserts on timing rather than content: bytes must reach the caller
+    while members are still being produced, not after the last one.
+    """
+    from app.routers import export as export_router
+
+    produced: list[str] = []
+
+    async def batches(name):
+        for index in range(3):
+            yield [{"timestamp": index}]
+
+    async def members():
+        for name in ("a.csv", "b.csv", "c.csv"):
+            produced.append(name)
+            yield (name, ["timestamp"], batches(name))
+
+    seen_after: list[int] = []
+    async for chunk in export_router._stream_archive(members()):
+        if chunk:
+            seen_after.append(len(produced))
+
+    assert seen_after, "the archive yielded nothing at all"
+    # The first bytes arrived while members were still being made.
+    assert seen_after[0] < len(produced)
+
+
+@pytest.mark.asyncio
+async def test_a_manifest_reaches_the_caller_before_the_data_is_read():
+    """A window changes which rows are read, not how the archive is assembled.
+
+    The manifest is written first precisely so an interrupted download still
+    says what it was, which only holds if it is *sent* before the rows are
+    fetched rather than merely written first into a buffer.
+    """
+    from app.routers import export as export_router
+
+    read_batches = 0
+
+    async def batches():
+        nonlocal read_batches
+        for index in range(3):
+            read_batches += 1
+            yield [{"timestamp": index}]
+
+    async def members():
+        yield ("android_accelerometer.csv", ["timestamp"], batches())
+
+    batches_when_first_chunk_arrived = None
+    async for chunk in export_router._stream_archive(
+        members(), None, export_router._export_manifest("all", (1000, 2000))
+    ):
+        if chunk and batches_when_first_chunk_arrived is None:
+            batches_when_first_chunk_arrived = read_batches
+
+    assert batches_when_first_chunk_arrived == 0
