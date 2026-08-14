@@ -7,6 +7,11 @@ MYSQL_USER="${MYSQL_USER:-root}"
 MYSQL_PASSWORD="${MYSQL_PASSWORD:-}"
 BACKUP_DATABASES="${BACKUP_DATABASES:-aware_android aware_ios}"
 BACKUP_DIR="${BACKUP_DIR:-/backups}"
+# The dashboard's own tables, kept out of every archive. Each one summarises the
+# `_id` values of the deployment that built it, so restoring one describes rows
+# the target may not have; the API rebuilds them all from the restored data.
+# Mirrors CACHE_TABLES in analytics_api/app/services/dump_stream.py.
+BACKUP_SKIP_TABLES="${BACKUP_SKIP_TABLES:-record_counts coverage_hourly device_enrolment}"
 BACKUP_INTERVAL_SECONDS="${BACKUP_INTERVAL_SECONDS:-86400}"
 BACKUP_RETENTION_DAYS="${BACKUP_RETENTION_DAYS:-30}"
 
@@ -37,7 +42,15 @@ run_backup() {
 
   log "Starting MySQL backup for: $BACKUP_DATABASES"
 
-  # Intentional word splitting: BACKUP_DATABASES is a space-separated database list.
+  ignore_flags=""
+  for database in $BACKUP_DATABASES; do
+    for table in $BACKUP_SKIP_TABLES; do
+      ignore_flags="$ignore_flags --ignore-table=$database.$table"
+    done
+  done
+
+  # Intentional word splitting: BACKUP_DATABASES is a space-separated database
+  # list, and ignore_flags one option per skipped table.
   if ! MYSQL_PWD="$MYSQL_PASSWORD" mysqldump \
     --host="$MYSQL_HOST" \
     --port="$MYSQL_PORT" \
@@ -45,6 +58,7 @@ run_backup() {
     --single-transaction \
     --routines \
     --triggers \
+    $ignore_flags \
     --databases $BACKUP_DATABASES \
     --result-file="$sql_tmp"; then
     rm -f "$sql_tmp" "$gzip_tmp"
