@@ -1,9 +1,13 @@
 import type {
   AndroidStudyEvent,
+  ChosenPeriod,
   CountsStatus,
+  CoverageCounts,
+  CoverageWindows,
   AwareLogPage,
   DeviceDetail,
   DevicesResponse,
+  ExportPlatform,
   Manifest,
   SensorRecord,
   SeriesBucket,
@@ -136,7 +140,45 @@ export const iosLogsExportHref = (opts: AndroidLogQuery = {}): string =>
 /** When the counts were last refreshed, and whether that is too long ago. */
 export const fetchCountsStatus = (): Promise<CountsStatus> => get("/counts/status");
 
-export const exportAllHref = (): string => `${BASE}/export/all.zip`;
+/** The periods on offer, each resolved to absolute bounds and what it holds. */
+export const fetchCoverageWindows = (): Promise<CoverageWindows> =>
+  get("/coverage/windows");
+
+/** How many records a period holds, optionally narrowed to a platform or sensor. */
+export const fetchCoverageCounts = (opts: {
+  from?: number | null;
+  to?: number | null;
+  platform?: "android" | "ios" | null;
+  sensor?: string | null;
+} = {}): Promise<CoverageCounts> => {
+  const params = new URLSearchParams();
+  if (opts.from != null) params.set("from_ts", String(Math.round(opts.from)));
+  if (opts.to != null) params.set("to_ts", String(Math.round(opts.to)));
+  if (opts.platform) params.set("platform", opts.platform);
+  if (opts.sensor) params.set("sensor", opts.sensor);
+  const query = params.toString();
+  return get(`/coverage/counts${query ? `?${query}` : ""}`);
+};
+
+/**
+ * Bounds as the export endpoints take them. Omitted entirely for all time, so
+ * the server reads it as the whole table rather than as an empty window.
+ */
+export const periodParams = (period?: ChosenPeriod | null): string => {
+  if (!period || (period.from == null && period.to == null)) return "";
+  const params = new URLSearchParams();
+  if (period.from != null) params.set("from_ts", String(Math.round(period.from)));
+  if (period.to != null) params.set("to_ts", String(Math.round(period.to)));
+  return `?${params.toString()}`;
+};
+
+export const exportAllHref = (
+  period?: ChosenPeriod | null,
+  platform: ExportPlatform = "all",
+): string => {
+  const params = periodParams(period);
+  return `${BASE}/export/all.zip${params ? `${params}&` : "?"}platform=${platform}`;
+};
 
 export const fetchManifest = (): Promise<Manifest> => get("/export/manifest");
 
@@ -145,14 +187,16 @@ export const exportManifestHref = (): string => `${BASE}/export/manifest`;
 export const exportDeviceHref = (
   platform: "android" | "ios",
   deviceId: string,
+  period?: ChosenPeriod | null,
 ): string =>
-  `${BASE}/export/device/${platform}/${encodeURIComponent(deviceId)}.zip`;
+  `${BASE}/export/device/${platform}/${encodeURIComponent(deviceId)}.zip${periodParams(period)}`;
 
 export const exportSensorZipHref = (
-  platform: "android" | "ios",
+  platform: ExportPlatform,
   sensor: string,
+  period?: ChosenPeriod | null,
 ): string =>
-  `${BASE}/export/sensor/${platform}/${encodeURIComponent(sensor)}.zip`;
+  `${BASE}/export/sensor/${platform}/${encodeURIComponent(sensor)}.zip${periodParams(period)}`;
 
 /**
  * CSV download URL for one sensor over a window. Returns every raw row in the

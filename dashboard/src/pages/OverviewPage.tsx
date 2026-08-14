@@ -2,8 +2,8 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import {
   exportAllHref,
-  fetchCountsStatus,
   exportSensorZipHref,
+  fetchCountsStatus,
   fetchDevices,
   fetchManifest,
   fetchStudyRequirements,
@@ -15,7 +15,7 @@ import {
   type SensorConfig,
 } from "../config/sensors";
 import SensorStatCard from "../components/SensorStatCard";
-import ExportLink from "../components/ExportLink";
+import ExportDialog from "../components/ExportDialog";
 import SensorViewFilter from "../components/SensorViewFilter";
 import { useSensorView } from "../utils/sensorView";
 import {
@@ -50,6 +50,12 @@ export default function OverviewPage() {
     null,
   );
   const [countsStatus, setCountsStatus] = useState<CountsStatus | null>(null);
+  // The period is chosen in the dialog rather than defaulted, so a
+  // study-scale download is never something a single click can start.
+  const [exporting, setExporting] = useState(false);
+  // Which sensor card asked to export. Its dialog adds the platform question a
+  // card needs, since one card spans both.
+  const [sensorExport, setSensorExport] = useState<SensorConfig | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [now, setNow] = useState(() => Date.now());
 
@@ -217,16 +223,7 @@ export default function OverviewPage() {
       ios={entryFor("ios", config.key)}
       loading={loading}
       className="h-full overflow-hidden"
-      androidExportHref={
-        config.tables.android != null
-          ? exportSensorZipHref("android", config.key)
-          : undefined
-      }
-      iosExportHref={
-        config.tables.ios != null
-          ? exportSensorZipHref("ios", config.key)
-          : undefined
-      }
+      onExport={() => setSensorExport(config)}
     />
   );
 
@@ -273,12 +270,14 @@ export default function OverviewPage() {
               >
                 Logs
               </Link>
-              <ExportLink
-                href={exportAllHref()}
-                label="Export all"
-                title="Export all CSVs"
-                className="h-9 px-3"
-              />
+              <button
+                type="button"
+                onClick={() => setExporting(true)}
+                title="Choose a period, then export everything the study holds"
+                className="inline-flex h-9 items-center justify-center rounded-lg border border-wire bg-card-strong px-3 text-[10px] font-semibold uppercase tracking-[0.4px] text-sage transition-colors hover:border-teal hover:text-teal"
+              >
+                Export all
+              </button>
               <div className="rounded-xl bg-teal-soft px-3 py-2 text-right">
                 <p className="text-[12px] font-semibold text-teal">
                   {relativeAge(latestUpload.last_seen, now)}
@@ -303,12 +302,14 @@ export default function OverviewPage() {
               >
                 Logs
               </Link>
-              <ExportLink
-                href={exportAllHref()}
-                label="Export all"
-                title="Export all CSVs"
-                className="h-9 px-3"
-              />
+              <button
+                type="button"
+                onClick={() => setExporting(true)}
+                title="Choose a period, then export everything the study holds"
+                className="inline-flex h-9 items-center justify-center rounded-lg border border-wire bg-card-strong px-3 text-[10px] font-semibold uppercase tracking-[0.4px] text-sage transition-colors hover:border-teal hover:text-teal"
+              >
+                Export all
+              </button>
             </div>
           )}
         </div>
@@ -367,6 +368,29 @@ export default function OverviewPage() {
       {view === "required" && required.available ? (
         <RequiredStreamNote settings={required.requiredWithoutStream} />
       ) : null}
+
+      {sensorExport && (
+        <ExportDialog
+          title={`Export ${sensorExport.label}`}
+          subtitle="Every phone that collected this sensor, for the platforms and period you choose."
+          href={(period, platform) =>
+            exportSensorZipHref(platform, sensorExport.key, period)
+          }
+          hasAndroid={sensorExport.tables.android != null}
+          hasIos={sensorExport.tables.ios != null}
+          sensor={sensorExport.key}
+          onClose={() => setSensorExport(null)}
+        />
+      )}
+
+      {exporting && (
+        <ExportDialog
+          title="Export the study"
+          subtitle="Every sensor and every phone, for the platforms and period you choose."
+          href={(period, platform) => exportAllHref(period, platform)}
+          onClose={() => setExporting(false)}
+        />
+      )}
     </div>
   );
 }

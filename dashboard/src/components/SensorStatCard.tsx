@@ -1,7 +1,6 @@
 import type { SensorConfig } from "../config/sensors";
 import type { SensorManifestEntry } from "../types";
 import { absoluteDate } from "../utils/time";
-import ExportLink from "./ExportLink";
 
 interface Props {
   config: SensorConfig;
@@ -10,8 +9,8 @@ interface Props {
   ios: SensorManifestEntry | null;
   loading: boolean;
   className?: string;
-  androidExportHref?: string;
-  iosExportHref?: string;
+  /** Opens the export dialog for this sensor. */
+  onExport?: () => void;
 }
 
 function hasRows(entry: SensorManifestEntry | null): entry is SensorManifestEntry {
@@ -80,8 +79,7 @@ export default function SensorStatCard({
   ios,
   loading,
   className = "",
-  androidExportHref,
-  iosExportHref,
+  onExport,
 }: Props) {
   const androidHasRows = hasRows(android);
   const iosHasRows = hasRows(ios);
@@ -104,35 +102,27 @@ export default function SensorStatCard({
             {config.unit}
           </span>
         )}
-        {androidExportHref && iosExportHref ? (
-          <>
-            <ExportLink
-              href={androidExportHref}
-              label="↓ Android"
-              title="Download Android records as CSV ZIP"
-              disabled={!loading && !androidHasRows}
-            />
-            <ExportLink
-              href={iosExportHref}
-              label="↓ iOS"
-              title="Download iOS records as CSV ZIP"
-              disabled={!loading && !iosHasRows}
-            />
-          </>
-        ) : androidExportHref ? (
-          <ExportLink
-            href={androidExportHref}
-            label="↓ Export"
-            title="Download records as CSV ZIP"
-            disabled={!loading && !androidHasRows}
-          />
-        ) : iosExportHref ? (
-          <ExportLink
-            href={iosExportHref}
-            label="↓ Export"
-            title="Download records as CSV ZIP"
-            disabled={!loading && !iosHasRows}
-          />
+        {/* One control rather than a button per platform: the dialog behind it
+            asks which platforms and which period, and those two questions
+            belong together. */}
+        {onExport ? (
+          androidHasRows || iosHasRows || loading ? (
+            <button
+              type="button"
+              onClick={onExport}
+              title="Choose platforms and a period, then export"
+              className="inline-flex h-7 items-center justify-center gap-1.5 rounded-lg border border-wire bg-card-strong px-2 text-[10px] font-semibold uppercase tracking-[0.4px] text-sage transition-colors hover:border-teal hover:text-teal"
+            >
+              ↓ Export
+            </button>
+          ) : (
+            <span
+              title="No records to export"
+              className="inline-flex h-7 cursor-not-allowed items-center justify-center rounded-lg border border-wire bg-card-strong px-2 text-[10px] font-semibold uppercase tracking-[0.4px] text-sage/30"
+            >
+              ↓ Export
+            </span>
+          )
         ) : null}
       </div>
 

@@ -225,3 +225,52 @@ export interface CountsStatus {
     { last_refreshed: number | null; age_seconds: number | null }
   >;
 }
+
+export type CoverageAnchor = "data" | "now";
+export type CoveragePeriod = "hour" | "day" | "week" | "month" | "year";
+
+/** One period on offer, already resolved to the instants it means. */
+export interface CoverageWindow {
+  key: string;
+  anchor: CoverageAnchor;
+  period: CoveragePeriod;
+  label: string;
+  from: number | null;
+  to: number | null;
+  available: boolean;
+  records: number;
+  platforms: Record<string, number>;
+}
+
+export interface CoverageWindows {
+  now: number;
+  newest: number | null;
+  windows: CoverageWindow[];
+  /** Totals count the whole hour a window's edge lands in. */
+  hour_granular: boolean;
+}
+
+export interface CoverageCounts {
+  from: number | null;
+  to: number | null;
+  total: number;
+  platforms: Record<string, number>;
+  sensors: Record<string, Record<string, number>>;
+  available: boolean;
+  hour_granular: boolean;
+  /** Roughly what the download will weigh. A magnitude, not a promise. */
+  estimated_bytes: number;
+}
+
+/** Which side of a sensor card an export covers. */
+export type ExportPlatform = "all" | "android" | "ios";
+
+/**
+ * What the researcher picked. `from`/`to` null on both ends means all time,
+ * which is an explicit choice rather than the absence of one.
+ */
+export interface ChosenPeriod {
+  from: number | null;
+  to: number | null;
+  label: string;
+}
