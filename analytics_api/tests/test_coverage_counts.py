@@ -198,3 +198,32 @@ def test_the_answer_says_it_is_hour_granular(client, counted):
     holdings["android"][android_table("accelerometer")] = 1
 
     assert client.get("/coverage/counts").json()["hour_granular"] is True
+
+
+def test_a_device_narrows_the_count_to_that_phone(client, counted, monkeypatch):
+    """A device export covers one phone, so the dialog beside it must not report
+    what the whole study holds — the figure would be wildly larger than the
+    archive the button produces."""
+    holdings, _ = counted
+    holdings["android"][android_table("accelerometer")] = 500
+    asked_for: list = []
+
+    async def records_by_table(db, model, window, tables=None, device_id=None):
+        asked_for.append(device_id)
+        return {} if device_id else dict(holdings["android"])
+
+    monkeypatch.setattr(
+        coverage_router.coverage_rollup, "records_by_table", records_by_table
+    )
+
+    body = client.get("/coverage/counts?platform=android&device=phone-a").json()
+
+    assert asked_for == ["phone-a"]
+    assert body["total"] == 0
+
+
+def test_no_device_asks_about_every_phone(client, counted):
+    holdings, _ = counted
+    holdings["android"][android_table("accelerometer")] = 500
+
+    assert client.get("/coverage/counts?platform=android").json()["total"] == 500

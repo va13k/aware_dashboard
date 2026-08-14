@@ -64,7 +64,11 @@ def _window(from_ts: float | None, to_ts: float | None) -> tuple:
 
 
 async def _platform_counts(
-    db: AsyncSession, platform: str, window: tuple, sensor: str | None
+    db: AsyncSession,
+    platform: str,
+    window: tuple,
+    sensor: str | None,
+    device: str | None = None,
 ) -> tuple[int, dict[str, int], dict[str, int]]:
     """One platform's total for the window, its split by sensor, and by table.
 
@@ -87,7 +91,7 @@ async def _platform_counts(
             return 0, {}, {}
 
     counted = await coverage_rollup.records_by_table(
-        db, _ROLLUP_FOR[platform], window, wanted
+        db, _ROLLUP_FOR[platform], window, wanted, device
     )
 
     by_sensor: dict[str, int] = {}
@@ -193,6 +197,7 @@ async def coverage_counts(
     to_ts: float | None = Query(None),
     platform: str | None = Query(None),
     sensor: str | None = Query(None),
+    device: str | None = Query(None),
     android_db: AsyncSession = Depends(get_android_db),
     ios_db: AsyncSession = Depends(get_ios_db),
 ):
@@ -202,9 +207,10 @@ async def coverage_counts(
     stored, which is the ``all time`` choice the export dialog offers explicitly
     rather than as a silent default.
 
-    ``platform`` narrows to one side, ``sensor`` to one card. Both are reported
-    per platform as well as summed, because a sensor card spans the two and
-    offers all-platforms / iPhone / Android as its second question.
+    ``platform`` narrows to one side, ``sensor`` to one card, ``device`` to one
+    phone. They are reported per platform as well as summed, because a sensor
+    card spans the two and offers all-platforms / iPhone / Android as its second
+    question — a device belongs to one platform and needs no such choice.
     """
     window = _window(from_ts, to_ts)
     wanted = _requested_platforms(platform)
@@ -217,7 +223,9 @@ async def coverage_counts(
     estimated = 0
     for name in wanted:
         db = sessions[name]
-        total, by_sensor, by_table = await _platform_counts(db, name, window, sensor)
+        total, by_sensor, by_table = await _platform_counts(
+            db, name, window, sensor, device
+        )
         totals[name] = total
         sensors[name] = by_sensor
         if by_table:
