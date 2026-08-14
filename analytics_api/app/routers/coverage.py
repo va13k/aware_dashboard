@@ -16,14 +16,21 @@ control wants to be right about its magnitude and instant to produce, and a
 window landing mid-hour counts the hour it lands in.
 """
 
+import time
+
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_android_db, get_ios_db
-from app.models import AndroidCoverageHourly, IosCoverageHourly
+from app.models import (
+    AndroidCoverageHourly,
+    AndroidRecordCount,
+    IosCoverageHourly,
+    IosRecordCount,
+)
 from app.routers.android import _EXPORT_MODELS as ANDROID_EXPORT_MODELS
 from app.routers.ios import _EXPORT_MODELS as IOS_EXPORT_MODELS
-from app.services import coverage_rollup, sensor_tables
+from app.services import coverage, coverage_rollup, record_counts, sensor_tables
 
 router = APIRouter(prefix="/coverage", tags=["coverage"])
 
@@ -31,6 +38,7 @@ PLATFORMS = ("android", "ios")
 
 _EXPORT_MODELS_FOR = {"android": ANDROID_EXPORT_MODELS, "ios": IOS_EXPORT_MODELS}
 _ROLLUP_FOR = {"android": AndroidCoverageHourly, "ios": IosCoverageHourly}
+_COUNTS_FOR = {"android": AndroidRecordCount, "ios": IosRecordCount}
 
 
 def _requested_platforms(platform: str | None) -> tuple[str, ...]:
@@ -80,6 +88,93 @@ async def _platform_counts(
         by_sensor[name] = by_sensor.get(name, 0) + records
 
     return sum(by_sensor.values()), by_sensor
+
+
+async def records_across(sessions: dict, window: tuple) -> list[int]:
+    """What one window holds on each platform, in the order `sessions` gives."""
+    return [
+        (await coverage_rollup.records_for_windows(db, _ROLLUP_FOR[name], [window]))[0]
+        for name, db in sessions.items()
+    ]
+
+
+async def offered_windows(sessions: dict, newest: float | None, now_ms: float) -> list[dict]:
+    """Every period on offer, each carrying what it actually holds.
+
+    One contract for both the export dialogs and the backup page, so the two
+    cannot come to disagree about which periods are worth offering.
+
+    `available` used to be settled by probing the data tables for a single row
+    per window. That is cheap when a window has data and worst when it does not
+    — it walks every table before concluding nothing is there, which is exactly
+    the case the page needs in order to grey the period out. Read from the
+    rollup instead, all windows in one aggregate per platform, and the answer
+    arrives with a record count rather than just a yes.
+    """
+    offered = coverage.windows(newest, now_ms)
+
+    # A period whose anchor is missing has no bounds to ask about, and reads as
+    # unavailable however much the study holds.
+    askable = [entry for entry in offered if entry["from"] is not None]
+    if not askable:
+        return offered
+
+    bounds = [(entry["from"], entry["to"]) for entry in askable]
+    totals = {name: [0] * len(bounds) for name in sessions}
+    for name, db in sessions.items():
+        totals[name] = await coverage_rollup.records_for_windows(
+            db, _ROLLUP_FOR[name], bounds
+        )
+
+    for index, entry in enumerate(askable):
+        per_platform = {name: totals[name][index] for name in sessions}
+        entry["records"] = sum(per_platform.values())
+        entry["platforms"] = per_platform
+        entry["available"] = entry["records"] > 0
+
+    for entry in offered:
+        entry.setdefault("records", 0)
+        entry.setdefault("platforms", {name: 0 for name in sessions})
+
+    return offered
+
+
+@router.get("/windows")
+async def coverage_windows(
+    android_db: AsyncSession = Depends(get_android_db),
+    ios_db: AsyncSession = Depends(get_ios_db),
+):
+    """The periods a researcher may pick, and what each one holds.
+
+    A relative period is returned as the absolute pair it resolves to, because a
+    choice whose starting point is invisible makes an export impossible to
+    reproduce afterwards.
+    """
+    now_ms = time.time() * 1000
+    sessions = {"android": android_db, "ios": ios_db}
+    newest = await _newest_stored(sessions)
+
+    return {
+        "now": now_ms,
+        "newest": newest,
+        "windows": await offered_windows(sessions, newest, now_ms),
+        "hour_granular": True,
+    }
+
+
+async def _newest_stored(sessions: dict) -> float | None:
+    """The newest row either platform holds, from the count cache.
+
+    Exact rather than hour-granular, because it anchors half the periods on
+    offer: read from `record_counts.last_ts` instead of the rollup, which would
+    round the anchor down to the top of the hour.
+    """
+    newest = None
+    for name, db in sessions.items():
+        stamp = await record_counts.newest_timestamp(db, _COUNTS_FOR[name])
+        if stamp is not None and (newest is None or stamp > newest):
+            newest = stamp
+    return newest
 
 
 @router.get("/counts")

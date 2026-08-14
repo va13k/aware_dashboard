@@ -165,6 +165,27 @@ async def sensor_totals(db: AsyncSession, count_model) -> dict:
     return {sensor: (int(total or 0), int(devices)) for sensor, total, devices in rows}
 
 
+async def newest_timestamp(db: AsyncSession, count_model) -> float | None:
+    """The newest row this database holds, across every sensor and device.
+
+    The cache already carries `last_ts` per (sensor, device), so this is one
+    aggregate over a small table rather than a `MAX(timestamp)` per data table.
+    It anchors the periods a period control offers, which is why it is read here
+    and not from the hourly rollup: the rollup would round it down to the top of
+    its hour, and a period counted back from that would end early.
+    """
+    try:
+        newest = (
+            await db.execute(
+                select(func.max(count_model.last_ts)).where(count_model.last_ts > 0)
+            )
+        ).scalar()
+    except (ProgrammingError, OperationalError, SQLAlchemyError):
+        await _rollback(db)
+        return None
+    return float(newest) if newest else None
+
+
 async def reset(db: AsyncSession, count_model) -> None:
     """Drop the whole cache so the next refresh rebuilds it (post-purge)."""
     try:

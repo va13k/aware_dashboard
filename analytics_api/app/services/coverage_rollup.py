@@ -36,7 +36,7 @@ Timestamps are AWARE's epoch milliseconds, so bucketing is integer arithmetic on
 them and lands in UTC. A display timezone is applied when a grid is drawn.
 """
 
-from sqlalchemy import column, func, select, table as sql_table
+from sqlalchemy import and_, case, column, func, select, table as sql_table, true
 from sqlalchemy.dialects.mysql import insert as mysql_insert
 from sqlalchemy.exc import OperationalError, ProgrammingError, SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -267,6 +267,44 @@ async def records_in(
 ) -> int:
     """The total the rollup reports for `window`, across `tables`."""
     return sum((await records_by_table(db, model, window, tables, device_id)).values())
+
+
+async def records_for_windows(
+    db: AsyncSession, model, windows: list, tables=None
+) -> list[int]:
+    """How many records each of several windows holds, in one read.
+
+    A period control offers ten windows at once and needs a figure for each of
+    them before the researcher has chosen anything. Asked one at a time that is
+    ten aggregates; asked as a sum per window it is one, over the same rows.
+
+    Returns a total per window, positionally. A window with no bounds counts
+    everything, which is what the explicit `all time` choice means.
+    """
+    if not windows:
+        return []
+
+    columns = []
+    for index, window in enumerate(windows):
+        conditions = _overlapping(model, window)
+        matched = and_(*conditions) if conditions else true()
+        columns.append(
+            func.coalesce(func.sum(case((matched, model.records), else_=0)), 0).label(
+                f"w{index}"
+            )
+        )
+
+    query = select(*columns)
+    if tables is not None:
+        query = query.where(model.table_name.in_(list(tables)))
+
+    try:
+        row = (await db.execute(query)).one()
+    except (ProgrammingError, OperationalError, SQLAlchemyError):
+        await _rollback(db)
+        return [0] * len(windows)
+
+    return [int(value or 0) for value in row]
 
 
 async def reset(db: AsyncSession, model) -> None:

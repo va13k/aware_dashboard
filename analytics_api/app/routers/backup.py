@@ -42,6 +42,7 @@ from app.models import (
     IosRecordCount,
 )
 from app.routers.counts import ANDROID_SOURCES, IOS_SOURCES
+from app.routers import coverage as coverage_windows
 from app.services import backup_jobs as jobs
 from app.services import (
     coverage,
@@ -150,45 +151,38 @@ async def export_coverage(
 ):
     """Which periods hold data, so the page only offers exports that yield rows.
 
-    Windows ending at the newest stored row contain that row by construction, so
-    they are known to be available without asking. The clock-anchored ones are
-    the interesting case — on a quiet study they are empty, and that is what the
-    page needs in order to grey them out.
+    The offer itself is built once for the whole deployment (routers/coverage.py)
+    so this page and the export dialogs cannot come to disagree about which
+    periods are worth showing. What stays here is the part only a backup cares
+    about: the size of the dump it would produce.
     """
     now_ms = time.time() * 1000
-    tables_by_database: dict[str, list[str]] = {}
-    oldest = newest = None
+    oldest = None
 
     for database in DATABASES:
         async with _session_for(database)() as db:
             tables = await coverage.timestamped_tables(db, database)
-            tables_by_database[database] = tables
-            low, high = await coverage.span(db, database, tables)
+            low, _ = await coverage.span(db, database, tables)
         if low is not None and (oldest is None or low < oldest):
             oldest = low
-        if high is not None and (newest is None or high > newest):
-            newest = high
 
-    async def available(start: float, end: float) -> bool:
-        for database, tables in tables_by_database.items():
-            async with _session_for(database)() as db:
-                if await coverage.has_rows(db, database, tables, start, end):
-                    return True
-        return False
+    async with AndroidSessionLocal() as android_db, IosSessionLocal() as ios_db:
+        sessions = {"android": android_db, "ios": ios_db}
+        newest = await coverage_windows._newest_stored(sessions)
+        offered = await coverage_windows.offered_windows(sessions, newest, now_ms)
 
-    offered = coverage.windows(newest, now_ms)
-    for window in offered:
-        if window["from"] is None:
-            continue
-        if window["anchor"] == coverage.DATA_ANCHOR:
-            window["available"] = True
-            continue
-        window["available"] = await available(window["from"], window["to"])
-
-    custom = None
-    if from_ts is not None and to_ts is not None:
-        start, end = (from_ts, to_ts) if from_ts <= to_ts else (to_ts, from_ts)
-        custom = {"from": start, "to": end, "available": await available(start, end)}
+        custom = None
+        if from_ts is not None and to_ts is not None:
+            start, end = (from_ts, to_ts) if from_ts <= to_ts else (to_ts, from_ts)
+            records = sum(
+                await coverage_windows.records_across(sessions, (start, end))
+            )
+            custom = {
+                "from": start,
+                "to": end,
+                "records": records,
+                "available": records > 0,
+            }
 
     return {
         "now": now_ms,

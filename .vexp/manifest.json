@@ -79,7 +79,7 @@
     "analytics_api/app/routers/__init__.py": "af1349b9f5f9a1a6a0404dea36dcc9499bcb25c9adc112b7cc9a93cae41f3262",
     "analytics_api/app/routers/android.py": "4231bee20b08d8f664c9f8403d0e87a750ee97be92427bda79cab74515a57153",
     "analytics_api/app/routers/auth.py": "0468f635685bbd89149626a5be8f60baf6a60e406032cef2a12205195214f023",
-    "analytics_api/app/routers/backup.py": "3df23d705f68097e5ccf12b9644e31a3729d2196984a7b274e6d386f7975d453",
+    "analytics_api/app/routers/backup.py": "1e9c665d5b7da7df01a5a3497bafa2ab056d203e447b44bf1f4be93ef33eb518",
     "analytics_api/app/routers/counts.py": "22eef387d4ded8317d76f7e4010e3c98b508fea928abf387868a26e4db3aa4d5",
     "analytics_api/app/routers/devices.py": "895e17557e02f1fb84f6a912d3de7395d548f0ab7642cdb909d395fb3529a2ea",
     "analytics_api/app/routers/export.py": "97d926667ebc2ea76c67f9958a9836b7f82ba6844c6366e2bdc3dcdf1018d85e",
@@ -213,11 +213,11 @@
     "shared_config/source_store.py": "ceaf715a4f7aa1198409553bed5ab30ab761f23c6f6db02140ee2e84148aa1f9",
     "shared_config/test_serializers.py": "d7614beeadecc7e75fcf9671fbc58ae7c8d9ce338a9cc21480128038ccd23fdb"
   },
-  "indexed_at_commit": "c6c6a951f6aaf30ce586831b2a8be93a8419d88b",
-  "indexed_at_timestamp": "2026-08-14T15:09:15.628481+00:00",
+  "indexed_at_commit": "9a766274fa33d5560672d76bfc6aee535ec724f8",
+  "indexed_at_timestamp": "2026-08-14T16:00:26.561716+00:00",
   "schema_version": 3,
   "stats": {
-    "total_edges": 2159,
+    "total_edges": 2154,
     "total_files": 212,
     "total_nodes": 2056
   },
