@@ -121,8 +121,12 @@ def dump(server, tmp_path, ranged=False):
     env = {**os.environ, "MYSQL_PWD": server.password}
     if ranged:
         command.append("--where=timestamp >= 0 AND timestamp <= 9999")
+        # The list production uses, so a table added there is excluded here too
+        # rather than failing this test later.
         command += [
-            f"--ignore-table={db}.record_counts" for db in ("aware_android", "aware_ios")
+            f"--ignore-table={db}.{table}"
+            for db in ("aware_android", "aware_ios")
+            for table in sorted(dump_stream.MERGE_SKIP_TABLES)
         ]
     command += ["--databases", "aware_android", "aware_ios"]
     produced = subprocess.run(command, capture_output=True, timeout=300, env=env)

@@ -27,10 +27,12 @@ import re
 REPLACE = "replace"
 MERGE = "merge"
 
-#: The dashboard's own count cache is per-deployment bookkeeping, not study
-#: data. It is refreshed from the merged rows afterwards, so a merge skips it
-#: rather than folding a foreign deployment's tallies into it.
-MERGE_SKIP_TABLES = frozenset({"record_counts"})
+#: The dashboard's own caches are per-deployment bookkeeping, not study data.
+#: They are rebuilt from the merged rows afterwards, so a merge skips them rather
+#: than folding a foreign deployment's tallies into them. A period export leaves
+#: them out for a second reason: neither carries a `timestamp` column, and the
+#: single `--where` a ranged dump applies to every table would fail on them.
+MERGE_SKIP_TABLES = frozenset({"record_counts", "coverage_hourly"})
 
 _QUOTE = ord("'")
 _BACKSLASH = ord("\\")
