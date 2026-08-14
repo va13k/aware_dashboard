@@ -6,17 +6,22 @@ from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import StreamingResponse
-from sqlalchemy import func, select
+from sqlalchemy import and_, func, or_, select
 from sqlalchemy.exc import OperationalError, ProgrammingError, SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import AndroidSessionLocal, IosSessionLocal, get_android_db, get_ios_db
-from app.models import AndroidRecordCount, IosRecordCount
+from app.models import (
+    AndroidCoverageHourly,
+    AndroidRecordCount,
+    IosCoverageHourly,
+    IosRecordCount,
+)
 from app.routers.android import _EXPORT_MODELS as ANDROID_EXPORT_MODELS
 from app.routers.ios import _EXPORT_MODELS as IOS_EXPORT_MODELS
 from app.schemas import IosSchema
 from app.services import backup_jobs as jobs
-from app.services import record_counts
+from app.services import coverage_rollup, record_counts
 
 router = APIRouter(prefix="/export", tags=["export"])
 
@@ -71,20 +76,57 @@ def _csv_rows(fields: list[str], records: list[dict], header: bool = False) -> b
     return buf.getvalue().encode("utf-8")
 
 
-async def _paged(db: AsyncSession, model, device_id: str | None, render):
-    """Walk a table in ``_id`` order, yielding one rendered batch at a time.
+#: No period chosen, so the export covers whatever the table holds.
+ALL_TIME = (None, None)
 
-    Paging on the primary key rather than ``OFFSET`` keeps each round trip an
-    indexed seek, and means the rows a batch held can be released before the next
-    one is read.
+
+def _bounded(query, model, window):
+    """The query, narrowed to the chosen period. Both ends are inclusive."""
+    start, end = window
+    if start is not None:
+        query = query.where(model.timestamp >= start)
+    if end is not None:
+        query = query.where(model.timestamp <= end)
+    return query
+
+
+async def _paged(db: AsyncSession, model, device_id: str | None, render, window=ALL_TIME):
+    """Walk a table in batches, yielding one rendered batch at a time.
+
+    Paging on a key rather than ``OFFSET`` keeps each round trip an indexed seek,
+    and means the rows a batch held can be released before the next one is read.
+
+    *Which* key depends on the period. With none, ``_id`` — the primary key, and
+    the order the archives have always been written in. With one, ``(timestamp,
+    _id)``, because the two cannot both be indexed: the table carries ``PRIMARY
+    KEY (_id)`` and ``KEY time_device (timestamp, device_id)``, so walking in
+    ``_id`` order with a ``timestamp`` predicate reads the whole table and
+    discards most of it. Ordering by ``timestamp`` makes the period an index
+    range seek, so a day out of a year costs a day. ``_id`` breaks ties, so rows
+    sharing a millisecond are neither repeated across batches nor skipped.
     """
-    last_id = 0
+    ranged = window != ALL_TIME
+    last_ts, last_id = None, 0
     while True:
-        query = select(model).where(model._id > last_id)
+        query = select(model)
         if device_id is not None:
             query = query.where(model.device_id == device_id)
+
+        if ranged:
+            query = _bounded(query, model, window)
+            if last_ts is not None:
+                query = query.where(
+                    or_(
+                        model.timestamp > last_ts,
+                        and_(model.timestamp == last_ts, model._id > last_id),
+                    )
+                )
+            query = query.order_by(model.timestamp.asc(), model._id.asc())
+        else:
+            query = query.where(model._id > last_id).order_by(model._id.asc())
+
         try:
-            result = await db.execute(query.order_by(model._id.asc()).limit(EXPORT_BATCH))
+            result = await db.execute(query.limit(EXPORT_BATCH))
             rows = result.scalars().all()
         except (OperationalError, ProgrammingError, SQLAlchemyError):
             await _rollback_after_table_error(db)
@@ -92,13 +134,16 @@ async def _paged(db: AsyncSession, model, device_id: str | None, render):
         if not rows:
             return
         yield [render(row) for row in rows]
-        last_id = rows[-1]._id
+        last_ts, last_id = rows[-1].timestamp, rows[-1]._id
 
 
-async def _has_rows(db: AsyncSession, model, device_id: str | None = None) -> bool:
+async def _has_rows(
+    db: AsyncSession, model, device_id: str | None = None, window=ALL_TIME
+) -> bool:
     query = select(model._id)
     if device_id is not None:
         query = query.where(model.device_id == device_id)
+    query = _bounded(query, model, window)
     try:
         return (await db.execute(query.limit(1))).first() is not None
     except (OperationalError, ProgrammingError, SQLAlchemyError):
@@ -313,19 +358,76 @@ async def _start_zip_job(scope: str, filename: str, total: int):
     return {"id": job.id, "filename": filename, "rows": total}
 
 
-async def _sensor_row_total(db: AsyncSession, count_model, sensor: str) -> int:
-    totals = await record_counts.sensor_totals(db, count_model)
-    return int(totals.get(sensor, (0, 0))[0])
+def _window(from_ts: float | None, to_ts: float | None) -> tuple:
+    """The chosen period, or ALL_TIME when neither end was given.
+
+    A reversed pair is read as the period the researcher meant rather than
+    refused, since the two ends are a range and not an order.
+    """
+    if from_ts is None and to_ts is None:
+        return ALL_TIME
+    if from_ts is not None and to_ts is not None and from_ts > to_ts:
+        return (to_ts, from_ts)
+    return (from_ts, to_ts)
 
 
-async def _device_row_total(db: AsyncSession, count_model, device_id: str) -> int:
-    cached = await record_counts.counts_for_device(db, count_model, device_id)
-    return sum(entry["count"] for entry in cached.values())
+def _rollup_model(platform: str):
+    return AndroidCoverageHourly if platform == "android" else IosCoverageHourly
 
 
-async def _platform_row_total(db: AsyncSession, count_model) -> int:
-    totals = await record_counts.sensor_totals(db, count_model)
-    return sum(count for count, _ in totals.values())
+def _sensor_tables(platform: str, sensor: str) -> list[str]:
+    """The tables one sensor's rows live in.
+
+    Taken from the export models rather than the count cache's source map: a
+    sensor spread across two tables is missing from that map entirely, and
+    counting it is the reason the rollup is keyed by table.
+    """
+    export_models = ANDROID_EXPORT_MODELS if platform == "android" else IOS_EXPORT_MODELS
+    entry = export_models.get(sensor)
+    if entry is None:
+        return []
+    models = (entry[0],) if _is_android_export_entry(entry) else _ios_models(entry)
+    return [model.__tablename__ for model in models]
+
+
+# The totals below are what a progress bar is measured against. Without a period
+# they come from the count cache, which holds exactly the rows an export writes.
+# With one they come from the rollup, whose buckets are whole hours — so a window
+# landing mid-hour reads slightly high. The bar is completed when the job
+# finishes rather than by reaching its denominator, so the difference is not
+# visible; what would be visible is measuring a windowed export against the whole
+# table, which is what these replace.
+
+
+async def _sensor_row_total(
+    db: AsyncSession, platform: str, count_model, sensor: str, window=ALL_TIME
+) -> int:
+    if window == ALL_TIME:
+        totals = await record_counts.sensor_totals(db, count_model)
+        return int(totals.get(sensor, (0, 0))[0])
+    return await coverage_rollup.records_in(
+        db, _rollup_model(platform), window, _sensor_tables(platform, sensor)
+    )
+
+
+async def _device_row_total(
+    db: AsyncSession, platform: str, count_model, device_id: str, window=ALL_TIME
+) -> int:
+    if window == ALL_TIME:
+        cached = await record_counts.counts_for_device(db, count_model, device_id)
+        return sum(entry["count"] for entry in cached.values())
+    return await coverage_rollup.records_in(
+        db, _rollup_model(platform), window, device_id=device_id
+    )
+
+
+async def _platform_row_total(
+    db: AsyncSession, platform: str, count_model, window=ALL_TIME
+) -> int:
+    if window == ALL_TIME:
+        totals = await record_counts.sensor_totals(db, count_model)
+        return sum(count for count, _ in totals.values())
+    return await coverage_rollup.records_in(db, _rollup_model(platform), window)
 
 
 def _zip_streaming_response(members, filename: str, job=None) -> StreamingResponse:
@@ -340,7 +442,9 @@ def _zip_streaming_response(members, filename: str, job=None) -> StreamingRespon
     )
 
 
-async def _chained(db: AsyncSession, models: tuple, device_ids: list[str], render):
+async def _chained(
+    db: AsyncSession, models: tuple, device_ids: list[str], render, window=ALL_TIME
+):
     """Every device's rows for one sensor, in turn, as batches.
 
     Walking device by device keeps the CSV grouped the way it has always been —
@@ -348,11 +452,11 @@ async def _chained(db: AsyncSession, models: tuple, device_ids: list[str], rende
     """
     for model in models:
         for device_id in device_ids:
-            async for batch in _paged(db, model, device_id, render):
+            async for batch in _paged(db, model, device_id, render, window):
                 yield batch
 
 
-async def _sensor_members(platform: str, sensor: str, model_entry):
+async def _sensor_members(platform: str, sensor: str, model_entry, window=ALL_TIME):
     """One sensor across every phone, as a single CSV inside the archive."""
     name = f"{platform}_{_safe_path_part(sensor)}.csv"
     session = AndroidSessionLocal if platform == "android" else IosSessionLocal
@@ -363,7 +467,13 @@ async def _sensor_members(platform: str, sensor: str, model_entry):
             yield (
                 name,
                 _android_fields(schema),
-                _chained(db, (model,), devices, lambda row: schema.model_validate(row).model_dump()),
+                _chained(
+                    db,
+                    (model,),
+                    devices,
+                    lambda row: schema.model_validate(row).model_dump(),
+                    window,
+                ),
             )
             return
 
@@ -379,36 +489,56 @@ async def _sensor_members(platform: str, sensor: str, model_entry):
                 models,
                 sorted(devices),
                 lambda row: IosSchema.model_validate(row).model_dump(),
+                window,
             ),
         )
 
 
-async def _device_members(platform: str, device_id: str):
-    """Every sensor this phone has data for, one archive member each."""
+async def _device_members(platform: str, device_id: str, window=ALL_TIME):
+    """Every sensor this phone has data for, one archive member each.
+
+    A sensor with nothing inside the period is left out rather than written as a
+    header-only member, so the archive says which sensors the period actually
+    covers.
+    """
     safe_device = _safe_path_part(device_id)
     session = AndroidSessionLocal if platform == "android" else IosSessionLocal
     async with session() as db:
         if platform == "android":
             for sensor, (model, schema) in ANDROID_EXPORT_MODELS.items():
-                if not await _has_rows(db, model, device_id):
+                if not await _has_rows(db, model, device_id, window):
                     continue
                 yield (
                     f"android/{safe_device}/{_safe_path_part(sensor)}.csv",
                     _android_fields(schema),
-                    _paged(db, model, device_id, lambda row, s=schema: s.model_validate(row).model_dump()),
+                    _paged(
+                        db,
+                        model,
+                        device_id,
+                        lambda row, s=schema: s.model_validate(row).model_dump(),
+                        window,
+                    ),
                 )
             return
 
         for sensor, model_entry in IOS_EXPORT_MODELS.items():
             models = _ios_models(model_entry)
-            if not any([await _has_rows(db, model, device_id) for model in models]):
+            if not any(
+                [await _has_rows(db, model, device_id, window) for model in models]
+            ):
                 continue
             fields = await _ios_field_union(db, models)
             for model in models:
                 yield (
                     f"ios/{safe_device}/{_safe_path_part(sensor)}.csv",
                     fields,
-                    _paged(db, model, device_id, lambda row: IosSchema.model_validate(row).model_dump()),
+                    _paged(
+                        db,
+                        model,
+                        device_id,
+                        lambda row: IosSchema.model_validate(row).model_dump(),
+                        window,
+                    ),
                 )
 
 
@@ -452,17 +582,20 @@ async def export_manifest(
     }
 
 
-async def _any_sensor_has_rows(db: AsyncSession, platform: str, device_id: str) -> bool:
-    """Whether this phone wrote anything at all.
+async def _any_sensor_has_rows(
+    db: AsyncSession, platform: str, device_id: str, window=ALL_TIME
+) -> bool:
+    """Whether this phone wrote anything inside the chosen period.
 
     Settled before the response begins: once a streaming body is under way its
-    status can no longer become a 404.
+    status can no longer become a 404. With a period that makes an empty window
+    a refusal rather than an archive of empty CSVs.
     """
     exports = _platform_exports(platform)
     for entry in exports.values():
         models = (entry[0],) if _is_android_export_entry(entry) else _ios_models(entry)
         for model in models:
-            if await _has_rows(db, model, device_id):
+            if await _has_rows(db, model, device_id, window):
                 return True
     return False
 
@@ -471,13 +604,16 @@ async def _any_sensor_has_rows(db: AsyncSession, platform: str, device_id: str) 
 async def start_device_csv_zip(
     platform: str,
     device_id: str,
+    from_ts: float | None = Query(None),
+    to_ts: float | None = Query(None),
     android_db: AsyncSession = Depends(get_android_db),
     ios_db: AsyncSession = Depends(get_ios_db),
 ):
     """Register the export so the page can show progress while it downloads."""
     _platform_exports(platform)
     db = android_db if platform == "android" else ios_db
-    if not await _any_sensor_has_rows(db, platform, device_id):
+    window = _window(from_ts, to_ts)
+    if not await _any_sensor_has_rows(db, platform, device_id, window):
         raise HTTPException(
             status_code=404,
             detail=f"No sensor data found for {platform} device: {device_id}",
@@ -486,7 +622,7 @@ async def start_device_csv_zip(
     return await _start_zip_job(
         f"device:{platform}:{device_id}",
         f"{platform}_{_safe_path_part(device_id)}.zip",
-        await _device_row_total(db, model, device_id),
+        await _device_row_total(db, platform, model, device_id, window),
     )
 
 
@@ -495,20 +631,24 @@ async def export_device_csv_zip(
     platform: str,
     device_id: str,
     job: str | None = Query(None),
+    from_ts: float | None = Query(None),
+    to_ts: float | None = Query(None),
+
     android_db: AsyncSession = Depends(get_android_db),
     ios_db: AsyncSession = Depends(get_ios_db),
 ):
     _platform_exports(platform)
     db = android_db if platform == "android" else ios_db
 
-    if not await _any_sensor_has_rows(db, platform, device_id):
+    window = _window(from_ts, to_ts)
+    if not await _any_sensor_has_rows(db, platform, device_id, window):
         raise HTTPException(
             status_code=404,
             detail=f"No sensor data found for {platform} device: {device_id}",
         )
 
     return _zip_streaming_response(
-        _device_members(platform, device_id),
+        _device_members(platform, device_id, window),
         f"{platform}_{_safe_path_part(device_id)}.zip",
         _progress_job(job, f"device:{platform}:{device_id}"),
     )
@@ -518,6 +658,8 @@ async def export_device_csv_zip(
 async def start_sensor_csv_zip(
     platform: str,
     sensor: str,
+    from_ts: float | None = Query(None),
+    to_ts: float | None = Query(None),
     android_db: AsyncSession = Depends(get_android_db),
     ios_db: AsyncSession = Depends(get_ios_db),
 ):
@@ -528,7 +670,8 @@ async def start_sensor_csv_zip(
         raise HTTPException(status_code=404, detail=f"Unknown sensor: {sensor}")
     db = android_db if platform == "android" else ios_db
     models = (model_entry[0],) if _is_android_export_entry(model_entry) else _ios_models(model_entry)
-    if not any([await _has_rows(db, model) for model in models]):
+    window = _window(from_ts, to_ts)
+    if not any([await _has_rows(db, model, None, window) for model in models]):
         raise HTTPException(
             status_code=404, detail=f"No data found for {platform} sensor: {sensor}"
         )
@@ -536,7 +679,7 @@ async def start_sensor_csv_zip(
     return await _start_zip_job(
         f"sensor:{platform}:{sensor}",
         f"{platform}_{_safe_path_part(sensor)}.zip",
-        await _sensor_row_total(db, count_model, sensor),
+        await _sensor_row_total(db, platform, count_model, sensor, window),
     )
 
 
@@ -545,6 +688,9 @@ async def export_sensor_csv_zip(
     platform: str,
     sensor: str,
     job: str | None = Query(None),
+    from_ts: float | None = Query(None),
+    to_ts: float | None = Query(None),
+
     android_db: AsyncSession = Depends(get_android_db),
     ios_db: AsyncSession = Depends(get_ios_db),
 ):
@@ -556,7 +702,8 @@ async def export_sensor_csv_zip(
     db = android_db if platform == "android" else ios_db
     models = (model_entry[0],) if _is_android_export_entry(model_entry) else _ios_models(model_entry)
 
-    if not any([await _has_rows(db, model) for model in models]):
+    window = _window(from_ts, to_ts)
+    if not any([await _has_rows(db, model, None, window) for model in models]):
         raise HTTPException(
             status_code=404,
             detail=f"No data found for {platform} sensor: {sensor}",
@@ -564,25 +711,27 @@ async def export_sensor_csv_zip(
 
     safe_sensor = _safe_path_part(sensor)
     return _zip_streaming_response(
-        _sensor_members(platform, sensor, model_entry),
+        _sensor_members(platform, sensor, model_entry, window),
         f"{platform}_{safe_sensor}.zip",
         _progress_job(job, f"sensor:{platform}:{sensor}"),
     )
 
 
-async def _all_members():
+async def _all_members(window=ALL_TIME):
     """Every sensor of every phone on both platforms."""
     for platform in ("android", "ios"):
         session = AndroidSessionLocal if platform == "android" else IosSessionLocal
         exports = ANDROID_EXPORT_MODELS if platform == "android" else IOS_EXPORT_MODELS
         async with session() as db:
             for device_id in await _platform_device_ids(db, exports):
-                async for entry in _device_members(platform, device_id):
+                async for entry in _device_members(platform, device_id, window):
                     yield entry
 
 
 @router.post("/all.zip")
 async def start_all_csv_zip(
+    from_ts: float | None = Query(None),
+    to_ts: float | None = Query(None),
     android_db: AsyncSession = Depends(get_android_db),
     ios_db: AsyncSession = Depends(get_ios_db),
 ):
@@ -592,14 +741,18 @@ async def start_all_csv_zip(
     if not android and not ios:
         raise HTTPException(status_code=404, detail="No sensor data found to export")
 
-    total = await _platform_row_total(android_db, AndroidRecordCount)
-    total += await _platform_row_total(ios_db, IosRecordCount)
+    window = _window(from_ts, to_ts)
+    total = await _platform_row_total(android_db, "android", AndroidRecordCount, window)
+    total += await _platform_row_total(ios_db, "ios", IosRecordCount, window)
     return await _start_zip_job("all", "all.zip", total)
 
 
 @router.get("/all.zip")
 async def export_all_csv_zip(
     job: str | None = Query(None),
+    from_ts: float | None = Query(None),
+    to_ts: float | None = Query(None),
+
     android_db: AsyncSession = Depends(get_android_db),
     ios_db: AsyncSession = Depends(get_ios_db),
 ):
@@ -608,4 +761,6 @@ async def export_all_csv_zip(
     if not android and not ios:
         raise HTTPException(status_code=404, detail="No sensor data found to export")
 
-    return _zip_streaming_response(_all_members(), "all.zip", _progress_job(job, "all"))
+    return _zip_streaming_response(
+        _all_members(_window(from_ts, to_ts)), "all.zip", _progress_job(job, "all")
+    )

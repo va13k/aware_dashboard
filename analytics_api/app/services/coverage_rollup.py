@@ -215,6 +215,60 @@ async def refresh(db: AsyncSession, model, database: str) -> dict[str, int]:
     return added
 
 
+def _overlapping(model, window):
+    """Conditions selecting the buckets a window touches.
+
+    A bucket covers the hour beginning at `hour_start`, so a window that starts
+    or ends part-way through one includes that whole hour. The figure is
+    therefore hour-granular at its edges — which is what makes it cheap, and is
+    the difference between reading a summary table and counting the rows
+    themselves. Callers wanting an exact figure must count the source.
+    """
+    start, end = window
+    conditions = []
+    if start is not None:
+        conditions.append(model.hour_start + HOUR_MS > start)
+    if end is not None:
+        conditions.append(model.hour_start <= end)
+    return conditions
+
+
+async def records_by_table(
+    db: AsyncSession, model, window, tables=None, device_id: str | None = None
+) -> dict[str, int]:
+    """How many records each table holds inside `window`, per the rollup.
+
+    `tables` restricts the answer to a set of table names; `device_id` to one
+    phone. A table with nothing in the window is absent rather than zero.
+    """
+    query = select(model.table_name, func.sum(model.records).label("records"))
+    for condition in _overlapping(model, window):
+        query = query.where(condition)
+    if tables is not None:
+        query = query.where(model.table_name.in_(list(tables)))
+    if device_id is not None:
+        query = query.where(model.device_id == device_id)
+
+    try:
+        rows = (await db.execute(query.group_by(model.table_name))).all()
+    except (ProgrammingError, OperationalError, SQLAlchemyError):
+        await _rollback(db)
+        return {}
+
+    return {
+        str(row.table_name): int(row.records)
+        for row in rows
+        if row.table_name and row.records
+    }
+
+
+async def records_in(
+    db: AsyncSession, model, window, tables=None, device_id: str | None = None
+) -> int:
+    """The total the rollup reports for `window`, across `tables`."""
+    return sum((await records_by_table(db, model, window, tables, device_id)).values())
+
+
 async def reset(db: AsyncSession, model) -> None:
     """Empty the rollup so the next pass rebuilds it from zero."""
     try:
