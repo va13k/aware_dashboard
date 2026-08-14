@@ -179,11 +179,16 @@ export default function SensorModal({
       className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-black/40 p-4 backdrop-blur-sm"
       onClick={onClose}
     >
+      {/* Bounded to the viewport, with the body scrolling rather than the panel.
+          A centred flex child taller than its container overflows past *both*
+          edges, and the part above the scroll origin cannot be reached at all —
+          on a laptop that put this header, and with it the download button,
+          permanently off-screen. */}
       <div
-        className="my-8 w-full max-w-4xl rounded-3xl border border-wire bg-card p-5 shadow-card"
+        className="my-8 flex max-h-[90vh] w-full max-w-4xl flex-col rounded-3xl border border-wire bg-card p-5 shadow-card"
         onClick={(event) => event.stopPropagation()}
       >
-        <div className="mb-4 flex items-start justify-between gap-4">
+        <div className="mb-4 flex shrink-0 items-start justify-between gap-4">
           <div className="flex items-center gap-2">
             <span
               className="h-2.5 w-2.5 shrink-0 rounded-full"
@@ -223,6 +228,7 @@ export default function SensorModal({
           </div>
         </div>
 
+        <div className="min-h-0 flex-1 overflow-y-auto">
         {useSeries ? (
           <SeriesChart config={config} buckets={series} loading={loading} />
         ) : (
@@ -296,6 +302,7 @@ export default function SensorModal({
             </label>
           </div>
         ) : null}
+        </div>
       </div>
     </div>
   );

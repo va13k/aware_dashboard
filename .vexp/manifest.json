@@ -157,7 +157,7 @@
     "dashboard/src/components/ProcessorCard.tsx": "723f2ab00cd379fe368724755872bd690a382d8e2c2fcfc15787d06946aed9ab",
     "dashboard/src/components/RequiredByConfig.tsx": "dfab7ca973bc0dbac2f6d18fa217f9633894e14e2385872c372ff7a2163aa450",
     "dashboard/src/components/SensorChart.tsx": "0307ed6d4d71b36e98194d0fff62e8a2d25eb84a2e8213b7241a7a3a36b72299",
-    "dashboard/src/components/SensorModal.tsx": "677775495bb4cf11258752fd474589813ea59266bbd32733e99c61174f77b1ed",
+    "dashboard/src/components/SensorModal.tsx": "6a39eb37278e9286b8fcfcd075981200da3f443630a4ca1e33d22962e133f5be",
     "dashboard/src/components/SensorStatCard.tsx": "dc09a7ee5f85193c066d0b12f4717da468395de04d2e6e5bc539604f2c5cb9e9",
     "dashboard/src/components/SensorTile.tsx": "446b6f2f65c0b8d0345d4a795a1ead40f6860e91f8406801348f01bd3b017324",
     "dashboard/src/components/SensorTimeSeriesCard.tsx": "910fed63b5763bb310cf632e16b23559e07808bb0d99ebfe585bf6cbce755faa",
@@ -213,11 +213,11 @@
     "shared_config/source_store.py": "ceaf715a4f7aa1198409553bed5ab30ab761f23c6f6db02140ee2e84148aa1f9",
     "shared_config/test_serializers.py": "d7614beeadecc7e75fcf9671fbc58ae7c8d9ce338a9cc21480128038ccd23fdb"
   },
-  "indexed_at_commit": "9bebc8a1532652a820f2c7074bf0212be970513e",
-  "indexed_at_timestamp": "2026-08-14T17:14:05.479704+00:00",
+  "indexed_at_commit": "fd8a07aa8a9215a86c3e7aad38f1f1800d1d6e2f",
+  "indexed_at_timestamp": "2026-08-14T17:19:16.633202+00:00",
   "schema_version": 3,
   "stats": {
-    "total_edges": 2208,
+    "total_edges": 2217,
     "total_files": 212,
     "total_nodes": 2082
   },
