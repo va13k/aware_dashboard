@@ -15,6 +15,7 @@ import {
   sensorDataKeys,
 } from "../config/sensors";
 import SensorTile from "../components/SensorTile";
+import DeviceCoveragePanel from "../components/DeviceCoveragePanel";
 import SensorModal from "../components/SensorModal";
 import LogsModal from "../components/LogsModal";
 import ExportDialog from "../components/ExportDialog";
@@ -416,6 +417,13 @@ export default function DeviceDetailPage() {
 
           {currentDetail?.study ? (
             <StudyEventsTimeline events={currentDetail.study_events ?? []} />
+          ) : null}
+
+          {selected ? (
+            <DeviceCoveragePanel
+              platform={selected.platform}
+              deviceId={selected.device_id}
+            />
           ) : null}
 
           {selected &&
