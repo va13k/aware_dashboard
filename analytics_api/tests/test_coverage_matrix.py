@@ -274,3 +274,74 @@ def test_an_uncovered_aggregate_cell_expects_nothing():
     cell = coverage_matrix.aggregate_cell({}, ["battery"], one_hour(4), 0.0)
 
     assert cell["state"] == coverage_matrix.NOT_EXPECTED
+
+
+def test_a_band_splits_a_shortfall_at_half_the_expectation():
+    """`state` says which side of the configured rate a bucket fell on; the band
+    splits far-short from nearly-there, which is what a colour shows."""
+    far = coverage_matrix.cell(10, one_hour(4), 1.0, rate(100))
+    near = coverage_matrix.cell(80, one_hour(4), 1.0, rate(100))
+
+    assert far["state"] == near["state"] == coverage_matrix.UNDER
+    assert far["band"] == coverage_matrix.BAND_SHORT
+    assert near["band"] == coverage_matrix.BAND_MODERATE
+
+
+def test_a_band_splits_far_above_from_as_configured():
+    at = coverage_matrix.cell(100, one_hour(4), 1.0, rate(100))
+    over = coverage_matrix.cell(500, one_hour(4), 1.0, rate(100))
+
+    assert at["state"] == over["state"] == coverage_matrix.REPORTING
+    assert at["band"] == coverage_matrix.BAND_EXPECTED
+    assert over["band"] == coverage_matrix.BAND_OVER
+
+
+def test_the_two_structural_bands_come_from_the_state_alone():
+    """Nothing expected and nothing arrived have to stay distinguishable however
+    the arithmetic falls out — they are the pair the enrolment registry exists for."""
+    outside = coverage_matrix.cell(0, one_hour(4), 0.0, rate(100))
+    empty = coverage_matrix.cell(0, one_hour(4), 1.0, rate(100))
+
+    assert outside["band"] == coverage_matrix.BAND_BLANK
+    assert empty["band"] == coverage_matrix.BAND_NONE
+
+
+def test_an_event_sensors_records_are_unjudged():
+    cell = coverage_matrix.cell(
+        7, one_hour(4), 1.0, sensor_rates.ExpectedRate("calls", sensor_rates.EVENT)
+    )
+
+    assert cell["band"] == coverage_matrix.BAND_UNJUDGED
+
+
+def test_the_band_boundaries_sit_where_the_reporting_ratio_puts_them():
+    """The reporting/under line is stated once, and the bands read it rather than
+    restating it — so moving REPORTING_RATIO moves the green edge with it."""
+    ratio = coverage_matrix.REPORTING_RATIO
+    just_under = coverage_matrix.cell(
+        int(100 * ratio) - 1, one_hour(4), 1.0, rate(100)
+    )
+    just_at = coverage_matrix.cell(int(100 * ratio) + 1, one_hour(4), 1.0, rate(100))
+
+    assert just_under["band"] == coverage_matrix.BAND_MODERATE
+    assert just_at["band"] == coverage_matrix.BAND_EXPECTED
+
+
+def test_the_aggregate_band_follows_the_share_that_reported():
+    def band(reporting, required):
+        return coverage_matrix.aggregate_cell(
+            {f"s{index}": 1 for index in range(reporting)},
+            [f"s{index}" for index in range(required)],
+            one_hour(4),
+            1.0,
+        )["band"]
+
+    assert band(0, 10) == coverage_matrix.BAND_NONE
+    assert band(2, 10) == coverage_matrix.BAND_SHORT
+    assert band(7, 10) == coverage_matrix.BAND_MODERATE
+    assert band(10, 10) == coverage_matrix.BAND_EXPECTED
+
+
+def test_the_aggregate_has_no_far_above_band():
+    """Its share is a fraction of what was asked for and cannot exceed it."""
+    assert coverage_matrix.aggregate_band(20, 10) == coverage_matrix.BAND_EXPECTED

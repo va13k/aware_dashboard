@@ -22,21 +22,10 @@ import type { CoverageCell } from "../types";
  * three steps of volume, which keeps them readable while leaving the six judged
  * colours to mean exactly what they say.
  *
- * Both grids and the legend read the bands from here, so a colour on screen and
- * its entry in the key cannot come to disagree.
+ * The bands themselves are decided by the API (`services/coverage_matrix.py`);
+ * what lives here is which colour each one wears. Both grids and the legend read
+ * it from here, so a colour on screen and its entry in the key cannot disagree.
  */
-
-/**
- * Two boundaries live here, and only two. The API already decides where a bucket
- * meets the configured rate — it returns `reporting` or `under` — so that
- * threshold is read from its answer rather than restated. What the API has no
- * opinion on is how far short is worth its own colour, and how far above is
- * worth another, which is what these two split.
- */
-/** Below this share of the expectation, short becomes its own colour. */
-export const SHORT_BELOW = 0.5;
-/** Above this multiple of the expectation, a bucket reads as far over. */
-export const FAR_OVER = 2;
 
 export type CoverageBand =
   | "blank"
@@ -47,42 +36,32 @@ export type CoverageBand =
   | "over"
   | "unjudged";
 
-function share(cell: CoverageCell): number | null {
-  if (cell.expected == null || cell.expected <= 0) return null;
-  return cell.records / cell.expected;
-}
+const BANDS = new Set<string>([
+  "blank",
+  "none",
+  "short",
+  "moderate",
+  "expected",
+  "over",
+  "unjudged",
+]);
 
-/** Where a bucket falls, given what arrived and what was asked for. */
+/**
+ * Which band a cell falls in, as the API decided.
+ *
+ * Sent with the cell rather than worked out here, because the downloadable
+ * workbook is coloured server-side from the same figure. Two implementations of
+ * the boundaries would let a cell come out red on screen and green in the
+ * spreadsheet a researcher circulates.
+ *
+ * `state` is the fallback for a response predating the band, and covers the two
+ * cases a colour must never get wrong: nothing expected, and nothing arrived.
+ */
 export function bandOf(cell: CoverageCell): CoverageBand {
-  // The aggregate cell counts required sensors reporting rather than records, so
-  // its share is a fraction of what the study asked for and never exceeds it.
-  // Every boundary on it is drawn here, the API carrying only the two counts.
-  if (cell.required != null) {
-    if (cell.state === "not_expected") return "blank";
-    if (!cell.required || !cell.reporting) return "none";
-    const reported = cell.reporting / cell.required;
-    if (reported < SHORT_BELOW) return "short";
-    if (reported < 1) return "moderate";
-    return "expected";
-  }
-
-  switch (cell.state) {
-    case "not_expected":
-      return "blank";
-    case "missing":
-      return "none";
-    // Records arrived with no configured rate behind them.
-    case "present":
-      return "unjudged";
-    case "under": {
-      const ratio = share(cell);
-      return ratio != null && ratio < SHORT_BELOW ? "short" : "moderate";
-    }
-    case "reporting": {
-      const ratio = share(cell);
-      return ratio != null && ratio > FAR_OVER ? "over" : "expected";
-    }
-  }
+  if (cell.band && BANDS.has(cell.band)) return cell.band as CoverageBand;
+  if (cell.state === "not_expected") return "blank";
+  if (cell.state === "missing") return "none";
+  return cell.records > 0 ? "unjudged" : "none";
 }
 
 /** Three steps of neutral for a bucket with no rate behind it. */

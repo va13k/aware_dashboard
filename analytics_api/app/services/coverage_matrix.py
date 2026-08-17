@@ -60,12 +60,67 @@ MISSING = "missing"
 PRESENT = "present"
 
 #: A bucket at or above this fraction of its expectation reads as reporting
-#: rather than under-reporting. The plan's line is "at or above what the
-#: configured frequency implies", and this is that line with room for the two
-#: places a whole-hour bucket is unavoidably approximate: a sampling loop drifts
-#: by a sample or two an hour, and an hour is attributed to one bucket even when
-#: the enrolment window it belongs to opens part-way through it.
+#: rather than under-reporting. The line is "at or above what the configured
+#: frequency implies", with room for the two places a whole-hour bucket is
+#: unavoidably approximate: a sampling loop drifts by a sample or two an hour, and
+#: an hour is attributed to one bucket even when the enrolment window it belongs
+#: to opens part-way through it.
 REPORTING_RATIO = 0.9
+
+#: Where a bucket sits against its expectation, as a reader sees it. `state` says
+#: which side of the configured rate a bucket fell on; a band splits that finer,
+#: far enough short and far enough over each earning their own reading.
+BAND_BLANK = "blank"
+BAND_NONE = "none"
+BAND_SHORT = "short"
+BAND_MODERATE = "moderate"
+BAND_EXPECTED = "expected"
+BAND_OVER = "over"
+#: Records arrived with no configured rate to weigh them against.
+BAND_UNJUDGED = "unjudged"
+
+#: Below this share of the expectation, a shortfall is its own band.
+SHORT_BELOW = 0.5
+#: Above this multiple of the expectation, a bucket reads as far over.
+FAR_OVER = 2
+
+
+def band_for(state: str, records: int, expected: float | None) -> str:
+    """Which band a classified cell falls in.
+
+    Derived from `state` rather than recomputed from the ratio, so the boundary
+    between reporting and under-reporting is stated once (`REPORTING_RATIO`) and
+    the bands only split what it has already decided.
+
+    Served to every reader — the grid on screen and the workbook a researcher
+    downloads — so a colour cannot mean one thing in the browser and another in
+    the spreadsheet.
+    """
+    if state == NOT_EXPECTED:
+        return BAND_BLANK
+    if state == MISSING:
+        return BAND_NONE
+    if state == PRESENT:
+        return BAND_UNJUDGED
+
+    share = None if not expected else records / expected
+    if state == UNDER:
+        return BAND_SHORT if share is not None and share < SHORT_BELOW else BAND_MODERATE
+    return BAND_OVER if share is not None and share > FAR_OVER else BAND_EXPECTED
+
+
+def aggregate_band(reporting: int, required: int) -> str:
+    """Which band an all-sensors cell falls in, by the share that reported.
+
+    The share is a fraction of what the study asked for and cannot exceed it, so
+    this scale has no `over`.
+    """
+    if not required or not reporting:
+        return BAND_NONE
+    share = reporting / required
+    if share < SHORT_BELOW:
+        return BAND_SHORT
+    return BAND_MODERATE if share < 1 else BAND_EXPECTED
 
 
 @dataclass(frozen=True)
@@ -319,12 +374,19 @@ def cell(
     researcher needs to see before believing the colour.
     """
     if hours <= 0:
-        return {"state": NOT_EXPECTED, "records": records, "hours": 0}
+        return {
+            "state": NOT_EXPECTED,
+            "band": BAND_BLANK,
+            "records": records,
+            "hours": 0,
+        }
 
     expected = rate.per_hour * hours if rate.comparable else None
+    state = classify(records, expected, rate.comparable)
 
     return {
-        "state": classify(records, expected, rate.comparable),
+        "state": state,
+        "band": band_for(state, records, expected),
         "records": records,
         "hours": round(hours, 4),
         "expected": None if expected is None else round(expected, 2),
@@ -349,12 +411,18 @@ def aggregate_cell(
     Selecting a sensor is how the amount is examined.
     """
     if hours <= 0:
-        return {"state": NOT_EXPECTED, "reporting": 0, "required": len(required)}
+        return {
+            "state": NOT_EXPECTED,
+            "band": BAND_BLANK,
+            "reporting": 0,
+            "required": len(required),
+        }
 
     reporting = sum(1 for key in required if per_sensor.get(key, 0) > 0)
     total = len(required)
     return {
         "state": MISSING if reporting == 0 else PRESENT,
+        "band": aggregate_band(reporting, total),
         "reporting": reporting,
         "required": total,
         "fraction": None if not total else round(reporting / total, 4),

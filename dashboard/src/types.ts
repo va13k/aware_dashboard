@@ -288,6 +288,11 @@ export interface CoverageBucket {
 
 export interface CoverageCell {
   state: CoverageState;
+  /**
+   * Which colour band the cell falls in, decided by the API so the grid and the
+   * downloadable workbook are coloured from one answer.
+   */
+  band?: string;
   records: number;
   /** Hours of this bucket the device was enrolled for. */
   hours: number;
