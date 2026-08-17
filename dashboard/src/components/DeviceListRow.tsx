@@ -1,6 +1,6 @@
 import type { Device } from "../types";
 import { deviceLabel } from "../utils/devices";
-import { relativeAge } from "../utils/time";
+import { absoluteTime, relativeAge } from "../utils/time";
 import { ConfigBadge, EnrollmentBadge } from "./StudyBadges";
 import PlatformIcon from "./PlatformIcon";
 
@@ -53,11 +53,33 @@ export default function DeviceListRow({
             diffCount={study.diff_count}
           />
         ) : null}
+        {/* Data arrived from a phone the study has no record of joining. Worth a
+            badge rather than a page of its own: whoever is looking at the list is
+            the person who can say who it is. */}
+        {device.recognised === false ? (
+          <span
+            title="This phone is sending data, and the study has no record of it joining. Open it to see what it wrote and how much."
+            className="inline-flex items-center rounded-md border border-short/40 bg-short/10 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.3px] text-short"
+          >
+            No enrolment record
+          </span>
+        ) : null}
       </div>
 
-      {/* Two different facts. A phone can be uploading sensor data without
-          reporting a study event, and the reverse. */}
-      <div className="mt-2 grid grid-cols-2 gap-x-2 text-[12px]">
+      {/* Three different facts. A phone can be uploading sensor data without
+          reporting a study event, and the reverse — and how long it has been
+          sending is what separates a phone that appeared this week from one
+          reporting since the study opened. */}
+      <div className="mt-2 grid grid-cols-3 gap-x-2 text-[12px]">
+        <div className="min-w-0">
+          <div className="truncate text-sage">First</div>
+          <div
+            className="truncate font-semibold text-ink"
+            title={device.first_seen ? absoluteTime(device.first_seen) : undefined}
+          >
+            {relativeAge(device.first_seen)}
+          </div>
+        </div>
         <div className="min-w-0">
           <div className="truncate text-sage">Upload</div>
           <div className="truncate font-semibold text-ink">

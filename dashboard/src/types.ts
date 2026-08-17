@@ -108,10 +108,27 @@ export interface AndroidDevice {
   product?: string | null;
   release?: string | null;
   sdk?: string | null;
+  /** When this phone's first record arrived. Null before it has uploaded. */
+  first_seen?: number | null;
   /** Null for a phone that joined the study but has never uploaded. */
   last_seen: number | null;
   platform: "android";
   study?: AndroidStudyListSummary | null;
+  /** The enrolment span, including a first-data span inferred for coverage. */
+  enrolment?: DeviceEnrolmentSummary | null;
+  /**
+   * Whether the study has a record of this device joining. False is the finding:
+   * data arrived from a phone that left no trace of enrolling.
+   */
+  recognised?: boolean | null;
+}
+
+/** What a device row shows about enrolment: the span, and how it is known. */
+export interface DeviceEnrolmentSummary {
+  joined_at: number;
+  left_at: number | null;
+  join_source: string;
+  window_count: number;
 }
 
 export interface IosDevice {
@@ -129,8 +146,14 @@ export interface IosDevice {
   release_type?: string | null;
   sdk?: string | null;
   label?: string | null;
+  first_seen?: number | null;
   last_seen: number | null;
   platform: "ios";
+  /**
+   * Always null: an iPhone keeps its study state on the phone and never uploads
+   * it, so the server holds nothing to recognise it by.
+   */
+  recognised?: null;
 }
 
 export type Device = AndroidDevice | IosDevice;
@@ -156,6 +179,10 @@ export interface DeviceDetail {
   study?: AndroidStudySummary;
   config_diff?: ConfigDiff;
   study_events?: AndroidStudyEvent[];
+  /** Android only: the enrolment span, including one inferred from first data. */
+  enrolment?: DeviceEnrolmentSummary | null;
+  /** Every window, so the gap between two of them reads as time off the study. */
+  enrolment_windows?: EnrolmentWindow[];
 }
 
 export type SensorRecord = Record<string, unknown> & {
@@ -224,6 +251,18 @@ export interface CountsStatus {
     "android" | "ios",
     { last_refreshed: number | null; age_seconds: number | null }
   >;
+}
+
+export interface OrphanPlatformCounts {
+  records: number;
+  tables: Record<string, number>;
+}
+
+/** Rows stored without a device id and deliberately excluded from exports/totals. */
+export interface OrphanCounts {
+  records: number;
+  cause: string;
+  platforms: Record<"android" | "ios", OrphanPlatformCounts>;
 }
 
 export type CoverageAnchor = "data" | "now";

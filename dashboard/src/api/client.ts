@@ -8,9 +8,11 @@ import type {
   AwareLogPage,
   DeviceCoverage,
   DeviceDetail,
+  EnrolmentWindow,
   DevicesResponse,
   ExportPlatform,
   Manifest,
+  OrphanCounts,
   SensorRecord,
   SeriesBucket,
   StudyCoverage,
@@ -27,6 +29,19 @@ async function get<T>(path: string): Promise<T> {
     return new Promise<T>(() => {});
   }
   if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
+  return res.json();
+}
+
+async function post<T>(path: string, body: unknown): Promise<T> {
+  const res = await fetch(`${BASE}${path}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    const detail = await res.json().catch(() => ({}));
+    throw new Error(detail.detail || `${res.status} ${res.statusText}`);
+  }
   return res.json();
 }
 
@@ -143,6 +158,9 @@ export const iosLogsExportHref = (opts: AndroidLogQuery = {}): string =>
 /** When the counts were last refreshed, and whether that is too long ago. */
 export const fetchCountsStatus = (): Promise<CountsStatus> => get("/counts/status");
 
+/** Rows whose Android insert supplied no device id, reported outside totals. */
+export const fetchOrphanCounts = (): Promise<OrphanCounts> => get("/counts/orphans");
+
 /** The periods on offer, each resolved to absolute bounds and what it holds. */
 export const fetchCoverageWindows = (): Promise<CoverageWindows> =>
   get("/coverage/windows");
@@ -164,6 +182,27 @@ export const fetchCoverageCounts = (opts: {
   const query = params.toString();
   return get(`/coverage/counts${query ? `?${query}` : ""}`);
 };
+
+/**
+ * Record that a participant has left, closing their enrolment window.
+ *
+ * `leftAt` is when they *acted*, which a researcher usually learns after the
+ * fact — sending it is what makes a late notice land on the right day instead of
+ * marking every day since as expected-and-missing.
+ */
+export const withdrawDevice = (
+  deviceId: string,
+  opts: { leftAt?: number | null } = {},
+): Promise<{ status: string; window: EnrolmentWindow }> =>
+  post(`/devices/android/${encodeURIComponent(deviceId)}/withdraw`, {
+    left_at: opts.leftAt ?? null,
+  });
+
+/** Undo a withdrawal, handing the device back to its own study log. */
+export const reopenDeviceEnrolment = (
+  deviceId: string,
+): Promise<{ status: string }> =>
+  post(`/devices/android/${encodeURIComponent(deviceId)}/rejoin`, {});
 
 /** The parameters both coverage grids share. */
 function gridParams(opts: {
