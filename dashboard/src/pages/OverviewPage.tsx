@@ -15,6 +15,7 @@ import {
   type SensorConfig,
 } from "../config/sensors";
 import SensorStatCard from "../components/SensorStatCard";
+import CoveragePanel from "../components/CoveragePanel";
 import ExportDialog from "../components/ExportDialog";
 import SensorViewFilter from "../components/SensorViewFilter";
 import { useSensorView } from "../utils/sensorView";
@@ -315,7 +316,9 @@ export default function OverviewPage() {
         </div>
       </section>
 
-      <div className="mb-3 flex flex-col gap-2 px-1 sm:flex-row sm:items-center sm:justify-between">
+      <CoveragePanel />
+
+      <div className="mb-3 mt-5 flex flex-col gap-2 px-1 sm:flex-row sm:items-center sm:justify-between">
         <div className="text-[11px] font-semibold uppercase tracking-[0.6px] text-sage">
           Sensors
         </div>
