@@ -116,11 +116,18 @@ def _database(monkeypatch):
         # first refresh. test_enrolment_endpoint.py covers the filled table.
         return {}
 
+    async def first_record_by_device(db, coverage_model):
+        # An empty rollup, so `first_seen` reads as unknown rather than invented.
+        return {}
+
     monkeypatch.setattr(devices_router, "_combined_last_seen_by_device", last_seen)
     monkeypatch.setattr(devices_router, "_device_metadata_by_device", metadata)
     monkeypatch.setattr(devices_router, "_android_study_rows", study_rows)
     monkeypatch.setattr(devices_router, "_best_device_row", best_device_row)
     monkeypatch.setattr(devices_router, "_enrolment_windows", enrolment_windows)
+    monkeypatch.setattr(
+        devices_router.enrolment, "first_record_by_device", first_record_by_device
+    )
     monkeypatch.setattr(
         devices_router.record_counts, "counts_for_device", counts_for_device
     )
@@ -145,6 +152,18 @@ def android_devices(client):
 
 def by_id(devices, device_id):
     return next(device for device in devices if device["device_id"] == device_id)
+
+
+def test_a_first_data_window_is_not_mistaken_for_recorded_enrolment():
+    windows = [{"join_source": devices_router.enrolment.FIRST_DATA}]
+
+    assert devices_router._has_recorded_enrolment(windows) is False
+
+
+def test_a_phone_reported_join_is_recognised():
+    windows = [{"join_source": devices_router.enrolment.STUDY_EVENT}]
+
+    assert devices_router._has_recorded_enrolment(windows) is True
 
 
 # --- the device list -------------------------------------------------------
@@ -293,6 +312,68 @@ def test_the_timeline_route_is_not_shadowed_by_the_detail_route(client):
     assert isinstance(response.json(), list)
 
 
+# --- withdrawal -----------------------------------------------------------
+
+
+def test_withdrawal_passes_the_participants_own_date_to_the_window(monkeypatch, client):
+    async def close_window(db, model, device_id, left_at):
+        assert device_id == ANDROID_DEVICE
+        assert left_at == 12_345
+        return {
+            "device_id": device_id,
+            "joined_at": 1_000,
+            "left_at": left_at,
+            "join_source": devices_router.enrolment.STUDY_EVENT,
+            "left_source": devices_router.enrolment.MANUAL,
+        }
+
+    monkeypatch.setattr(devices_router.enrolment, "close_window", close_window)
+
+    response = client.post(
+        f"/devices/android/{ANDROID_DEVICE}/withdraw",
+        json={"left_at": 12_345},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["window"]["left_at"] == 12_345
+
+
+def test_withdrawal_without_a_window_is_refused(monkeypatch, client):
+    async def close_window(db, model, device_id, left_at):
+        return None
+
+    monkeypatch.setattr(devices_router.enrolment, "close_window", close_window)
+
+    response = client.post(f"/devices/android/{ANDROID_DEVICE}/withdraw", json={})
+
+    assert response.status_code == 404
+
+
+def test_rejoin_hands_the_device_back_to_derivation(monkeypatch, client):
+    refreshed = False
+
+    async def reopen(db, model, device_id):
+        assert device_id == ANDROID_DEVICE
+        return True
+
+    async def refresh(db, model, coverage_model, study_model):
+        nonlocal refreshed
+        refreshed = True
+        assert model is devices_router.AndroidDeviceEnrolment
+        assert coverage_model is devices_router.AndroidCoverageHourly
+        assert study_model is devices_router.AndroidAwareStudy
+        return {"devices": 1, "windows": 1, "researcher_owned": 0}
+
+    monkeypatch.setattr(devices_router.enrolment, "reopen", reopen)
+    monkeypatch.setattr(devices_router.enrolment, "refresh", refresh)
+
+    response = client.post(f"/devices/android/{ANDROID_DEVICE}/rejoin", json={})
+
+    assert response.status_code == 200
+    assert response.json() == {"status": "reopened", "device_id": ANDROID_DEVICE}
+    assert refreshed is True
+
+
 # --- requirements ---------------------------------------------------------
 
 
@@ -406,3 +487,28 @@ def test_the_detail_survives_a_phone_reporting_an_odd_config(client, monkeypatch
     assert detail.status_code == 200
     assert events.status_code == 200
     assert detail.json()["study"]["enrollment_status"] == "in_study"
+
+
+def test_a_date_before_the_device_joined_says_so(monkeypatch, client):
+    """Two different refusals. A date outside the enrolment is a typo to correct;
+    no enrolment at all is a finding about the device — and the message has to say
+    which, since the first one used to claim the device had never enrolled."""
+
+    async def close_window(db, model, device_id, left_at):
+        return None
+
+    async def enrolment_windows(db, device_id=None):
+        return {ANDROID_DEVICE: [{"joined_at": 5_000, "left_at": None}]}
+
+    monkeypatch.setattr(devices_router.enrolment, "close_window", close_window)
+    monkeypatch.setattr(devices_router, "_enrolment_windows", enrolment_windows)
+
+    response = client.post(
+        f"/devices/android/{ANDROID_DEVICE}/withdraw", json={"left_at": 1_000}
+    )
+
+    assert response.status_code == 422
+    detail = response.json()["detail"]
+    assert "outside this device's enrolment" in detail
+    # The join time, so the researcher can pick a date that works.
+    assert "1970" in detail

@@ -1,4 +1,8 @@
+import time
+from datetime import datetime, timezone
+
 from fastapi import APIRouter, Depends, HTTPException, Query
+from pydantic import BaseModel
 from sqlalchemy import select, func
 from sqlalchemy.exc import ProgrammingError, OperationalError, SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -6,7 +10,9 @@ from app.database import get_android_db, get_ios_db
 from app.services import record_counts
 from app.routers.android import _EXPORT_MODELS as _ANDROID_EXPORT_MODELS
 from app.models import (
+    AndroidCoverageHourly,
     AndroidRecordCount,
+    IosCoverageHourly,
     IosRecordCount,
     AndroidDevice,
     AndroidDeviceEnrolment,
@@ -236,7 +242,12 @@ async def _cached_last_seen_by_device(db: AsyncSession, count_model):
             select(
                 count_model.device_id,
                 func.max(count_model.last_ts).label("last_seen"),
-            ).group_by(count_model.device_id)
+            )
+            # The cache keeps an internal row under an empty `device_id` to carry
+            # a sensor's watermark past an orphan-only batch. It stands for no
+            # phone, so it must not arrive here as one.
+            .where(count_model.device_id != record_counts.ORPHAN_DEVICE)
+            .group_by(count_model.device_id)
         )
     except (ProgrammingError, OperationalError, SQLAlchemyError):
         await _rollback_after_table_error(db)
@@ -331,6 +342,20 @@ def _enrolment_summary(windows: list | None) -> dict | None:
         "join_source": windows[0]["join_source"],
         "window_count": len(windows),
     }
+
+
+def _has_recorded_enrolment(windows: list | None) -> bool:
+    """Whether something other than sensor data says this phone joined.
+
+    The registry deliberately gives a data-only phone a `first_data` window so
+    the coverage grid has a left edge. The existence of that inferred window is
+    therefore not evidence of enrolment; its source is the distinction the badge
+    needs to preserve.
+    """
+    return any(
+        window.get("join_source") in {enrolment.STUDY_EVENT, enrolment.MANUAL}
+        for window in windows or []
+    )
 
 
 async def _android_study_rows(db: AsyncSession, device_id: str | None = None):
@@ -481,6 +506,9 @@ async def list_android_devices(db: AsyncSession = Depends(get_android_db)):
     metadata_by_device = await _device_metadata_by_device(db, AndroidDevice)
     study_states = await _android_study_states(db)
     enrolment_by_device = await _enrolment_windows(db)
+    first_seen_by_device = await enrolment.first_record_by_device(
+        db, AndroidCoverageHourly
+    )
 
     devices = []
     # A phone that joined but has not uploaded yet exists only in aware_studies,
@@ -488,6 +516,7 @@ async def list_android_devices(db: AsyncSession = Depends(get_android_db)):
     for device_id in set(last_seen_by_device) | set(study_states) | set(enrolment_by_device):
         metadata = metadata_by_device.get(device_id, {})
         state = study_states.get(device_id)
+        windows = enrolment_by_device.get(device_id)
         devices.append(
             {
                 "device_id": device_id,
@@ -498,12 +527,22 @@ async def list_android_devices(db: AsyncSession = Depends(get_android_db)):
                 },
                 "manufacturer": metadata.get("manufacturer"),
                 "model": metadata.get("model"),
+                # When this device's first record arrived, to the hour. A phone
+                # that appeared this week reads differently from one reporting
+                # since the study opened, and that is the first thing worth
+                # knowing about a device nobody recognises.
+                "first_seen": first_seen_by_device.get(device_id),
                 "last_seen": last_seen_by_device.get(device_id),
                 "platform": "android",
                 "study": _study_list_summary(state) if state else None,
-                # None for a device that wrote data the study never recorded a
-                # join for — the case worth being able to see.
-                "enrolment": _enrolment_summary(enrolment_by_device.get(device_id)),
+                # A first-data window still appears here because coverage needs
+                # its left edge; `recognised` below says whether a join was ever
+                # actually recorded.
+                "enrolment": _enrolment_summary(windows),
+                # Whether the study has a record of this device joining. False is
+                # the finding: data arrived from a phone that left no trace of
+                # enrolling, which is what the device gate exists to surface.
+                "recognised": _has_recorded_enrolment(windows),
             }
         )
 
@@ -519,6 +558,7 @@ async def list_ios_devices(db: AsyncSession = Depends(get_ios_db)):
     )
 
     metadata_by_device = await _device_metadata_by_device(db, IosDevice)
+    first_seen_by_device = await enrolment.first_record_by_device(db, IosCoverageHourly)
 
     devices = []
     for device_id, last_seen in last_seen_by_device.items():
@@ -531,8 +571,14 @@ async def list_ios_devices(db: AsyncSession = Depends(get_ios_db)):
                     for field in DEVICE_METADATA_FIELDS
                     if metadata.get(field) not in (None, "")
                 },
+                "first_seen": first_seen_by_device.get(device_id),
                 "last_seen": last_seen,
                 "platform": "ios",
+                # An iPhone keeps its study state in `NSUserDefaults` and never
+                # uploads it, so the server holds nothing to recognise it by.
+                # Unknown rather than false: an iPhone is not a suspect for
+                # lacking a record it was never able to send.
+                "recognised": None,
             }
         )
 
@@ -584,3 +630,93 @@ async def get_device_detail(
         return await _device_detail(platform, device_id, db)
     except (ProgrammingError, OperationalError, SQLAlchemyError):
         raise HTTPException(status_code=404, detail="Device data is unavailable")
+
+
+def _utc_text(milliseconds: int) -> str:
+    """An instant a researcher can compare against, in UTC."""
+    return datetime.fromtimestamp(milliseconds / 1000, tz=timezone.utc).strftime(
+        "%d %b %Y %H:%M UTC"
+    )
+
+
+class WithdrawalRequest(BaseModel):
+    """When the participant left."""
+
+    #: The moment the participant acted, in epoch milliseconds. Absent means now,
+    #: which is right when a researcher is told during the conversation and wrong
+    #: whenever they are told later — so a caller who knows the date sends it.
+    left_at: int | None = None
+
+
+@router.post("/android/{device_id}/withdraw")
+async def withdraw_device(
+    device_id: str,
+    body: WithdrawalRequest | None = None,
+    db: AsyncSession = Depends(get_android_db),
+):
+    """Record that a participant has left, closing their enrolment window.
+
+    The reliable path, because a researcher usually finds out by being told rather
+    than by watching a phone go quiet. It takes effect on everything that reads the
+    windows at once: the coverage grid stops expecting data from the moment they
+    left, and the device reads as withdrawn rather than as merely gone silent.
+
+    Closing the window is not deletion. What happens to the data already collected
+    is a separate and deliberate action, because consent forms answer that question
+    differently.
+
+    Android only: an iPhone keeps its study state on the phone and the server holds
+    no window to close.
+    """
+    request = body or WithdrawalRequest()
+    left_at = int(request.left_at if request.left_at is not None else time.time() * 1000)
+
+    stored = await enrolment.close_window(
+        db, AndroidDeviceEnrolment, device_id, left_at
+    )
+    if stored is None:
+        # Two different refusals, and saying which one it is matters: a date
+        # before the device joined is a typo to correct, while no enrolment at all
+        # is a finding about the device.
+        # Through the router's own reader, which is what every other path here
+        # uses to reach the windows.
+        windows = (await _enrolment_windows(db, device_id)).get(device_id) or []
+        if windows:
+            earliest = min(window["joined_at"] for window in windows)
+            raise HTTPException(
+                status_code=422,
+                detail=(
+                    "That moment falls outside this device's enrolment: it joined "
+                    f"at {_utc_text(earliest)}. Pick a time after it joined."
+                ),
+            )
+        raise HTTPException(
+            status_code=404,
+            detail=(
+                "The study has no record of this device joining, so there is no "
+                "enrolment window to close."
+            ),
+        )
+
+    return {"status": "withdrawn", "window": stored}
+
+
+@router.post("/android/{device_id}/rejoin")
+async def reopen_device_enrolment(
+    device_id: str,
+    db: AsyncSession = Depends(get_android_db),
+):
+    """Undo a withdrawal recorded by mistake.
+
+    Clears this device's stored windows, then immediately derives them from the
+    study log again, which is the phone's own account of when it joined and left.
+    """
+    if not await enrolment.reopen(db, AndroidDeviceEnrolment, device_id):
+        raise HTTPException(status_code=500, detail="Could not clear the windows")
+    await enrolment.refresh(
+        db,
+        AndroidDeviceEnrolment,
+        AndroidCoverageHourly,
+        AndroidAwareStudy,
+    )
+    return {"status": "reopened", "device_id": device_id}
