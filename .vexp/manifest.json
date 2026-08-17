@@ -70,7 +70,7 @@
     "AWARE-Configurator/util/gunicorn.conf.py": "1b16da2f9e46b7c241a2a56e12d286ac1fd87c8b53b68769e328985fd6b96856",
     "README.md": "cb666db27ff44a487ad32aabc492f12c7f699906c3d5e5d1031ccaed4018cd7a",
     "analytics_api/Dockerfile": "6e6eb8bb501c9edc390478d0d23e6fa9f24b3e9b212e6a2414697c2a7f02e199",
-    "analytics_api/README.md": "f0a355959918221e2e20898f459f5c7263567b1fa409bd3f08d82af5d1b69a3f",
+    "analytics_api/README.md": "8095f73d0b5f24910de448f42c9ae90d9ec8fbb1d8db2681af54ec6e924225da",
     "analytics_api/app/__init__.py": "af1349b9f5f9a1a6a0404dea36dcc9499bcb25c9adc112b7cc9a93cae41f3262",
     "analytics_api/app/database.py": "d1f132c400343e280275261c365e52ed0cc514fdbc526e6729f53102411ffe2b",
     "analytics_api/app/main.py": "58ac0b36295697cd7f71800d5ec700c3ae5eb7b268eca9792565aeb6c5e721e7",
@@ -181,7 +181,7 @@
     "dashboard/src/utils/requirements.ts": "e1d9460ddb313bc32c801db62868b2d91800e261a9d3a0e9e7fb2a13171bc0ee",
     "dashboard/src/utils/sensorView.ts": "686dd3767064f13a3415f5e603e75c9103b4f5c7fafcb1d368b8ff766e061de1",
     "dashboard/src/utils/stats.ts": "0c9571e4f8ea03d4e3f4484449ce51e90382e218e77dd20ffc16ade63c50e534",
-    "dashboard/src/utils/time.ts": "7368c10b53e7e5a3d7ab035c69745b909b3fa23c5d651cedd6c0656778b8be55",
+    "dashboard/src/utils/time.ts": "61a5e848494686321116eb6eee237d458ae6226ff03f1a96741f8690ac0b9e1a",
     "dashboard/src/utils/timeRange.ts": "7b15fd0ea7e26f0316f22820f17ba9b2901105f270dea45993b6e023e4beba19",
     "dashboard/vite.config.ts": "40f284df10761043fff2560ddc1da546b70e010c70f1f2e0d11cb8389b8f4b9c",
     "db/00-bootstrap.sql": "702ddc1cbcfb73e83ada5c076d80f521f0a63f1fda084d4d1c74f3f3ed9aaa7a",
@@ -213,13 +213,13 @@
     "shared_config/source_store.py": "ceaf715a4f7aa1198409553bed5ab30ab761f23c6f6db02140ee2e84148aa1f9",
     "shared_config/test_serializers.py": "d7614beeadecc7e75fcf9671fbc58ae7c8d9ce338a9cc21480128038ccd23fdb"
   },
-  "indexed_at_commit": "fd8a07aa8a9215a86c3e7aad38f1f1800d1d6e2f",
-  "indexed_at_timestamp": "2026-08-14T17:19:16.633202+00:00",
+  "indexed_at_commit": "911103eedffc8c389d16a4cd30d61531ddc2a52f",
+  "indexed_at_timestamp": "2026-08-17T09:57:29.039690+00:00",
   "schema_version": 3,
   "stats": {
-    "total_edges": 2217,
+    "total_edges": 2209,
     "total_files": 212,
-    "total_nodes": 2082
+    "total_nodes": 2083
   },
   "vexp_version": "2.5.2"
 }
