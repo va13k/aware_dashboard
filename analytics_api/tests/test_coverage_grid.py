@@ -19,6 +19,7 @@ import zipfile
 import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
+from openpyxl import load_workbook
 
 from app.routers import coverage as coverage_router
 from app.services import coverage_matrix, sensor_rates, sensor_requirements
@@ -467,3 +468,107 @@ def test_an_unknown_value_mode_is_refused(client):
     )
 
     assert response.status_code == 422
+
+
+def workbook(client, path):
+    response = client.get(path)
+    assert response.status_code == 200, response.text
+    assert "spreadsheetml" in response.headers["content-type"]
+    return load_workbook(io.BytesIO(response.content))
+
+
+def test_the_study_workbook_holds_the_grid_that_was_on_screen(client, grid):
+    """Same parameters as the grid endpoint, so the file is the view rather than a
+    layout of its own."""
+    counts = [0] * 24
+    counts[9] = 60
+    grid["holdings"]["android"][(DEVICE, android_table("bluetooth"))] = counts
+
+    book = workbook(
+        client,
+        f"/coverage/study.xlsx?level=hour&anchor={DAY_START}&platform=android"
+        "&sensor=bluetooth&tz=UTC",
+    )
+    sheet = book["Coverage"]
+
+    assert sheet["A1"].value == "Device"
+    # 24 hour columns, a label column and a total column.
+    assert sheet.max_column == 26
+    assert sheet.cell(row=2, column=1).value.startswith(DEVICE)
+    assert sheet.cell(row=2, column=11).value == 60
+
+
+def test_the_study_workbook_follows_the_level(client, grid):
+    book = workbook(
+        client, f"/coverage/study.xlsx?level=month&anchor={DAY_START}&platform=android"
+    )
+
+    # Twelve months, plus the label and total columns.
+    assert book["Coverage"].max_column == 14
+    assert book["Coverage"].cell(row=1, column=2).value == "Jan"
+
+
+def test_the_study_workbook_records_the_view_it_came_from(client, grid):
+    book = workbook(
+        client,
+        f"/coverage/study.xlsx?level=day&anchor={DAY_START}&platform=android&tz=UTC",
+    )
+    key = book["Key"]
+    written = {
+        key.cell(row=line, column=2).value: key.cell(row=line, column=3).value
+        for line in range(1, key.max_row + 1)
+    }
+
+    assert written["Level"] == "day buckets"
+    assert written["Timezone"] == "UTC"
+    assert written["Platforms"] == "android"
+
+
+def test_the_device_workbook_holds_a_sensor_per_row(client, grid):
+    counts = [0] * 24
+    counts[7] = 12
+    grid["holdings"]["android"][(DEVICE, android_table("battery"))] = counts
+
+    book = workbook(
+        client,
+        f"/coverage/device/android/{DEVICE}/workbook.xlsx?level=hour&anchor={DAY_START}&tz=UTC",
+    )
+    sheet = book["Coverage"]
+    labels = [sheet.cell(row=line, column=1).value for line in range(2, sheet.max_row)]
+
+    assert sheet["A1"].value == "Sensor"
+    assert "battery" in labels
+    battery = labels.index("battery") + 2
+    assert sheet.cell(row=battery, column=9).value == 12
+
+
+def test_the_device_workbook_marks_a_sensor_the_config_did_not_ask_for(client, grid):
+    grid["required"] = ["battery"]
+    grid["holdings"]["android"][(DEVICE, android_table("bluetooth"))] = [1] * 24
+
+    book = workbook(
+        client,
+        f"/coverage/device/android/{DEVICE}/workbook.xlsx?level=hour&anchor={DAY_START}&tz=UTC",
+    )
+    sheet = book["Coverage"]
+    labels = [sheet.cell(row=line, column=1).value for line in range(2, sheet.max_row)]
+
+    assert "bluetooth (extra)" in labels
+
+
+def test_an_unknown_platform_has_no_device_workbook(client):
+    assert client.get(f"/coverage/device/symbian/{DEVICE}/workbook.xlsx").status_code == 404
+
+
+def test_an_unknown_level_is_refused_by_the_workbook(client):
+    assert client.get("/coverage/study.xlsx?level=fortnight").status_code == 422
+
+
+def test_an_empty_matrix_archive_says_so(client):
+    """The window a grid opens on may hold nothing, and an archive of one note is
+    otherwise indistinguishable from a broken download."""
+    body = matrix(client)["README.txt"]
+    text = "\n".join(",".join(row) for row in body)
+
+    assert "Sensor files: 0" in text
+    assert "No sensor reported anything inside this window" in text

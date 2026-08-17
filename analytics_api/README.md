@@ -52,7 +52,7 @@ is no valid session. That applies to every endpoint below.
 
 ## The API surface
 
-135 endpoints. The auto-generated OpenAPI pages (`/docs`, `/redoc`,
+137 endpoints. The auto-generated OpenAPI pages (`/docs`, `/redoc`,
 `/openapi.json`) are currently **disabled** in `app/main.py`, so this table is
 the reference.
 
@@ -86,6 +86,8 @@ the reference.
 | `GET /coverage/counts`                       | How many records a period holds, per platform and per sensor      |
 | `GET /coverage/study`                        | The study coverage grid: a phone per row, a time bucket per column |
 | `GET /coverage/device/{platform}/{id}`       | One phone's grid: a sensor per row, the same buckets               |
+| `GET /coverage/study.xlsx`                   | That grid as an Excel workbook: counts, colours, row/column totals |
+| `GET /coverage/device/{platform}/{id}/workbook.xlsx` | One phone's grid as the same workbook                      |
 | `GET /coverage/matrix`                       | The grid as a ZIP of CSVs, one per sensor, hours across            |
 | `GET /health`                                | Liveness, used by the container healthcheck                       |
 | `/auth/login`, `/auth/logout`, `/auth/validate` | Session handling for the Nginx login check                     |
@@ -123,6 +125,7 @@ The services, roughly in the order a newcomer meets them:
 | `coverage.py`            | Which periods hold data                                               |
 | `coverage_matrix.py`     | Grid columns per level and timezone, and what each cell says           |
 | `sensor_rates.py`        | The records an hour should hold, from the study config's frequencies    |
+| `coverage_workbook.py`   | Writes a coverage grid to `.xlsx`, coloured by band, with totals        |
 | `dump_stream.py`         | Rewrites a mysqldump stream during a merge import                     |
 | `watermarks.py`          | The newest stored timestamp per table and phone                       |
 | `backup_jobs.py`         | Progress records for long-running work                                |

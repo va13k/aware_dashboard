@@ -40,12 +40,14 @@ from app.services import (
     coverage,
     coverage_matrix,
     coverage_rollup,
+    coverage_workbook,
     enrolment,
     export_size,
     record_counts,
     sensor_rates,
     sensor_requirements,
     sensor_tables,
+    study_config,
 )
 
 router = APIRouter(prefix="/coverage", tags=["coverage"])
@@ -447,6 +449,39 @@ async def device_coverage(
     now_ms = time.time() * 1000
 
     db = android_db if platform == "android" else ios_db
+    windows = (await _expectation_windows(db, platform, now_ms)).get(device_id)
+    rows = await _device_grid_rows(db, platform, device_id, buckets, now_ms)
+
+    start, end = coverage_matrix.span_of(buckets)
+    return {
+        "platform": platform,
+        "device_id": device_id,
+        "level": resolved_level,
+        "drills_into": coverage_matrix.DRILLS_INTO[resolved_level],
+        "anchor": anchor_ms,
+        "timezone": str(zone),
+        "from": start,
+        "to": end,
+        "enrolment_windows": windows or [],
+        "buckets": _bucket_payload(buckets),
+        "rows": rows,
+        "max_records": _grid_scale(rows),
+        "hour_granular": True,
+    }
+
+
+async def _device_grid_rows(
+    db: AsyncSession,
+    platform: str,
+    device_id: str,
+    buckets: list,
+    now_ms: float,
+) -> list[dict]:
+    """One phone's rows: a sensor per row, judged against its configured rate.
+
+    Shared by the endpoint and the workbook, so the spreadsheet a researcher
+    downloads holds the same rows the screen showed them.
+    """
     counted = await coverage_matrix.bucketed_by_table(
         db, _ROLLUP_FOR[platform], buckets, None, device_id
     )
@@ -483,26 +518,7 @@ async def device_coverage(
                 "basis": rate.basis,
             }
         )
-
-    start, end = coverage_matrix.span_of(buckets)
-    return {
-        "platform": platform,
-        "device_id": device_id,
-        "level": resolved_level,
-        "drills_into": coverage_matrix.DRILLS_INTO[resolved_level],
-        "anchor": anchor_ms,
-        "timezone": str(zone),
-        "from": start,
-        "to": end,
-        "enrolment_windows": windows or [],
-        "buckets": [
-            {"key": bucket.key, "label": bucket.label, "from": bucket.start, "to": bucket.end}
-            for bucket in buckets
-        ],
-        "rows": rows,
-        "max_records": _grid_scale(rows),
-        "hour_granular": True,
-    }
+    return rows
 
 
 #: Hour columns one matrix export may carry. Two months of them is already a
@@ -586,6 +602,150 @@ def _matrix_sheet(
     return sink.getvalue().encode("utf-8")
 
 
+def _bucket_payload(buckets: list) -> list[dict]:
+    return [
+        {"key": bucket.key, "label": bucket.label, "from": bucket.start, "to": bucket.end}
+        for bucket in buckets
+    ]
+
+
+def _workbook_name(scope: str, level: str, buckets: list) -> str:
+    return f"coverage-{scope}-{level}-{_stamp(buckets[0].start)}.xlsx"
+
+
+def _workbook_response(content: bytes, filename: str) -> Response:
+    return Response(
+        content=content,
+        media_type=(
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        ),
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
+@router.get("/study.xlsx")
+async def study_coverage_workbook(
+    level: str = Query(coverage_matrix.DAY),
+    anchor: float | None = Query(None),
+    platform: str | None = Query(None),
+    sensor: str | None = Query(None),
+    tz: str | None = Query(None),
+    android_db: AsyncSession = Depends(get_android_db),
+    ios_db: AsyncSession = Depends(get_ios_db),
+):
+    """The study grid as a spreadsheet, exactly as it is drawn on screen.
+
+    Takes the same parameters as `/coverage/study` and builds the same rows and
+    buckets from them, so the file holds the view the researcher was looking at
+    rather than a fixed layout of its own: the level's buckets across, a device per
+    row, the record count in each cell with the colour its band gives it, and a
+    total down every row and across every column.
+    """
+    resolved_level, anchor_ms = _level_and_anchor(level, anchor)
+    wanted = _requested_platforms(platform)
+    zone = coverage_matrix.resolve_timezone(tz)
+    buckets = coverage_matrix.buckets_for(resolved_level, anchor_ms, zone)
+    now_ms = time.time() * 1000
+
+    sessions = {"android": android_db, "ios": ios_db}
+    rows: list[dict] = []
+    for name in wanted:
+        rows.extend(
+            await _platform_grid(sessions[name], name, buckets, sensor, now_ms)
+        )
+
+    start, end = coverage_matrix.span_of(buckets)
+    sheet_rows = [
+        {"label": f"{row['device_id']} ({row['platform']})", "cells": row["cells"]}
+        for row in rows
+    ]
+    content = coverage_workbook.build(
+        buckets=_bucket_payload(buckets),
+        rows=sheet_rows,
+        row_header="Device",
+        about=[
+            ("Study", _study_title()),
+            ("Level", f"{resolved_level} buckets"),
+            ("From", _iso(start)),
+            ("To", _iso(end)),
+            ("Timezone", str(zone)),
+            ("Platforms", ", ".join(wanted)),
+            (
+                "Sensor",
+                sensor if sensor else "all required sensors (cells count reporting sensors)",
+            ),
+            ("Devices", len(sheet_rows)),
+        ],
+    )
+    return _workbook_response(
+        content, _workbook_name("study", resolved_level, buckets)
+    )
+
+
+# A path segment of its own rather than a `.xlsx` suffix: `{device_id}` would
+# otherwise match "phone-a.xlsx" on the grid route above, leaving which handler
+# answers to depend on the order they happen to be declared in.
+@router.get("/device/{platform}/{device_id}/workbook.xlsx")
+async def device_coverage_workbook(
+    platform: str,
+    device_id: str,
+    level: str = Query(coverage_matrix.DAY),
+    anchor: float | None = Query(None),
+    tz: str | None = Query(None),
+    android_db: AsyncSession = Depends(get_android_db),
+    ios_db: AsyncSession = Depends(get_ios_db),
+):
+    """One phone's grid as a spreadsheet: a sensor per row, the same buckets."""
+    if platform not in PLATFORMS:
+        raise HTTPException(status_code=404, detail=f"Unknown platform: {platform}")
+
+    resolved_level, anchor_ms = _level_and_anchor(level, anchor)
+    zone = coverage_matrix.resolve_timezone(tz)
+    buckets = coverage_matrix.buckets_for(resolved_level, anchor_ms, zone)
+    now_ms = time.time() * 1000
+
+    db = android_db if platform == "android" else ios_db
+    rows = await _device_grid_rows(db, platform, device_id, buckets, now_ms)
+
+    start, end = coverage_matrix.span_of(buckets)
+    sheet_rows = [
+        {
+            "label": row["sensor"] + ("" if row["required"] else " (extra)"),
+            "cells": row["cells"],
+        }
+        for row in rows
+    ]
+    content = coverage_workbook.build(
+        buckets=_bucket_payload(buckets),
+        rows=sheet_rows,
+        row_header="Sensor",
+        about=[
+            ("Study", _study_title()),
+            ("Device", device_id),
+            ("Platform", platform),
+            ("Level", f"{resolved_level} buckets"),
+            ("From", _iso(start)),
+            ("To", _iso(end)),
+            ("Timezone", str(zone)),
+            ("Sensors", len(sheet_rows)),
+        ],
+    )
+    return _workbook_response(
+        content,
+        f"coverage-{_safe_name(device_id)}-{resolved_level}-{_stamp(start)}.xlsx",
+    )
+
+
+def _safe_name(value: str) -> str:
+    return "".join(char if char.isalnum() or char in "-_" else "-" for char in value)[:40]
+
+
+def _study_title() -> str:
+    deployed = study_config.load_deployed_config()
+    title = (deployed.summary.get("study_title") if deployed else None) or "AWARE study"
+    return str(title)
+
+
 @router.get("/matrix")
 async def coverage_matrix_export(
     from_ts: float = Query(...),
@@ -647,6 +807,7 @@ async def coverage_matrix_export(
                 f"Window: {_iso(buckets[0].start)} to {_iso(buckets[-1].end)}\n"
                 f"Timezone: {zone}\n"
                 f"Hour columns: {len(buckets)}\n"
+                f"Sensor files: {written}\n"
                 f"Values: {values}"
                 + (
                     " (1 where the hour holds at least one record)\n"
@@ -655,6 +816,13 @@ async def coverage_matrix_export(
                 )
                 + "\nA column is a whole hour, counted from the rollup. An hour is\n"
                 "attributed to the column its start falls in.\n"
+                + (
+                    ""
+                    if written
+                    else "\nNo sensor reported anything inside this window, so the\n"
+                    "archive holds this note and nothing else. Pick a period the\n"
+                    "study has data for.\n"
+                )
             ).encode("utf-8"),
         )
 
