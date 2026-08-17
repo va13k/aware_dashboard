@@ -262,6 +262,98 @@ export interface CoverageCounts {
   estimated_bytes: number;
 }
 
+/** The bucket width a coverage grid is drawn at, named after the bucket. */
+export type CoverageLevel = "month" | "day" | "hour";
+
+/** What a cell says about its bucket. */
+export type CoverageState =
+  /** Outside every enrolment window: neutral, not a gap. */
+  | "not_expected"
+  /** At or above what the configured rate implies. */
+  | "reporting"
+  /** Some data, materially less than the configured rate implies. */
+  | "under"
+  /** Expected and absent. */
+  | "missing"
+  /** Data arrived, with no configured rate to judge the amount against. */
+  | "present";
+
+/** One column of a grid. */
+export interface CoverageBucket {
+  key: string;
+  label: string;
+  from: number;
+  to: number;
+}
+
+export interface CoverageCell {
+  state: CoverageState;
+  records: number;
+  /** Hours of this bucket the device was enrolled for. */
+  hours: number;
+  /** Records the config implies for the covered part, when it implies any. */
+  expected?: number | null;
+  basis?: string | null;
+  /** The expectation bounds scans rather than rows, so it is a lower bound. */
+  floor?: boolean;
+  /** Aggregate cells only: required sensors reporting, out of how many. */
+  reporting?: number;
+  required?: number;
+  fraction?: number | null;
+}
+
+export interface EnrolmentWindow {
+  joined_at: number;
+  left_at: number | null;
+  join_source: string;
+  left_source: string | null;
+}
+
+export interface CoverageRow {
+  device_id: string;
+  platform: "android" | "ios";
+  enrolment_windows: EnrolmentWindow[];
+  cells: CoverageCell[];
+  records: number;
+}
+
+interface CoverageGridBase {
+  level: CoverageLevel;
+  /** The level a column click opens, or null at the finest. */
+  drills_into: CoverageLevel | null;
+  anchor: number;
+  timezone: string;
+  from: number;
+  to: number;
+  buckets: CoverageBucket[];
+  /** The busiest cell, so every row shades against one ceiling. */
+  max_records: number;
+  hour_granular: boolean;
+}
+
+export interface StudyCoverage extends CoverageGridBase {
+  sensor: string | null;
+  platforms: ("android" | "ios")[];
+  rows: CoverageRow[];
+  required_sensors: Record<string, string[]>;
+}
+
+export interface DeviceCoverageRow {
+  sensor: string;
+  required: boolean;
+  cells: CoverageCell[];
+  records: number;
+  expected_per_hour: number | null;
+  basis: string | null;
+}
+
+export interface DeviceCoverage extends CoverageGridBase {
+  platform: "android" | "ios";
+  device_id: string;
+  enrolment_windows: EnrolmentWindow[];
+  rows: DeviceCoverageRow[];
+}
+
 /** Which side of a sensor card an export covers. */
 export type ExportPlatform = "all" | "android" | "ios";
 

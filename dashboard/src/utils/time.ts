@@ -116,3 +116,15 @@ export function durationLabel(milliseconds: unknown): string {
   const hours = Math.floor(minutes / 60);
   return `${hours}h ${minutes - hours * 60}m`;
 }
+
+/**
+ * The timezone the browser is in, for cutting coverage buckets into the days a
+ * participant actually lived. UTC when the browser will not say.
+ */
+export function browserTimezone(): string {
+  try {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
+  } catch {
+    return "UTC";
+  }
+}

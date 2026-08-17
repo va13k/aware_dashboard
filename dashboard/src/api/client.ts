@@ -3,14 +3,17 @@ import type {
   ChosenPeriod,
   CountsStatus,
   CoverageCounts,
+  CoverageLevel,
   CoverageWindows,
   AwareLogPage,
+  DeviceCoverage,
   DeviceDetail,
   DevicesResponse,
   ExportPlatform,
   Manifest,
   SensorRecord,
   SeriesBucket,
+  StudyCoverage,
   StudyRequirements,
 } from "../types";
 
@@ -160,6 +163,68 @@ export const fetchCoverageCounts = (opts: {
   if (opts.device) params.set("device", opts.device);
   const query = params.toString();
   return get(`/coverage/counts${query ? `?${query}` : ""}`);
+};
+
+/** The parameters both coverage grids share. */
+function gridParams(opts: {
+  level: CoverageLevel;
+  anchor: number;
+  tz?: string | null;
+}): URLSearchParams {
+  const params = new URLSearchParams();
+  params.set("level", opts.level);
+  params.set("anchor", String(Math.round(opts.anchor)));
+  if (opts.tz) params.set("tz", opts.tz);
+  return params;
+}
+
+/** The study grid: a device per row, a bucket of `level` per column. */
+export const fetchStudyCoverage = (opts: {
+  level: CoverageLevel;
+  anchor: number;
+  platform?: "android" | "ios" | null;
+  sensor?: string | null;
+  tz?: string | null;
+}): Promise<StudyCoverage> => {
+  const params = gridParams(opts);
+  if (opts.platform) params.set("platform", opts.platform);
+  if (opts.sensor) params.set("sensor", opts.sensor);
+  return get(`/coverage/study?${params.toString()}`);
+};
+
+/** One phone's grid: a sensor per row, the same buckets. */
+export const fetchDeviceCoverage = (
+  platform: "android" | "ios",
+  deviceId: string,
+  opts: { level: CoverageLevel; anchor: number; tz?: string | null },
+): Promise<DeviceCoverage> =>
+  get(
+    `/coverage/device/${platform}/${encodeURIComponent(deviceId)}?${gridParams(
+      opts,
+    ).toString()}`,
+  );
+
+/**
+ * The whole grid as files: one CSV per sensor, devices down and hours across.
+ *
+ * Hour columns whatever the level on screen, because the archive is the raw
+ * matrix a researcher takes into their own analysis rather than the summary the
+ * grid draws.
+ */
+export const coverageMatrixHref = (opts: {
+  from: number;
+  to: number;
+  platform?: "android" | "ios" | null;
+  tz?: string | null;
+  values?: "presence" | "counts";
+}): string => {
+  const params = new URLSearchParams();
+  params.set("from_ts", String(Math.round(opts.from)));
+  params.set("to_ts", String(Math.round(opts.to)));
+  if (opts.platform) params.set("platform", opts.platform);
+  if (opts.tz) params.set("tz", opts.tz);
+  if (opts.values) params.set("values", opts.values);
+  return `${BASE}/coverage/matrix?${params.toString()}`;
 };
 
 /**
