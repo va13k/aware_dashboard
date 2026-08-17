@@ -246,11 +246,12 @@ async def _sensor_stats(db: AsyncSession, models: tuple, cached=None) -> dict:
 
     for model in models:
         try:
+            exportable = (model.device_id.is_not(None), model.device_id != "")
             stats = await db.execute(
                 select(
                     func.min(model.timestamp).label("first_timestamp"),
                     func.max(model.timestamp).label("last_timestamp"),
-                )
+                ).where(*exportable)
             )
             row = stats.one()
             if row.first_timestamp is not None:
@@ -268,10 +269,12 @@ async def _sensor_stats(db: AsyncSession, models: tuple, cached=None) -> dict:
 
             if cached is None:
                 count_row = await db.execute(
-                    select(func.count()).select_from(model)
+                    select(func.count()).select_from(model).where(*exportable)
                 )
                 row_count += int(count_row.scalar() or 0)
-                device_result = await db.execute(select(model.device_id).distinct())
+                device_result = await db.execute(
+                    select(model.device_id).where(*exportable).distinct()
+                )
                 device_ids.update(
                     str(item[0])
                     for item in device_result.all()

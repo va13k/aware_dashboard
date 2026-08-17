@@ -25,6 +25,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 #: schemas: they live on the same server.
 REFRESH_LOCK = "aware_record_counts_refresh"
 
+#: What an Android insert with no `device_id` lands as, the column defaulting to
+#: the empty string. The cache keeps this internal row so its `_id` can advance
+#: the sensor watermark, but every public total filters it out to match exports.
+ORPHAN_DEVICE = ""
+
 
 @contextlib.asynccontextmanager
 async def single_writer(engine, lock_name: str = REFRESH_LOCK):
@@ -110,7 +115,11 @@ async def refresh(db: AsyncSession, count_model, source_models: dict) -> dict:
                 last_ts=func.greatest(count_model.last_ts, ts),
             )
             await db.execute(stmt)
-            gained += d
+            # Keep an internal orphan row so an orphan-only batch still advances
+            # this sensor's watermark. Without it, the refresher rescans the same
+            # bad rows every minute forever. Public readers filter the row below.
+            if device_id != ORPHAN_DEVICE:
+                gained += d
         if gained:
             added[sensor] = gained
 
@@ -155,7 +164,10 @@ async def sensor_totals(db: AsyncSession, count_model) -> dict:
                     func.sum(count_model.count),
                     func.count(),
                 )
-                .where(count_model.count > 0)
+                .where(
+                    count_model.count > 0,
+                    count_model.device_id != ORPHAN_DEVICE,
+                )
                 .group_by(count_model.sensor)
             )
         ).all()
@@ -177,7 +189,10 @@ async def newest_timestamp(db: AsyncSession, count_model) -> float | None:
     try:
         newest = (
             await db.execute(
-                select(func.max(count_model.last_ts)).where(count_model.last_ts > 0)
+                select(func.max(count_model.last_ts)).where(
+                    count_model.last_ts > 0,
+                    count_model.device_id != ORPHAN_DEVICE,
+                )
             )
         ).scalar()
     except (ProgrammingError, OperationalError, SQLAlchemyError):
