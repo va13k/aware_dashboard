@@ -317,25 +317,36 @@ async def first_record_by_device(db: AsyncSession, coverage_model) -> dict[str, 
     }
 
 
-async def _researcher_owned(db: AsyncSession, model) -> set[str]:
-    """Devices whose windows a researcher entered, which the derivation leaves.
+async def _researcher_marks(db: AsyncSession, model) -> dict[str, int]:
+    """Per device, the moment a researcher's own answer stops applying.
 
-    Ownership is per device rather than per window: once someone has said when a
-    participant joined or left, rebuilding the rest of that device's windows
-    around their answer would mean guessing how the two accounts fit together.
+    Scoped in time rather than per device. A researcher saying when somebody left
+    settles the history up to that moment, and nothing about what the participant
+    does afterwards — so a rejoin the phone reports later has to be honoured, or
+    marking one person as having quit would bar them from the study permanently.
+
+    The moment returned is the newest instant a researcher entered for that device.
+    Windows at or before it are theirs; study events after it are derived as usual.
     """
     try:
         rows = (
             await db.execute(
-                select(model.device_id).where(
-                    (model.join_source == MANUAL) | (model.left_source == MANUAL)
+                select(
+                    model.device_id,
+                    func.max(func.coalesce(model.left_at, model.joined_at)),
                 )
+                .where((model.join_source == MANUAL) | (model.left_source == MANUAL))
+                .group_by(model.device_id)
             )
         ).all()
     except (ProgrammingError, OperationalError, SQLAlchemyError):
         await _rollback(db)
-        return set()
-    return {str(device_id) for (device_id,) in rows if device_id}
+        return {}
+    return {
+        str(device_id): int(marked)
+        for device_id, marked in rows
+        if device_id and marked is not None
+    }
 
 
 async def _study_events_by_device(db: AsyncSession, study_model) -> dict[str, list]:
@@ -400,22 +411,30 @@ async def refresh(
 
     Rebuilt whole rather than incrementally: `aware_studies` holds a handful of
     rows per phone, so re-reading it costs less than tracking what changed, and a
-    correction to an earlier event is picked up for free. Researcher-owned
-    devices are left exactly as they are.
+    correction to an earlier event is picked up for free.
+
+    A researcher's own answer is kept, and only for the stretch it speaks to: their
+    windows stay, and anything the phone reports after the moment they entered is
+    derived on top. That is what lets a participant marked as having quit rejoin
+    whenever they choose.
     """
-    owned = await _researcher_owned(db, model)
+    marks = await _researcher_marks(db, model)
     events_by_device = await _study_events_by_device(db, study_model)
     first_record = await first_record_by_device(db, coverage_model)
 
     windows = [
         window
         for window in derive(events_by_device, first_record)
-        if window.device_id not in owned
+        if window.joined_at > marks.get(window.device_id, -1)
     ]
 
     discard = delete(model)
-    if owned:
-        discard = discard.where(model.device_id.notin_(owned))
+    for device_id, marked in marks.items():
+        # Keep this device's researcher-entered windows, drop the derived ones so
+        # they are rebuilt from the log.
+        discard = discard.where(
+            ~((model.device_id == device_id) & (model.joined_at <= marked))
+        )
 
     try:
         await db.execute(discard)
@@ -432,7 +451,7 @@ async def refresh(
     return {
         "devices": len({window.device_id for window in windows}),
         "windows": len(windows),
-        "researcher_owned": len(owned),
+        "researcher_owned": len(marks),
     }
 
 

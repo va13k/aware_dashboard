@@ -174,11 +174,10 @@ async def test_a_later_quit_closes_a_window_an_earlier_pass_left_open(android_se
 
 
 @pytest.mark.asyncio
-async def test_a_researcher_owned_device_survives_the_rebuild(android_session):
-    """Nothing writes `manual` yet. The carve-out is here from the start so the
-    writer that lands later does not have to teach the rebuild to respect it."""
+async def test_a_researcher_window_survives_the_rebuild(android_session):
+    """A researcher's own answer is kept rather than overwritten by the log."""
     sessionmaker_, server = android_session
-    seed_study(server, [(DEVICE, 1_000, "joined study", 0, 0)])
+    seed_study(server, [(DEVICE, 40, "joined study", 0, 0)])
     server.run(
         "INSERT INTO device_enrolment "
         "(device_id, joined_at, left_at, join_source, left_source) "
@@ -190,6 +189,49 @@ async def test_a_researcher_owned_device_survives_the_rebuild(android_session):
 
     assert stored(server) == [(DEVICE, 40, 90, enrolment.MANUAL)]
     assert result["researcher_owned"] == 1
+
+
+@pytest.mark.asyncio
+async def test_a_rejoin_after_a_researcher_marked_a_quit_is_honoured(android_session):
+    """The point of scoping ownership in time. A researcher saying somebody left
+    settles the history up to that moment and nothing after it, so a participant
+    marked as having quit can rejoin whenever they choose -- otherwise marking one
+    person would bar them from the study permanently."""
+    sessionmaker_, server = android_session
+    server.run(
+        "INSERT INTO device_enrolment "
+        "(device_id, joined_at, left_at, join_source, left_source) "
+        f"VALUES ('{DEVICE}', 40, 90, 'study_event', 'manual')",
+        "aware_android",
+    )
+    # The phone rejoins well after the researcher's mark.
+    seed_study(server, [(DEVICE, 500, "rejoined study", 0, 0)])
+
+    await run_refresh(sessionmaker_)
+
+    assert stored(server) == [
+        (DEVICE, 40, 90, enrolment.STUDY_EVENT),
+        (DEVICE, 500, -1, enrolment.STUDY_EVENT),
+    ]
+
+
+@pytest.mark.asyncio
+async def test_the_log_cannot_reopen_a_window_the_researcher_closed(android_session):
+    """The other half: events at or before the mark are the researcher's, so a
+    stale join in the log does not undo their correction."""
+    sessionmaker_, server = android_session
+    server.run(
+        "INSERT INTO device_enrolment "
+        "(device_id, joined_at, left_at, join_source, left_source) "
+        f"VALUES ('{DEVICE}', 40, 90, 'study_event', 'manual')",
+        "aware_android",
+    )
+    # The log still carries the original open join, which the mark supersedes.
+    seed_study(server, [(DEVICE, 40, "joined study", 0, 0)])
+
+    await run_refresh(sessionmaker_)
+
+    assert stored(server) == [(DEVICE, 40, 90, enrolment.STUDY_EVENT)]
 
 
 @pytest.mark.asyncio

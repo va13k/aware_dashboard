@@ -47,7 +47,10 @@ export default function WithdrawDevice({
   const [failed, setFailed] = useState<string | null>(null);
 
   const withdrawn = enrolment?.left_at != null;
-  const byResearcher = windows.some((w) => w.left_source === "manual");
+  // The current window only. A participant marked as having left and then back of
+  // their own accord is in the study now, and carrying the mark forward would
+  // label an active participant with a correction that no longer applies to them.
+  const byResearcher = windows.at(-1)?.left_source === "manual";
 
   async function act(run: () => Promise<unknown>) {
     setBusy(true);
