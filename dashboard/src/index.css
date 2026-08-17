@@ -11,6 +11,17 @@
   --color-teal: rgb(31, 179, 223);
   --color-teal-soft: rgba(31, 179, 223, 0.16);
 
+  /* Coverage bands, read against what the study config asked for. Desaturated
+     to sit on the warm paper ground, and separated in lightness as well as hue
+     so the order survives without colour vision: short is the darkest, over the
+     lightest. */
+  --color-short: rgb(199, 74, 62);
+  --color-moderate: rgb(226, 162, 51);
+  --color-expected: rgb(74, 152, 100);
+  --color-over: rgb(72, 132, 200);
+  /* A bucket with no configured rate behind it, which the bands cannot judge. */
+  --color-plain: rgb(133, 150, 142);
+
   --shadow-card: 0 20px 60px rgba(25, 50, 41, 0.12);
 }
 

@@ -1,57 +1,37 @@
+import type { ReactNode } from "react";
 import type { CoverageBucket, CoverageCell } from "../types";
+import { BAND_LEGEND, bandOf, cellFill } from "../utils/coverageScale";
 
 /**
  * The coverage grid: one row per device or per sensor, one column per bucket.
  *
- * What the view is for is seeing *how and when* data arrives — so volume is what
- * the colour carries, on one sequential ramp shared by every row. Two cells of
- * the same shade hold the same amount of data, which is the only claim a heatmap
- * makes and the reason the ceiling is decided per grid rather than per row.
+ * Colour reads a bucket against what the study config asked for, so a sensor that
+ * came in short is visible without reading a count — the bands and what each one
+ * claims live in `utils/coverageScale.ts`.
  *
- * A single-hue ramp, for two reasons. Its steps differ in lightness as well as
- * hue, so the order survives without colour vision. And it says how much arrived
- * and leaves why to the reader: a quiet stretch is usually just a quiet stretch —
- * a participant asleep, a phone in a pocket, an event sensor with nothing to
- * report — so the comparison with the study config sits in the hover detail,
- * beside the count it was made against.
- *
- * One distinction earns its own appearance. A bucket where nothing was expected —
- * before the phone joined, in the gap after it quit, after it withdrew — is drawn
- * as a neutral wash, and an expected bucket that stayed empty is drawn as an
- * outlined cell. Telling those two apart is what the enrolment windows are for.
+ * The count itself, and the expectation it was compared with, sit in the cell's
+ * hover detail. A band says which side of the configured rate a bucket fell on;
+ * the two numbers say by how much, and for a sensor whose configured and
+ * delivered rates differ by orders of magnitude that is what a reader needs
+ * before acting on the colour.
  */
 
-/** Where a cell's shade sits on the ramp, by its share of the grid's busiest. */
-function shadeOf(records: number, ceiling: number): string {
-  if (records <= 0) return "";
-  if (ceiling <= 0) return "bg-teal/70";
-  // Five steps on a square-root scale: record counts span orders of magnitude
-  // between sensors, and a linear ramp would put everything but the busiest
-  // sensor in the palest step.
-  const share = Math.sqrt(records / ceiling);
-  if (share >= 0.85) return "bg-teal";
-  if (share >= 0.6) return "bg-teal/80";
-  if (share >= 0.4) return "bg-teal/60";
-  if (share >= 0.2) return "bg-teal/40";
-  return "bg-teal/25";
-}
-
-function cellClass(cell: CoverageCell, ceiling: number): string {
-  if (cell.state === "not_expected") {
-    // Nothing was asked of this bucket. A faint wash keeps the grid's alignment
-    // readable through a long run of them, so a reader can still see which
-    // column they are looking at.
-    return "bg-ink/4";
-  }
-  if (cell.records <= 0) {
-    // Expected and empty. An outline says the bucket exists and is bare, which
-    // is what separates a quiet sensor from one nobody asked for.
-    return "bg-card-strong ring-1 ring-inset ring-wire";
-  }
-  return shadeOf(cell.records, ceiling);
-}
+/**
+ * Column widths, in pixels. Every bucket is this wide exactly, at every level, so
+ * a cell is the same square whether the grid is showing twelve months or
+ * thirty-one days. Sharing the leftover width between the buckets instead would
+ * land them on fractions of a pixel that differ from each other by a tenth.
+ */
+const BUCKET_COLUMN = 26;
+const TOTAL_COLUMN = 132;
+/** The row heading takes what is left over, down to this. */
+const MIN_LABEL_COLUMN = 208;
 
 const NUMBER = new Intl.NumberFormat();
+
+function recordCount(count: number): string {
+  return `${NUMBER.format(count)} record${count === 1 ? "" : "s"}`;
+}
 
 function bucketRange(bucket: CoverageBucket, timezone: string): string {
   const format = new Intl.DateTimeFormat(undefined, {
@@ -62,6 +42,16 @@ function bucketRange(bucket: CoverageBucket, timezone: string): string {
   return `${format.format(bucket.from)} — ${format.format(bucket.to)}`;
 }
 
+const BAND_SUMMARY: Record<string, string> = {
+  blank: "Nothing expected — outside this device's enrolment.",
+  none: "Expected, and nothing arrived.",
+  short: "Well under the rate the study config asks for.",
+  moderate: "Approaching the rate the study config asks for.",
+  expected: "At the rate the study config asks for.",
+  over: "Far above the rate the study config asks for.",
+  unjudged: "Arrived. No configured rate to compare it with.",
+};
+
 /** What hovering a cell says, in the order a reader needs it. */
 function cellTitle(
   cell: CoverageCell,
@@ -69,22 +59,23 @@ function cellTitle(
   rowLabel: string,
   timezone: string,
 ): string {
-  const lines = [`${rowLabel} · ${bucketRange(bucket, timezone)}`];
+  const band = bandOf(cell);
+  const lines = [
+    `${rowLabel} · ${bucketRange(bucket, timezone)}`,
+    BAND_SUMMARY[band],
+  ];
 
-  if (cell.state === "not_expected") {
-    lines.push("Nothing expected — outside this device's enrolment.");
-    return lines.join("\n");
-  }
+  if (band === "blank") return lines.join("\n");
 
   if (cell.required != null) {
     lines.push(
       `${cell.reporting} of ${cell.required} required sensors reported`,
-      `${NUMBER.format(cell.records ?? 0)} records`,
+      recordCount(cell.records ?? 0),
     );
     return lines.join("\n");
   }
 
-  lines.push(`${NUMBER.format(cell.records)} records`);
+  lines.push(recordCount(cell.records));
 
   if (cell.expected != null) {
     const verb = cell.floor ? "at least" : "about";
@@ -93,7 +84,7 @@ function cellTitle(
       lines.push("That figure bounds the scans, not the rows each one yields.");
     }
   } else if (cell.basis === "event") {
-    lines.push("Event sensor — no configured rate to expect.");
+    lines.push("Event sensor — the phone writes when something happens.");
   } else if (cell.basis === "unconfigured") {
     lines.push("The study config carries no rate for this sensor.");
   }
@@ -108,8 +99,8 @@ function cellTitle(
 export interface HeatmapRow {
   key: string;
   label: string;
-  /** Rendered instead of `label` when the row heading needs more than text. */
-  heading?: React.ReactNode;
+  /** Rendered in place of `label` when the row heading carries more than text. */
+  heading?: ReactNode;
   cells: CoverageCell[];
   records: number;
   /** Shown after the row's total, e.g. the rate it is judged against. */
@@ -137,20 +128,39 @@ export default function CoverageHeatmap({
 }) {
   if (rows.length === 0 || buckets.length === 0) {
     return (
-      <div className="rounded-xl border border-wire bg-card p-6 text-center text-[13px] text-sage">
+      <div className="rounded-xl border border-wire bg-card p-6 text-center text-[14px] text-sage">
         {emptyMessage}
       </div>
     );
   }
 
   const drillable = onColumnClick != null;
+  const minWidth =
+    MIN_LABEL_COLUMN + TOTAL_COLUMN + buckets.length * BUCKET_COLUMN;
 
   return (
     <div className="overflow-x-auto">
-      <table className="w-full border-separate border-spacing-0 text-[11px]">
+      {/* `table-fixed` with a colgroup is what makes every bucket the same size:
+          the default algorithm widths a column to its content, so a column headed
+          "1" comes out narrower than one headed "31" and the squares stop being
+          squares. Fixed layout takes the widths from the columns instead. The
+          buckets are pinned to an exact width and the row heading is left to
+          absorb whatever the panel has spare, which is the column that can use
+          it — a long sensor name gets more room rather than being truncated. */}
+      <table
+        className="w-full table-fixed border-separate border-spacing-0 text-[14px]"
+        style={{ minWidth }}
+      >
+        <colgroup>
+          <col />
+          {buckets.map((bucket) => (
+            <col key={bucket.key} style={{ width: BUCKET_COLUMN }} />
+          ))}
+          <col style={{ width: TOTAL_COLUMN }} />
+        </colgroup>
         <thead>
           <tr>
-            <th className="sticky left-0 z-10 bg-card px-2 py-1 text-left text-[10px] font-semibold uppercase tracking-[0.4px] text-sage">
+            <th className="sticky left-0 z-10 bg-card px-2 py-1 text-left text-[12px] font-semibold uppercase tracking-[0.4px] text-sage">
               {rowHeader}
             </th>
             {buckets.map((bucket) => (
@@ -160,18 +170,18 @@ export default function CoverageHeatmap({
                     type="button"
                     onClick={() => onColumnClick?.(bucket)}
                     title={`Open ${bucketRange(bucket, timezone)}`}
-                    className="w-full cursor-pointer rounded px-0.5 text-[9px] font-medium text-sage transition-colors hover:text-teal"
+                    className="w-full cursor-pointer truncate rounded text-center text-[12px] font-medium text-sage transition-colors hover:text-teal"
                   >
                     {bucket.label}
                   </button>
                 ) : (
-                  <span className="block text-[9px] font-medium text-sage">
+                  <span className="block truncate text-center text-[12px] font-medium text-sage">
                     {bucket.label}
                   </span>
                 )}
               </th>
             ))}
-            <th className="px-2 pb-1 text-right text-[10px] font-semibold uppercase tracking-[0.4px] text-sage">
+            <th className="px-2 pb-1 text-right text-[12px] font-semibold uppercase tracking-[0.4px] text-sage">
               Records
             </th>
           </tr>
@@ -181,7 +191,7 @@ export default function CoverageHeatmap({
             <tr key={row.key} className="group">
               <th
                 scope="row"
-                className="sticky left-0 z-10 max-w-[190px] truncate bg-card px-2 py-0.5 text-left font-medium text-ink group-hover:bg-teal-soft/40"
+                className="sticky left-0 z-10 truncate bg-card px-2 py-0.5 text-left font-medium text-ink group-hover:bg-teal-soft/40"
                 title={row.label}
               >
                 {row.heading ?? row.label}
@@ -190,28 +200,21 @@ export default function CoverageHeatmap({
                 const bucket = buckets[index];
                 if (!bucket) return null;
                 return (
-                  <td key={bucket.key} className="p-[1px]">
+                  <td key={bucket.key} className="p-[1.5px]">
                     <div
                       title={cellTitle(cell, bucket, row.label, timezone)}
-                      className={`h-4 w-full min-w-[9px] rounded-[2px] ${cellClass(
+                      className={`h-5 w-full rounded-[2px] ${cellFill(
                         cell,
                         maxRecords,
-                      )} ${
-                        // A shortfall against the configured rate is marked, not
-                        // coloured: worth spotting while scanning, not worth
-                        // shouting about.
-                        cell.state === "under"
-                          ? "border-b-2 border-b-ink/25"
-                          : ""
-                      }`}
+                      )}`}
                     />
                   </td>
                 );
               })}
-              <td className="whitespace-nowrap px-2 py-0.5 text-right tabular-nums text-sage">
+              <td className="truncate px-2 py-0.5 text-right tabular-nums text-sage">
                 {NUMBER.format(row.records)}
                 {row.note ? (
-                  <span className="ml-1 text-[9px] text-sage/70">{row.note}</span>
+                  <span className="ml-1.5 text-[12px] text-sage/70">{row.note}</span>
                 ) : null}
               </td>
             </tr>
@@ -222,38 +225,16 @@ export default function CoverageHeatmap({
   );
 }
 
-/** What the shades and the two structural states mean, beside the grid. */
-export function CoverageLegend({ maxRecords }: { maxRecords: number }) {
+/** What each colour claims, beside the grid. */
+export function CoverageLegend() {
   return (
-    <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-[10px] text-sage">
-      <span className="flex items-center gap-1.5">
-        Fewer
-        <span className="flex gap-[2px]">
-          {["bg-teal/25", "bg-teal/40", "bg-teal/60", "bg-teal/80", "bg-teal"].map(
-            (shade) => (
-              <span key={shade} className={`h-3 w-3 rounded-[2px] ${shade}`} />
-            ),
-          )}
+    <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-[13px] text-sage">
+      {BAND_LEGEND.map((entry) => (
+        <span key={entry.band} className="flex items-center gap-1.5">
+          <span className={`h-3.5 w-3.5 shrink-0 rounded-[2px] ${entry.fill}`} />
+          {entry.label}
         </span>
-        More
-        {maxRecords > 0 ? (
-          <span className="tabular-nums">
-            (up to {NUMBER.format(maxRecords)})
-          </span>
-        ) : null}
-      </span>
-      <span className="flex items-center gap-1.5">
-        <span className="h-3 w-3 rounded-[2px] bg-card-strong ring-1 ring-inset ring-wire" />
-        Nothing arrived
-      </span>
-      <span className="flex items-center gap-1.5">
-        <span className="h-3 w-3 rounded-[2px] bg-ink/4" />
-        Nothing expected
-      </span>
-      <span className="flex items-center gap-1.5">
-        <span className="h-3 w-3 rounded-[2px] bg-teal/40 border-b-2 border-b-ink/25" />
-        Below the configured rate
-      </span>
+      ))}
     </div>
   );
 }
