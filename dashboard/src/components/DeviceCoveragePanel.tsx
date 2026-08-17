@@ -1,8 +1,13 @@
-import { useMemo } from "react";
+import { useEffect, useMemo, useRef } from "react";
+import { useLocation } from "react-router-dom";
 import { fetchDeviceCoverage } from "../api/client";
 import { SENSOR_CONFIGS } from "../config/sensors";
 import type { CoverageBucket, CoverageLevel, DeviceCoverage } from "../types";
-import { useCoverageGrid, useCoverageView } from "../utils/coverageView";
+import {
+  COVERAGE_ANCHOR,
+  useCoverageGrid,
+  useCoverageView,
+} from "../utils/coverageView";
 import CoverageHeatmap, {
   CoverageLegend,
   type HeatmapRow,
@@ -54,6 +59,20 @@ export default function DeviceCoveragePanel({
     () => fetchDeviceCoverage(platform, deviceId, { level, anchor, tz: timezone }),
   );
 
+  const section = useRef<HTMLElement>(null);
+  const { hash } = useLocation();
+  const arrived = useRef(false);
+
+  // A link from the study grid names this section in its hash. Scrolled once the
+  // first grid has rendered, since the page's height settles with it — and only
+  // once, so a level change later leaves the reader where they are.
+  useEffect(() => {
+    if (arrived.current || grid == null) return;
+    if (hash !== `#${COVERAGE_ANCHOR}`) return;
+    arrived.current = true;
+    section.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [grid, hash]);
+
   const rows: HeatmapRow[] = useMemo(() => {
     if (!grid) return [];
     const ordered = [...grid.rows].sort((a, b) => {
@@ -73,7 +92,7 @@ export default function DeviceCoveragePanel({
           {!row.required ? (
             <span
               title="Uploading, but the study config does not ask for it"
-              className="shrink-0 rounded border border-wire px-1 text-[8px] uppercase tracking-[0.3px] text-sage"
+              className="shrink-0 rounded border border-wire px-1 text-[10px] uppercase tracking-[0.3px] text-sage"
             >
               extra
             </span>
@@ -101,19 +120,24 @@ export default function DeviceCoveragePanel({
   }).format(anchor);
 
   const controlClass =
-    "h-8 rounded-lg border border-wire bg-card-strong px-2 text-[11px] text-ink transition-colors hover:border-teal focus:border-teal focus:outline-none";
+    "h-8 rounded-lg border border-wire bg-card-strong px-2 text-[12px] text-ink transition-colors hover:border-teal focus:border-teal focus:outline-none";
 
   return (
-    <section className="mt-5 rounded-2xl border border-wire bg-card p-4 shadow-card">
+    <section
+      id={COVERAGE_ANCHOR}
+      ref={section}
+      // Scrolled to from a study-grid row, so the heading clears the sticky header.
+      className="mt-5 scroll-mt-20 rounded-2xl border border-wire bg-card p-4 shadow-card"
+    >
       <div className="mb-3 flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
         <div>
-          <div className="text-[11px] font-semibold uppercase tracking-[0.6px] text-sage">
+          <div className="text-[13px] font-semibold uppercase tracking-[0.6px] text-sage">
             Coverage
           </div>
-          <div className="mt-1 text-[13px] font-medium text-ink">
+          <div className="mt-1 text-[16px] font-medium text-ink">
             {LEVEL_LABEL[level]} {anchorText}
           </div>
-          <p className="mt-1 max-w-[46rem] text-[11px] leading-relaxed text-sage">
+          <p className="mt-1 max-w-[46rem] text-[14px] leading-relaxed text-sage">
             What this phone sent, per sensor.{" "}
             {grid?.drills_into
               ? "Click a column heading to open it."
@@ -143,7 +167,7 @@ export default function DeviceCoveragePanel({
       </div>
 
       {failed ? (
-        <div className="rounded-xl border border-wire bg-card p-6 text-center text-[13px] text-sage">
+        <div className="rounded-xl border border-wire bg-card p-6 text-center text-[14px] text-sage">
           The coverage grid could not be loaded.
         </div>
       ) : !grid ? (
@@ -160,8 +184,8 @@ export default function DeviceCoveragePanel({
             emptyMessage="The study config asks this phone for nothing, and it has sent nothing."
           />
           <div className="mt-3 flex flex-col gap-2 border-t border-wire pt-2.5 sm:flex-row sm:items-center sm:justify-between">
-            <CoverageLegend maxRecords={grid.max_records} />
-            <span className="text-[10px] text-sage/80">
+            <CoverageLegend />
+            <span className="text-[11px] text-sage/80">
               Buckets are whole hours, in {grid.timezone}.
             </span>
           </div>

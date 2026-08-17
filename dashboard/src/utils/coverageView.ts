@@ -29,6 +29,29 @@ function isLevel(value: string | null): value is CoverageLevel {
   return value === "month" || value === "day" || value === "hour";
 }
 
+/** The id the coverage section carries, so a link can land on the grid itself. */
+export const COVERAGE_ANCHOR = "coverage";
+
+/**
+ * One phone's coverage view, at the span and timezone currently on screen.
+ *
+ * Carrying the view across means the device grid opens showing the same hours
+ * the study grid was showing, which is what makes the link an answer to "what
+ * happened on this phone here" rather than a fresh start.
+ */
+export function deviceCoverageHref(
+  platform: "android" | "ios",
+  deviceId: string,
+  view: { level: CoverageLevel; anchor: number; timezone: string },
+): string {
+  const params = new URLSearchParams({
+    level: view.level,
+    at: String(Math.round(view.anchor)),
+    tz: view.timezone,
+  });
+  return `/devices/${platform}/${encodeURIComponent(deviceId)}?${params}#${COVERAGE_ANCHOR}`;
+}
+
 export function useCoverageView(): CoverageViewState {
   const [params, setParams] = useSearchParams();
 

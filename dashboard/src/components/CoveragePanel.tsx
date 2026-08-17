@@ -1,8 +1,13 @@
 import { useMemo } from "react";
+import { Link } from "react-router-dom";
 import { coverageMatrixHref, fetchStudyCoverage } from "../api/client";
 import { SENSOR_CONFIGS } from "../config/sensors";
 import type { CoverageBucket, CoverageLevel, StudyCoverage } from "../types";
-import { useCoverageGrid, useCoverageView } from "../utils/coverageView";
+import {
+  deviceCoverageHref,
+  useCoverageGrid,
+  useCoverageView,
+} from "../utils/coverageView";
 import CoverageHeatmap, {
   CoverageLegend,
   type HeatmapRow,
@@ -75,17 +80,28 @@ export default function CoveragePanel() {
       key: `${row.platform}:${row.device_id}`,
       label: row.device_id,
       heading: (
-        <span className="flex items-center gap-1.5">
-          <PlatformIcon platform={row.platform} />
-          <span className="truncate font-mono text-[10px]">
-            {row.device_id.slice(0, 8)}
+        // The row heading opens that phone's own grid at the same span and
+        // timezone, landing on its coverage section — the study grid says which
+        // device came in short, and this is the next question a reader asks.
+        <Link
+          to={deviceCoverageHref(row.platform, row.device_id, {
+            level,
+            anchor,
+            timezone,
+          })}
+          title={`Open ${row.device_id} — its coverage per sensor, same period`}
+          className="flex items-center gap-1.5 text-ink no-underline transition-colors hover:text-teal"
+        >
+          <PlatformIcon platform={row.platform} className="h-4 w-4 shrink-0" />
+          <span className="truncate font-mono text-[13px]">
+            #{row.device_id.slice(0, 8)}
           </span>
-        </span>
+        </Link>
       ),
       cells: row.cells,
       records: row.records,
     }));
-  }, [grid]);
+  }, [grid, level, anchor, timezone]);
 
   /** Opening a column: the next level down, anchored inside that column. */
   function openColumn(bucket: CoverageBucket) {
@@ -102,22 +118,22 @@ export default function CoveragePanel() {
   }, [platform]);
 
   const controlClass =
-    "h-8 rounded-lg border border-wire bg-card-strong px-2 text-[11px] text-ink transition-colors hover:border-teal focus:border-teal focus:outline-none";
+    "h-8 rounded-lg border border-wire bg-card-strong px-2 text-[12px] text-ink transition-colors hover:border-teal focus:border-teal focus:outline-none";
 
   return (
     <section className="mt-5 rounded-2xl border border-wire bg-card p-4 shadow-card">
       <div className="mb-3 flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
         <div>
-          <div className="text-[11px] font-semibold uppercase tracking-[0.6px] text-sage">
+          <div className="text-[12px] font-semibold uppercase tracking-[0.6px] text-sage">
             Coverage
           </div>
-          <div className="mt-1 flex flex-wrap items-center gap-1.5 text-[13px] text-ink">
+          <div className="mt-1 flex flex-wrap items-center gap-1.5 text-[14px] text-ink">
             {trail.map((step) => (
               <button
                 key={step}
                 type="button"
                 onClick={() => update({ level: step })}
-                className="cursor-pointer rounded px-1 text-[12px] text-sage underline decoration-wire underline-offset-2 transition-colors hover:text-teal"
+                className="cursor-pointer rounded px-1 text-[13px] text-sage underline decoration-wire underline-offset-2 transition-colors hover:text-teal"
               >
                 {anchorLabel(step, anchor, timezone)}
               </button>
@@ -127,7 +143,7 @@ export default function CoveragePanel() {
               {LEVEL_LABEL[level]} {anchorLabel(level, anchor, timezone)}
             </span>
           </div>
-          <p className="mt-1 max-w-[46rem] text-[11px] leading-relaxed text-sage">
+          <p className="mt-1 max-w-[46rem] text-[12px] leading-relaxed text-sage">
             {sensor
               ? `How much ${sensorLabel(sensor)} arrived in each bucket.`
               : "How many of the sensors the study asks for reported in each bucket."}{" "}
@@ -189,7 +205,7 @@ export default function CoveragePanel() {
       </div>
 
       {failed ? (
-        <div className="rounded-xl border border-wire bg-card p-6 text-center text-[13px] text-sage">
+        <div className="rounded-xl border border-wire bg-card p-6 text-center text-[14px] text-sage">
           The coverage grid could not be loaded.
         </div>
       ) : !grid ? (
@@ -212,8 +228,8 @@ export default function CoveragePanel() {
             }
           />
           <div className="mt-3 flex flex-col gap-2 border-t border-wire pt-2.5 sm:flex-row sm:items-center sm:justify-between">
-            <CoverageLegend maxRecords={grid.max_records} />
-            <span className="flex items-center gap-3 text-[10px] text-sage/80">
+            <CoverageLegend />
+            <span className="flex items-center gap-3 text-[11px] text-sage/80">
               Buckets are whole hours, in {grid.timezone}.
               {/* Hour columns regardless of the level shown: the archive is the
                   raw matrix for someone's own analysis, not this summary. */}
