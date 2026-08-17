@@ -86,6 +86,21 @@ def _verify_token(token: str) -> bool:
         return False
 
 
+#: The cookie a browser presents, named for callers outside this module.
+SESSION_COOKIE = _COOKIE
+
+
+def session_is_valid(cookies) -> bool:
+    """Whether a request's cookies carry a live researcher session.
+
+    Nginx's `auth_request` guards the HTTP request that opens a WebSocket and
+    nothing that travels over it afterwards, so the socket has to check for
+    itself. Exposed here rather than reached into, so both checks read the same
+    token the same way.
+    """
+    return _verify_token(cookies.get(_COOKIE, ""))
+
+
 def _safe_next(url: str) -> str:
     if url and url.startswith("/") and not url.startswith("//") and not url.startswith("/api/"):
         return url

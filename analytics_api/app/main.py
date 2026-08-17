@@ -16,6 +16,7 @@ from app.routers import (
     counts,
     coverage,
     jobs,
+    live,
 )
 
 
@@ -38,7 +39,14 @@ async def lifespan(app: FastAPI):
             logger.info(f"{name} DB connected successfully")
         except Exception as e:
             logger.error(f"{name} DB connection failed: {e}")
-    yield
+
+    # The shared watcher behind the live channel. Started here so there is exactly
+    # one per process, and it idles until a dashboard subscribes.
+    live.watcher.start()
+    try:
+        yield
+    finally:
+        await live.watcher.stop()
 
 
 app = FastAPI(
@@ -60,6 +68,7 @@ app.include_router(export.router)
 app.include_router(logs.router)
 app.include_router(counts.router)
 app.include_router(coverage.router)
+app.include_router(live.router)
 
 
 @app.get("/")

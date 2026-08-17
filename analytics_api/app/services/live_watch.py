@@ -1,0 +1,267 @@
+"""What arrived since a moment ago, watched once and told to everyone.
+
+A minute-old count is an interim answer. The refresher keeps the caches honest on
+its own schedule, and this closes the gap between a row landing and a tile moving.
+
+**One loop, not one per connection.** Ten open dashboards must not mean ten times
+the database work, so the watching happens here, once, and the result is handed to
+whoever is listening. A subscriber is a queue, not a poller.
+
+**It sleeps when nobody is watching.** With no subscribers the loop does nothing at
+all — the study is not made more expensive by a feature nobody has open.
+
+**Watermarks come from `MAX(_id)` per table.** The tempting shortcut is
+`AUTO_INCREMENT` from `information_schema`, one query for every table at once. It
+is wrong: that column is cached, and a scratch table showed it reporting 4 when the
+table already held 5 rows, with the default expiry leaving it stale for up to a day.
+A watcher built on it would look live and silently miss changes, so the tables are
+asked directly — but in one statement rather than one round trip each, and only the
+tables the rollup has ever seen data in.
+
+Deltas are per `(device, sensor)`: the count of rows that arrived in the tick. That
+is what a tile shows, so a subscriber can apply the change without asking anything
+further. A sensor spread over two tables sums, the same way every other reader
+treats it.
+"""
+
+import asyncio
+import logging
+import time
+from collections import deque
+
+from sqlalchemy import text
+from sqlalchemy.exc import SQLAlchemyError
+
+logger = logging.getLogger("aware.live")
+
+#: How often the loop looks, while anyone is listening. Short enough that a tile
+#: moves while the researcher is still looking at it, long enough that a quiet
+#: study costs two statements per platform per tick.
+TICK_SECONDS = 2.0
+
+#: Sent when a tick found nothing, so a silent socket stays distinguishable from a
+#: dead one. A subscriber that hears nothing for several of these has lost the
+#: connection rather than the study going quiet.
+HEARTBEAT_SECONDS = 20.0
+
+#: Messages kept for a subscriber that reconnects and asks to carry on. Bounded:
+#: a client further behind than this is told to refetch rather than replayed.
+HISTORY = 200
+
+
+class Subscriber:
+    """One open dashboard. A queue, so a slow reader cannot stall the loop."""
+
+    def __init__(self, seq: int) -> None:
+        #: The newest sequence this subscriber has been given.
+        self.seq = seq
+        self.queue: asyncio.Queue = asyncio.Queue(maxsize=64)
+        #: Set when the queue overflowed: the subscriber is too far behind to be
+        #: caught up incrementally and is told to refetch instead.
+        self.overflowed = False
+
+    def offer(self, message: dict) -> None:
+        try:
+            self.queue.put_nowait(message)
+        except asyncio.QueueFull:
+            self.overflowed = True
+
+
+class LiveWatch:
+    """The shared loop, its subscribers, and the recent history they resume from."""
+
+    def __init__(self, sessions: dict, tables_for) -> None:
+        #: `{platform: async_sessionmaker}`.
+        self._sessions = sessions
+        #: Called per platform, returns the tables worth watching.
+        self._tables_for = tables_for
+        self._subscribers: set[Subscriber] = set()
+        self._history: deque = deque(maxlen=HISTORY)
+        self._seq = 0
+        #: `{(platform, table): highest _id folded in}`.
+        self._watermarks: dict[tuple[str, str], int] = {}
+        self._task: asyncio.Task | None = None
+        self._wake = asyncio.Event()
+
+    # -- lifecycle ---------------------------------------------------------
+
+    def start(self) -> None:
+        if self._task is None or self._task.done():
+            self._task = asyncio.create_task(self._run(), name="live-watch")
+
+    async def stop(self) -> None:
+        if self._task is None:
+            return
+        self._task.cancel()
+        try:
+            await self._task
+        except (asyncio.CancelledError, Exception):
+            pass
+        self._task = None
+
+    # -- subscribers -------------------------------------------------------
+
+    def subscribe(self, since: int | None = None) -> tuple[Subscriber, list[dict], bool]:
+        """Register a listener, with whatever it missed.
+
+        Returns the subscriber, the backlog to send first, and whether the client
+        should refetch instead — true when it asked to resume from further back
+        than the history holds, so nothing is quietly skipped.
+        """
+        subscriber = Subscriber(self._seq)
+        self._subscribers.add(subscriber)
+        # The loop idles with no subscribers, so the first one has to wake it.
+        self._wake.set()
+
+        if since is None:
+            return subscriber, [], False
+
+        backlog = [message for message in self._history if message["seq"] > since]
+        # Either the history reaches back far enough to cover the gap, or it does
+        # not and the client cannot be trusted to be up to date.
+        oldest = self._history[0]["seq"] if self._history else self._seq + 1
+        resumable = since >= oldest - 1
+        return subscriber, backlog if resumable else [], not resumable
+
+    def unsubscribe(self, subscriber: Subscriber) -> None:
+        self._subscribers.discard(subscriber)
+        if not self._subscribers:
+            # Nothing is listening; stop looking until something is.
+            self._wake.clear()
+            self._watermarks.clear()
+
+    @property
+    def subscriber_count(self) -> int:
+        return len(self._subscribers)
+
+    @property
+    def sequence(self) -> int:
+        return self._seq
+
+    # -- the loop ----------------------------------------------------------
+
+    async def _run(self) -> None:
+        logger.info("live watch started")
+        while True:
+            # Nobody listening: wait rather than poll.
+            await self._wake.wait()
+            try:
+                changes = await self._collect()
+            except asyncio.CancelledError:
+                raise
+            except Exception as error:  # noqa: BLE001 - the loop must outlive a bad tick
+                logger.warning("live watch tick failed: %s", error)
+                changes = []
+
+            if changes:
+                self._publish({"type": "changes", "changes": changes})
+            await asyncio.sleep(TICK_SECONDS)
+
+    def _publish(self, message: dict) -> None:
+        self._seq += 1
+        message = {**message, "seq": self._seq, "at": int(time.time() * 1000)}
+        self._history.append(message)
+        for subscriber in self._subscribers:
+            subscriber.offer(message)
+
+    def publish_heartbeat(self) -> dict:
+        """A message carrying no change, for a connection to prove itself with.
+
+        Not put through `_publish`: it holds no news, so it must not take a
+        sequence number a reconnecting client would then try to resume from.
+        """
+        return {"type": "heartbeat", "seq": self._seq, "at": int(time.time() * 1000)}
+
+    # -- reading the databases --------------------------------------------
+
+    async def _collect(self) -> list[dict]:
+        changes: list[dict] = []
+        for platform, factory in self._sessions.items():
+            async with factory() as db:
+                changes.extend(await self._collect_platform(db, platform))
+        return changes
+
+    async def _collect_platform(self, db, platform: str) -> list[dict]:
+        tables = await self._tables_for(db, platform)
+        if not tables:
+            return []
+
+        current = await self._max_ids(db, tables)
+        first_look = not any(
+            (platform, table) in self._watermarks for table in tables
+        )
+
+        changes: list[dict] = []
+        for table, highest in current.items():
+            key = (platform, table)
+            previous = self._watermarks.get(key)
+            self._watermarks[key] = highest
+            # A first look establishes where the study is now. Reporting every row
+            # ever stored as "just arrived" would be worse than saying nothing.
+            if first_look or previous is None or highest <= previous:
+                continue
+            for device_id, records in await self._new_rows(
+                db, table, previous, highest
+            ):
+                changes.append(
+                    {
+                        "platform": platform,
+                        "table": table,
+                        "device_id": device_id,
+                        "records": records,
+                    }
+                )
+        return changes
+
+    async def _max_ids(self, db, tables: list[str]) -> dict[str, int]:
+        """The highest `_id` in each table, in one statement.
+
+        One round trip rather than one per table: the subqueries are primary-key
+        lookups, and the cost of asking is dominated by the trips, not the reads.
+        """
+        parts = [
+            f"SELECT '{table}' AS table_name, COALESCE(MAX(`_id`), 0) AS highest "
+            f"FROM `{table}`"
+            for table in tables
+        ]
+        try:
+            rows = (await db.execute(text(" UNION ALL ".join(parts)))).all()
+        except SQLAlchemyError:
+            try:
+                await db.rollback()
+            except SQLAlchemyError:
+                pass
+            return {}
+        # Read through `_mapping` rather than as attributes: SQLAlchemy reserves
+        # short names on Row for its own API — `Row.t` is the whole row as a tuple —
+        # so a column aliased `t` comes back as the row itself and every watermark
+        # lands under a nonsense key.
+        return {
+            str(row._mapping["table_name"]): int(row._mapping["highest"] or 0)
+            for row in rows
+        }
+
+    async def _new_rows(self, db, table: str, low: int, high: int):
+        """Which devices the rows between two watermarks belong to, and how many."""
+        try:
+            rows = (
+                await db.execute(
+                    text(
+                        f"SELECT `device_id` AS device, COUNT(*) AS records "
+                        f"FROM `{table}` "
+                        "WHERE `_id` > :low AND `_id` <= :high GROUP BY `device_id`"
+                    ),
+                    {"low": low, "high": high},
+                )
+            ).all()
+        except SQLAlchemyError:
+            try:
+                await db.rollback()
+            except SQLAlchemyError:
+                pass
+            return []
+        return [
+            (str(row._mapping["device"]), int(row._mapping["records"]))
+            for row in rows
+            if row._mapping["device"] not in (None, "") and row._mapping["records"]
+        ]
