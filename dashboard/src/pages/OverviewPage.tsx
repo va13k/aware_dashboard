@@ -6,6 +6,7 @@ import {
   fetchCountsStatus,
   fetchDevices,
   fetchManifest,
+  fetchOrphanCounts,
   fetchStudyRequirements,
 } from "../api/client";
 import {
@@ -31,6 +32,7 @@ import type {
   Device,
   DevicesResponse,
   Manifest,
+  OrphanCounts,
   SensorManifestEntry,
   StudyRequirements,
 } from "../types";
@@ -51,6 +53,7 @@ export default function OverviewPage() {
     null,
   );
   const [countsStatus, setCountsStatus] = useState<CountsStatus | null>(null);
+  const [orphanCounts, setOrphanCounts] = useState<OrphanCounts | null>(null);
   // The period is chosen in the dialog rather than defaulted, so a
   // study-scale download is never something a single click can start.
   const [exporting, setExporting] = useState(false);
@@ -93,10 +96,14 @@ export default function OverviewPage() {
   // How fresh the numbers on this page are. A refresher that has died leaves a
   // dashboard that looks exactly like a study gone quiet, so the age is shown.
   useEffect(() => {
-    const load = () =>
+    const load = () => {
       fetchCountsStatus()
         .then(setCountsStatus)
         .catch(() => setCountsStatus(null));
+      fetchOrphanCounts()
+        .then(setOrphanCounts)
+        .catch(() => setOrphanCounts(null));
+    };
     load();
     const id = window.setInterval(load, REFRESH_INTERVAL_MS);
     return () => window.clearInterval(id);
@@ -315,6 +322,51 @@ export default function OverviewPage() {
           )}
         </div>
       </section>
+
+      {orphanCounts && orphanCounts.records > 0 ? (
+        <details className="mb-5 rounded-2xl border border-short/40 bg-short/10 px-4 py-3 text-[13px] text-ink shadow-card">
+          <summary className="cursor-pointer font-semibold text-short">
+            {orphanCounts.records.toLocaleString()} records have no device id
+          </summary>
+          <div className="mt-3 space-y-2 text-sage">
+            {Object.entries(orphanCounts.platforms).map(([platform, entry]) =>
+              entry.records > 0 ? (
+                <div key={platform}>
+                  <span className="font-semibold capitalize text-ink">
+                    {platform}: {entry.records.toLocaleString()}
+                  </span>
+                  <ul className="mt-1 list-disc pl-5">
+                    {Object.entries(entry.tables).map(([table, records]) => (
+                      <li key={table}>
+                        {table}: {records.toLocaleString()}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ) : null,
+            )}
+            {/* A count on its own leaves the reader with nothing to do, so this
+                says what the rows are, what to check, and who can act. The
+                dashboard reads study data and cannot delete it — removing rows
+                needs a database administrator. */}
+            <p>
+              A row lands here when a phone uploaded it before its device id
+              resolved. They are left out of every total and every export, so
+              nothing on this page is counting them.
+            </p>
+            <p>
+              They are usually attributable: look at which device was writing the
+              same table around their timestamps, and they almost certainly belong
+              to it. Coverage → pick the sensor → open the hour.
+            </p>
+            <p>
+              Removing or reassigning them is a database administrator's job — the
+              dashboard has read-only access to study data. Until someone does,
+              they sit here and change nothing.
+            </p>
+          </div>
+        </details>
+      ) : null}
 
       <CoveragePanel />
 

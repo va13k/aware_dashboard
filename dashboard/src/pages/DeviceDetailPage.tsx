@@ -22,6 +22,7 @@ import ExportDialog from "../components/ExportDialog";
 import StudyStatusPanel from "../components/StudyStatusPanel";
 import ConfigDiffPanel from "../components/ConfigDiffPanel";
 import StudyEventsTimeline from "../components/StudyEventsTimeline";
+import WithdrawDevice from "../components/WithdrawDevice";
 import SensorViewFilter from "../components/SensorViewFilter";
 import { useSensorView } from "../utils/sensorView";
 import { RequiredStreamNote } from "../components/RequiredByConfig";
@@ -304,6 +305,16 @@ export default function DeviceDetailPage() {
   // grid needs nothing fetched per sensor on load.
   const detailLoading = Boolean(selected && !currentDetail);
 
+  async function refreshParticipation() {
+    if (!selected) return;
+    const [updatedDetail, updatedDevices] = await Promise.all([
+      fetchDeviceDetail(selected.platform, selected.device_id),
+      fetchDevices(),
+    ]);
+    setDetail(updatedDetail);
+    setDevices(updatedDevices);
+  }
+
   // Tick every 10 s to keep the "updated X ago" label current.
   useEffect(() => {
     const id = setInterval(() => setTick((t) => t + 1), 10_000);
@@ -407,6 +418,25 @@ export default function DeviceDetailPage() {
               study={currentDetail.study}
               configDiff={currentDetail.config_diff}
             />
+          ) : null}
+
+          {selected?.platform === "android" && currentDetail ? (
+            <section className="rounded-3xl border border-wire bg-card p-5 shadow-card backdrop-blur-xl">
+              <div className="mb-3">
+                <p className="text-[12px] uppercase tracking-[0.5px] text-sage">
+                  Participation
+                </p>
+                <h2 className="text-[16px] font-bold text-ink">
+                  Enrolment window
+                </h2>
+              </div>
+              <WithdrawDevice
+                deviceId={selected.device_id}
+                enrolment={currentDetail.enrolment}
+                windows={currentDetail.enrolment_windows ?? []}
+                onChanged={refreshParticipation}
+              />
+            </section>
           ) : null}
 
           {currentDetail ? <LatestPayloadPanel detail={currentDetail} /> : null}
