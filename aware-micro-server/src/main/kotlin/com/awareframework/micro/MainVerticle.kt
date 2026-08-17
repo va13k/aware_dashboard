@@ -317,16 +317,35 @@ class MainVerticle : AbstractVerticle() {
                 route.response().end()
               }
 	              "insert" -> {
-	                eventBus.publish(
-	                  "insertData",
-	                  JsonObject()
-	                    .put("table", route.request().getParam("table"))
-	                    .put("device_id", route.request().getFormAttribute("device_id"))
-	                    .put("data", requestDataPayload(route))
-	                )
-                route.response().statusCode = 200
-                route.response().end()
-              }
+	                val payload = requestDataPayload(route)
+	                // Resolved through the same three sources the aware_device route
+	                // uses — form field, body, then the payload rows themselves —
+	                // because a batch whose rows carry the id is attributable and
+	                // should be stored, not refused.
+	                val deviceId = requestDeviceId(route, payload)
+	                if (deviceId.isNullOrBlank()) {
+	                  // Refused rather than stored. The Android data tables declare
+	                  // `device_id varchar(150) DEFAULT ''`, so passing an absent id
+	                  // through lands a row belonging to no device, counted by
+	                  // nothing and exportable by nothing.
+	                  logger.warn {
+	                    "refused an insert into ${route.request().getParam("table")} " +
+	                      "with no device_id from ${route.request().remoteAddress()}"
+	                  }
+	                  route.response().statusCode = 400
+	                  route.response().end("device_id is required")
+	                } else {
+	                  eventBus.publish(
+	                    "insertData",
+	                    JsonObject()
+	                      .put("table", route.request().getParam("table"))
+	                      .put("device_id", deviceId)
+	                      .put("data", payload)
+	                  )
+	                  route.response().statusCode = 200
+	                  route.response().end()
+	                }
+	              }
               "update" -> {
                 eventBus.publish(
                   "updateData",

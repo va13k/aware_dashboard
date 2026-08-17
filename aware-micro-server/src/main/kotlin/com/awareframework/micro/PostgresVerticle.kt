@@ -380,6 +380,14 @@ class PostgresVerticle : AbstractVerticle() {
       return
     }
 
+    // The same gate the MySQL path carries. Postgres declares the column NOT NULL
+    // and would reject a null, but an empty string satisfies that and stores a row
+    // belonging to no device just as readily.
+    if (device_id.isBlank()) {
+      logger.warn { "refused an insert into $table with no device_id (${data.size()} rows)" }
+      return
+    }
+
     if (table == "aware_device") {
       insertAwareDeviceData(device_id, data)
       return

@@ -340,6 +340,16 @@ class MySQLVerticle : AbstractVerticle() {
       return
     }
 
+    // The last gate before the SQL, so the rule holds for every route that
+    // publishes an insert rather than once per route. The data tables declare
+    // `device_id varchar(150) DEFAULT ''`, so a blank id is accepted by MySQL and
+    // lands as a row belonging to no device: counted by nothing, exportable by
+    // nothing, and attributable only by its timestamps.
+    if (device_id.isBlank()) {
+      logger.warn { "refused an insert into $table with no device_id (${data.size()} rows)" }
+      return
+    }
+
     if (table == "aware_device") {
       insertAwareDeviceData(device_id, data)
       return
