@@ -95,17 +95,17 @@ export default function DeviceUsageRecordsCard({
     <div className="bg-card backdrop-blur-xl border border-wire rounded-3xl shadow-card p-5">
       <div className="flex items-center gap-2 mb-1">
         <span className="w-2 h-2 rounded-full shrink-0 bg-[#9333ea]" />
-        <h3 className="text-[13px] font-semibold flex-1 text-ink">
+        <h3 className="text-[14px] font-semibold flex-1 text-ink">
           Device Usage
         </h3>
-        <span className="text-[11px] text-sage bg-[rgba(48,67,54,0.07)] px-1.5 py-0.5 rounded-md">
+        <span className="text-[12px] text-sage bg-[rgba(48,67,54,0.07)] px-1.5 py-0.5 rounded-md">
           duration
         </span>
         {exportHref && <ExportLink href={exportHref} />}
       </div>
 
       {records.length > 0 && (
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mb-3 text-[11px] text-sage">
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mb-3 text-[12px] text-sage">
           <span>
             <b className="text-ink">{records.length.toLocaleString()}</b>{" "}
             records
@@ -129,7 +129,7 @@ export default function DeviceUsageRecordsCard({
         </div>
       )}
 
-      <div className="mb-3 rounded-lg border border-wire bg-card-strong/70 px-3 py-2 text-[11px] leading-snug text-sage">
+      <div className="mb-3 rounded-lg border border-wire bg-card-strong/70 px-3 py-2 text-[12px] leading-snug text-sage">
         Device Usage measures elapsed time between screen lock and unlock state
         changes. elapsed_device_on and elapsed_device_off are milliseconds. A
         positive on value means the device had been on or active for that long
@@ -141,7 +141,7 @@ export default function DeviceUsageRecordsCard({
       {loading ? (
         <div className="h-44 rounded-xl shimmer" />
       ) : !data.length ? (
-        <div className="h-44 flex items-center justify-center text-sage text-[13px]">
+        <div className="h-44 flex items-center justify-center text-sage text-[14px]">
           No data
         </div>
       ) : (
@@ -196,34 +196,34 @@ export default function DeviceUsageRecordsCard({
 
           <div className="grid grid-cols-[repeat(auto-fit,minmax(130px,1fr))] gap-2">
             <div className="rounded-xl border border-wire bg-card-strong/70 px-3 py-2">
-              <div className="text-[10px] uppercase tracking-[0.5px] text-sage">
+              <div className="text-[11px] uppercase tracking-[0.5px] text-sage">
                 Total on time
               </div>
-              <div className="mt-1 text-[18px] font-semibold text-ink">
+              <div className="mt-1 text-[19px] font-semibold text-ink">
                 {formatDuration(totalOnMs)}
               </div>
             </div>
             <div className="rounded-xl border border-wire bg-card-strong/70 px-3 py-2">
-              <div className="text-[10px] uppercase tracking-[0.5px] text-sage">
+              <div className="text-[11px] uppercase tracking-[0.5px] text-sage">
                 Total off time
               </div>
-              <div className="mt-1 text-[18px] font-semibold text-ink">
+              <div className="mt-1 text-[19px] font-semibold text-ink">
                 {formatDuration(totalOffMs)}
               </div>
             </div>
             <div className="rounded-xl border border-wire bg-card-strong/70 px-3 py-2">
-              <div className="text-[10px] uppercase tracking-[0.5px] text-sage">
+              <div className="text-[11px] uppercase tracking-[0.5px] text-sage">
                 On intervals
               </div>
-              <div className="mt-1 text-[18px] font-semibold text-ink">
+              <div className="mt-1 text-[19px] font-semibold text-ink">
                 {onEvents.toLocaleString()}
               </div>
             </div>
             <div className="rounded-xl border border-wire bg-card-strong/70 px-3 py-2">
-              <div className="text-[10px] uppercase tracking-[0.5px] text-sage">
+              <div className="text-[11px] uppercase tracking-[0.5px] text-sage">
                 Off intervals
               </div>
-              <div className="mt-1 text-[18px] font-semibold text-ink">
+              <div className="mt-1 text-[19px] font-semibold text-ink">
                 {offEvents.toLocaleString()}
               </div>
             </div>

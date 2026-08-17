@@ -240,15 +240,15 @@ export default function OverviewPage() {
       <section className="mb-5 rounded-2xl border border-wire bg-card p-4 shadow-card">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <p className="text-[11px] uppercase tracking-[0.5px] text-sage">
+            <p className="text-[12px] uppercase tracking-[0.5px] text-sage">
               Last phone data upload
             </p>
-            <p className="mt-1 text-[20px] font-bold text-ink">
+            <p className="mt-1 text-[21px] font-bold text-ink">
               {latestUploadText}
             </p>
             {countsFreshness && (
               <p
-                className={`mt-1 text-[11px] ${
+                className={`mt-1 text-[12px] ${
                   countsFreshness.stale ? "font-semibold text-amber-600" : "text-sage"
                 }`}
                 title="Record counts are cached and refreshed on a schedule"
@@ -261,13 +261,13 @@ export default function OverviewPage() {
             <div className="flex items-center gap-2">
               <Link
                 to="/manifest"
-                className="inline-flex h-9 items-center justify-center rounded-lg border border-wire bg-card-strong px-3 text-[10px] font-semibold uppercase tracking-[0.4px] text-sage transition-colors hover:border-teal hover:text-teal"
+                className="inline-flex h-9 items-center justify-center rounded-lg border border-wire bg-card-strong px-3 text-[11px] font-semibold uppercase tracking-[0.4px] text-sage transition-colors hover:border-teal hover:text-teal"
               >
                 Manifest
               </Link>
               <Link
                 to="/logs"
-                className="inline-flex h-9 items-center justify-center rounded-lg border border-wire bg-card-strong px-3 text-[10px] font-semibold uppercase tracking-[0.4px] text-sage transition-colors hover:border-teal hover:text-teal"
+                className="inline-flex h-9 items-center justify-center rounded-lg border border-wire bg-card-strong px-3 text-[11px] font-semibold uppercase tracking-[0.4px] text-sage transition-colors hover:border-teal hover:text-teal"
               >
                 Logs
               </Link>
@@ -275,15 +275,15 @@ export default function OverviewPage() {
                 type="button"
                 onClick={() => setExporting(true)}
                 title="Choose a period, then export everything the study holds"
-                className="inline-flex h-9 items-center justify-center rounded-lg border border-wire bg-card-strong px-3 text-[10px] font-semibold uppercase tracking-[0.4px] text-sage transition-colors hover:border-teal hover:text-teal"
+                className="inline-flex h-9 items-center justify-center rounded-lg border border-wire bg-card-strong px-3 text-[11px] font-semibold uppercase tracking-[0.4px] text-sage transition-colors hover:border-teal hover:text-teal"
               >
                 Export all
               </button>
               <div className="rounded-xl bg-teal-soft px-3 py-2 text-right">
-                <p className="text-[12px] font-semibold text-teal">
+                <p className="text-[13px] font-semibold text-teal">
                   {relativeAge(latestUpload.last_seen, now)}
                 </p>
-                <p className="mt-0.5 text-[11px] text-sage">
+                <p className="mt-0.5 text-[12px] text-sage">
                   {latestUpload.platform} - {deviceLabel(latestUpload)}
                 </p>
               </div>
@@ -293,13 +293,13 @@ export default function OverviewPage() {
             <div className="flex items-center gap-2 self-start sm:self-center">
               <Link
                 to="/manifest"
-                className="inline-flex h-9 items-center justify-center rounded-lg border border-wire bg-card-strong px-3 text-[10px] font-semibold uppercase tracking-[0.4px] text-sage transition-colors hover:border-teal hover:text-teal"
+                className="inline-flex h-9 items-center justify-center rounded-lg border border-wire bg-card-strong px-3 text-[11px] font-semibold uppercase tracking-[0.4px] text-sage transition-colors hover:border-teal hover:text-teal"
               >
                 Manifest
               </Link>
               <Link
                 to="/logs"
-                className="inline-flex h-9 items-center justify-center rounded-lg border border-wire bg-card-strong px-3 text-[10px] font-semibold uppercase tracking-[0.4px] text-sage transition-colors hover:border-teal hover:text-teal"
+                className="inline-flex h-9 items-center justify-center rounded-lg border border-wire bg-card-strong px-3 text-[11px] font-semibold uppercase tracking-[0.4px] text-sage transition-colors hover:border-teal hover:text-teal"
               >
                 Logs
               </Link>
@@ -307,7 +307,7 @@ export default function OverviewPage() {
                 type="button"
                 onClick={() => setExporting(true)}
                 title="Choose a period, then export everything the study holds"
-                className="inline-flex h-9 items-center justify-center rounded-lg border border-wire bg-card-strong px-3 text-[10px] font-semibold uppercase tracking-[0.4px] text-sage transition-colors hover:border-teal hover:text-teal"
+                className="inline-flex h-9 items-center justify-center rounded-lg border border-wire bg-card-strong px-3 text-[11px] font-semibold uppercase tracking-[0.4px] text-sage transition-colors hover:border-teal hover:text-teal"
               >
                 Export all
               </button>
@@ -319,20 +319,20 @@ export default function OverviewPage() {
       <CoveragePanel />
 
       <div className="mb-3 mt-5 flex flex-col gap-2 px-1 sm:flex-row sm:items-center sm:justify-between">
-        <div className="text-[11px] font-semibold uppercase tracking-[0.6px] text-sage">
+        <div className="text-[12px] font-semibold uppercase tracking-[0.6px] text-sage">
           Sensors
         </div>
         <SensorViewFilter value={view} onChange={setView} />
       </div>
 
       {view === "required" && !required.available ? (
-        <div className="rounded-2xl border border-wire bg-card p-6 text-center text-[13px] text-sage shadow-card">
+        <div className="rounded-2xl border border-wire bg-card p-6 text-center text-[14px] text-sage shadow-card">
           {requirements
             ? "No deployed config was found to derive sensor requirements from."
             : "Loading sensor requirements…"}
         </div>
       ) : visibleSensorCount === 0 && view !== "all" ? (
-        <div className="rounded-2xl border border-wire bg-card p-6 text-center text-[13px] text-sage shadow-card">
+        <div className="rounded-2xl border border-wire bg-card p-6 text-center text-[14px] text-sage shadow-card">
           {view === "required"
             ? "The deployed config requires no sensors this dashboard can show."
             : "No sensors have records yet."}
@@ -341,7 +341,7 @@ export default function OverviewPage() {
 
       {sections.map((section) => (
         <section key={section.title} className="mt-5">
-          <div className="mb-2 px-1 text-[11px] font-semibold uppercase tracking-[0.6px] text-sage">
+          <div className="mb-2 px-1 text-[12px] font-semibold uppercase tracking-[0.6px] text-sage">
             {section.title}
           </div>
           <div className="grid auto-rows-[220px] grid-cols-[repeat(auto-fill,minmax(340px,1fr))] gap-4">

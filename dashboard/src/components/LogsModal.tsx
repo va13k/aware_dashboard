@@ -36,14 +36,14 @@ export default function LogsModal({
       >
         <div className="mb-4 flex items-start justify-between gap-4">
           <div>
-            <h2 className="text-[15px] font-bold text-ink">Client logs</h2>
-            {title ? <p className="text-[11px] text-sage">{title}</p> : null}
+            <h2 className="text-[16px] font-bold text-ink">Client logs</h2>
+            {title ? <p className="text-[12px] text-sage">{title}</p> : null}
           </div>
           <button
             type="button"
             onClick={onClose}
             aria-label="Close"
-            className="shrink-0 cursor-pointer rounded-lg border border-wire bg-card-strong px-2.5 py-1 text-[13px] font-semibold text-sage transition-colors hover:border-teal hover:text-teal"
+            className="shrink-0 cursor-pointer rounded-lg border border-wire bg-card-strong px-2.5 py-1 text-[14px] font-semibold text-sage transition-colors hover:border-teal hover:text-teal"
           >
             ✕
           </button>

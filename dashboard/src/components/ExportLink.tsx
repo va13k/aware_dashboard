@@ -124,7 +124,7 @@ export default function ExportLink({
     [busy, download, follow, href],
   );
 
-  const base = `inline-flex h-7 items-center justify-center gap-1.5 rounded-lg border px-2 text-[10px] font-semibold uppercase tracking-[0.4px] ${className}`;
+  const base = `inline-flex h-7 items-center justify-center gap-1.5 rounded-lg border px-2 text-[11px] font-semibold uppercase tracking-[0.4px] ${className}`;
 
   /** While it runs the button says so itself — a hairline bar alone is easy to
       miss on a control this small, and an export can last minutes.

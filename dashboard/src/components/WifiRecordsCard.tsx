@@ -53,9 +53,9 @@ export default function WifiRecordsCard({
     >
       <div className="flex items-center gap-2 mb-3">
         <span className="w-2 h-2 rounded-full shrink-0 bg-[#8b5cf6]" />
-        <h3 className="text-[13px] font-semibold text-ink">Wi-Fi</h3>
+        <h3 className="text-[14px] font-semibold text-ink">Wi-Fi</h3>
         {total > 0 && (
-          <span className="text-[11px] text-sage ml-auto">
+          <span className="text-[12px] text-sage ml-auto">
             {total.toLocaleString()} records
           </span>
         )}
@@ -65,35 +65,35 @@ export default function WifiRecordsCard({
       {loading ? (
         <div className="h-44 rounded-xl shimmer" />
       ) : !rows.length ? (
-        <div className="h-44 flex items-center justify-center text-sage text-[13px]">
+        <div className="h-44 flex items-center justify-center text-sage text-[14px]">
           No data
         </div>
       ) : (
         <div className={`overflow-auto ${tableClassName}`}>
-          <table className="w-full min-w-[560px] text-[12px] border-collapse">
+          <table className="w-full min-w-[560px] text-[13px] border-collapse">
             <thead>
               <tr className="text-sage border-b border-wire">
-                <th className="text-left pb-1.5 font-semibold text-[10px] uppercase tracking-[0.5px]">
+                <th className="text-left pb-1.5 font-semibold text-[11px] uppercase tracking-[0.5px]">
                   Time
                 </th>
                 {showSource && (
-                  <th className="text-left pb-1.5 font-semibold text-[10px] uppercase tracking-[0.5px]">
+                  <th className="text-left pb-1.5 font-semibold text-[11px] uppercase tracking-[0.5px]">
                     Source
                   </th>
                 )}
-                <th className="text-left pb-1.5 font-semibold text-[10px] uppercase tracking-[0.5px]">
+                <th className="text-left pb-1.5 font-semibold text-[11px] uppercase tracking-[0.5px]">
                   SSID
                 </th>
-                <th className="text-left pb-1.5 font-semibold text-[10px] uppercase tracking-[0.5px]">
+                <th className="text-left pb-1.5 font-semibold text-[11px] uppercase tracking-[0.5px]">
                   BSSID
                 </th>
-                <th className="text-left pb-1.5 font-semibold text-[10px] uppercase tracking-[0.5px]">
+                <th className="text-left pb-1.5 font-semibold text-[11px] uppercase tracking-[0.5px]">
                   RSSI
                 </th>
-                <th className="text-left pb-1.5 font-semibold text-[10px] uppercase tracking-[0.5px]">
+                <th className="text-left pb-1.5 font-semibold text-[11px] uppercase tracking-[0.5px]">
                   Frequency
                 </th>
-                <th className="text-left pb-1.5 font-semibold text-[10px] uppercase tracking-[0.5px]">
+                <th className="text-left pb-1.5 font-semibold text-[11px] uppercase tracking-[0.5px]">
                   Security
                 </th>
               </tr>

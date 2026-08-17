@@ -39,8 +39,8 @@ export default function StudyEventsTimeline({
   if (events.length === 0) {
     return (
       <section className="rounded-3xl border border-wire bg-card p-5 shadow-card backdrop-blur-xl">
-        <h2 className="mb-2 text-[15px] font-bold text-ink">Study events</h2>
-        <p className="text-[13px] text-sage">
+        <h2 className="mb-2 text-[16px] font-bold text-ink">Study events</h2>
+        <p className="text-[14px] text-sage">
           This phone has not reported any study events.
         </p>
       </section>
@@ -49,7 +49,7 @@ export default function StudyEventsTimeline({
 
   return (
     <section className="rounded-3xl border border-wire bg-card p-5 shadow-card backdrop-blur-xl">
-      <h2 className="mb-4 text-[15px] font-bold text-ink">Study events</h2>
+      <h2 className="mb-4 text-[16px] font-bold text-ink">Study events</h2>
       <ol className="space-y-3">
         {events.map((event, index) => {
           const meta = KIND_META[event.kind];
@@ -65,22 +65,22 @@ export default function StudyEventsTimeline({
               />
               <div className="min-w-0 flex-1">
                 <div className="flex flex-wrap items-baseline gap-x-2">
-                  <span className="text-[13px] font-semibold text-ink">
+                  <span className="text-[14px] font-semibold text-ink">
                     {meta.label}
                   </span>
                   <span
-                    className="text-[11px] text-sage"
+                    className="text-[12px] text-sage"
                     title={absoluteTime(event.timestamp)}
                   >
                     {relativeAge(event.timestamp)}
                   </span>
                   {event.occurrences > 1 ? (
-                    <span className="text-[11px] text-sage">
+                    <span className="text-[12px] text-sage">
                       · ×{event.occurrences}
                     </span>
                   ) : null}
                 </div>
-                <p className="mt-0.5 text-[12px] text-sage wrap-break-word">
+                <p className="mt-0.5 text-[13px] text-sage wrap-break-word">
                   {event.message}
                   {event.kind === "consent" ? (
                     <ConsentSummary event={event} />

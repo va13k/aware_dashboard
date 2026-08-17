@@ -57,10 +57,10 @@ function formatValue(label: string, value: unknown): string {
 function DetailField({ label, value }: { label: string; value: unknown }) {
   return (
     <div className="min-w-0 rounded-xl border border-wire bg-card-strong/70 px-3 py-2">
-      <div className="text-[10px] uppercase tracking-[0.5px] text-sage">
+      <div className="text-[11px] uppercase tracking-[0.5px] text-sage">
         {label}
       </div>
-      <div className="mt-1 text-[12px] font-semibold text-ink wrap-break-word">
+      <div className="mt-1 text-[13px] font-semibold text-ink wrap-break-word">
         {formatValue(label, value)}
       </div>
     </div>
@@ -82,7 +82,7 @@ function DeviceSwitcher({
   }
 
   return (
-    <label className="flex items-center gap-2 text-[11px] text-sage">
+    <label className="flex items-center gap-2 text-[12px] text-sage">
       Device
       <select
         aria-label="Switch device"
@@ -93,7 +93,7 @@ function DeviceSwitcher({
           if (separator < 0) return;
           onSwitch(value.slice(0, separator), value.slice(separator + 1));
         }}
-        className="min-w-[200px] cursor-pointer rounded-lg border border-wire bg-card-strong px-2.5 py-1.5 text-[12px] font-semibold text-ink"
+        className="min-w-[200px] cursor-pointer rounded-lg border border-wire bg-card-strong px-2.5 py-1.5 text-[13px] font-semibold text-ink"
       >
         {selectedKey ? null : <option value="">Select a device</option>}
         {devices.android.length > 0 ? (
@@ -143,10 +143,10 @@ function DeviceDetailPanel({
     <section className="bg-card backdrop-blur-xl border border-wire rounded-3xl shadow-card p-5">
       <div className="flex items-start justify-between gap-4 mb-4">
         <div>
-          <div className="text-[11px] uppercase tracking-[0.5px] text-sage">
+          <div className="text-[12px] uppercase tracking-[0.5px] text-sage">
             Device info
           </div>
-          <h2 className="text-[15px] font-bold text-ink">
+          <h2 className="text-[16px] font-bold text-ink">
             {deviceName || "Unknown device"}
           </h2>
         </div>
@@ -157,12 +157,12 @@ function DeviceDetailPanel({
                 type="button"
                 onClick={onExport}
                 title="Choose a period, then export this phone's CSVs"
-                className="inline-flex h-7 items-center justify-center rounded-lg border border-wire bg-card-strong px-2 text-[10px] font-semibold uppercase tracking-[0.4px] text-sage transition-colors hover:border-teal hover:text-teal"
+                className="inline-flex h-7 items-center justify-center rounded-lg border border-wire bg-card-strong px-2 text-[11px] font-semibold uppercase tracking-[0.4px] text-sage transition-colors hover:border-teal hover:text-teal"
               >
                 ↓ Export
               </button>
             )}
-            <span className="text-[11px] uppercase tracking-[0.5px] text-teal bg-teal-soft px-2 py-1 rounded-lg">
+            <span className="text-[12px] uppercase tracking-[0.5px] text-teal bg-teal-soft px-2 py-1 rounded-lg">
               {detail.platform}
             </span>
           </div>
@@ -172,7 +172,7 @@ function DeviceDetailPanel({
       {loading ? (
         <div className="h-32 rounded-xl shimmer" />
       ) : !detail ? (
-        <div className="h-32 flex items-center justify-center text-sage text-[13px]">
+        <div className="h-32 flex items-center justify-center text-sage text-[14px]">
           Loading device…
         </div>
       ) : (
@@ -227,8 +227,8 @@ function LatestPayloadPanel({ detail }: { detail: DeviceDetail }) {
   return (
     <section className="bg-card backdrop-blur-xl border border-wire rounded-3xl shadow-card p-5">
       <div className="mb-4 flex items-center gap-2">
-        <h2 className="text-[15px] font-bold text-ink">Latest payload</h2>
-        <span className="rounded-md bg-[rgba(48,67,54,0.07)] px-1.5 py-0.5 text-[11px] font-semibold text-sage">
+        <h2 className="text-[16px] font-bold text-ink">Latest payload</h2>
+        <span className="rounded-md bg-[rgba(48,67,54,0.07)] px-1.5 py-0.5 text-[12px] font-semibold text-sage">
           from {source.key}
         </span>
       </div>
@@ -382,7 +382,7 @@ export default function DeviceDetailPage() {
       </div>
 
       {notFound ? (
-        <div className="rounded-2xl border border-wire bg-card p-8 text-center text-[13px] text-sage shadow-card">
+        <div className="rounded-2xl border border-wire bg-card p-8 text-center text-[14px] text-sage shadow-card">
           This device is not in the list.{" "}
           <button
             type="button"
@@ -506,7 +506,7 @@ export default function DeviceDetailPage() {
               return (
                 <>
                   <div className="flex flex-col gap-2 px-1 sm:flex-row sm:items-center sm:justify-between">
-                    <div className="flex items-center gap-1.5 text-[11px] text-sage">
+                    <div className="flex items-center gap-1.5 text-[12px] text-sage">
                       <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" />
                       {lastUpdated
                         ? `Updated ${relativeAge(lastUpdated)}`
@@ -516,13 +516,13 @@ export default function DeviceDetailPage() {
                   </div>
 
                   {view === "required" && !requiredLookup.available ? (
-                    <div className="rounded-2xl border border-wire bg-card p-6 text-center text-[13px] text-sage shadow-card">
+                    <div className="rounded-2xl border border-wire bg-card p-6 text-center text-[14px] text-sage shadow-card">
                       {requirements
                         ? `No deployed ${selected.platform} config was found to derive sensor requirements from.`
                         : "Loading sensor requirements…"}
                     </div>
                   ) : visibleConfigs.length === 0 && view !== "all" ? (
-                    <div className="rounded-2xl border border-wire bg-card p-6 text-center text-[13px] text-sage shadow-card">
+                    <div className="rounded-2xl border border-wire bg-card p-6 text-center text-[14px] text-sage shadow-card">
                       {view === "required"
                         ? "The deployed config requires no sensors this dashboard can show."
                         : "No sensors have records for this device yet."}
@@ -531,7 +531,7 @@ export default function DeviceDetailPage() {
 
                   {sharedTiles.length > 0 ? (
                     <>
-                      <div className="text-[11px] font-semibold uppercase tracking-[0.6px] text-sage px-1">
+                      <div className="text-[12px] font-semibold uppercase tracking-[0.6px] text-sage px-1">
                         Shared
                       </div>
                       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
@@ -542,7 +542,7 @@ export default function DeviceDetailPage() {
 
                   {specificTiles.length > 0 ? (
                     <>
-                      <div className="text-[11px] font-semibold uppercase tracking-[0.6px] text-sage px-1 mt-2">
+                      <div className="text-[12px] font-semibold uppercase tracking-[0.6px] text-sage px-1 mt-2">
                         {specificLabel}
                       </div>
                       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
@@ -567,8 +567,8 @@ export default function DeviceDetailPage() {
               className="flex w-full cursor-pointer items-center justify-between gap-4 rounded-2xl border border-wire bg-card p-5 text-left shadow-card transition-colors hover:border-teal hover:bg-teal-soft/40"
             >
               <div>
-                <h2 className="text-[15px] font-bold text-ink">Client logs</h2>
-                <p className="mt-0.5 text-[11px] text-sage">
+                <h2 className="text-[16px] font-bold text-ink">Client logs</h2>
+                <p className="mt-0.5 text-[12px] text-sage">
                   This device's operation logs — click to open, then filter by
                   type, window or text.
                 </p>

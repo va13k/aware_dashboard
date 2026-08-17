@@ -13,11 +13,11 @@ function Field({
 }) {
   return (
     <div className="min-w-0 rounded-xl border border-wire bg-card-strong/70 px-3 py-2">
-      <div className="text-[10px] uppercase tracking-[0.5px] text-sage">
+      <div className="text-[11px] uppercase tracking-[0.5px] text-sage">
         {label}
       </div>
       <div
-        className="mt-1 text-[12px] font-semibold text-ink wrap-break-word"
+        className="mt-1 text-[13px] font-semibold text-ink wrap-break-word"
         title={title}
       >
         {value}
@@ -37,7 +37,7 @@ function ConsentChips({
   emptyLabel: string;
 }) {
   if (consents.length === 0) {
-    return <span className="text-[12px] text-sage">{emptyLabel}</span>;
+    return <span className="text-[13px] text-sage">{emptyLabel}</span>;
   }
 
   const toneClass =
@@ -50,7 +50,7 @@ function ConsentChips({
       {consents.map((consent) => (
         <span
           key={consent}
-          className={`inline-flex items-center rounded-lg border px-2 py-0.5 text-[11px] font-semibold ${toneClass}`}
+          className={`inline-flex items-center rounded-lg border px-2 py-0.5 text-[12px] font-semibold ${toneClass}`}
         >
           {consent}
         </span>
@@ -77,7 +77,7 @@ export default function StudyStatusPanel({
   return (
     <section className="rounded-3xl border border-wire bg-card p-5 shadow-card backdrop-blur-xl">
       <div className="mb-4 flex flex-wrap items-center gap-2">
-        <h2 className="text-[15px] font-bold text-ink">Study status</h2>
+        <h2 className="text-[16px] font-bold text-ink">Study status</h2>
         <div className="flex flex-wrap gap-1.5">
           <EnrollmentBadge status={study.enrollment_status} />
           {configDiff ? (
@@ -116,7 +116,7 @@ export default function StudyStatusPanel({
       </div>
 
       {rejoined ? (
-        <div className="mt-3 rounded-xl border border-wire bg-card-strong/70 px-3 py-2 text-[12px]">
+        <div className="mt-3 rounded-xl border border-wire bg-card-strong/70 px-3 py-2 text-[13px]">
           <span className="font-semibold text-ink">
             Rejoined {relativeAge(study.last_rejoin_at)}
           </span>
@@ -137,7 +137,7 @@ export default function StudyStatusPanel({
 
       <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
         <div>
-          <div className="mb-1.5 text-[10px] uppercase tracking-[0.5px] text-sage">
+          <div className="mb-1.5 text-[11px] uppercase tracking-[0.5px] text-sage">
             Approved consent
           </div>
           <ConsentChips
@@ -147,7 +147,7 @@ export default function StudyStatusPanel({
           />
         </div>
         <div>
-          <div className="mb-1.5 text-[10px] uppercase tracking-[0.5px] text-sage">
+          <div className="mb-1.5 text-[11px] uppercase tracking-[0.5px] text-sage">
             Declined consent
           </div>
           <ConsentChips
@@ -159,7 +159,7 @@ export default function StudyStatusPanel({
       </div>
 
       {study.last_consent_at != null ? (
-        <p className="mt-2 text-[11px] text-sage">
+        <p className="mt-2 text-[12px] text-sage">
           Last consent {relativeAge(study.last_consent_at)}
           {study.consent_context === "study_update"
             ? " (during a study update)"

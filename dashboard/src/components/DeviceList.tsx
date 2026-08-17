@@ -90,13 +90,13 @@ export default function DeviceList({
   }, [all, platform, status, order]);
 
   const selectClass =
-    "min-w-[120px] flex-1 cursor-pointer rounded-xl border border-wire bg-card-strong px-2 py-1.5 text-[11px] font-semibold text-ink";
+    "min-w-[120px] flex-1 cursor-pointer rounded-xl border border-wire bg-card-strong px-2 py-1.5 text-[12px] font-semibold text-ink";
 
   return (
     <section className="rounded-3xl border border-wire bg-card p-4 shadow-card backdrop-blur-xl">
       <div className="mb-3 flex items-baseline justify-between gap-3">
-        <h1 className="text-[16px] font-bold text-ink">All devices</h1>
-        <p className="shrink-0 text-[11px] text-sage">
+        <h1 className="text-[17px] font-bold text-ink">All devices</h1>
+        <p className="shrink-0 text-[12px] text-sage">
           {devices?.android.length ?? 0} Android · {devices?.ios.length ?? 0} iOS
         </p>
       </div>
@@ -146,7 +146,7 @@ export default function DeviceList({
         {!devices ? (
           <div className="h-24 rounded-xl shimmer sm:col-span-2" />
         ) : visible.length === 0 ? (
-          <div className="py-8 text-center text-[13px] text-sage sm:col-span-2">
+          <div className="py-8 text-center text-[14px] text-sage sm:col-span-2">
             {all.length === 0
               ? "No devices"
               : `No devices match these filters (${all.length} hidden)`}

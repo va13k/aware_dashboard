@@ -66,7 +66,7 @@ function appCountData(records: SensorRecord[]) {
 
 function UserSystemLegend({ userColor }: { userColor: string }) {
   return (
-    <div className="flex items-center gap-3 mb-2 text-[10px] text-sage">
+    <div className="flex items-center gap-3 mb-2 text-[11px] text-sage">
       <span>
         <span
           className="inline-block w-1.5 h-1.5 rounded-full mr-1"
@@ -159,8 +159,8 @@ function SubcardShell({
           className="w-2 h-2 rounded-full shrink-0"
           style={{ background: color }}
         />
-        <h4 className="text-[12px] font-semibold text-ink flex-1">{title}</h4>
-        {note && <span className="text-[10px] text-sage">{note}</span>}
+        <h4 className="text-[13px] font-semibold text-ink flex-1">{title}</h4>
+        {note && <span className="text-[11px] text-sage">{note}</span>}
       </div>
       {children}
     </div>
@@ -169,7 +169,7 @@ function SubcardShell({
 
 function EmptyState() {
   return (
-    <div className="h-28 flex items-center justify-center text-sage text-[12px]">
+    <div className="h-28 flex items-center justify-center text-sage text-[13px]">
       No data
     </div>
   );
@@ -331,7 +331,7 @@ function CrashesSubcard({
       {loading ? (
         <div className="h-28 rounded-xl shimmer" />
       ) : !sorted.length ? (
-        <div className="h-28 flex items-center justify-center text-sage text-[12px]">
+        <div className="h-28 flex items-center justify-center text-sage text-[13px]">
           No crashes
         </div>
       ) : (
@@ -342,29 +342,29 @@ function CrashesSubcard({
               className="rounded-xl bg-card px-2.5 py-1.5 flex flex-col gap-0.5"
             >
               <div className="flex items-center justify-between gap-2">
-                <span className="text-[11px] font-semibold text-ink truncate">
+                <span className="text-[12px] font-semibold text-ink truncate">
                   {(r.application_name as string | null) ??
                     (r.package_name as string | null) ??
                     "Unknown"}
                 </span>
-                <span className="text-[10px] text-sage shrink-0">
+                <span className="text-[11px] text-sage shrink-0">
                   {fmtTime(r.timestamp as number)}
                 </span>
               </div>
               {r.error_short != null && (
-                <span className="text-[11px] text-red-500 truncate">
+                <span className="text-[12px] text-red-500 truncate">
                   {r.error_short as string}
                 </span>
               )}
               <div className="flex items-center gap-1.5">
                 {(r.application_version as number | null) != null &&
                   (r.application_version as number) !== 0 && (
-                    <span className="text-[10px] text-sage">
+                    <span className="text-[11px] text-sage">
                       v{r.application_version as number}
                     </span>
                   )}
                 {Boolean(r.is_system_app) && (
-                  <span className="rounded-md bg-wire/60 px-1.5 py-0.5 text-[10px] text-sage">
+                  <span className="rounded-md bg-wire/60 px-1.5 py-0.5 text-[11px] text-sage">
                     system
                   </span>
                 )}
@@ -401,11 +401,11 @@ export default function ApplicationsCard({
     >
       <div className="flex items-center gap-2 mb-4">
         <span className="w-2 h-2 rounded-full shrink-0 bg-[#9333ea]" />
-        <h3 className="text-[13px] font-semibold flex-1 text-ink">
+        <h3 className="text-[14px] font-semibold flex-1 text-ink">
           Applications
         </h3>
         {totalRecords > 0 && (
-          <span className="text-[11px] text-sage">
+          <span className="text-[12px] text-sage">
             {totalRecords.toLocaleString()} records
           </span>
         )}

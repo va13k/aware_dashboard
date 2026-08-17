@@ -80,12 +80,12 @@ function SensorRow({ name, entry, deviceCount }: SensorRowProps) {
             }}
           />
           <span
-            className={`text-[13px] font-semibold ${hasData ? "text-ink" : "text-sage/60"}`}
+            className={`text-[14px] font-semibold ${hasData ? "text-ink" : "text-sage/60"}`}
           >
             {config?.label ?? name}
           </span>
           {!hasData && (
-            <span className="rounded-md bg-wire/60 px-1.5 py-0.5 text-[10px] uppercase tracking-[0.4px] text-sage/50">
+            <span className="rounded-md bg-wire/60 px-1.5 py-0.5 text-[11px] uppercase tracking-[0.4px] text-sage/50">
               no data
             </span>
           )}
@@ -94,25 +94,25 @@ function SensorRow({ name, entry, deviceCount }: SensorRowProps) {
         {/* Stats */}
         <div className="flex flex-wrap items-center gap-x-5 gap-y-1">
           <div className="text-right">
-            <div className="text-[10px] uppercase tracking-[0.5px] text-sage">
+            <div className="text-[11px] uppercase tracking-[0.5px] text-sage">
               Records
             </div>
             <div
-              className={`text-[13px] font-bold ${hasData ? "text-ink" : "text-sage/40"}`}
+              className={`text-[14px] font-bold ${hasData ? "text-ink" : "text-sage/40"}`}
             >
               {entry.row_count.toLocaleString()}
             </div>
           </div>
 
           <div className="text-right">
-            <div className="text-[10px] uppercase tracking-[0.5px] text-sage">
+            <div className="text-[11px] uppercase tracking-[0.5px] text-sage">
               Devices
             </div>
             <div
-              className={`text-[13px] font-bold ${hasData ? "text-ink" : "text-sage/40"}`}
+              className={`text-[14px] font-bold ${hasData ? "text-ink" : "text-sage/40"}`}
             >
               {entry.devices_with_data}
-              <span className="text-[11px] font-normal text-sage">
+              <span className="text-[12px] font-normal text-sage">
                 {" "}
                 / {deviceCount}
               </span>
@@ -120,34 +120,34 @@ function SensorRow({ name, entry, deviceCount }: SensorRowProps) {
           </div>
 
           <div className="text-right">
-            <div className="text-[10px] uppercase tracking-[0.5px] text-sage">
+            <div className="text-[11px] uppercase tracking-[0.5px] text-sage">
               First sample
             </div>
             <div
-              className={`text-[13px] font-bold ${hasData ? "text-ink" : "text-sage/40"}`}
+              className={`text-[14px] font-bold ${hasData ? "text-ink" : "text-sage/40"}`}
             >
               {absoluteDate(entry.first_timestamp)}
             </div>
           </div>
 
           <div className="text-right">
-            <div className="text-[10px] uppercase tracking-[0.5px] text-sage">
+            <div className="text-[11px] uppercase tracking-[0.5px] text-sage">
               Last sample
             </div>
             <div
-              className={`text-[13px] font-bold ${hasData ? "text-ink" : "text-sage/40"}`}
+              className={`text-[14px] font-bold ${hasData ? "text-ink" : "text-sage/40"}`}
             >
               {absoluteDate(entry.last_timestamp)}
             </div>
           </div>
 
           <div className="text-right">
-            <div className="text-[10px] uppercase tracking-[0.5px] text-sage">
+            <div className="text-[11px] uppercase tracking-[0.5px] text-sage">
               Fields
             </div>
             <button
               onClick={() => setFieldsOpen((o) => !o)}
-              className="text-[13px] font-bold text-teal hover:underline cursor-pointer"
+              className="text-[14px] font-bold text-teal hover:underline cursor-pointer"
             >
               {entry.fields.length} {fieldsOpen ? "▲" : "▼"}
             </button>
@@ -160,7 +160,7 @@ function SensorRow({ name, entry, deviceCount }: SensorRowProps) {
           {entry.fields.map((f) => (
             <span
               key={f}
-              className="rounded-md bg-card-strong px-2 py-0.5 font-mono text-[10px] text-sage"
+              className="rounded-md bg-card-strong px-2 py-0.5 font-mono text-[11px] text-sage"
             >
               {f}
             </span>
@@ -192,8 +192,8 @@ function PlatformSection({ platform, manifest }: PlatformSectionProps) {
           className="h-2.5 w-2.5 rounded-full"
           style={{ background: dotColor }}
         />
-        <h2 className="text-[15px] font-bold text-ink">{label}</h2>
-        <span className="text-[12px] text-sage">
+        <h2 className="text-[16px] font-bold text-ink">{label}</h2>
+        <span className="text-[13px] text-sage">
           {data.device_count} {data.device_count === 1 ? "device" : "devices"} ·{" "}
           {sensorsWithData} of {sensors.length} sensors with data
         </span>
@@ -250,9 +250,9 @@ export default function ManifestPage() {
       <section className="rounded-2xl border border-wire bg-card p-5 shadow-card">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
-            <h1 className="text-[20px] font-bold text-ink">Study Manifest</h1>
+            <h1 className="text-[21px] font-bold text-ink">Study Manifest</h1>
             {manifest && (
-              <p className="mt-1 text-[12px] text-sage">
+              <p className="mt-1 text-[13px] text-sage">
                 Generated {isoDateTime(manifest.generated_at)}
               </p>
             )}
@@ -260,7 +260,7 @@ export default function ManifestPage() {
           {manifest && (
             <button
               onClick={() => downloadJson(manifest)}
-              className="inline-flex h-9 items-center gap-2 rounded-xl border border-wire bg-card-strong px-4 text-[12px] font-semibold text-sage shadow-card transition-colors hover:border-teal hover:text-teal"
+              className="inline-flex h-9 items-center gap-2 rounded-xl border border-wire bg-card-strong px-4 text-[13px] font-semibold text-sage shadow-card transition-colors hover:border-teal hover:text-teal"
             >
               <svg width="13" height="13" viewBox="0 0 16 16" fill="none">
                 <path
@@ -303,10 +303,10 @@ export default function ManifestPage() {
               key={label}
               className="rounded-xl border border-wire bg-card-strong/70 px-4 py-3"
             >
-              <div className="text-[10px] uppercase tracking-[0.5px] text-sage">
+              <div className="text-[11px] uppercase tracking-[0.5px] text-sage">
                 {label}
               </div>
-              <div className="mt-1 text-[15px] font-bold text-ink">{value}</div>
+              <div className="mt-1 text-[16px] font-bold text-ink">{value}</div>
             </div>
           ))}
         </div>

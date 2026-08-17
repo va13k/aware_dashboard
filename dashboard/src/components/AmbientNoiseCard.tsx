@@ -63,8 +63,8 @@ function SubcardShell({
           className="w-2 h-2 rounded-full shrink-0"
           style={{ background: color }}
         />
-        <h4 className="text-[12px] font-semibold text-ink flex-1">{title}</h4>
-        {unit && <span className="text-[10px] text-sage">{unit}</span>}
+        <h4 className="text-[13px] font-semibold text-ink flex-1">{title}</h4>
+        {unit && <span className="text-[11px] text-sage">{unit}</span>}
       </div>
       {children}
     </div>
@@ -89,7 +89,7 @@ function MetricChart({
 
   if (!data.length) {
     return (
-      <div className="h-[148px] flex items-center justify-center text-sage text-[12px]">
+      <div className="h-[148px] flex items-center justify-center text-sage text-[13px]">
         No data
       </div>
     );
@@ -97,7 +97,7 @@ function MetricChart({
 
   return (
     <>
-      <div className="flex items-center gap-3 mb-2 text-[10px] text-sage">
+      <div className="flex items-center gap-3 mb-2 text-[11px] text-sage">
         <span>
           last <b className="text-ink">{fmt(lastVal!, 1)}</b> {unit}
         </span>
@@ -190,11 +190,11 @@ export default function AmbientNoiseCard({
           className="w-2 h-2 rounded-full shrink-0"
           style={{ background: COLOR_DB }}
         />
-        <h3 className="text-[13px] font-semibold flex-1 text-ink">
+        <h3 className="text-[14px] font-semibold flex-1 text-ink">
           Ambient Noise
         </h3>
         {records.length > 0 && (
-          <span className="text-[11px] text-sage">
+          <span className="text-[12px] text-sage">
             {records.length.toLocaleString()} records
           </span>
         )}
@@ -204,7 +204,7 @@ export default function AmbientNoiseCard({
       {loading ? (
         <div className="h-72 rounded-xl shimmer" />
       ) : !records.length ? (
-        <div className="h-44 flex items-center justify-center text-sage text-[13px]">
+        <div className="h-44 flex items-center justify-center text-sage text-[14px]">
           No data
         </div>
       ) : (
@@ -232,7 +232,7 @@ export default function AmbientNoiseCard({
           </div>
 
           {silenceRatio != null && (
-            <div className="rounded-2xl border border-wire bg-card-strong/70 px-4 py-3 flex items-center gap-4 text-[11px]">
+            <div className="rounded-2xl border border-wire bg-card-strong/70 px-4 py-3 flex items-center gap-4 text-[12px]">
               <span
                 className="w-2 h-2 rounded-full shrink-0"
                 style={{ background: "#64748b" }}
@@ -245,7 +245,7 @@ export default function AmbientNoiseCard({
             </div>
           )}
 
-          <div className="rounded-lg border border-wire bg-card-strong/70 px-3 py-2 text-[11px] leading-snug text-sage space-y-1">
+          <div className="rounded-lg border border-wire bg-card-strong/70 px-3 py-2 text-[12px] leading-snug text-sage space-y-1">
             <p>
               Recorded by the AWARE Ambient Noise plugin using short microphone
               bursts. <b className="text-ink">double_decibels</b> is the

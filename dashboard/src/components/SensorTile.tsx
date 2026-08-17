@@ -38,11 +38,11 @@ export default function SensorTile({
           className="h-2 w-2 shrink-0 rounded-full"
           style={{ background: config.color }}
         />
-        <h3 className="min-w-0 flex-1 truncate text-[13px] font-semibold text-ink">
+        <h3 className="min-w-0 flex-1 truncate text-[14px] font-semibold text-ink">
           {config.label}
         </h3>
         {config.unit ? (
-          <span className="shrink-0 rounded-md bg-[rgba(48,67,54,0.07)] px-1.5 py-0.5 text-[11px] text-sage">
+          <span className="shrink-0 rounded-md bg-[rgba(48,67,54,0.07)] px-1.5 py-0.5 text-[12px] text-sage">
             {config.unit}
           </span>
         ) : null}
@@ -51,17 +51,17 @@ export default function SensorTile({
       <div className="mt-auto flex items-end justify-between gap-2">
         <div className="min-w-0">
           <div
-            className={`text-[22px] font-bold leading-none ${
+            className={`text-[23px] font-bold leading-none ${
               flagged ? "text-amber-700" : empty ? "text-sage" : "text-ink"
             }`}
           >
             {count.toLocaleString()}
           </div>
-          <div className="mt-1 text-[11px] text-sage">
+          <div className="mt-1 text-[12px] text-sage">
             {flagged ? "required · no data" : "records"}
           </div>
         </div>
-        <div className="shrink-0 text-right text-[11px] text-sage">
+        <div className="shrink-0 text-right text-[12px] text-sage">
           {lastSeen != null ? relativeAge(lastSeen) : "—"}
         </div>
       </div>

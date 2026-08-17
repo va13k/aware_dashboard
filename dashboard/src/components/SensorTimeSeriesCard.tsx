@@ -72,11 +72,11 @@ export default function SensorTimeSeriesCard({
           className="w-2 h-2 rounded-full shrink-0"
           style={{ background: config.color }}
         />
-        <h3 className="text-[13px] font-semibold flex-1 text-ink">
+        <h3 className="text-[14px] font-semibold flex-1 text-ink">
           {config.label}
         </h3>
         {config.unit && (
-          <span className="text-[11px] text-sage bg-[rgba(48,67,54,0.07)] px-1.5 py-0.5 rounded-md">
+          <span className="text-[12px] text-sage bg-[rgba(48,67,54,0.07)] px-1.5 py-0.5 rounded-md">
             {config.unit}
           </span>
         )}
@@ -84,7 +84,7 @@ export default function SensorTimeSeriesCard({
       </div>
 
       {values.length > 0 && (
-        <div className="flex items-center gap-3 mb-3 text-[11px] text-sage">
+        <div className="flex items-center gap-3 mb-3 text-[12px] text-sage">
           <span>
             <b className="text-ink">{values.length}</b> pts
           </span>
@@ -110,7 +110,7 @@ export default function SensorTimeSeriesCard({
       )}
 
       {config.note && (
-        <div className="mb-3 rounded-lg border border-wire bg-card-strong/70 px-3 py-2 text-[11px] leading-snug text-sage">
+        <div className="mb-3 rounded-lg border border-wire bg-card-strong/70 px-3 py-2 text-[12px] leading-snug text-sage">
           {config.note}
         </div>
       )}
@@ -120,14 +120,14 @@ export default function SensorTimeSeriesCard({
       ) : config.countOnly ? (
         records.length ? (
           <div className="h-40 flex flex-col justify-center rounded-xl border border-wire bg-card-strong/70 px-4">
-            <div className="text-[10px] uppercase tracking-[0.5px] text-sage">
+            <div className="text-[11px] uppercase tracking-[0.5px] text-sage">
               Records
             </div>
-            <div className="mt-1 text-[32px] font-bold leading-none text-ink">
+            <div className="mt-1 text-[34px] font-bold leading-none text-ink">
               {records.length.toLocaleString()}
             </div>
             {latestRecord && (
-              <div className="mt-3 text-[11px] text-sage">
+              <div className="mt-3 text-[12px] text-sage">
                 Last received{" "}
                 <span className="font-semibold text-ink">
                   {new Date(latestRecord.timestamp).toLocaleString()}
@@ -136,12 +136,12 @@ export default function SensorTimeSeriesCard({
             )}
           </div>
         ) : (
-          <div className="h-40 flex items-center justify-center text-sage text-[13px]">
+          <div className="h-40 flex items-center justify-center text-sage text-[14px]">
             No data
           </div>
         )
       ) : !data.length ? (
-        <div className="h-40 flex items-center justify-center text-sage text-[13px]">
+        <div className="h-40 flex items-center justify-center text-sage text-[14px]">
           No data
         </div>
       ) : (

@@ -129,14 +129,14 @@ export default function PeriodPicker({
   };
 
   const preset =
-    "rounded-lg border px-2.5 py-1.5 text-[11px] font-semibold transition-colors";
+    "rounded-lg border px-2.5 py-1.5 text-[12px] font-semibold transition-colors";
   const chosen = "border-teal bg-teal-soft text-teal";
   const idle = "border-wire bg-card-strong text-sage hover:border-teal hover:text-teal";
   const off = "cursor-not-allowed border-wire bg-card-strong text-sage/30";
 
   if (failed) {
     return (
-      <p className="text-[12px] text-red-600">
+      <p className="text-[13px] text-red-600">
         Could not load the periods on offer. The export can still run over all time.
       </p>
     );
@@ -146,7 +146,7 @@ export default function PeriodPicker({
     <div className="flex flex-col gap-3">
       {ANCHORS.map((anchor) => (
         <div key={anchor.key}>
-          <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-[0.5px] text-sage">
+          <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-[0.5px] text-sage">
             {anchor.label}{" "}
             <span className="font-normal normal-case tracking-normal">
               — {anchor.hint}
@@ -179,7 +179,7 @@ export default function PeriodPicker({
               );
             })}
             {!offer && (
-              <span className="text-[11px] text-sage">Loading periods…</span>
+              <span className="text-[12px] text-sage">Loading periods…</span>
             )}
           </div>
         </div>
@@ -209,7 +209,7 @@ export default function PeriodPicker({
 
       {custom && (
         <div className="flex flex-wrap items-center gap-2 rounded-xl border border-wire bg-card-strong p-2.5">
-          <label className="text-[10px] font-semibold uppercase tracking-[0.5px] text-sage">
+          <label className="text-[11px] font-semibold uppercase tracking-[0.5px] text-sage">
             From
             <input
               type="datetime-local"
@@ -219,10 +219,10 @@ export default function PeriodPicker({
                 setCustomFrom(event.target.value);
                 chooseCustom(event.target.value, customTo);
               }}
-              className="ml-1.5 rounded-lg border border-wire bg-card px-2 py-1 text-[11px] font-normal normal-case tracking-normal text-ink"
+              className="ml-1.5 rounded-lg border border-wire bg-card px-2 py-1 text-[12px] font-normal normal-case tracking-normal text-ink"
             />
           </label>
-          <label className="text-[10px] font-semibold uppercase tracking-[0.5px] text-sage">
+          <label className="text-[11px] font-semibold uppercase tracking-[0.5px] text-sage">
             To
             <input
               type="datetime-local"
@@ -232,7 +232,7 @@ export default function PeriodPicker({
                 setCustomTo(event.target.value);
                 chooseCustom(customFrom, event.target.value);
               }}
-              className="ml-1.5 rounded-lg border border-wire bg-card px-2 py-1 text-[11px] font-normal normal-case tracking-normal text-ink"
+              className="ml-1.5 rounded-lg border border-wire bg-card px-2 py-1 text-[12px] font-normal normal-case tracking-normal text-ink"
             />
           </label>
         </div>
@@ -242,18 +242,18 @@ export default function PeriodPicker({
           the export reproducible from its own name months later. */}
       <div className="rounded-xl border border-wire bg-card-strong px-3 py-2">
         {!value ? (
-          <p className="text-[11px] text-sage">Pick a period to export.</p>
+          <p className="text-[12px] text-sage">Pick a period to export.</p>
         ) : (
           <>
-            <p className="text-[11px] font-semibold text-ink">{value.label}</p>
-            <p className="mt-0.5 text-[11px] text-sage">
+            <p className="text-[12px] font-semibold text-ink">{value.label}</p>
+            <p className="mt-0.5 text-[12px] text-sage">
               {value.from == null && value.to == null
                 ? "Everything the study holds"
                 : `${value.from == null ? "the beginning" : absoluteTime(value.from)} — ${
                     value.to == null ? "now" : absoluteTime(value.to)
                   }`}
             </p>
-            <p className="mt-1 text-[11px] text-sage">
+            <p className="mt-1 text-[12px] text-sage">
               {counting
                 ? "Counting…"
                 : count == null
@@ -266,7 +266,7 @@ export default function PeriodPicker({
               ) : null}
             </p>
             {!counting && count ? (
-              <p className="mt-0.5 text-[10px] text-sage/60">
+              <p className="mt-0.5 text-[11px] text-sage/60">
                 Counted to the hour. The size is a rough estimate — the file is
                 often smaller.
               </p>

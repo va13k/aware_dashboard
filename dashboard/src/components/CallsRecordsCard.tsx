@@ -62,9 +62,9 @@ export default function CallsRecordsCard({
     <div className="bg-card backdrop-blur-xl border border-wire rounded-3xl shadow-card p-5">
       <div className="flex items-center gap-2 mb-3">
         <span className="w-2 h-2 rounded-full shrink-0 bg-[#f97316]" />
-        <h3 className="text-[13px] font-semibold text-ink">Calls</h3>
+        <h3 className="text-[14px] font-semibold text-ink">Calls</h3>
         {records.length > 0 && (
-          <span className="text-[11px] text-sage ml-auto">
+          <span className="text-[12px] text-sage ml-auto">
             {records.length.toLocaleString()} records
           </span>
         )}
@@ -74,13 +74,13 @@ export default function CallsRecordsCard({
       {loading ? (
         <div className="h-44 rounded-xl shimmer" />
       ) : !records.length ? (
-        <div className="h-44 flex items-center justify-center text-sage text-[13px]">
+        <div className="h-44 flex items-center justify-center text-sage text-[14px]">
           No data
         </div>
       ) : (
         <div className="space-y-3">
           {durations.length > 0 && (
-            <div className="flex items-center gap-3 text-[11px] text-sage">
+            <div className="flex items-center gap-3 text-[12px] text-sage">
               <span>
                 last <b className="text-ink">{fmt(lastDuration!)} s</b>
               </span>
@@ -139,21 +139,21 @@ export default function CallsRecordsCard({
               </LineChart>
             </ResponsiveContainer>
           ) : (
-            <div className="h-40 flex items-center justify-center text-sage text-[13px]">
+            <div className="h-40 flex items-center justify-center text-sage text-[14px]">
               No duration data
             </div>
           )}
 
           <div className="rounded-xl border border-wire bg-card-strong/70 px-3 py-2">
-            <div className="text-[10px] uppercase tracking-[0.5px] text-sage">
+            <div className="text-[11px] uppercase tracking-[0.5px] text-sage">
               Unique traces
             </div>
-            <div className="mt-1 text-[18px] font-semibold text-ink">
+            <div className="mt-1 text-[19px] font-semibold text-ink">
               {sessionCount.toLocaleString()}
             </div>
           </div>
 
-          <div className="rounded-lg border border-wire bg-card-strong/70 px-3 py-2 text-[11px] leading-snug text-sage">
+          <div className="rounded-lg border border-wire bg-card-strong/70 px-3 py-2 text-[12px] leading-snug text-sage">
             Trace is a CallKit UUID for the call event/session, not a phone
             number.
           </div>

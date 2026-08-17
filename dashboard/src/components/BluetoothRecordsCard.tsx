@@ -96,17 +96,17 @@ export default function BluetoothRecordsCard({
     <div className="bg-card backdrop-blur-xl border border-wire rounded-3xl shadow-card p-5">
       <div className="flex items-center gap-2 mb-1">
         <span className="w-2 h-2 rounded-full shrink-0 bg-[#06b6d4]" />
-        <h3 className="text-[13px] font-semibold flex-1 text-ink">
+        <h3 className="text-[14px] font-semibold flex-1 text-ink">
           Bluetooth Signal
         </h3>
-        <span className="text-[11px] text-sage bg-[rgba(48,67,54,0.07)] px-1.5 py-0.5 rounded-md">
+        <span className="text-[12px] text-sage bg-[rgba(48,67,54,0.07)] px-1.5 py-0.5 rounded-md">
           dBm
         </span>
         {exportHref && <ExportLink href={exportHref} />}
       </div>
 
       {data.length > 0 && latest && (
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mb-3 text-[11px] text-sage">
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mb-3 text-[12px] text-sage">
           <span>
             <b className="text-ink">{records.length.toLocaleString()}</b>{" "}
             discoveries
@@ -126,7 +126,7 @@ export default function BluetoothRecordsCard({
         </div>
       )}
 
-      <div className="mb-3 rounded-lg border border-wire bg-card-strong/70 px-3 py-2 text-[11px] leading-snug text-sage">
+      <div className="mb-3 rounded-lg border border-wire bg-card-strong/70 px-3 py-2 text-[12px] leading-snug text-sage">
         RSSI closer to 0 is stronger: about -40 is strong, -70 is medium, and
         -90 is weak. On iPhone, the identifier is a CoreBluetooth peripheral
         UUID, not the real Bluetooth MAC address. iOS scans BLE
@@ -137,7 +137,7 @@ export default function BluetoothRecordsCard({
       {loading ? (
         <div className="h-44 rounded-xl shimmer" />
       ) : !data.length ? (
-        <div className="h-44 flex items-center justify-center text-sage text-[13px]">
+        <div className="h-44 flex items-center justify-center text-sage text-[14px]">
           No data
         </div>
       ) : (
@@ -189,25 +189,25 @@ export default function BluetoothRecordsCard({
           </ResponsiveContainer>
 
           <div className="overflow-auto max-h-56">
-            <table className="w-full min-w-[680px] text-[12px] border-collapse">
+            <table className="w-full min-w-[680px] text-[13px] border-collapse">
               <thead>
                 <tr className="text-sage border-b border-wire">
-                  <th className="text-left pb-1.5 font-semibold text-[10px] uppercase tracking-[0.5px]">
+                  <th className="text-left pb-1.5 font-semibold text-[11px] uppercase tracking-[0.5px]">
                     Time
                   </th>
-                  <th className="text-left pb-1.5 font-semibold text-[10px] uppercase tracking-[0.5px]">
+                  <th className="text-left pb-1.5 font-semibold text-[11px] uppercase tracking-[0.5px]">
                     Name
                   </th>
-                  <th className="text-left pb-1.5 font-semibold text-[10px] uppercase tracking-[0.5px]">
+                  <th className="text-left pb-1.5 font-semibold text-[11px] uppercase tracking-[0.5px]">
                     Identifier
                   </th>
-                  <th className="text-left pb-1.5 font-semibold text-[10px] uppercase tracking-[0.5px]">
+                  <th className="text-left pb-1.5 font-semibold text-[11px] uppercase tracking-[0.5px]">
                     RSSI
                   </th>
-                  <th className="text-left pb-1.5 font-semibold text-[10px] uppercase tracking-[0.5px]">
+                  <th className="text-left pb-1.5 font-semibold text-[11px] uppercase tracking-[0.5px]">
                     Strength
                   </th>
-                  <th className="text-left pb-1.5 font-semibold text-[10px] uppercase tracking-[0.5px]">
+                  <th className="text-left pb-1.5 font-semibold text-[11px] uppercase tracking-[0.5px]">
                     Scan session
                   </th>
                 </tr>

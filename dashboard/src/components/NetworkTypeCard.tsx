@@ -105,11 +105,11 @@ export default function NetworkTypeCard({
     <div className="bg-card backdrop-blur-xl border border-wire rounded-3xl shadow-card p-5">
       <div className="flex items-center gap-2 mb-3">
         <span className="w-2 h-2 rounded-full shrink-0 bg-sage" />
-        <h3 className="text-[13px] font-semibold text-ink">
+        <h3 className="text-[14px] font-semibold text-ink">
           {platform === "ios" ? "Network Reachability" : "Network Type"}
         </h3>
         {records.length > 0 && (
-          <span className="text-[11px] text-sage ml-auto">
+          <span className="text-[12px] text-sage ml-auto">
             {records.length} events
           </span>
         )}
@@ -117,7 +117,7 @@ export default function NetworkTypeCard({
       </div>
 
       {latest && (
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mb-3 text-[11px] text-sage">
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mb-3 text-[12px] text-sage">
           <span>
             current{" "}
             <b className="text-ink">
@@ -134,7 +134,7 @@ export default function NetworkTypeCard({
       )}
 
       {platform === "ios" && (
-        <div className="mb-3 rounded-lg border border-wire bg-card-strong/70 px-3 py-2 text-[11px] leading-snug text-sage">
+        <div className="mb-3 rounded-lg border border-wire bg-card-strong/70 px-3 py-2 text-[12px] leading-snug text-sage">
           iOS network data shows reachability only: Wi-Fi, cellular, or not
           reachable. It does not include SSID, BSSID, IP address, carrier,
           LTE/5G subtype, bandwidth, bytes, or per-app traffic. The client app
@@ -146,24 +146,24 @@ export default function NetworkTypeCard({
       {loading ? (
         <div className="h-40 rounded-xl shimmer" />
       ) : !rows.length ? (
-        <div className="h-40 flex items-center justify-center text-sage text-[13px]">
+        <div className="h-40 flex items-center justify-center text-sage text-[14px]">
           No data
         </div>
       ) : (
         <div className="overflow-auto max-h-40">
-          <table className="w-full text-[12px] border-collapse">
+          <table className="w-full text-[13px] border-collapse">
             <thead>
               <tr className="text-sage border-b border-wire">
-                <th className="text-left pb-1.5 font-semibold text-[10px] uppercase tracking-[0.5px]">
+                <th className="text-left pb-1.5 font-semibold text-[11px] uppercase tracking-[0.5px]">
                   Time
                 </th>
-                <th className="text-left pb-1.5 font-semibold text-[10px] uppercase tracking-[0.5px]">
+                <th className="text-left pb-1.5 font-semibold text-[11px] uppercase tracking-[0.5px]">
                   Type
                 </th>
-                <th className="text-left pb-1.5 font-semibold text-[10px] uppercase tracking-[0.5px]">
+                <th className="text-left pb-1.5 font-semibold text-[11px] uppercase tracking-[0.5px]">
                   Subtype
                 </th>
-                <th className="text-left pb-1.5 font-semibold text-[10px] uppercase tracking-[0.5px]">
+                <th className="text-left pb-1.5 font-semibold text-[11px] uppercase tracking-[0.5px]">
                   State
                 </th>
               </tr>

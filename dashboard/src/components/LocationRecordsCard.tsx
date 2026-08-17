@@ -118,15 +118,15 @@ function LocationMetricChart({
           className="w-2 h-2 rounded-full shrink-0"
           style={{ background: metric.color }}
         />
-        <h4 className="text-[12px] font-semibold text-ink flex-1">
+        <h4 className="text-[13px] font-semibold text-ink flex-1">
           {metric.label}
         </h4>
-        <span className="text-[10px] text-sage">{metric.unit}</span>
+        <span className="text-[11px] text-sage">{metric.unit}</span>
       </div>
 
       {values.length ? (
         <>
-          <div className="flex items-center gap-2 text-[10px] text-sage mb-2">
+          <div className="flex items-center gap-2 text-[11px] text-sage mb-2">
             <span>
               last <b className="text-ink">{fmt(lastVal!, 3)}</b>
             </span>
@@ -180,7 +180,7 @@ function LocationMetricChart({
           </ResponsiveContainer>
         </>
       ) : (
-        <div className="h-[148px] flex items-center justify-center text-sage text-[12px]">
+        <div className="h-[148px] flex items-center justify-center text-sage text-[13px]">
           No data
         </div>
       )}
@@ -209,9 +209,9 @@ export default function LocationRecordsCard({
           className="w-2 h-2 rounded-full shrink-0"
           style={{ background: color }}
         />
-        <h3 className="text-[13px] font-semibold text-ink">{title}</h3>
+        <h3 className="text-[14px] font-semibold text-ink">{title}</h3>
         {records.length > 0 && (
-          <span className="text-[11px] text-sage ml-auto">
+          <span className="text-[12px] text-sage ml-auto">
             {records.length.toLocaleString()} records
           </span>
         )}
@@ -221,7 +221,7 @@ export default function LocationRecordsCard({
       {loading ? (
         <div className="h-72 rounded-xl shimmer" />
       ) : !latest ? (
-        <div className="h-44 flex items-center justify-center text-sage text-[13px]">
+        <div className="h-44 flex items-center justify-center text-sage text-[14px]">
           No data
         </div>
       ) : (
@@ -236,7 +236,7 @@ export default function LocationRecordsCard({
             ))}
           </div>
 
-          <div className="rounded-lg border border-wire bg-card-strong/70 px-3 py-2 text-[11px] leading-snug text-sage">
+          <div className="rounded-lg border border-wire bg-card-strong/70 px-3 py-2 text-[12px] leading-snug text-sage">
             Bearing is the device course over ground from the iOS location fix,
             saved from location.course. It is movement direction, not compass
             heading or phone orientation: 0 deg is north, 90 deg east, 180 deg
@@ -247,7 +247,7 @@ export default function LocationRecordsCard({
           </div>
 
           {showLocationAccuracyNote && (
-            <div className="rounded-lg border border-wire bg-card-strong/70 px-3 py-2 text-[11px] leading-snug text-sage">
+            <div className="rounded-lg border border-wire bg-card-strong/70 px-3 py-2 text-[12px] leading-snug text-sage">
               Accuracy is the estimated position radius in meters for the
               location fix. For example, 10 means the position is estimated
               within about 10 m, 150 within about 150 m, and 1000 within about 1

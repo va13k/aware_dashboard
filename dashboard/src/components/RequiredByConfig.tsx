@@ -23,20 +23,20 @@ export function RequiredEmptyCard({
           className="h-2 w-2 shrink-0 rounded-full"
           style={{ background: config.color }}
         />
-        <h3 className="flex-1 text-[13px] font-semibold text-ink">
+        <h3 className="flex-1 text-[14px] font-semibold text-ink">
           {config.label}
         </h3>
         {config.unit ? (
-          <span className="rounded-md bg-amber-100 px-1.5 py-0.5 text-[11px] text-amber-700">
+          <span className="rounded-md bg-amber-100 px-1.5 py-0.5 text-[12px] text-amber-700">
             {config.unit}
           </span>
         ) : null}
       </div>
       <div className="flex flex-1 flex-col items-center justify-center gap-1 py-10 text-center">
-        <span className="text-[12px] font-semibold uppercase tracking-[0.5px] text-amber-700">
+        <span className="text-[13px] font-semibold uppercase tracking-[0.5px] text-amber-700">
           Required
         </span>
-        <span className="text-[13px] text-amber-700/80">No data yet</span>
+        <span className="text-[14px] text-amber-700/80">No data yet</span>
       </div>
     </div>
   );
@@ -49,7 +49,7 @@ export function RequiredEmptyCard({
 export function RequiredStreamNote({ settings }: { settings: string[] }) {
   if (settings.length === 0) return null;
   return (
-    <p className="mt-4 rounded-xl border border-wire bg-card-strong/60 px-3 py-2 text-[11px] text-sage">
+    <p className="mt-4 rounded-xl border border-wire bg-card-strong/60 px-3 py-2 text-[12px] text-sage">
       No dashboard stream for {settings.length} required setting
       {settings.length === 1 ? "" : "s"}:{" "}
       <span className="font-mono text-ink">{settings.join(", ")}</span>

@@ -32,7 +32,7 @@ function Layout() {
   const { center } = useHeaderSlot();
 
   const backLinkClass =
-    "flex items-center gap-1 text-[12px] font-medium text-sage hover:text-ink transition-colors no-underline px-2.5 py-1 rounded-lg hover:bg-teal-soft/50";
+    "flex items-center gap-1 text-[13px] font-medium text-sage hover:text-ink transition-colors no-underline px-2.5 py-1 rounded-lg hover:bg-teal-soft/50";
   const backLinkBody = (
     <>
       <svg width="13" height="13" viewBox="0 0 16 16" fill="none">
@@ -57,7 +57,7 @@ function Layout() {
           </div>
         ) : null}
         <div className="flex items-center gap-3">
-          <span className="font-bold text-[15px] tracking-tight">
+          <span className="font-bold text-[16px] tracking-tight">
             AWARE Dashboard
           </span>
           {backLink.external ? (
@@ -80,7 +80,7 @@ function Layout() {
               to={to}
               end={end}
               className={({ isActive }) =>
-                `px-3.5 py-1.5 rounded-lg text-[13px] font-medium transition-colors cursor-pointer border-none no-underline ` +
+                `px-3.5 py-1.5 rounded-lg text-[14px] font-medium transition-colors cursor-pointer border-none no-underline ` +
                 (isActive
                   ? "bg-teal-soft text-teal"
                   : "bg-transparent text-sage hover:bg-teal-soft/50 hover:text-ink")

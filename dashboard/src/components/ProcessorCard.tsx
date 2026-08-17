@@ -75,15 +75,15 @@ export default function ProcessorCard({ records, loading, exportHref }: Props) {
           className="w-2 h-2 rounded-full shrink-0"
           style={{ background: COLOR }}
         />
-        <h3 className="text-[13px] font-semibold flex-1 text-ink">Processor</h3>
-        <span className="text-[11px] text-sage bg-[rgba(48,67,54,0.07)] px-1.5 py-0.5 rounded-md">
+        <h3 className="text-[14px] font-semibold flex-1 text-ink">Processor</h3>
+        <span className="text-[12px] text-sage bg-[rgba(48,67,54,0.07)] px-1.5 py-0.5 rounded-md">
           %
         </span>
         {exportHref && <ExportLink href={exportHref} />}
       </div>
 
       {data.length > 0 && last != null && (
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mb-3 text-[11px] text-sage">
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mb-3 text-[12px] text-sage">
           <span>
             <b className="text-ink">{data.length}</b> pts
           </span>
@@ -107,7 +107,7 @@ export default function ProcessorCard({ records, loading, exportHref }: Props) {
         </div>
       )}
 
-      <div className="mb-3 rounded-lg border border-wire bg-card-strong/70 px-3 py-2 text-[11px] leading-snug text-sage space-y-1">
+      <div className="mb-3 rounded-lg border border-wire bg-card-strong/70 px-3 py-2 text-[12px] leading-snug text-sage space-y-1">
         <p>
           App CPU usage via Mach thread APIs — sum of non-idle thread time as a
           percentage. Only{" "}
@@ -125,7 +125,7 @@ export default function ProcessorCard({ records, loading, exportHref }: Props) {
       {loading ? (
         <div className="h-44 rounded-xl shimmer" />
       ) : !data.length ? (
-        <div className="h-44 flex items-center justify-center text-sage text-[13px]">
+        <div className="h-44 flex items-center justify-center text-sage text-[14px]">
           No data
         </div>
       ) : (

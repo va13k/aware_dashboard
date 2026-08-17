@@ -55,7 +55,7 @@ function SeriesTooltip({
   const row = payload[0].payload;
   const suffix = unit ? ` ${unit}` : "";
   return (
-    <div className="rounded-[10px] border border-[rgba(48,67,54,0.14)] bg-[#fffdf8] px-3 py-2 text-[11px]">
+    <div className="rounded-[10px] border border-[rgba(48,67,54,0.14)] bg-[#fffdf8] px-3 py-2 text-[12px]">
       <div className="text-sage">{new Date(row.t).toLocaleString()}</div>
       {row.avg != null ? (
         <div className="mt-0.5 text-ink">
@@ -107,11 +107,11 @@ export default function SeriesChart({
           className="w-2 h-2 rounded-full shrink-0"
           style={{ background: config.color }}
         />
-        <h3 className="text-[13px] font-semibold flex-1 text-ink">
+        <h3 className="text-[14px] font-semibold flex-1 text-ink">
           {config.label}
         </h3>
         {config.unit && (
-          <span className="text-[11px] text-sage bg-[rgba(48,67,54,0.07)] px-1.5 py-0.5 rounded-md">
+          <span className="text-[12px] text-sage bg-[rgba(48,67,54,0.07)] px-1.5 py-0.5 rounded-md">
             {config.unit}
           </span>
         )}
@@ -119,7 +119,7 @@ export default function SeriesChart({
       </div>
 
       {data.length > 0 && (
-        <div className="flex items-center gap-3 mb-3 text-[11px] text-sage">
+        <div className="flex items-center gap-3 mb-3 text-[12px] text-sage">
           <span>
             <b className="text-ink">{data.length}</b> buckets
           </span>
@@ -147,7 +147,7 @@ export default function SeriesChart({
       )}
 
       {config.note && (
-        <div className="mb-3 rounded-lg border border-wire bg-card-strong/70 px-3 py-2 text-[11px] leading-snug text-sage">
+        <div className="mb-3 rounded-lg border border-wire bg-card-strong/70 px-3 py-2 text-[12px] leading-snug text-sage">
           {config.note}
         </div>
       )}
@@ -155,7 +155,7 @@ export default function SeriesChart({
       {loading ? (
         <div className="h-40 rounded-xl shimmer" />
       ) : !data.length ? (
-        <div className="h-40 flex items-center justify-center text-sage text-[13px]">
+        <div className="h-40 flex items-center justify-center text-sage text-[14px]">
           No data in this range
         </div>
       ) : (

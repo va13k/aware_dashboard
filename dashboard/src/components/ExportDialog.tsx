@@ -68,14 +68,14 @@ export default function ExportDialog({
       >
         <div className="mb-4 flex items-start justify-between gap-4">
           <div>
-            <h2 className="text-[17px] font-bold text-ink">{title}</h2>
-            {subtitle ? <p className="text-[12px] text-sage">{subtitle}</p> : null}
+            <h2 className="text-[18px] font-bold text-ink">{title}</h2>
+            {subtitle ? <p className="text-[13px] text-sage">{subtitle}</p> : null}
           </div>
           <button
             type="button"
             onClick={onClose}
             aria-label="Close"
-            className="shrink-0 cursor-pointer rounded-lg border border-wire bg-card-strong px-2.5 py-1 text-[13px] font-semibold text-sage transition-colors hover:border-teal hover:text-teal"
+            className="shrink-0 cursor-pointer rounded-lg border border-wire bg-card-strong px-2.5 py-1 text-[14px] font-semibold text-sage transition-colors hover:border-teal hover:text-teal"
           >
             ✕
           </button>
@@ -87,7 +87,7 @@ export default function ExportDialog({
             than no control. */}
         {hasAndroid && hasIos ? (
         <div className="mb-3">
-          <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-[0.5px] text-sage">
+          <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-[0.5px] text-sage">
             Platforms
           </p>
           <div className="flex flex-wrap gap-1.5">
@@ -109,7 +109,7 @@ export default function ExportDialog({
                   setCount(null);
                   setPlatform(option.key);
                 }}
-                className={`rounded-lg border px-2.5 py-1.5 text-[11px] font-semibold transition-colors ${
+                className={`rounded-lg border px-2.5 py-1.5 text-[12px] font-semibold transition-colors ${
                   !option.enabled
                     ? "cursor-not-allowed border-wire bg-card-strong text-sage/30"
                     : platform === option.key
@@ -142,7 +142,7 @@ export default function ExportDialog({
           <button
             type="button"
             onClick={onClose}
-            className="rounded-lg border border-wire bg-card-strong px-3 py-1.5 text-[11px] font-semibold text-sage transition-colors hover:border-teal hover:text-teal"
+            className="rounded-lg border border-wire bg-card-strong px-3 py-1.5 text-[12px] font-semibold text-sage transition-colors hover:border-teal hover:text-teal"
           >
             Cancel
           </button>

@@ -152,17 +152,17 @@ export default function ConversationRecordsCard({
     <div className="bg-card backdrop-blur-xl border border-wire rounded-3xl shadow-card p-5">
       <div className="flex items-center gap-2 mb-1">
         <span className="w-2 h-2 rounded-full shrink-0 bg-[#7c3aed]" />
-        <h3 className="text-[13px] font-semibold flex-1 text-ink">
+        <h3 className="text-[14px] font-semibold flex-1 text-ink">
           Conversation
         </h3>
-        <span className="text-[11px] text-sage bg-[rgba(48,67,54,0.07)] px-1.5 py-0.5 rounded-md">
+        <span className="text-[12px] text-sage bg-[rgba(48,67,54,0.07)] px-1.5 py-0.5 rounded-md">
           metadata
         </span>
         {exportHref && <ExportLink href={exportHref} />}
       </div>
 
       {records.length > 0 && (
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mb-3 text-[11px] text-sage">
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mb-3 text-[12px] text-sage">
           <span>
             <b className="text-ink">{records.length.toLocaleString()}</b>{" "}
             records
@@ -191,7 +191,7 @@ export default function ConversationRecordsCard({
         </div>
       )}
 
-      <div className="mb-3 rounded-lg border border-wire bg-card-strong/70 px-3 py-2 text-[11px] leading-snug text-sage">
+      <div className="mb-3 rounded-lg border border-wire bg-card-strong/70 px-3 py-2 text-[12px] leading-snug text-sage">
         StudentLife audio classifies ambient microphone input into Silence,
         Voice, Noise, or Unknown and stores derived metadata only. Raw audio is
         not uploaded. The sensor needs microphone permission. Rows with datatype
@@ -203,7 +203,7 @@ export default function ConversationRecordsCard({
       {loading ? (
         <div className="h-44 rounded-xl shimmer" />
       ) : !records.length ? (
-        <div className="h-44 flex items-center justify-center text-sage text-[13px]">
+        <div className="h-44 flex items-center justify-center text-sage text-[14px]">
           No data
         </div>
       ) : (
@@ -280,41 +280,41 @@ export default function ConversationRecordsCard({
               </LineChart>
             </ResponsiveContainer>
           ) : (
-            <div className="h-40 flex items-center justify-center rounded-xl border border-wire bg-card-strong/60 text-sage text-[13px]">
+            <div className="h-40 flex items-center justify-center rounded-xl border border-wire bg-card-strong/60 text-sage text-[14px]">
               No audio classification samples
             </div>
           )}
 
           <div className="grid grid-cols-[repeat(auto-fit,minmax(130px,1fr))] gap-2">
             <div className="rounded-xl border border-wire bg-card-strong/70 px-3 py-2">
-              <div className="text-[10px] uppercase tracking-[0.5px] text-sage">
+              <div className="text-[11px] uppercase tracking-[0.5px] text-sage">
                 Voice samples
               </div>
-              <div className="mt-1 text-[18px] font-semibold text-ink">
+              <div className="mt-1 text-[19px] font-semibold text-ink">
                 {(inferenceCounts[1] ?? 0).toLocaleString()}
               </div>
             </div>
             <div className="rounded-xl border border-wire bg-card-strong/70 px-3 py-2">
-              <div className="text-[10px] uppercase tracking-[0.5px] text-sage">
+              <div className="text-[11px] uppercase tracking-[0.5px] text-sage">
                 Conversation events
               </div>
-              <div className="mt-1 text-[18px] font-semibold text-ink">
+              <div className="mt-1 text-[19px] font-semibold text-ink">
                 {conversationEvents.length.toLocaleString()}
               </div>
             </div>
             <div className="rounded-xl border border-wire bg-card-strong/70 px-3 py-2">
-              <div className="text-[10px] uppercase tracking-[0.5px] text-sage">
+              <div className="text-[11px] uppercase tracking-[0.5px] text-sage">
                 Total duration
               </div>
-              <div className="mt-1 text-[18px] font-semibold text-ink">
+              <div className="mt-1 text-[19px] font-semibold text-ink">
                 {formatDuration(totalDurationMs || null)}
               </div>
             </div>
             <div className="rounded-xl border border-wire bg-card-strong/70 px-3 py-2">
-              <div className="text-[10px] uppercase tracking-[0.5px] text-sage">
+              <div className="text-[11px] uppercase tracking-[0.5px] text-sage">
                 Avg event
               </div>
-              <div className="mt-1 text-[18px] font-semibold text-ink">
+              <div className="mt-1 text-[19px] font-semibold text-ink">
                 {formatDuration(averageDurationMs)}
               </div>
             </div>
@@ -322,10 +322,10 @@ export default function ConversationRecordsCard({
 
           {recentEvents.length > 0 && (
             <div className="rounded-xl border border-wire bg-card-strong/70 px-3 py-2">
-              <div className="text-[10px] uppercase tracking-[0.5px] text-sage mb-2">
+              <div className="text-[11px] uppercase tracking-[0.5px] text-sage mb-2">
                 Recent conversation events
               </div>
-              <div className="space-y-1.5 text-[11px] text-sage">
+              <div className="space-y-1.5 text-[12px] text-sage">
                 {recentEvents.map((event) => (
                   <div
                     key={`${event.time}-${event.start ?? "start"}-${event.end ?? "end"}`}
@@ -344,7 +344,7 @@ export default function ConversationRecordsCard({
           )}
 
           {featureRows > 0 && (
-            <div className="rounded-lg border border-wire bg-card-strong/70 px-3 py-2 text-[11px] leading-snug text-sage">
+            <div className="rounded-lg border border-wire bg-card-strong/70 px-3 py-2 text-[12px] leading-snug text-sage">
               {featureRows.toLocaleString()} datatype 1 feature rows are
               present. Feature payload saving is not expected in the current iOS
               implementation, so inspect blob_feature only if the app was

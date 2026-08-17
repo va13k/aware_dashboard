@@ -88,15 +88,15 @@ export default function GyroscopeRecordsCard({
     <div className="bg-card backdrop-blur-xl border border-wire rounded-3xl shadow-card p-5">
       <div className="flex items-center gap-2 mb-1">
         <span className="w-2 h-2 rounded-full shrink-0 bg-[#ef4444]" />
-        <h3 className="text-[13px] font-semibold flex-1 text-ink">Gyroscope</h3>
-        <span className="text-[11px] text-sage bg-[rgba(48,67,54,0.07)] px-1.5 py-0.5 rounded-md">
+        <h3 className="text-[14px] font-semibold flex-1 text-ink">Gyroscope</h3>
+        <span className="text-[12px] text-sage bg-[rgba(48,67,54,0.07)] px-1.5 py-0.5 rounded-md">
           rad/s
         </span>
         {exportHref && <ExportLink href={exportHref} />}
       </div>
 
       {data.length > 0 && last && (
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mb-3 text-[11px] text-sage">
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mb-3 text-[12px] text-sage">
           <span>
             <b className="text-ink">{data.length}</b> pts
           </span>
@@ -115,7 +115,7 @@ export default function GyroscopeRecordsCard({
         </div>
       )}
 
-      <div className="mb-3 rounded-lg border border-wire bg-card-strong/70 px-3 py-2 text-[11px] leading-snug text-sage">
+      <div className="mb-3 rounded-lg border border-wire bg-card-strong/70 px-3 py-2 text-[12px] leading-snug text-sage">
         Gyroscope values are angular velocity around the x, y, and z axes.
         Values near 0 mean the phone is not rotating. Positive and negative
         values indicate rotation direction; larger absolute values mean faster
@@ -125,7 +125,7 @@ export default function GyroscopeRecordsCard({
       {loading ? (
         <div className="h-44 rounded-xl shimmer" />
       ) : !data.length ? (
-        <div className="h-44 flex items-center justify-center text-sage text-[13px]">
+        <div className="h-44 flex items-center justify-center text-sage text-[14px]">
           No data
         </div>
       ) : (

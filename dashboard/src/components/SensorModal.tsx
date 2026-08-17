@@ -166,7 +166,7 @@ export default function SensorModal({
   }, [keys, raw]);
 
   const buttonClass = (active: boolean) =>
-    `cursor-pointer rounded-[10px] px-3 py-1.5 text-[12px] font-semibold transition-colors ${
+    `cursor-pointer rounded-[10px] px-3 py-1.5 text-[13px] font-semibold transition-colors ${
       active ? "bg-teal-soft text-teal" : "text-sage hover:text-ink"
     }`;
 
@@ -195,8 +195,8 @@ export default function SensorModal({
               style={{ background: config.color }}
             />
             <div>
-              <h2 className="text-[15px] font-bold text-ink">{config.label}</h2>
-              <p className="text-[11px] text-sage">
+              <h2 className="text-[16px] font-bold text-ink">{config.label}</h2>
+              <p className="text-[12px] text-sage">
                 {[
                   totalCount != null
                     ? `${totalCount.toLocaleString()} records total`
@@ -221,7 +221,7 @@ export default function SensorModal({
               type="button"
               onClick={onClose}
               aria-label="Close"
-              className="cursor-pointer rounded-lg border border-wire bg-card-strong px-2.5 py-1 text-[13px] font-semibold text-sage transition-colors hover:border-teal hover:text-teal"
+              className="cursor-pointer rounded-lg border border-wire bg-card-strong px-2.5 py-1 text-[14px] font-semibold text-sage transition-colors hover:border-teal hover:text-teal"
             >
               ✕
             </button>
@@ -241,7 +241,7 @@ export default function SensorModal({
         )}
 
         <div className="mt-4 flex flex-wrap items-center gap-2">
-          <span className="text-[11px] font-semibold uppercase tracking-[0.5px] text-sage">
+          <span className="text-[12px] font-semibold uppercase tracking-[0.5px] text-sage">
             Time range
           </span>
           <div className="inline-flex flex-wrap gap-1 rounded-xl border border-wire bg-card-strong p-0.5">
@@ -269,7 +269,7 @@ export default function SensorModal({
             </button>
           </div>
           {loading ? (
-            <span className="flex items-center gap-1.5 text-[11px] text-sage">
+            <span className="flex items-center gap-1.5 text-[12px] text-sage">
               <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-teal" />
               Loading…
             </span>
@@ -277,7 +277,7 @@ export default function SensorModal({
         </div>
 
         {range === "custom" ? (
-          <div className="mt-2 flex flex-wrap items-center gap-3 text-[12px] text-sage">
+          <div className="mt-2 flex flex-wrap items-center gap-3 text-[13px] text-sage">
             <label className="flex items-center gap-1.5">
               From
               <input
@@ -286,7 +286,7 @@ export default function SensorModal({
                 value={customFrom}
                 max={customTo || undefined}
                 onChange={(event) => setCustomFrom(event.target.value)}
-                className="rounded-lg border border-wire bg-card-strong px-2 py-1 text-[12px] text-ink"
+                className="rounded-lg border border-wire bg-card-strong px-2 py-1 text-[13px] text-ink"
               />
             </label>
             <label className="flex items-center gap-1.5">
@@ -297,7 +297,7 @@ export default function SensorModal({
                 value={customTo}
                 min={customFrom || undefined}
                 onChange={(event) => setCustomTo(event.target.value)}
-                className="rounded-lg border border-wire bg-card-strong px-2 py-1 text-[12px] text-ink"
+                className="rounded-lg border border-wire bg-card-strong px-2 py-1 text-[13px] text-ink"
               />
             </label>
           </div>

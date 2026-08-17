@@ -17,7 +17,7 @@ export default function SensorViewFilter({
     <div
       role="radiogroup"
       aria-label="Sensor view"
-      className="inline-flex self-start rounded-xl border border-wire bg-card p-0.5 text-[12px] font-semibold shadow-card sm:self-auto"
+      className="inline-flex self-start rounded-xl border border-wire bg-card p-0.5 text-[13px] font-semibold shadow-card sm:self-auto"
     >
       {OPTIONS.map((option) => {
         const active = option.value === value;

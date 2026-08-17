@@ -110,8 +110,8 @@ function SubcardShell({
           className="w-2 h-2 rounded-full shrink-0"
           style={{ background: color }}
         />
-        <h4 className="text-[12px] font-semibold text-ink flex-1">{title}</h4>
-        {note && <span className="text-[10px] text-sage">{note}</span>}
+        <h4 className="text-[13px] font-semibold text-ink flex-1">{title}</h4>
+        {note && <span className="text-[11px] text-sage">{note}</span>}
         {exportHref && <ExportLink href={exportHref} />}
       </div>
       {children}
@@ -121,7 +121,7 @@ function SubcardShell({
 
 function EmptyState({ label }: { label: string }) {
   return (
-    <div className="h-28 flex items-center justify-center text-sage text-[12px]">
+    <div className="h-28 flex items-center justify-center text-sage text-[13px]">
       No {label}
     </div>
   );
@@ -147,7 +147,7 @@ function DeltaTooltip({
   const d = payload[0].payload;
   return (
     <div
-      className="rounded-xl border px-3 py-2 text-[11px]"
+      className="rounded-xl border px-3 py-2 text-[12px]"
       style={{ background: "#fffdf8", borderColor: "rgba(48,67,54,0.14)" }}
     >
       <div className="text-sage mb-1">{fmtTime(d.timestamp)}</div>
@@ -196,20 +196,20 @@ function BatteryLevelSection({
           className="w-2 h-2 rounded-full shrink-0"
           style={{ background: BATTERY_COLOR }}
         />
-        <h4 className="text-[12px] font-semibold text-ink flex-1">Level</h4>
-        <span className="text-[10px] text-sage">%</span>
+        <h4 className="text-[13px] font-semibold text-ink flex-1">Level</h4>
+        <span className="text-[11px] text-sage">%</span>
         {exportHref && <ExportLink href={exportHref} />}
       </div>
 
       {loading ? (
         <div className="h-40 rounded-xl shimmer" />
       ) : !values.length ? (
-        <div className="h-40 flex items-center justify-center text-sage text-[12px]">
+        <div className="h-40 flex items-center justify-center text-sage text-[13px]">
           No data
         </div>
       ) : (
         <>
-          <div className="flex items-center gap-3 mb-2 text-[10px] text-sage">
+          <div className="flex items-center gap-3 mb-2 text-[11px] text-sage">
             <span>
               <b className="text-ink">{values.length}</b> pts
             </span>
@@ -264,7 +264,7 @@ function BatteryLevelSection({
               />
             </LineChart>
           </ResponsiveContainer>
-          <p className="mt-2 text-[10px] text-sage leading-snug">
+          <p className="mt-2 text-[11px] text-sage leading-snug">
             iPhone battery values are approximate and are usually reported in
             5% increments.
           </p>
@@ -314,7 +314,7 @@ function EventsSubcard({
         <EmptyState label={title.toLowerCase()} />
       ) : (
         <div className="space-y-2">
-          <div className="flex items-center gap-3 text-[10px] text-sage">
+          <div className="flex items-center gap-3 text-[11px] text-sage">
             {avgDelta != null && (
               <span>
                 avg Δ{" "}
@@ -375,19 +375,19 @@ function EventsSubcard({
                 key={e.id}
                 className="rounded-xl bg-card px-2.5 py-1.5 flex items-center gap-2"
               >
-                <span className="text-[10px] text-sage shrink-0">
+                <span className="text-[11px] text-sage shrink-0">
                   {fmtTime(e.timestamp)}
                 </span>
                 {e.start != null && e.end != null ? (
-                  <span className="text-[11px] text-ink font-semibold flex-1">
+                  <span className="text-[12px] text-ink font-semibold flex-1">
                     {e.start}% → {e.end}%
                   </span>
                 ) : (
-                  <span className="text-[11px] text-sage flex-1">—</span>
+                  <span className="text-[12px] text-sage flex-1">—</span>
                 )}
                 {e.delta != null && (
                   <span
-                    className="text-[11px] font-semibold shrink-0"
+                    className="text-[12px] font-semibold shrink-0"
                     style={{ color: e.delta >= 0 ? color : "#ef4444" }}
                   >
                     {e.delta >= 0 ? "+" : ""}
@@ -424,9 +424,9 @@ export default function BatteryEventsCard({
     >
       <div className="flex items-center gap-2 mb-4">
         <span className="w-2 h-2 rounded-full shrink-0 bg-[#22c55e]" />
-        <h3 className="text-[13px] font-semibold flex-1 text-ink">Battery</h3>
+        <h3 className="text-[14px] font-semibold flex-1 text-ink">Battery</h3>
         {totalRecords > 0 && (
-          <span className="text-[11px] text-sage">
+          <span className="text-[12px] text-sage">
             {totalRecords.toLocaleString()} records
           </span>
         )}

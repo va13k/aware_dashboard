@@ -42,9 +42,9 @@ export default function ActivityCard({ records, loading, exportHref }: Props) {
     <div className="bg-card backdrop-blur-xl border border-wire rounded-3xl shadow-card p-5">
       <div className="flex items-center gap-2 mb-3">
         <span className="w-2 h-2 rounded-full shrink-0 bg-[#22c55e]" />
-        <h3 className="text-[13px] font-semibold flex-1 text-ink">Activity</h3>
+        <h3 className="text-[14px] font-semibold flex-1 text-ink">Activity</h3>
         {records.length > 0 && (
-          <span className="text-[11px] text-sage">{records.length} events</span>
+          <span className="text-[12px] text-sage">{records.length} events</span>
         )}
         {exportHref && <ExportLink href={exportHref} />}
       </div>
@@ -52,7 +52,7 @@ export default function ActivityCard({ records, loading, exportHref }: Props) {
       {loading ? (
         <div className="h-40 rounded-xl shimmer" />
       ) : !data.length ? (
-        <div className="h-40 flex items-center justify-center text-sage text-[13px]">
+        <div className="h-40 flex items-center justify-center text-sage text-[14px]">
           No data
         </div>
       ) : (

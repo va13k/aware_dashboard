@@ -36,12 +36,12 @@ export default function DeviceListRow({
     >
       <div className="flex min-w-0 items-center gap-2">
         <PlatformIcon platform={device.platform} className="h-4 w-4 shrink-0" />
-        <span className="min-w-0 flex-1 truncate text-[13px] font-semibold leading-tight text-ink">
+        <span className="min-w-0 flex-1 truncate text-[14px] font-semibold leading-tight text-ink">
           {deviceLabel(device)}
         </span>
       </div>
 
-      <div className="mt-0.5 truncate text-[11px] text-sage" title={device.device_id}>
+      <div className="mt-0.5 truncate text-[12px] text-sage" title={device.device_id}>
         {device.device_id}
       </div>
 
@@ -57,7 +57,7 @@ export default function DeviceListRow({
 
       {/* Two different facts. A phone can be uploading sensor data without
           reporting a study event, and the reverse. */}
-      <div className="mt-2 grid grid-cols-2 gap-x-2 text-[11px]">
+      <div className="mt-2 grid grid-cols-2 gap-x-2 text-[12px]">
         <div className="min-w-0">
           <div className="truncate text-sage">Upload</div>
           <div className="truncate font-semibold text-ink">
