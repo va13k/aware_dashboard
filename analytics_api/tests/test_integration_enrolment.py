@@ -222,3 +222,84 @@ async def test_an_empty_study_and_an_empty_rollup_leave_an_empty_table(android_s
         "researcher_owned": 0,
     }
     assert stored(server) == []
+
+
+@pytest.mark.asyncio
+async def test_a_withdrawal_closes_the_window_in_the_table(android_session):
+    """Against a real table, because `close_window` writes a compound-key update
+    and a stand-in session cannot say whether it matched the intended row."""
+    sessionmaker_, server = android_session
+    seed_study(server, [(DEVICE, 1_000, "joined study", 0, 0)])
+    await run_refresh(sessionmaker_)
+
+    left_at = 9_000
+    async with sessionmaker_() as db:
+        written = await enrolment.close_window(
+            db, AndroidDeviceEnrolment, DEVICE, left_at
+        )
+
+    assert written is not None
+    assert stored(server) == [(DEVICE, 1_000, left_at, enrolment.STUDY_EVENT)]
+
+
+@pytest.mark.asyncio
+async def test_a_refresh_leaves_a_manually_closed_window_alone(android_session):
+    """Otherwise the next pass rebuilds the window from the study log and reopens
+    what a researcher has just closed."""
+    sessionmaker_, server = android_session
+    seed_study(server, [(DEVICE, 1_000, "joined study", 0, 0)])
+    await run_refresh(sessionmaker_)
+
+    async with sessionmaker_() as db:
+        await enrolment.close_window(db, AndroidDeviceEnrolment, DEVICE, 4_000)
+
+    await run_refresh(sessionmaker_)
+
+    assert stored(server) == [(DEVICE, 1_000, 4_000, enrolment.STUDY_EVENT)]
+
+
+@pytest.mark.asyncio
+async def test_a_late_notice_closes_the_window_where_the_participant_left(
+    android_session,
+):
+    """A device that quit and rejoined has windows behind it; a withdrawal reported
+    late has to land in the one it belongs to."""
+    sessionmaker_, server = android_session
+    seed_study(
+        server,
+        [
+            (DEVICE, 1_000, "joined study", 0, 0),
+            (DEVICE, 3_000, "quit study", 0, 0),
+            (DEVICE, 6_000, "rejoined study", 0, 0),
+        ],
+    )
+    await run_refresh(sessionmaker_)
+
+    # Told afterwards that they really stopped during the first spell.
+    async with sessionmaker_() as db:
+        written = await enrolment.close_window(
+            db, AndroidDeviceEnrolment, DEVICE, 2_000
+        )
+
+    assert written["joined_at"] == 1_000
+    closed = [row for row in stored(server) if row[1] == 1_000]
+    assert closed == [(DEVICE, 1_000, 2_000, enrolment.STUDY_EVENT)]
+
+
+@pytest.mark.asyncio
+async def test_reopening_lets_the_derivation_rebuild_from_the_study_log(
+    android_session,
+):
+    """Undoing a mistake hands the device back to the phone's own account."""
+    sessionmaker_, server = android_session
+    seed_study(server, [(DEVICE, 1_000, "joined study", 0, 0)])
+    await run_refresh(sessionmaker_)
+
+    async with sessionmaker_() as db:
+        await enrolment.close_window(db, AndroidDeviceEnrolment, DEVICE, 4_000)
+        await enrolment.reopen(db, AndroidDeviceEnrolment, DEVICE)
+
+    await run_refresh(sessionmaker_)
+
+    # Back to the log's account: joined at 1,000 and still open.
+    assert stored(server) == [(DEVICE, 1_000, -1, enrolment.STUDY_EVENT)]

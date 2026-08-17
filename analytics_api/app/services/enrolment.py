@@ -216,6 +216,79 @@ async def stored_windows(
     return windows
 
 
+async def close_window(
+    db: AsyncSession, model, device_id: str, left_at: int
+) -> dict | None:
+    """Record that a device left the study, at the moment it left.
+
+    `left_at` is when the participant *acted*, which is not always when anyone
+    found out: a withdrawal reported days later still has to land on the day it
+    happened, or every bucket in between reads as expected-and-missing on a grid
+    the participant had already left. So the caller supplies the moment and this
+    stores it.
+
+    The window closed is the one covering `left_at`, or the latest still open
+    before it. Marked `manual`, which is what makes the derivation leave this
+    device alone afterwards rather than reopening the window from the study log.
+
+    Returns the window as stored, or None when the device has none to close.
+    """
+    windows = (await stored_windows(db, model, device_id)).get(device_id) or []
+
+    target = None
+    for index, window in enumerate(windows):
+        if window["joined_at"] > left_at:
+            continue
+        # A changed withdrawal date may be later than the date stored before.
+        # Partition by the next join instead of the old end, so editing a manual
+        # correction can extend or shorten it without ever crossing a rejoin.
+        next_join = (
+            windows[index + 1]["joined_at"] if index + 1 < len(windows) else None
+        )
+        if next_join is None or left_at < next_join:
+            target = window
+    if target is None:
+        return None
+
+    try:
+        await db.execute(
+            model.__table__.update()
+            .where(model.device_id == device_id)
+            .where(model.joined_at == target["joined_at"])
+            .values(left_at=int(left_at), left_source=MANUAL)
+        )
+        await db.commit()
+    except SQLAlchemyError:
+        await _rollback(db)
+        return None
+
+    return {
+        "device_id": device_id,
+        "joined_at": target["joined_at"],
+        "left_at": int(left_at),
+        "join_source": target["join_source"],
+        "left_source": MANUAL,
+    }
+
+
+async def reopen(db: AsyncSession, model, device_id: str) -> bool:
+    """Undo a withdrawal recorded by mistake, handing the device back to the log.
+
+    Clears the manual marks so the next derivation rebuilds this device's windows
+    from `aware_studies` — the phone's own account — rather than leaving it frozen
+    at a researcher's correction.
+    """
+    try:
+        await db.execute(
+            model.__table__.delete().where(model.device_id == device_id)
+        )
+        await db.commit()
+    except SQLAlchemyError:
+        await _rollback(db)
+        return False
+    return True
+
+
 async def first_record_by_device(db: AsyncSession, coverage_model) -> dict[str, int]:
     """When each device's first record arrived, to the hour.
 
