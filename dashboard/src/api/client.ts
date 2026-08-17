@@ -205,11 +205,42 @@ export const fetchDeviceCoverage = (
   );
 
 /**
- * The whole grid as files: one CSV per sensor, devices down and hours across.
+ * The grid on screen as an `.xlsx` workbook: the same buckets, the same counts,
+ * each cell filled with its band's colour, and a total down every row and across
+ * every column.
  *
- * Hour columns whatever the level on screen, because the archive is the raw
- * matrix a researcher takes into their own analysis rather than the summary the
- * grid draws.
+ * Takes the whole view rather than a window, so the file holds what the
+ * researcher was looking at instead of a layout of its own.
+ */
+export const studyCoverageWorkbookHref = (opts: {
+  level: CoverageLevel;
+  anchor: number;
+  platform?: "android" | "ios" | null;
+  sensor?: string | null;
+  tz?: string | null;
+}): string => {
+  const params = gridParams(opts);
+  if (opts.platform) params.set("platform", opts.platform);
+  if (opts.sensor) params.set("sensor", opts.sensor);
+  return `${BASE}/coverage/study.xlsx?${params.toString()}`;
+};
+
+/** One phone's grid as a workbook: a sensor per row, the same buckets. */
+export const deviceCoverageWorkbookHref = (
+  platform: "android" | "ios",
+  deviceId: string,
+  opts: { level: CoverageLevel; anchor: number; tz?: string | null },
+): string =>
+  `${BASE}/coverage/device/${platform}/${encodeURIComponent(
+    deviceId,
+  )}/workbook.xlsx?${gridParams(opts).toString()}`;
+
+/**
+ * The reference-spreadsheet layout: one CSV per sensor inside a ZIP, devices
+ * down and hours across, marked 1 where an hour holds a record.
+ *
+ * Hour columns whatever the level on screen, because this reproduces a fixed
+ * layout for diffing rather than the grid the interface draws.
  */
 export const coverageMatrixHref = (opts: {
   from: number;

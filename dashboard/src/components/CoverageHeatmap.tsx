@@ -280,7 +280,7 @@ export default function CoverageHeatmap({
         </colgroup>
         <thead>
           <tr>
-            <th className="sticky left-0 z-10 bg-card px-2 py-1 text-left text-[12px] font-semibold uppercase tracking-[0.4px] text-sage">
+            <th className="sticky left-0 z-[1] bg-card px-2 py-1 text-left text-[12px] font-semibold uppercase tracking-[0.4px] text-sage">
               {rowHeader}
             </th>
             {buckets.map((bucket) => (
@@ -301,7 +301,7 @@ export default function CoverageHeatmap({
                 )}
               </th>
             ))}
-            <th className="sticky right-0 z-10 bg-card px-2 pb-1 text-right text-[12px] font-semibold uppercase tracking-[0.4px] text-sage">
+            <th className="sticky right-0 z-[1] bg-card px-2 pb-1 text-right text-[12px] font-semibold uppercase tracking-[0.4px] text-sage">
               Records
             </th>
           </tr>
@@ -311,7 +311,7 @@ export default function CoverageHeatmap({
             <tr key={row.key} className="group">
               <th
                 scope="row"
-                className="sticky left-0 z-10 truncate bg-card px-2 py-0.5 text-left font-medium text-ink group-hover:bg-teal-soft/40"
+                className="sticky left-0 z-[1] truncate bg-card px-2 py-0.5 text-left font-medium text-ink group-hover:bg-teal-soft/40"
                 title={row.label}
               >
                 {row.heading ?? row.label}
@@ -337,7 +337,7 @@ export default function CoverageHeatmap({
                   </td>
                 );
               })}
-              <td className="sticky right-0 z-10 truncate bg-card px-2 py-0.5 text-right tabular-nums text-sage group-hover:bg-teal-soft/40">
+              <td className="sticky right-0 z-[1] truncate bg-card px-2 py-0.5 text-right tabular-nums text-sage group-hover:bg-teal-soft/40">
                 {NUMBER.format(row.records)}
                 {row.note ? (
                   <span className="ml-1.5 text-[12px] text-sage/70">{row.note}</span>
@@ -354,7 +354,7 @@ export default function CoverageHeatmap({
           <tr>
             <th
               scope="row"
-              className="sticky left-0 z-10 bg-card px-2 pt-1.5 text-left text-[12px] font-semibold uppercase tracking-[0.4px] text-sage"
+              className="sticky left-0 z-[1] bg-card px-2 pt-1.5 text-left text-[12px] font-semibold uppercase tracking-[0.4px] text-sage"
             >
               Total
             </th>
@@ -382,7 +382,7 @@ export default function CoverageHeatmap({
                 </td>
               );
             })}
-            <td className="sticky right-0 z-10 border-t border-wire bg-card px-2 pt-1 text-right text-[12px] font-semibold tabular-nums text-ink">
+            <td className="sticky right-0 z-[1] border-t border-wire bg-card px-2 pt-1 text-right text-[12px] font-semibold tabular-nums text-ink">
               {NUMBER.format(gridTotal)}
             </td>
           </tr>

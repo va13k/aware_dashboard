@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 import { Link } from "react-router-dom";
-import { coverageMatrixHref, fetchStudyCoverage } from "../api/client";
+import { fetchStudyCoverage, studyCoverageWorkbookHref } from "../api/client";
 import { SENSOR_CONFIGS } from "../config/sensors";
 import type { CoverageBucket, CoverageLevel, StudyCoverage } from "../types";
 import {
@@ -231,19 +231,20 @@ export default function CoveragePanel() {
             <CoverageLegend />
             <span className="flex items-center gap-3 text-[11px] text-sage/80">
               Buckets are whole hours, in {grid.timezone}.
-              {/* Hour columns regardless of the level shown: the archive is the
-                  raw matrix for someone's own analysis, not this summary. */}
+              {/* The grid as it stands, so the file a researcher circulates
+                  carries the colours and totals they were reading. */}
               <a
-                href={coverageMatrixHref({
-                  from: grid.from,
-                  to: grid.to - 1,
+                href={studyCoverageWorkbookHref({
+                  level,
+                  anchor,
                   platform,
+                  sensor,
                   tz: grid.timezone,
                 })}
-                title="One CSV per sensor: devices down, hours across"
-                className="whitespace-nowrap font-semibold uppercase tracking-[0.4px] text-sage no-underline transition-colors hover:text-teal"
+                title="Excel: this grid, with each cell's count, its colour, and totals per row and column"
+                className="inline-flex h-7 shrink-0 items-center justify-center gap-1.5 rounded-lg border border-wire bg-card-strong px-2 text-[11px] font-semibold uppercase tracking-[0.4px] text-sage no-underline transition-colors hover:border-teal hover:text-teal"
               >
-                ↓ Matrix
+                ↓ Excel
               </a>
             </span>
           </div>

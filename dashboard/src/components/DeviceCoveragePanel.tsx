@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef } from "react";
 import { useLocation } from "react-router-dom";
-import { fetchDeviceCoverage } from "../api/client";
+import { deviceCoverageWorkbookHref, fetchDeviceCoverage } from "../api/client";
 import { SENSOR_CONFIGS } from "../config/sensors";
 import type { CoverageBucket, CoverageLevel, DeviceCoverage } from "../types";
 import {
@@ -185,8 +185,19 @@ export default function DeviceCoveragePanel({
           />
           <div className="mt-3 flex flex-col gap-2 border-t border-wire pt-2.5 sm:flex-row sm:items-center sm:justify-between">
             <CoverageLegend />
-            <span className="text-[11px] text-sage/80">
+            <span className="flex items-center gap-3 text-[11px] text-sage/80">
               Buckets are whole hours, in {grid.timezone}.
+              <a
+                href={deviceCoverageWorkbookHref(platform, deviceId, {
+                  level,
+                  anchor,
+                  tz: grid.timezone,
+                })}
+                title="Excel: this grid, with each cell's count, its colour, and totals per row and column"
+                className="inline-flex h-7 shrink-0 items-center justify-center gap-1.5 rounded-lg border border-wire bg-card-strong px-2 text-[11px] font-semibold uppercase tracking-[0.4px] text-sage no-underline transition-colors hover:border-teal hover:text-teal"
+              >
+                ↓ Excel
+              </a>
             </span>
           </div>
         </div>
