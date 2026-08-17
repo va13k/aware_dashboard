@@ -184,6 +184,38 @@ def windows_for(
     return windows
 
 
+async def stored_windows(
+    db: AsyncSession, model, device_id: str | None = None
+) -> dict[str, list[dict]]:
+    """The windows the table holds, per device, oldest first.
+
+    Read from the table rather than re-derived: the study log needs parsing and
+    deduplicating per device, and this is on the path of both the device list and
+    every coverage grid. The refresher keeps the table in step.
+    """
+    query = select(model).order_by(model.device_id, model.joined_at)
+    if device_id is not None:
+        query = query.where(model.device_id == device_id)
+
+    try:
+        result = await db.execute(query)
+    except (ProgrammingError, OperationalError, SQLAlchemyError):
+        await _rollback(db)
+        return {}
+
+    windows: dict[str, list[dict]] = {}
+    for row in result.scalars().all():
+        windows.setdefault(str(row.device_id), []).append(
+            {
+                "joined_at": int(row.joined_at),
+                "left_at": int(row.left_at) if row.left_at is not None else None,
+                "join_source": row.join_source,
+                "left_source": row.left_source,
+            }
+        )
+    return windows
+
+
 async def first_record_by_device(db: AsyncSession, coverage_model) -> dict[str, int]:
     """When each device's first record arrived, to the hour.
 

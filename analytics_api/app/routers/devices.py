@@ -65,7 +65,7 @@ from app.schemas import (
     ConfigDiffSchema,
     strip_ios_data_metadata,
 )
-from app.services import config_diff, study_state
+from app.services import config_diff, enrolment, study_state
 
 router = APIRouter(prefix="/devices", tags=["devices"])
 
@@ -305,33 +305,11 @@ async def _device_metadata_by_device(db: AsyncSession, model):
 async def _enrolment_windows(db: AsyncSession, device_id: str | None = None):
     """The stored enrolment windows per device, oldest first.
 
-    Read from the table rather than re-derived from the study log: the log needs
-    parsing and deduplicating per device, and this is on the path of every device
-    list. The refresher keeps the table in step (services/enrolment.py).
+    The coverage grids read the same rows to decide whether an empty bucket means
+    anything was expected, so the reader lives in services/enrolment.py and the
+    two cannot come to disagree about who was in the study when.
     """
-    query = select(AndroidDeviceEnrolment).order_by(
-        AndroidDeviceEnrolment.device_id, AndroidDeviceEnrolment.joined_at
-    )
-    if device_id is not None:
-        query = query.where(AndroidDeviceEnrolment.device_id == device_id)
-
-    try:
-        result = await db.execute(query)
-    except (ProgrammingError, OperationalError, SQLAlchemyError):
-        await _rollback_after_table_error(db)
-        return {}
-
-    windows: dict[str, list] = {}
-    for row in result.scalars().all():
-        windows.setdefault(str(row.device_id), []).append(
-            {
-                "joined_at": int(row.joined_at),
-                "left_at": int(row.left_at) if row.left_at is not None else None,
-                "join_source": row.join_source,
-                "left_source": row.left_source,
-            }
-        )
-    return windows
+    return await enrolment.stored_windows(db, AndroidDeviceEnrolment, device_id)
 
 
 def _enrolment_summary(windows: list | None) -> dict | None:
