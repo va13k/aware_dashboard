@@ -13,10 +13,15 @@ from sqlalchemy.exc import OperationalError, ProgrammingError, SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import android_engine, get_android_db, get_ios_db
-from app.models import AndroidRecordCount, IosRecordCount
+from app.models import (
+    AndroidCoverageHourly,
+    AndroidRecordCount,
+    IosCoverageHourly,
+    IosRecordCount,
+)
 from app.routers.android import _EXPORT_MODELS as ANDROID_EXPORT_MODELS
 from app.routers.ios import _EXPORT_MODELS as IOS_EXPORT_MODELS
-from app.services import record_counts
+from app.services import orphan_rows, record_counts
 
 router = APIRouter(prefix="/counts", tags=["counts"])
 
@@ -127,4 +132,33 @@ async def counts_status(
         "age_seconds": (now - newest) if newest is not None else None,
         "stale": newest is None or (now - newest) > STALE_AFTER_SECONDS,
         "platforms": platforms,
+    }
+
+
+@router.get("/orphans")
+async def orphan_counts(
+    android_db: AsyncSession = Depends(get_android_db),
+    ios_db: AsyncSession = Depends(get_ios_db),
+):
+    """Rows stored against no device at all, per platform and per table.
+
+    Reported rather than folded into anything. The counts and the exports both
+    leave these rows out, so this is the only place their number appears — and the
+    number is what decides what to do with them: a handful is an early test
+    insert, a large block is data a phone really collected and may be attributable
+    by timestamp before anything is discarded.
+    """
+    platforms = {
+        name: await orphan_rows.summary(db, model)
+        for name, db, model in (
+            ("android", android_db, AndroidCoverageHourly),
+            ("ios", ios_db, IosCoverageHourly),
+        )
+    }
+    return {
+        "records": sum(entry["records"] for entry in platforms.values()),
+        "platforms": platforms,
+        # Android's `device_id` column defaults to the empty string, so an insert
+        # that omits it succeeds; every iOS table declares the column NOT NULL.
+        "cause": "an insert with no device_id, which Android stores as ''",
     }
