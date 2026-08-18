@@ -120,6 +120,12 @@ class LiveWatch:
         if since is None:
             return subscriber, [], False
 
+        # A client naming a sequence ahead of this one has outlived a restart,
+        # which put the count back to zero. Its number refers to a history that no
+        # longer exists, so it cannot be told it is up to date.
+        if since > self._seq:
+            return subscriber, [], True
+
         backlog = [message for message in self._history if message["seq"] > since]
         # Either the history reaches back far enough to cover the gap, or it does
         # not and the client cannot be trusted to be up to date.

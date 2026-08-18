@@ -354,3 +354,31 @@ async def test_an_unclaimed_table_still_advances_its_watermark():
     await watch._collect()
 
     assert watch._watermarks[("android", "sensor_wifi")] == 40
+
+
+def test_a_client_ahead_of_the_server_is_told_to_refetch():
+    """The API restarting puts the sequence back to zero while an open tab still
+    remembers a high number. Told it was up to date, that tab would sit on tiles
+    frozen at the restart with nothing ever correcting them."""
+    watch = watcher_for({"max_ids": {}, "new_rows": {}})
+    opener, _, _ = watch.subscribe()
+    watch._publish({"type": "changes", "changes": []})
+    watch.unsubscribe(opener)
+
+    _, backlog, refetch = watch.subscribe(since=99999)
+
+    assert refetch is True
+    assert backlog == []
+
+
+def test_a_client_exactly_up_to_date_is_left_alone():
+    """The common reconnect: nothing happened while it was away."""
+    watch = watcher_for({"max_ids": {}, "new_rows": {}})
+    opener, _, _ = watch.subscribe()
+    watch._publish({"type": "changes", "changes": []})
+    watch.unsubscribe(opener)
+
+    _, backlog, refetch = watch.subscribe(since=watch.sequence)
+
+    assert refetch is False
+    assert backlog == []
