@@ -296,15 +296,14 @@ class PostgresVerticle : AbstractVerticle() {
       logger.warn {
         "$device_id ignored incomplete aware_device row with fields ${entry.fieldNames().sorted()}"
       }
-      return JsonObject()
+      // A placeholder so the device is registered, carrying only what the phone
+      // itself reported. The hardware fields stay absent until real metadata
+      // arrives: the dashboard shows them beside genuinely reported values with
+      // nothing to tell the two apart, so anything guessed here would reach a
+      // researcher as the phone's own answer. The update above fills them in.
+      return entry.copy()
         .put("device_id", device_id)
         .put("timestamp", timestampFrom(entry))
-        .put("brand", "iPhone")
-        .put("device", "iPhone")
-        .put("manufacturer", "Apple")
-        .put("model", "iPhone")
-        .put("product", "iPhone")
-        .put("label", "iPhone")
         .put("metadata_status", "pending")
         .put("metadata_complete", false)
     }
