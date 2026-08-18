@@ -26,6 +26,7 @@ from app.database import AndroidSessionLocal, IosSessionLocal
 from app.routers import auth
 from app.routers.android import _EXPORT_MODELS as ANDROID_EXPORT_MODELS
 from app.routers.ios import _EXPORT_MODELS as IOS_EXPORT_MODELS
+from app.refresh_counts import refresh_all
 from app.services import coverage_rollup, live_watch, sensor_tables
 
 logger = logging.getLogger("aware.live")
@@ -84,6 +85,9 @@ watcher = live_watch.LiveWatch(
     sessions={"android": AndroidSessionLocal, "ios": IosSessionLocal},
     tables_for=_watched_tables,
     sensor_for=_sensor_for,
+    # The same pass the scheduler runs, under the same lock. A tick that saw rows
+    # brings the caches to them, so a reader that refetches on the news finds it.
+    refresh=refresh_all,
 )
 
 

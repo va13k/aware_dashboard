@@ -22,6 +22,14 @@ Deltas are per `(device, sensor)`: the count of rows that arrived in the tick. T
 is what a tile shows, so a subscriber can apply the change without asking anything
 further. A sensor spread over two tables sums, the same way every other reader
 treats it.
+
+**A tick that found rows folds them into the caches before saying so.** Every
+number the dashboard shows is read from `record_counts` and `coverage_hourly`, which
+move only when a refresh runs. Announcing an arrival while those still hold the old
+totals would send every reader to refetch the very numbers they already have, and
+the change would appear to have been imagined. The refresh is the same incremental
+pass the scheduler runs, under the same lock, so a pass already in progress is
+skipped rather than double-counted.
 """
 
 import asyncio
@@ -70,7 +78,7 @@ class Subscriber:
 class LiveWatch:
     """The shared loop, its subscribers, and the recent history they resume from."""
 
-    def __init__(self, sessions: dict, tables_for, sensor_for) -> None:
+    def __init__(self, sessions: dict, tables_for, sensor_for, refresh) -> None:
         #: `{platform: async_sessionmaker}`.
         self._sessions = sessions
         #: Called per platform, returns the tables worth watching.
@@ -79,6 +87,9 @@ class LiveWatch:
         #: iPhone stores `wifi` across two tables and `esm` across two more, where
         #: every Android sensor is one table.
         self._sensor_for = sensor_for
+        #: Folds arrived rows into the caches every reader counts from. Injected
+        #: rather than reached for, so the loop stays testable without a database.
+        self._refresh = refresh
         self._subscribers: set[Subscriber] = set()
         self._history: deque = deque(maxlen=HISTORY)
         self._seq = 0
@@ -164,8 +175,23 @@ class LiveWatch:
                 changes = []
 
             if changes:
+                await self._fold_in()
                 self._publish({"type": "changes", "changes": changes})
             await asyncio.sleep(TICK_SECONDS)
+
+    async def _fold_in(self) -> None:
+        """Bring the caches up to the rows just seen, before anyone is told.
+
+        A failure here costs the readers their prompt numbers, not the channel: the
+        scheduled refresh folds the same rows in on its own pass, and the fallback
+        poll is what picks them up.
+        """
+        try:
+            await self._refresh()
+        except asyncio.CancelledError:
+            raise
+        except Exception as error:  # noqa: BLE001 - a stale cache outlives a bad pass
+            logger.warning("live watch could not refresh the caches: %s", error)
 
     def _publish(self, message: dict) -> None:
         self._seq += 1

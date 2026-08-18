@@ -170,11 +170,11 @@
     "dashboard/src/components/WifiRecordsCard.tsx": "2a4b03fb96ce10de7b283ba7f705c1bf45f017e81339c4d5abbd2d1297394603",
     "dashboard/src/config/sensors.ts": "15600f1bdb1d5932bf9f616047c700fc7953a0338bb1091579498b1ae4f6ac18",
     "dashboard/src/main.tsx": "717427d5d64470f97e4bb18e907ab095427e2aa9a6800fe3390b43bede6e9b35",
-    "dashboard/src/pages/DeviceDetailPage.tsx": "45402a7d618a2b3b4bee5a1443eaa677684223134ad59adb164f5e17c3a375db",
+    "dashboard/src/pages/DeviceDetailPage.tsx": "74c04b2be92aa5b6fae7f8af97093cda1893866bf450f160e415dad1240ec705",
     "dashboard/src/pages/DevicesPage.tsx": "aa15e8cf5d0bf27a539bce47b014368ff27a18b4d42ac450890befb70213593c",
     "dashboard/src/pages/LogsPage.tsx": "c7b60aff5d997824aaca373ce362910c64e91a31fe1dc09a5d7f4fabb452da41",
     "dashboard/src/pages/ManifestPage.tsx": "bc1932f4fd5a18cb32c4a3cce885d354deeddd90672d927affdcaaa1c3dfd4a9",
-    "dashboard/src/pages/OverviewPage.tsx": "80ec87c991366f6167210884f41af896bbab521810211ec5dc2b5908538e3d16",
+    "dashboard/src/pages/OverviewPage.tsx": "9292d73d2ff8ec873c32ce4a5d615626733fe296743799535c41dc0798318afe",
     "dashboard/src/types.ts": "53b6c54fda72875fb09d34d90b5ce777dfaee1f02379e88aa51d4afb2f79cfcd",
     "dashboard/src/utils/devices.ts": "c272275eaa86fc7193ca98cda049311fd0a4c3066917d9eafb90ad8617b8c641",
     "dashboard/src/utils/headerSlot.ts": "15ebb004e26cb060ed37b793971c08d2ba7b60fd8b2ed4ff94d6a3ceec93a689",
@@ -213,11 +213,11 @@
     "shared_config/source_store.py": "ceaf715a4f7aa1198409553bed5ab30ab761f23c6f6db02140ee2e84148aa1f9",
     "shared_config/test_serializers.py": "d7614beeadecc7e75fcf9671fbc58ae7c8d9ce338a9cc21480128038ccd23fdb"
   },
-  "indexed_at_commit": "d9903b58b2a2f2c6f2947068e95405d43f4b6f30",
-  "indexed_at_timestamp": "2026-08-18T09:10:47.891264+00:00",
+  "indexed_at_commit": "e5e617a7ca87ac76d2cb6e6eedb5a3d327a22876",
+  "indexed_at_timestamp": "2026-08-18T09:45:51.441851+00:00",
   "schema_version": 3,
   "stats": {
-    "total_edges": 2229,
+    "total_edges": 2235,
     "total_files": 212,
     "total_nodes": 2122
   },

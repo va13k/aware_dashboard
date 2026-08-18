@@ -90,6 +90,10 @@ def watcher_for(state, tables=("battery",), sensors=None):
     async def tables_for(db, platform):
         return list(tables)
 
+    async def refresh():
+        # Counts how many times a tick brought the caches up to what it saw.
+        state["refreshes"] = state.get("refreshes", 0) + 1
+
     # Android's tables map one-to-one onto sensors; an iPhone's `wifi` and `esm`
     # each span two, which is what the summing exists for.
     mapping = sensors or {table: table for table in tables}
@@ -101,6 +105,7 @@ def watcher_for(state, tables=("battery",), sensors=None):
         sessions={"android": factory},
         tables_for=tables_for,
         sensor_for=sensor_for,
+        refresh=refresh,
     )
 
 
@@ -292,10 +297,14 @@ async def test_a_failing_tick_does_not_kill_the_loop():
     async def tables_for(db, platform):
         return ["battery"]
 
+    async def refresh():
+        pass
+
     watch = live_watch.LiveWatch(
         sessions={"android": _Broken()},
         tables_for=tables_for,
         sensor_for=lambda platform: {"battery": "battery"},
+        refresh=refresh,
     )
     watch.subscribe()
     watch.start()
@@ -382,3 +391,43 @@ def test_a_client_exactly_up_to_date_is_left_alone():
 
     assert refetch is False
     assert backlog == []
+
+
+@pytest.mark.asyncio
+async def test_a_tick_that_found_rows_refreshes_the_caches_before_announcing():
+    """Every number a reader shows is read from the caches, which move only when a
+    refresh runs. Announcing first would send every reader to refetch the totals it
+    already has, and the arrival would look like it never happened."""
+    state = {"max_ids": {"battery": 10}, "new_rows": {}}
+    watch = watcher_for(state)
+    watch.subscribe()
+    await watch._collect()
+
+    state["max_ids"]["battery"] = 14
+    state["new_rows"] = {"phone-a": 4}
+    changes = await watch._collect()
+    assert changes
+    await watch._fold_in()
+
+    assert state["refreshes"] == 1
+
+
+@pytest.mark.asyncio
+async def test_a_refresh_that_fails_leaves_the_channel_running():
+    """A stale cache is worth less than a dead channel: the scheduled pass folds the
+    same rows in, and the fallback poll is what picks them up."""
+
+    async def refresh():
+        raise RuntimeError("lock wait timeout")
+
+    async def tables_for(db, platform):
+        return ["battery"]
+
+    watch = live_watch.LiveWatch(
+        sessions={},
+        tables_for=tables_for,
+        sensor_for=lambda platform: {"battery": "battery"},
+        refresh=refresh,
+    )
+
+    await watch._fold_in()
