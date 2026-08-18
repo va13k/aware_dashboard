@@ -345,3 +345,45 @@ def test_the_aggregate_band_follows_the_share_that_reported():
 def test_the_aggregate_has_no_far_above_band():
     """Its share is a fraction of what was asked for and cannot exceed it."""
     assert coverage_matrix.aggregate_band(20, 10) == coverage_matrix.BAND_EXPECTED
+
+
+def test_rows_arriving_outside_every_window_are_counted_not_blanked():
+    """A phone that keeps uploading after its enrolment closed. Painting the bucket
+    as though nothing was expected hid the records the row total was already
+    counting, so the grid contradicted its own totals -- and a withdrawn
+    participant still sending data is exactly what a researcher must see."""
+    cell = coverage_matrix.cell(5547, one_hour(4), 0.0, rate(180000))
+
+    assert cell["records"] == 5547
+    assert cell["state"] == coverage_matrix.PRESENT
+    assert cell["band"] == coverage_matrix.BAND_UNJUDGED
+    # No expectation to measure against, which is what leaves it unjudged.
+    assert cell["hours"] == 0
+
+
+def test_an_uncovered_bucket_with_nothing_in_it_stays_blank():
+    """The ordinary case the blank band is for: outside the study, and silent."""
+    cell = coverage_matrix.cell(0, one_hour(4), 0.0, rate(60))
+
+    assert cell["state"] == coverage_matrix.NOT_EXPECTED
+    assert cell["band"] == coverage_matrix.BAND_BLANK
+
+
+def test_an_aggregate_bucket_outside_every_window_counts_what_reported():
+    per_sensor = {"accelerometer": 2018, "wifi": 40}
+    cell = coverage_matrix.aggregate_cell(
+        per_sensor, ["accelerometer", "wifi", "battery"], one_hour(4), 0.0
+    )
+
+    assert cell["state"] == coverage_matrix.PRESENT
+    assert cell["band"] == coverage_matrix.BAND_UNJUDGED
+    assert cell["reporting"] == 2
+
+
+def test_an_aggregate_bucket_outside_every_window_and_silent_stays_blank():
+    cell = coverage_matrix.aggregate_cell(
+        {}, ["accelerometer", "wifi"], one_hour(4), 0.0
+    )
+
+    assert cell["state"] == coverage_matrix.NOT_EXPECTED
+    assert cell["band"] == coverage_matrix.BAND_BLANK

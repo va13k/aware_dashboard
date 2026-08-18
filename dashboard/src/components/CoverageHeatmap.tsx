@@ -129,6 +129,9 @@ function cellDetail(
 
   if (cell.hours > 0 && cell.hours < 1) {
     lines.push(`Enrolled for ${Math.round(cell.hours * 60)} min of this bucket.`);
+  } else if (cell.hours === 0 && cell.records > 0) {
+    // The colour says the count is unjudged; this says why it could not be judged.
+    lines.push("Arrived outside the enrolment window — the study asked for none.");
   }
 
   return lines;

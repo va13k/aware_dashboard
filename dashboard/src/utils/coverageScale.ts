@@ -9,18 +9,22 @@ import type { CoverageCell } from "../types";
  *
  * | band       | colour  | meaning                                            |
  * | ---------- | ------- | -------------------------------------------------- |
- * | `blank`    | wash    | nothing was expected — outside every enrolment      |
+ * | `blank`    | wash    | nothing was expected, and nothing arrived           |
  * | `none`     | white   | expected, and nothing arrived                       |
  * | `short`    | red     | well under the configured rate                      |
  * | `moderate` | yellow  | approaching the configured rate                     |
  * | `expected` | green   | at the configured rate                              |
  * | `over`     | blue    | far above the configured rate                       |
  *
- * A seventh outcome sits outside the scale. An event sensor — `calls`, `screen`,
- * `messages` — has no configured rate, so a count of its rows compares to nothing
- * and reads as neither short nor excessive. Those buckets take a neutral shade in
- * three steps of volume, which keeps them readable while leaving the six judged
- * colours to mean exactly what they say.
+ * A seventh outcome sits outside the scale: rows that arrived with nothing to
+ * measure them against. An event sensor — `calls`, `screen`, `messages` — has no
+ * configured rate, so a count of its rows compares to nothing and reads as neither
+ * short nor excessive. A bucket outside every enrolment window lands here too: a
+ * phone still uploading after it left the study asked nothing of it, so there is
+ * no expectation to judge the count by — but the rows are there and the grid says
+ * so, rather than showing the empty bucket its totals would then contradict.
+ * Those buckets take a neutral shade in three steps of volume, which keeps them
+ * readable while leaving the six judged colours to mean exactly what they say.
  *
  * The bands themselves are decided by the API (`services/coverage_matrix.py`);
  * what lives here is which colour each one wears. Both grids and the legend read
@@ -97,5 +101,5 @@ export const BAND_LEGEND: { band: CoverageBand; fill: string; label: string }[] 
   { band: "over", fill: BAND_FILL.over, label: "Far above expected" },
   { band: "none", fill: BAND_FILL.none, label: "Nothing arrived" },
   { band: "blank", fill: BAND_FILL.blank, label: "Nothing expected" },
-  { band: "unjudged", fill: "bg-plain/70", label: "Arrived · no configured rate" },
+  { band: "unjudged", fill: "bg-plain/70", label: "Arrived · nothing to judge by" },
 ];

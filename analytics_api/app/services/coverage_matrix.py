@@ -374,6 +374,18 @@ def cell(
     researcher needs to see before believing the colour.
     """
     if hours <= 0:
+        # Nothing was asked for in this bucket, and something arrived anyway: a
+        # phone still uploading after its enrolment closed. What arrived is a fact
+        # and what was expected is an interpretation, so the count is shown as
+        # unjudged rather than painted as an empty bucket -- a withdrawn
+        # participant still sending data is exactly what a researcher must see.
+        if records > 0:
+            return {
+                "state": PRESENT,
+                "band": BAND_UNJUDGED,
+                "records": records,
+                "hours": 0,
+            }
         return {
             "state": NOT_EXPECTED,
             "band": BAND_BLANK,
@@ -411,6 +423,17 @@ def aggregate_cell(
     Selecting a sensor is how the amount is examined.
     """
     if hours <= 0:
+        # Same as a single sensor's cell: sensors reporting outside every window
+        # are counted and left unjudged, since the fraction would be measured
+        # against a list of sensors nothing was asked of.
+        arriving = sum(1 for count in per_sensor.values() if count > 0)
+        if arriving > 0:
+            return {
+                "state": PRESENT,
+                "band": BAND_UNJUDGED,
+                "reporting": arriving,
+                "required": len(required),
+            }
         return {
             "state": NOT_EXPECTED,
             "band": BAND_BLANK,
