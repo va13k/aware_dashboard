@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
+import { useLiveRefresh } from "../api/live";
 import {
   exportAllHref,
   exportSensorZipHref,
@@ -37,7 +38,6 @@ import type {
   StudyRequirements,
 } from "../types";
 
-const REFRESH_INTERVAL_MS = 60000;
 const CLOCK_INTERVAL_MS = 10000;
 
 interface Section {
@@ -66,48 +66,40 @@ export default function OverviewPage() {
   // Per-sensor totals come from the manifest (absolute, cache-backed) in one
   // request — no per-device row fetching just to count. Devices are still
   // fetched for the "last upload" banner.
-  useEffect(() => {
-    let cancelled = false;
-
-    async function load() {
-      try {
-        const [loadedDevices, loadedManifest] = await Promise.all([
-          fetchDevices(),
-          fetchManifest(),
-        ]);
-        if (cancelled) return;
-        setDevices(loadedDevices);
-        setManifest(loadedManifest);
-        setError(null);
-      } catch (e) {
-        if (!cancelled) setError(String(e));
-      }
+  const loadTotals = async () => {
+    try {
+      const [loadedDevices, loadedManifest] = await Promise.all([
+        fetchDevices(),
+        fetchManifest(),
+      ]);
+      setDevices(loadedDevices);
+      setManifest(loadedManifest);
+      setError(null);
+    } catch (e) {
+      setError(String(e));
     }
+  };
 
-    load();
-    const intervalId = window.setInterval(load, REFRESH_INTERVAL_MS);
 
-    return () => {
-      cancelled = true;
-      window.clearInterval(intervalId);
-    };
-  }, []);
 
   // How fresh the numbers on this page are. A refresher that has died leaves a
   // dashboard that looks exactly like a study gone quiet, so the age is shown.
-  useEffect(() => {
-    const load = () => {
-      fetchCountsStatus()
-        .then(setCountsStatus)
-        .catch(() => setCountsStatus(null));
-      fetchOrphanCounts()
-        .then(setOrphanCounts)
-        .catch(() => setOrphanCounts(null));
-    };
-    load();
-    const id = window.setInterval(load, REFRESH_INTERVAL_MS);
-    return () => window.clearInterval(id);
-  }, []);
+  const loadFreshness = () => {
+    fetchCountsStatus()
+      .then(setCountsStatus)
+      .catch(() => setCountsStatus(null));
+    fetchOrphanCounts()
+      .then(setOrphanCounts)
+      .catch(() => setOrphanCounts(null));
+  };
+
+  // Everything on this page counts the whole study, so any arrival is relevant.
+  const refresh = () => {
+    loadTotals();
+    loadFreshness();
+  };
+
+  useLiveRefresh(refresh);
 
   useEffect(() => {
     fetchStudyRequirements()

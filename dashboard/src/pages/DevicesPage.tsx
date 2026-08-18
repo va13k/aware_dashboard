@@ -1,6 +1,7 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { fetchDevices } from "../api/client";
+import { useLiveRefresh } from "../api/live";
 import DeviceList from "../components/DeviceList";
 import type { DevicesResponse } from "../types";
 
@@ -13,11 +14,14 @@ export default function DevicesPage() {
   const [devices, setDevices] = useState<DevicesResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
+  const load = () => {
     fetchDevices()
       .then((d) => setDevices(d))
       .catch((e) => setError(String(e)));
-  }, []);
+  };
+
+  // The list carries each phone's last upload, which any arrival moves.
+  useLiveRefresh(load);
 
   if (error)
     return (

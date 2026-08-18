@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useHeaderSlot } from "../utils/headerSlot";
+import { useLiveRefresh } from "../api/live";
 import {
   exportDeviceHref,
   fetchDeviceDetail,
@@ -40,8 +41,6 @@ import type {
   DevicesResponse,
   StudyRequirements,
 } from "../types";
-
-const POLL_INTERVAL_MS = 60_000;
 
 function formatValue(label: string, value: unknown): string {
   if (value == null || value === "") return "-";
@@ -321,30 +320,27 @@ export default function DeviceDetailPage() {
     return () => clearInterval(id);
   }, []);
 
-  // Only the detail endpoint is fetched (and polled); it carries every sensor's
-  // count and last-seen. Per-sensor rows load on demand when a modal opens.
-  useEffect(() => {
-    if (!selected) return;
-    let cancelled = false;
+  // Only the detail endpoint is fetched; it carries every sensor's count and
+  // last-seen. Per-sensor rows load on demand when a modal opens.
+  // Keyed on the two identifiers rather than the device object: what to fetch is
+  // the platform and the id, and a row rebuilt from a new device list would
+  // otherwise count as a different phone.
+  const selectedPlatform = selected?.platform ?? null;
+  const selectedId = selected?.device_id ?? null;
 
-    const load = () => {
-      fetchDeviceDetail(selected.platform, selected.device_id)
-        .then((data) => {
-          if (cancelled) return;
-          setDetail(data);
-          setLastUpdated(Date.now());
-        })
-        .catch(() => {});
-    };
+  const loadDetail = () => {
+    if (!selectedPlatform || !selectedId) return;
+    fetchDeviceDetail(selectedPlatform, selectedId)
+      .then((data) => {
+        setDetail(data);
+        setLastUpdated(Date.now());
+      })
+      .catch(() => {});
+  };
 
-    load();
-    const pollId = setInterval(load, POLL_INTERVAL_MS);
-
-    return () => {
-      cancelled = true;
-      clearInterval(pollId);
-    };
-  }, [selected, selectedKey]);
+  // Narrowed to this phone: another participant uploading is not a reason for
+  // this page to move.
+  useLiveRefresh(loadDetail, selectedId);
 
   // Publish the device switcher into the centre of the global header while this
   // page is mounted, and clear it on the way out.

@@ -1,5 +1,6 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { fetchManifest } from "../api/client";
+import { useLiveRefresh } from "../api/live";
 import { SENSOR_CONFIGS } from "../config/sensors";
 import type { Manifest, SensorManifestEntry } from "../types";
 import { absoluteDate, isoDateTime } from "../utils/time";
@@ -218,7 +219,7 @@ export default function ManifestPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
+  const load = () => {
     fetchManifest()
       .then((data) => {
         setManifest(data);
@@ -228,7 +229,10 @@ export default function ManifestPage() {
         setError(String(e));
         setLoading(false);
       });
-  }, []);
+  };
+
+  // Every row here is a record count, so an arrival changes one of them.
+  useLiveRefresh(load);
 
   if (error)
     return (

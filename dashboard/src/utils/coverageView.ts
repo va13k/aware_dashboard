@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import type { CoverageLevel } from "../types";
+import { useLiveChanges } from "../api/live";
 import { browserTimezone } from "./time";
 
 /**
@@ -96,13 +97,18 @@ export function useCoverageView(): CoverageViewState {
 }
 
 /**
- * One grid, fetched for the current view.
+ * One grid, fetched for the current view and refetched as rows arrive.
  *
  * `stale` is derived by comparing what arrived against what is being asked for,
  * rather than by flipping a loading flag as the request goes out. That keeps the
  * effect free of synchronous state updates, and it keeps the previous grid on
  * screen while the next one loads — which matters when a reader is stepping
  * through days and a blank frame between each one reads as data disappearing.
+ *
+ * Arrivals land in the hour that is passing, so a grid that includes now gains a
+ * cell as data comes in. A grid of an earlier span is asked again and answers the
+ * same, which is the cost of not having to work out from here whether the span on
+ * screen reaches the present.
  */
 export function useCoverageGrid<T>(
   key: string,
@@ -118,6 +124,12 @@ export function useCoverageGrid<T>(
   // request, so the effect follows that rather than the function identity.
   const loader = useMemo(() => load, [key]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  const [arrivals, setArrivals] = useState(0);
+
+  // A change bumps a counter rather than fetching here, so the one effect below
+  // stays the only place a grid is loaded.
+  useLiveChanges(() => setArrivals((n) => n + 1));
+
   useEffect(() => {
     let live = true;
     loader()
@@ -130,7 +142,7 @@ export function useCoverageGrid<T>(
     return () => {
       live = false;
     };
-  }, [key, loader]);
+  }, [key, loader, arrivals]);
 
   return {
     grid: result?.grid ?? null,
