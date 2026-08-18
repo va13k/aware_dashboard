@@ -24,7 +24,9 @@ from sqlalchemy.exc import SQLAlchemyError
 
 from app.database import AndroidSessionLocal, IosSessionLocal
 from app.routers import auth
-from app.services import coverage_rollup, live_watch
+from app.routers.android import _EXPORT_MODELS as ANDROID_EXPORT_MODELS
+from app.routers.ios import _EXPORT_MODELS as IOS_EXPORT_MODELS
+from app.services import coverage_rollup, live_watch, sensor_tables
 
 logger = logging.getLogger("aware.live")
 
@@ -35,12 +37,28 @@ router = APIRouter(tags=["live"])
 UNAUTHORISED = 1008
 
 
+#: Which sensor each table belongs to, per platform. Read once: the export maps
+#: are the registry every other reader uses, so a table they do not claim is not
+#: something the interface can show.
+_SENSOR_BY_TABLE = {
+    "android": sensor_tables.sensor_by_table(ANDROID_EXPORT_MODELS),
+    "ios": sensor_tables.sensor_by_table(IOS_EXPORT_MODELS),
+}
+
+
+def _sensor_for(platform: str) -> dict:
+    return _SENSOR_BY_TABLE.get(platform, {})
+
+
 async def _watched_tables(db, platform: str) -> list[str]:
-    """The tables worth asking about: those the rollup has seen data in.
+    """The tables worth asking about: those the rollup has seen data in, and that
+    a sensor claims.
 
     Twenty of the fifty-nine have never held a row on this deployment, and an
     empty table cannot have gained one since the last tick. Taken from the rollup
-    rather than the schema so the list follows the study rather than the framework.
+    rather than the schema so the list follows the study rather than the framework,
+    and narrowed to what a tile could show, so no tick spends a query on a table
+    with nowhere to report to.
     """
     try:
         rows = (
@@ -52,16 +70,20 @@ async def _watched_tables(db, platform: str) -> list[str]:
         except SQLAlchemyError:
             pass
         return []
+    claimed = _sensor_for(platform)
     return [
         str(row[0])
         for row in rows
-        if row[0] and str(row[0]) not in coverage_rollup.SKIP_TABLES
+        if row[0]
+        and str(row[0]) not in coverage_rollup.SKIP_TABLES
+        and str(row[0]) in claimed
     ]
 
 
 watcher = live_watch.LiveWatch(
     sessions={"android": AndroidSessionLocal, "ios": IosSessionLocal},
     tables_for=_watched_tables,
+    sensor_for=_sensor_for,
 )
 
 

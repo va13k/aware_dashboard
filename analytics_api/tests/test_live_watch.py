@@ -83,15 +83,24 @@ class _Session:
         pass
 
 
-def watcher_for(state, tables=("battery",)):
+def watcher_for(state, tables=("battery",), sensors=None):
     def factory():
         return _Session(state)
 
     async def tables_for(db, platform):
         return list(tables)
 
+    # Android's tables map one-to-one onto sensors; an iPhone's `wifi` and `esm`
+    # each span two, which is what the summing exists for.
+    mapping = sensors or {table: table for table in tables}
+
+    def sensor_for(platform):
+        return mapping
+
     return live_watch.LiveWatch(
-        sessions={"android": factory}, tables_for=tables_for
+        sessions={"android": factory},
+        tables_for=tables_for,
+        sensor_for=sensor_for,
     )
 
 
@@ -115,7 +124,12 @@ async def test_rows_arriving_after_the_first_look_are_reported():
     state["new_rows"] = {"phone-a": 12}
 
     assert await watch._collect() == [
-        {"platform": "android", "table": "battery", "device_id": "phone-a", "records": 12}
+        {
+            "platform": "android",
+            "sensor": "battery",
+            "device_id": "phone-a",
+            "records": 12,
+        }
     ]
 
 
@@ -279,7 +293,9 @@ async def test_a_failing_tick_does_not_kill_the_loop():
         return ["battery"]
 
     watch = live_watch.LiveWatch(
-        sessions={"android": _Broken()}, tables_for=tables_for
+        sessions={"android": _Broken()},
+        tables_for=tables_for,
+        sensor_for=lambda platform: {"battery": "battery"},
     )
     watch.subscribe()
     watch.start()
@@ -287,3 +303,54 @@ async def test_a_failing_tick_does_not_kill_the_loop():
 
     assert watch._task is not None and not watch._task.done()
     await watch.stop()
+
+
+@pytest.mark.asyncio
+async def test_a_sensor_stored_in_two_tables_arrives_as_one_delta():
+    """An iPhone keeps `wifi` in `sensor_wifi` and `wifi`. A tile is a sensor, so
+    two tables gaining rows is one change of the sum -- not two changes naming
+    tables the interface has never heard of."""
+    state = {"max_ids": {"sensor_wifi": 100, "wifi": 200}, "new_rows": {}}
+    watch = watcher_for(
+        state,
+        tables=("sensor_wifi", "wifi"),
+        sensors={"sensor_wifi": "wifi", "wifi": "wifi"},
+    )
+    await watch._collect()
+
+    # Both tables advance by the same batch, three rows each.
+    state["max_ids"] = {"sensor_wifi": 103, "wifi": 203}
+    state["new_rows"] = {"phone-a": 3}
+
+    assert await watch._collect() == [
+        {"platform": "android", "sensor": "wifi", "device_id": "phone-a", "records": 6}
+    ]
+
+
+@pytest.mark.asyncio
+async def test_a_table_no_sensor_claims_reports_nothing():
+    """Android's `sensor_wifi` is claimed by no export entry, so a tile for it does
+    not exist. Reporting it would name a sensor the interface cannot show."""
+    state = {"max_ids": {"battery": 10, "sensor_wifi": 10}, "new_rows": {}}
+    watch = watcher_for(
+        state, tables=("battery", "sensor_wifi"), sensors={"battery": "battery"}
+    )
+    await watch._collect()
+
+    state["max_ids"] = {"battery": 10, "sensor_wifi": 15}
+    state["new_rows"] = {"phone-a": 5}
+
+    assert await watch._collect() == []
+
+
+@pytest.mark.asyncio
+async def test_an_unclaimed_table_still_advances_its_watermark():
+    """Otherwise every tick rescans the same rows it has already decided to ignore."""
+    state = {"max_ids": {"sensor_wifi": 10}, "new_rows": {}}
+    watch = watcher_for(state, tables=("sensor_wifi",), sensors={})
+    await watch._collect()
+
+    state["max_ids"] = {"sensor_wifi": 40}
+    await watch._collect()
+
+    assert watch._watermarks[("android", "sensor_wifi")] == 40

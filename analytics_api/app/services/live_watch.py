@@ -70,11 +70,15 @@ class Subscriber:
 class LiveWatch:
     """The shared loop, its subscribers, and the recent history they resume from."""
 
-    def __init__(self, sessions: dict, tables_for) -> None:
+    def __init__(self, sessions: dict, tables_for, sensor_for) -> None:
         #: `{platform: async_sessionmaker}`.
         self._sessions = sessions
         #: Called per platform, returns the tables worth watching.
         self._tables_for = tables_for
+        #: Called per platform, returns `{table: sensor}`. Platform-specific: an
+        #: iPhone stores `wifi` across two tables and `esm` across two more, where
+        #: every Android sensor is one table.
+        self._sensor_for = sensor_for
         self._subscribers: set[Subscriber] = set()
         self._history: deque = deque(maxlen=HISTORY)
         self._seq = 0
@@ -191,7 +195,12 @@ class LiveWatch:
             (platform, table) in self._watermarks for table in tables
         )
 
-        changes: list[dict] = []
+        sensor_by_table = self._sensor_for(platform)
+        # Summed per (device, sensor) rather than reported per table, because a
+        # tile is a sensor. On an iPhone `wifi` arrives in two tables, and two
+        # separate deltas naming tables would leave the interface to work out a
+        # mapping that only the API holds.
+        totals: dict[tuple[str, str], int] = {}
         for table, highest in current.items():
             key = (platform, table)
             previous = self._watermarks.get(key)
@@ -200,18 +209,23 @@ class LiveWatch:
             # ever stored as "just arrived" would be worse than saying nothing.
             if first_look or previous is None or highest <= previous:
                 continue
+            sensor = sensor_by_table.get(table)
+            if sensor is None:
+                continue
             for device_id, records in await self._new_rows(
                 db, table, previous, highest
             ):
-                changes.append(
-                    {
-                        "platform": platform,
-                        "table": table,
-                        "device_id": device_id,
-                        "records": records,
-                    }
-                )
-        return changes
+                totals[(device_id, sensor)] = totals.get((device_id, sensor), 0) + records
+
+        return [
+            {
+                "platform": platform,
+                "sensor": sensor,
+                "device_id": device_id,
+                "records": records,
+            }
+            for (device_id, sensor), records in sorted(totals.items())
+        ]
 
     async def _max_ids(self, db, tables: list[str]) -> dict[str, int]:
         """The highest `_id` in each table, in one statement.
