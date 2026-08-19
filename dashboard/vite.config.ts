@@ -10,6 +10,10 @@ export default defineConfig({
       '/api': {
         target: 'http://localhost:8000',
         changeOrigin: true,
+        // The live channel is a WebSocket, and the dev proxy forwards an upgrade
+        // only when asked to. Without this `/api/live` fails to connect in `npm
+        // run dev` while working in a deployment, where Nginx does the upgrade.
+        ws: true,
         rewrite: path => path.replace(/^\/api/, ''),
       },
     },
