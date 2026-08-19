@@ -18,6 +18,13 @@ A watcher built on it would look live and silently miss changes, so the tables a
 asked directly — but in one statement rather than one round trip each, and only the
 tables the rollup has ever seen data in.
 
+**Which tables those are is read on a slower clock than the tick.** The list grows
+only when the rollup first folds rows from a table it has never seen, and that
+happens on the refresher's pass rather than this loop's. Asking every tick would
+spend a statement per platform to be told the same thing thirty times over, so the
+answer is kept for `TABLE_LIST_SECONDS` and a quiet tick costs one statement per
+platform that has tables rather than two.
+
 Deltas are per `(device, sensor)`: the count of rows that arrived in the tick. That
 is what a tile shows, so a subscriber can apply the change without asking anything
 further. A sensor spread over two tables sums, the same way every other reader
@@ -52,6 +59,12 @@ TICK_SECONDS = 2.0
 #: connection rather than the study going quiet.
 HEARTBEAT_SECONDS = 20.0
 
+#: How long the watched-table list is trusted before being read again. Matched to
+#: the refresher's own interval, because that pass is the only thing that can add a
+#: table to the list: a new sensor becomes watched within a minute of its first
+#: rows being folded in, and the tick stops paying for the question in between.
+TABLE_LIST_SECONDS = 60.0
+
 #: Messages kept for a subscriber that reconnects and asks to carry on. Bounded:
 #: a client further behind than this is told to refetch rather than replayed.
 HISTORY = 200
@@ -81,7 +94,8 @@ class LiveWatch:
     def __init__(self, sessions: dict, tables_for, sensor_for, refresh) -> None:
         #: `{platform: async_sessionmaker}`.
         self._sessions = sessions
-        #: Called per platform, returns the tables worth watching.
+        #: Called per platform, returns the tables worth watching -- or `None`
+        #: when it could not find out, which is not the same answer as "none".
         self._tables_for = tables_for
         #: Called per platform, returns `{table: sensor}`. Platform-specific: an
         #: iPhone stores `wifi` across two tables and `esm` across two more, where
@@ -95,6 +109,9 @@ class LiveWatch:
         self._seq = 0
         #: `{(platform, table): highest _id folded in}`.
         self._watermarks: dict[tuple[str, str], int] = {}
+        #: The watched list per platform, and the monotonic time each was read at.
+        self._tables: dict[str, list[str]] = {}
+        self._tables_read_at: dict[str, float] = {}
         self._task: asyncio.Task | None = None
         self._wake = asyncio.Event()
 
@@ -150,6 +167,10 @@ class LiveWatch:
             # Nothing is listening; stop looking until something is.
             self._wake.clear()
             self._watermarks.clear()
+            # Dropped with them: the study may gain a sensor while nobody watches,
+            # and the next subscriber should not inherit a list from before that.
+            self._tables.clear()
+            self._tables_read_at.clear()
 
     @property
     def subscriber_count(self) -> int:
@@ -217,8 +238,28 @@ class LiveWatch:
                 changes.extend(await self._collect_platform(db, platform))
         return changes
 
-    async def _collect_platform(self, db, platform: str) -> list[dict]:
+    async def _watched(self, db, platform: str) -> list[str]:
+        """The tables worth asking about, remembered between ticks.
+
+        A read that fails leaves the previous list in place rather than emptying
+        it. The tables already known have not stopped existing, and a watcher that
+        went blind on one bad query would stay blind until something subscribed
+        again.
+        """
+        now = time.monotonic()
+        read_at = self._tables_read_at.get(platform)
+        if read_at is not None and now - read_at < TABLE_LIST_SECONDS:
+            return self._tables[platform]
+
         tables = await self._tables_for(db, platform)
+        if tables is None:
+            return self._tables.get(platform, [])
+        self._tables[platform] = tables
+        self._tables_read_at[platform] = now
+        return tables
+
+    async def _collect_platform(self, db, platform: str) -> list[dict]:
+        tables = await self._watched(db, platform)
         if not tables:
             return []
 

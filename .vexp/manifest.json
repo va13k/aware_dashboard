@@ -68,9 +68,9 @@
     "AWARE-Configurator/reactapp/src/setupTests.js": "efdfe426174f7d3c04966c9d3bbbd3eaffc975c1616c9d3135401849fc9fdb10",
     "AWARE-Configurator/start.sh": "2f4a9f26bbc2b4d215e502f1c22ff9f8997661abd53db5533dd89b7150a54cba",
     "AWARE-Configurator/util/gunicorn.conf.py": "1b16da2f9e46b7c241a2a56e12d286ac1fd87c8b53b68769e328985fd6b96856",
-    "README.md": "cb666db27ff44a487ad32aabc492f12c7f699906c3d5e5d1031ccaed4018cd7a",
+    "README.md": "d8a845965997067c0e05b547bc71dbf4e2231f247b4a0d121b2a57a69606549f",
     "analytics_api/Dockerfile": "6e6eb8bb501c9edc390478d0d23e6fa9f24b3e9b212e6a2414697c2a7f02e199",
-    "analytics_api/README.md": "fb0f978ff12671d21549faed179d7b11b857a365f05dee187363eb8b6e193750",
+    "analytics_api/README.md": "25747a0a6d3c39f1537c71e9edc3fb4e206753143df14fd6ed8b4beffd648606",
     "analytics_api/app/__init__.py": "af1349b9f5f9a1a6a0404dea36dcc9499bcb25c9adc112b7cc9a93cae41f3262",
     "analytics_api/app/database.py": "d1f132c400343e280275261c365e52ed0cc514fdbc526e6729f53102411ffe2b",
     "analytics_api/app/main.py": "4f241ada7b634ea666a933a45ae88edb43618374fdedafa3a610359568f55c98",
@@ -183,7 +183,7 @@
     "dashboard/src/utils/stats.ts": "0c9571e4f8ea03d4e3f4484449ce51e90382e218e77dd20ffc16ade63c50e534",
     "dashboard/src/utils/time.ts": "61a5e848494686321116eb6eee237d458ae6226ff03f1a96741f8690ac0b9e1a",
     "dashboard/src/utils/timeRange.ts": "7b15fd0ea7e26f0316f22820f17ba9b2901105f270dea45993b6e023e4beba19",
-    "dashboard/vite.config.ts": "40f284df10761043fff2560ddc1da546b70e010c70f1f2e0d11cb8389b8f4b9c",
+    "dashboard/vite.config.ts": "19aaa8651c2a6d51208309a78aa4fd86bbef595998900f6f7d1181c8ce7f9a02",
     "db/00-bootstrap.sql": "702ddc1cbcfb73e83ada5c076d80f521f0a63f1fda084d4d1c74f3f3ed9aaa7a",
     "db/android-tables.sql": "224baecdd6981cc8a02283c833340089898c1126ff60f0a4a8a993ab8beeb386",
     "db/build_init_all.py": "6dca4419ad3e821ca741da951ddc9f52c3790152a31d0bafa98e134c32652c7a",
@@ -213,13 +213,13 @@
     "shared_config/source_store.py": "ceaf715a4f7aa1198409553bed5ab30ab761f23c6f6db02140ee2e84148aa1f9",
     "shared_config/test_serializers.py": "d7614beeadecc7e75fcf9671fbc58ae7c8d9ce338a9cc21480128038ccd23fdb"
   },
-  "indexed_at_commit": "5d432dcf8218f9edb36d8a7ddfe8206fd66d98c2",
-  "indexed_at_timestamp": "2026-08-18T10:03:38.775582+00:00",
+  "indexed_at_commit": "c4d3cfd7c70a36fb7f6ad287f9ce979c39a26a92",
+  "indexed_at_timestamp": "2026-08-19T11:00:14.383228+00:00",
   "schema_version": 3,
   "stats": {
-    "total_edges": 2235,
+    "total_edges": 2236,
     "total_files": 212,
-    "total_nodes": 2122
+    "total_nodes": 2123
   },
   "vexp_version": "2.5.2"
 }

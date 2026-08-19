@@ -1,6 +1,6 @@
 """The shared watcher behind the live channel.
 
-Four things here are the ones that would be wrong silently.
+Five things here are the ones that would be wrong silently.
 
 A first look must report nothing. The watcher learns where each table stands before
 it can say what arrived, and announcing every row ever stored as "just now" would
@@ -13,8 +13,13 @@ Resume must be honest. A client naming a sequence the history still covers gets 
 gap; one naming an older sequence is told to refetch, because a skipped message
 would leave a tile wrong with nothing to correct it.
 
-And a heartbeat must not consume a sequence number: it carries no news, so a client
+A heartbeat must not consume a sequence number: it carries no news, so a client
 resuming from it would claim to have seen a change it never received.
+
+And the watched-table list, which is remembered between ticks so a quiet study is
+not asked the same question every two seconds, must still be re-read: a sensor
+whose first rows land mid-study would otherwise stay invisible for as long as the
+dashboard was left open.
 """
 
 import asyncio
@@ -88,7 +93,12 @@ def watcher_for(state, tables=("battery",), sensors=None):
         return _Session(state)
 
     async def tables_for(db, platform):
-        return list(tables)
+        state["table_reads"] = state.get("table_reads", 0) + 1
+        # `None` is "could not ask", which the watcher must not read as
+        # "there is nothing to watch".
+        if state.get("tables_unreadable"):
+            return None
+        return list(state.get("tables", tables))
 
     async def refresh():
         # Counts how many times a tick brought the caches up to what it saw.
@@ -178,6 +188,104 @@ async def test_watermarks_are_asked_for_in_one_statement():
     assert session.statements[0].count("UNION ALL") == 2
 
 
+@pytest.mark.asyncio
+async def test_the_watched_list_is_not_read_again_every_tick():
+    """It changes only when the rollup first folds rows from a table it has never
+    seen, which is the refresher's pass rather than this loop's. Asking every tick
+    buys the same answer thirty times over."""
+    state = {"max_ids": {"battery": 500}, "new_rows": {}}
+    watch = watcher_for(state)
+
+    for _ in range(5):
+        await watch._collect()
+
+    assert state["table_reads"] == 1
+
+
+@pytest.mark.asyncio
+async def test_the_watched_list_is_read_again_once_its_interval_passes():
+    state = {"max_ids": {"battery": 500}, "new_rows": {}}
+    watch = watcher_for(state)
+    await watch._collect()
+
+    # Age the cached answer rather than waiting a minute for it to age itself.
+    watch._tables_read_at["android"] -= live_watch.TABLE_LIST_SECONDS + 1
+    await watch._collect()
+
+    assert state["table_reads"] == 2
+
+
+@pytest.mark.asyncio
+async def test_a_sensor_arriving_mid_study_starts_being_watched():
+    """The case the cache could have broken: a table the rollup had never seen
+    gains its first rows, and the tile for it must start moving without anyone
+    reopening the page."""
+    state = {"max_ids": {"battery": 500}, "new_rows": {}}
+    watch = watcher_for(
+        state,
+        tables=("battery",),
+        sensors={"battery": "battery", "screen": "screen"},
+    )
+    await watch._collect()
+
+    state["tables"] = ("battery", "screen")
+    state["max_ids"] = {"battery": 500, "screen": 40}
+    watch._tables_read_at["android"] -= live_watch.TABLE_LIST_SECONDS + 1
+    # The new table gets a first look of its own, which reports nothing.
+    assert await watch._collect() == []
+
+    state["max_ids"]["screen"] = 47
+    state["new_rows"] = {"phone-a": 7}
+
+    assert await watch._collect() == [
+        {
+            "platform": "android",
+            "sensor": "screen",
+            "device_id": "phone-a",
+            "records": 7,
+        }
+    ]
+
+
+@pytest.mark.asyncio
+async def test_a_failed_read_keeps_the_list_it_had():
+    """A bad query is not an empty study. Emptying the list on one failure would
+    stop every tile moving until something resubscribed."""
+    state = {"max_ids": {"battery": 500}, "new_rows": {}}
+    watch = watcher_for(state)
+    await watch._collect()
+
+    state["tables_unreadable"] = True
+    watch._tables_read_at["android"] -= live_watch.TABLE_LIST_SECONDS + 1
+    state["max_ids"]["battery"] = 509
+    state["new_rows"] = {"phone-a": 9}
+
+    assert await watch._collect() == [
+        {
+            "platform": "android",
+            "sensor": "battery",
+            "device_id": "phone-a",
+            "records": 9,
+        }
+    ]
+
+
+@pytest.mark.asyncio
+async def test_a_failed_read_is_retried_rather_than_remembered():
+    """Caching the failure would hold the stale list for the whole interval; the
+    retry is what keeps a transient error costing one tick."""
+    state = {"max_ids": {"battery": 500}, "new_rows": {}}
+    watch = watcher_for(state)
+    await watch._collect()
+
+    state["tables_unreadable"] = True
+    watch._tables_read_at["android"] -= live_watch.TABLE_LIST_SECONDS + 1
+    await watch._collect()
+    await watch._collect()
+
+    assert state["table_reads"] == 3
+
+
 def test_the_loop_idles_until_something_subscribes():
     watch = watcher_for({"max_ids": {}, "new_rows": {}})
 
@@ -199,6 +307,20 @@ def test_a_departing_subscriber_leaves_no_watermarks_behind():
     watch.unsubscribe(subscriber)
 
     assert watch._watermarks == {}
+
+
+def test_a_departing_subscriber_leaves_no_table_list_behind():
+    """A study can gain a sensor while nobody is watching, so the next subscriber
+    reads the list fresh rather than inheriting one from before it left."""
+    watch = watcher_for({"max_ids": {}, "new_rows": {}})
+    watch._tables["android"] = ["battery"]
+    watch._tables_read_at["android"] = 1.0
+
+    subscriber, _, _ = watch.subscribe()
+    watch.unsubscribe(subscriber)
+
+    assert watch._tables == {}
+    assert watch._tables_read_at == {}
 
 
 def test_two_subscribers_share_one_loop():

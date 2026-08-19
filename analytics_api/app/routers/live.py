@@ -51,7 +51,7 @@ def _sensor_for(platform: str) -> dict:
     return _SENSOR_BY_TABLE.get(platform, {})
 
 
-async def _watched_tables(db, platform: str) -> list[str]:
+async def _watched_tables(db, platform: str) -> list[str] | None:
     """The tables worth asking about: those the rollup has seen data in, and that
     a sensor claims.
 
@@ -60,6 +60,10 @@ async def _watched_tables(db, platform: str) -> list[str]:
     rather than the schema so the list follows the study rather than the framework,
     and narrowed to what a tile could show, so no tick spends a query on a table
     with nowhere to report to.
+
+    The watcher asks for this on its own slower clock rather than every tick, and
+    reads `None` as "keep the list you have" rather than "there is nothing to
+    watch" -- so a failed read here costs nothing until the study really changes.
     """
     try:
         rows = (
@@ -70,7 +74,7 @@ async def _watched_tables(db, platform: str) -> list[str]:
             await db.rollback()
         except SQLAlchemyError:
             pass
-        return []
+        return None
     claimed = _sensor_for(platform)
     return [
         str(row[0])
