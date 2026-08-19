@@ -1,5 +1,5 @@
 export type StudyEnrollmentStatus = "in_study" | "left_study" | "unknown";
-export type StudyConfigStatus = "current" | "stale" | "unknown";
+export type StudyConfigStatus = "current" | "differs" | "unknown";
 export type StudyConfigStatusReason = "no_device_config" | "no_server_config";
 export type StudyConsentContext = "initial" | "study_update";
 export type StudyEventKind =

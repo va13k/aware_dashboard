@@ -74,8 +74,14 @@ export function EnrollmentBadge({
 /**
  * How the phone's installed config compares with the deployed one.
  *
- * A stale config reports how many fields differ, because "stale" alone does not
- * say whether one sampling rate moved or the whole study changed.
+ * All three labels lead with "Config" so a row of badges can be scanned down, and
+ * the differing one carries a count, because knowing that something differs does
+ * not say whether one sampling rate moved or the whole study changed.
+ *
+ * Deliberately not called "stale". A config does not go off with age -- it says
+ * something different from what the study now asks for, which a phone can reach by
+ * refusing an update or by being set up before the study changed. The word is also
+ * wanted for its real meaning elsewhere: a sensor that has stopped reporting.
  */
 export function ConfigBadge({
   status,
@@ -87,20 +93,20 @@ export function ConfigBadge({
   if (status === "current") {
     return (
       <Badge tone="teal" title="Matches the deployed study configuration">
-        Current config
+        Config matches
       </Badge>
     );
   }
 
-  if (status === "stale") {
+  if (status === "differs") {
     return (
       <Badge
         tone="amber"
-        title={`Differs from the deployed configuration in ${diffCount} field${
+        title={`${diffCount} setting${
           diffCount === 1 ? "" : "s"
-        }`}
+        } differ from the deployed study configuration`}
       >
-        {diffCount > 0 ? `Stale · ${diffCount}` : "Stale config"}
+        {diffCount > 0 ? `Config differs · ${diffCount}` : "Config differs"}
       </Badge>
     );
   }

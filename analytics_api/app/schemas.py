@@ -455,7 +455,7 @@ class ConfigDiffRowSchema(_Derived):
 
 
 class ConfigDiffSchema(_Derived):
-    config_status: Literal["current", "stale", "unknown"] = "unknown"
+    config_status: Literal["current", "differs", "unknown"] = "unknown"
     status_reason: Literal["no_device_config", "no_server_config"] | None = None
     config_update_enabled: bool = False
     device_config_update_enabled: bool = False
@@ -470,7 +470,7 @@ class AndroidStudyListSummarySchema(_Derived):
 
     enrollment_status: Literal["in_study", "left_study", "unknown"] = "unknown"
     last_study_event_at: float | None = None
-    config_status: Literal["current", "stale", "unknown"] = "unknown"
+    config_status: Literal["current", "differs", "unknown"] = "unknown"
     diff_count: int = 0
 
 

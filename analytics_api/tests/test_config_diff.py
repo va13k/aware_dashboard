@@ -118,7 +118,7 @@ def test_a_changed_sampling_frequency_is_reported():
     diff = config_diff.compare(server, device)
     row = diff.rows[0]
 
-    assert diff.config_status == config_diff.STALE
+    assert diff.config_status == config_diff.DIFFERS
     assert diff.diff_count == 1
     assert row.path == "sensors.frequency_accelerometer"
     assert row.kind == config_diff.CHANGED
@@ -362,7 +362,7 @@ def test_current_means_no_rows_and_stale_means_some(device_factory):
     if diff.config_status == config_diff.CURRENT:
         assert diff.rows == []
     else:
-        assert diff.config_status == config_diff.STALE
+        assert diff.config_status == config_diff.DIFFERS
         assert diff.rows
 
 
@@ -375,7 +375,7 @@ def test_the_status_agrees_with_the_fingerprint():
     )
 
     assert same is False
-    assert config_diff.compare(server, device).config_status == config_diff.STALE
+    assert config_diff.compare(server, device).config_status == config_diff.DIFFERS
 
 
 # --- against the deployed config -------------------------------------------

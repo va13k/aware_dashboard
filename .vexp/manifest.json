@@ -163,7 +163,7 @@
     "dashboard/src/components/SensorTimeSeriesCard.tsx": "910fed63b5763bb310cf632e16b23559e07808bb0d99ebfe585bf6cbce755faa",
     "dashboard/src/components/SensorViewFilter.tsx": "1f59a67fcc238550534e968a5c814d8d5d9a542083bc937b1000454b3d561a06",
     "dashboard/src/components/SeriesChart.tsx": "cbe0abd81f2454922d5c92aefe2ab11d812f9b42707dc8528744a2fc2c4e7173",
-    "dashboard/src/components/StudyBadges.tsx": "5fc0a6235197164472785115b4a5109e4cf224801c70a6c835d182f625ff9b72",
+    "dashboard/src/components/StudyBadges.tsx": "b57746f70ec830d06e78920ba23c4d19d452a1be441474715551fa5ad3ad8a34",
     "dashboard/src/components/StudyEventsTimeline.tsx": "ba5af5aa1aa2549e0ad1627f202e24d575f3664992896e17f0e594cb5534696b",
     "dashboard/src/components/StudyStatusPanel.tsx": "010ff42901c06d1d8ec74723b551f419ed6597804ce9560a7817f19573b63e0a",
     "dashboard/src/components/TimezoneRecordsCard.tsx": "1a392f0e9f2cb039f699e840192989b99b7563641136785674213aa90839dcaf",
@@ -213,11 +213,11 @@
     "shared_config/source_store.py": "ceaf715a4f7aa1198409553bed5ab30ab761f23c6f6db02140ee2e84148aa1f9",
     "shared_config/test_serializers.py": "d7614beeadecc7e75fcf9671fbc58ae7c8d9ce338a9cc21480128038ccd23fdb"
   },
-  "indexed_at_commit": "70047d9d8e243aa37b98aa0bc2812dcb99c087d8",
-  "indexed_at_timestamp": "2026-08-19T12:21:24.449917+00:00",
+  "indexed_at_commit": "f41457ad1b882373999025290709516c97d1f192",
+  "indexed_at_timestamp": "2026-08-19T12:44:17.514250+00:00",
   "schema_version": 3,
   "stats": {
-    "total_edges": 2239,
+    "total_edges": 2237,
     "total_files": 212,
     "total_nodes": 2123
   },

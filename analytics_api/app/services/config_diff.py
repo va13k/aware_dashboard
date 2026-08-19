@@ -7,7 +7,7 @@ A credential can never reach a diff row, because the redaction happens before th
 comparison rather than being filtered out of the result afterwards.
 
 `config_status` and the diff rows are derived from the same content, so a phone
-cannot read `current` while showing differing fields, and it cannot read `stale`
+cannot read `current` while showing differing fields, and it cannot read `differs`
 with nothing to show. `createdAt` and `updatedAt` are excluded from that content -
 re-saving a config moves them without changing a setting - so they are reported
 as plain version indicators instead of as differences.
@@ -19,7 +19,11 @@ from typing import Any
 from app.services import study_config
 
 CURRENT = "current"
-STALE = "stale"
+#: The phone carries settings that disagree with the deployed study. Named for what
+#: it is rather than "stale": the config has not gone off with age, it says
+#: something different from what the study now asks for -- and a sensor that has
+#: stopped reporting is a separate question that wants that word for itself.
+DIFFERS = "differs"
 UNKNOWN = "unknown"
 
 CHANGED = "changed"
@@ -140,7 +144,7 @@ def compare(server: dict | None, device: dict | None) -> ConfigDiff:
     _walk("", study_config.comparable(server), study_config.comparable(device), rows)
 
     return ConfigDiff(
-        config_status=CURRENT if not rows else STALE,
+        config_status=CURRENT if not rows else DIFFERS,
         diff_count=len(rows),
         rows=rows,
         **flags,
