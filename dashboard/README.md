@@ -29,7 +29,7 @@ Routed under the `/dashboard` basename (`src/App.tsx`).
 
 The pages do not poll for changes. The API watches the databases once, on one
 shared loop, and pushes a message over a WebSocket when rows arrive; `src/api/live.ts`
-is the browser's half of that. Four ideas in it are worth knowing before changing
+is the browser's half of that. Five ideas in it are worth knowing before changing
 anything nearby.
 
 **One socket for the whole page.** Readers subscribe to a module-level connection
@@ -62,7 +62,22 @@ Two hooks are the whole public surface:
 | `useLiveRefresh(load, device?)` | A page that should load now, on arrival, and on a timer. Pass a `device_id` and it ignores other phones' arrivals |
 | `useLiveChanges(onArrival)`     | A reader that already knows when to fetch and only needs telling that there is something new |
 
-`useLiveState()` returns `"connecting" | "open" | "offline"`. Nothing draws it yet.
+**The state is on screen.** `LiveStatus` sits in the global header and draws a dot
+and a label, because a dead channel and a quiet study otherwise look identical —
+both are a page that does not change. The counts stay correct either way, but
+"nothing is arriving" and "nothing is reaching me" are different facts and only one
+is about the study.
+
+Two rules keep it from crying wolf. A recovery is drawn at once, while a drop is
+drawn only once it has lasted 2.5 seconds — reconnects are ordinary and a badge
+that flipped on each one would be ignored. And a socket closed because no page is
+listening is not reported at all: the logs page subscribes no readers, and calling
+that an outage would report the interface's own choice back at it.
+
+| Hook                     | Returns                                                              |
+| ------------------------ | ---------------------------------------------------------------------- |
+| `useLiveState()`         | `"connecting" \| "open" \| "offline"` — the truth now, for deciding how often to poll |
+| `useSettledLiveState()`  | The same, or `null` while it is not worth saying — for drawing            |
 
 ---
 
