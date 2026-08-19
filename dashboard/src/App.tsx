@@ -13,6 +13,7 @@ import DevicesPage from "./pages/DevicesPage";
 import DeviceDetailPage from "./pages/DeviceDetailPage";
 import ManifestPage from "./pages/ManifestPage";
 import LogsPage from "./pages/LogsPage";
+import LiveStatus from "./components/LiveStatus";
 import { HeaderSlotContext, useHeaderSlot } from "./utils/headerSlot";
 
 function Layout() {
@@ -70,26 +71,29 @@ function Layout() {
             </Link>
           )}
         </div>
-        <nav className="flex gap-1">
-          {[
-            { to: "/", label: "Overview", end: true },
-            { to: "/devices", label: "Devices", end: false },
-          ].map(({ to, label, end }) => (
-            <NavLink
-              key={to}
-              to={to}
-              end={end}
-              className={({ isActive }) =>
-                `px-3.5 py-1.5 rounded-lg text-[14px] font-medium transition-colors cursor-pointer border-none no-underline ` +
-                (isActive
-                  ? "bg-teal-soft text-teal"
-                  : "bg-transparent text-sage hover:bg-teal-soft/50 hover:text-ink")
-              }
-            >
-              {label}
-            </NavLink>
-          ))}
-        </nav>
+        <div className="flex items-center gap-1">
+          <LiveStatus />
+          <nav className="flex gap-1">
+            {[
+              { to: "/", label: "Overview", end: true },
+              { to: "/devices", label: "Devices", end: false },
+            ].map(({ to, label, end }) => (
+              <NavLink
+                key={to}
+                to={to}
+                end={end}
+                className={({ isActive }) =>
+                  `px-3.5 py-1.5 rounded-lg text-[14px] font-medium transition-colors cursor-pointer border-none no-underline ` +
+                  (isActive
+                    ? "bg-teal-soft text-teal"
+                    : "bg-transparent text-sage hover:bg-teal-soft/50 hover:text-ink")
+                }
+              >
+                {label}
+              </NavLink>
+            ))}
+          </nav>
+        </div>
       </header>
       <main className="px-6 py-6 w-full max-w-350 mx-auto">
         <Routes>

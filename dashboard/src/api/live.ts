@@ -53,6 +53,12 @@ const SILENCE_MS = 50_000;
 // overnight is not asking every second by morning.
 const BACKOFF_MS = [1_000, 2_000, 4_000, 8_000, 15_000, 30_000];
 
+// How long a drop must last before the interface is told about it. A reconnect is
+// ordinary -- a server restart, a laptop waking, a browser dropping an idle socket
+// -- and an indicator that flipped on each one would cry wolf often enough to be
+// ignored. Recovery is reported at once; only bad news waits.
+const SETTLE_MS = 2_500;
+
 // A reader leaving is given a moment before the connection goes, because leaving
 // and arriving in the same instant is ordinary: React remounts effects, and moving
 // between two pages that both listen hands the channel from one to the other.
@@ -66,9 +72,13 @@ export const POLL_WITHOUT_CHANNEL_MS = 60_000;
 
 const readers = new Set<Reader>();
 const stateWatchers = new Set<() => void>();
+const settledWatchers = new Set<() => void>();
 
 let socket: WebSocket | null = null;
 let state: LiveState = "offline";
+/** The state worth drawing: `null` until one has lasted long enough to mean something. */
+let settled: LiveState | null = null;
+let settleTimer: number | null = null;
 /** The newest sequence seen, so a reconnect resumes rather than starts over. */
 let lastSeq: number | null = null;
 let attempt = 0;
@@ -82,6 +92,26 @@ function announce(next: LiveState) {
   if (state === next) return;
   state = next;
   stateWatchers.forEach((notify) => notify());
+  settle(next);
+}
+
+function settle(next: LiveState) {
+  settleTimer = clearTimer(settleTimer);
+  if (next === "open") {
+    // Recovery is not in doubt, so it is drawn the moment it happens.
+    announceSettled("open");
+    return;
+  }
+  settleTimer = window.setTimeout(() => {
+    settleTimer = null;
+    announceSettled(next);
+  }, SETTLE_MS);
+}
+
+function announceSettled(next: LiveState | null) {
+  if (settled === next) return;
+  settled = next;
+  settledWatchers.forEach((notify) => notify());
 }
 
 function clearTimer(id: number | null) {
@@ -160,7 +190,9 @@ function open() {
 
   const scheme = window.location.protocol === "https:" ? "wss:" : "ws:";
   const resume = lastSeq === null ? "" : `?since=${lastSeq}`;
-  const ws = new WebSocket(`${scheme}//${window.location.host}${PATH}${resume}`);
+  const ws = new WebSocket(
+    `${scheme}//${window.location.host}${PATH}${resume}`,
+  );
   socket = ws;
   announce("connecting");
 
@@ -205,6 +237,11 @@ function shutdown() {
   socket = null;
   closing?.close();
   announce("offline");
+  // Closed because nothing on this page is listening, not because anything broke.
+  // The logs page subscribes to no readers at all, and an indicator that called
+  // that an outage would be reporting the interface's own choice back at it.
+  settleTimer = clearTimer(settleTimer);
+  announceSettled(null);
 }
 
 function subscribe(reader: Reader): () => void {
@@ -226,6 +263,11 @@ function watchState(notify: () => void): () => void {
   return () => stateWatchers.delete(notify);
 }
 
+function watchSettled(notify: () => void): () => void {
+  settledWatchers.add(notify);
+  return () => settledWatchers.delete(notify);
+}
+
 /**
  * Whether the channel is carrying changes right now.
  *
@@ -238,6 +280,22 @@ export function useLiveState(): LiveState {
     watchState,
     () => state,
     () => "offline" as LiveState,
+  );
+}
+
+/**
+ * The channel's state as an interface should draw it.
+ *
+ * `null` means "not worth saying yet" -- the first moments of a page load, before
+ * a connection has either succeeded or stayed down long enough to be news. Differs
+ * from `useLiveState` only in that timing: a reader deciding how often to poll wants
+ * the truth immediately, while a badge in the header wants it to have settled.
+ */
+export function useSettledLiveState(): LiveState | null {
+  return useSyncExternalStore(
+    watchSettled,
+    () => settled,
+    () => null,
   );
 }
 

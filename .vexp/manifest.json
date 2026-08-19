@@ -130,9 +130,9 @@
     "aware-micro-server/src/main/kotlin/com/awareframework/micro/WebsocketVerticle.kt": "4cf14eaf205e8f0f986f964eb673cf3d62604f19b1f58f18a3bc9ea98366070f",
     "aware-micro-server/src/test/kotlin/com/awareframework/micro/TestMainVerticle.kt": "acab4464d6d254ecaab831d081cefcc3a929ee4003803655270bf11474b1d952",
     "dashboard/Dockerfile": "99966cfd5828c77a183ab70fe2c2f98d47cfb721ec77a53a195c361bb729defc",
-    "dashboard/README.md": "782f2c18441c4dfe79ec3c119f683ef8b4cc4b254ea3bfd1edd0b58233c3d7a0",
+    "dashboard/README.md": "a9c1b98f9af1935a9d7c86d69c533e125ab5b774d139330978fd45d33f840fbf",
     "dashboard/eslint.config.js": "aca28c59ed36fcb61767d95ac0f53b32021918bef6550e61ae5830658834e643",
-    "dashboard/src/App.tsx": "19eaba942405419092ebd9387a15c3637d676901f0849e38f450d79823e00f6d",
+    "dashboard/src/App.tsx": "c7f1901602eddf482b923edc6a4f25137507a7040ea0f56c6005ab64c5ab1f45",
     "dashboard/src/api/client.ts": "69d5299b6c31004adb776ac646b95322c11efa152128f67d8dc15c71f4c87a60",
     "dashboard/src/components/AccelerometerRecordsCard.tsx": "a9fa79ff68c18431dde4c1e368577526924fc477681e1839b5a0c9cbec1058dd",
     "dashboard/src/components/ActivityCard.tsx": "4cce68f3ad3eee6316d45dc79436578d7a48d64f8ff44e9a6e8f3f21093b5afc",
@@ -213,11 +213,11 @@
     "shared_config/source_store.py": "ceaf715a4f7aa1198409553bed5ab30ab761f23c6f6db02140ee2e84148aa1f9",
     "shared_config/test_serializers.py": "d7614beeadecc7e75fcf9671fbc58ae7c8d9ce338a9cc21480128038ccd23fdb"
   },
-  "indexed_at_commit": "33ee3c5ba18abe18adf45d9e53502c27de97b86f",
-  "indexed_at_timestamp": "2026-08-19T11:10:34.817990+00:00",
+  "indexed_at_commit": "cf68bc1a2b2dd643bd049a0e6d639fe12703312e",
+  "indexed_at_timestamp": "2026-08-19T12:21:04.224512+00:00",
   "schema_version": 3,
   "stats": {
-    "total_edges": 2236,
+    "total_edges": 2239,
     "total_files": 212,
     "total_nodes": 2123
   },
