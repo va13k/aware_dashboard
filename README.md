@@ -39,7 +39,7 @@ Once a participant joins a study (by scanning a QR code or entering a study URL)
 >
 > ![iPhone upload button](docs/images/iphone-upload-data.png)
 >
-> Remind participants to sync regularly — especially before any scheduled data collection session ends.
+> Remind participants to sync regularly — especially before any scheduled data collection session ends. Syncing is also how a phone picks up a changed study configuration, so a participant who syncs often stays current on both counts.
 
 ## Prerequisites
 
@@ -481,19 +481,9 @@ Shows a summary of the complete study configuration. When everything looks corre
 
 ---
 
-> **Important — participants must manually apply config updates.**
+> **Config changes reach participants when their app next syncs.**
 >
-> Every time you change anything in the Configurator and download a new study config, participants will not pick up the changes automatically. They need to refresh the study config from inside the AWARE app:
->
-> - **Android** — open the AWARE app and tap the **CHECK FOR STUDY UPDATES** button.
->
-> ![The android configuration update button](docs/images/android-check-study-updates.png)
->
-> - **iPhone** — open the AWARE app and tap the **update button** in the top-right corner, to the left of the QR-code button.
->
-> ![The iphone configuration update button](docs/images/ios-update-button.png)
->
-> Until participants do this, their app continues running the old configuration.
+> Every time you change anything in the Configurator and download a new study config, participants pick the changes up the next time they sync or upload their data — the same action described under [Client apps](#client-apps). There is no separate update step for them to remember.
 
 ### 6. Browse collected data in the Analytics Dashboard
 
@@ -510,7 +500,11 @@ The default view gives a cross-device snapshot of the entire dataset.
 - **Manifest** button — opens the Manifest page (see below).
 - **Sensor cards grid** — one card per sensor type, organised into three sections: Shared (available on both platforms), Android only, and iPhone only. Each card shows the record count for Android and iOS and a small visual indicator of the data. Sensors with no data are shown in a muted style.
 - **"Only sensors with records" toggle** — hides sensor cards that have received no data yet, letting you focus on what's actually been collected. The preference is saved in the browser and persists across sessions and page refreshes.
-- The entire page **auto-refreshes every 60 seconds** without any user action.
+- The entire page **updates itself as data arrives**, without any user action. The
+  API watches the databases on one shared loop and pushes a message over a WebSocket
+  when new rows land, so the counts follow the study rather than a timer. A slower
+  poll — five minutes — runs alongside it as a safety net, dropping back to every 60
+  seconds if the connection is lost.
 
 ---
 
@@ -524,7 +518,9 @@ Drill down into an individual participant's data.
 - **ZIP export** button — downloads all sensor CSVs for that device in one archive.
 - **Sensor cards** — the same sensor card grid as the Overview, but scoped to this device only. Cards are split into Shared and platform-specific sections. Each card has its own individual CSV export button.
 - The **"Only sensors with records" toggle** is shared with the Overview page.
-- Data **polls every 60 seconds** while a device is selected.
+- Data **updates as that phone uploads**, over the same live channel as the
+  Overview. A device page ignores arrivals belonging to other phones, so it stays
+  still while someone else's data comes in.
 
 ---
 

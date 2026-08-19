@@ -24,6 +24,7 @@ is for working on the service itself.
 | **Exports**              | CSV for one sensor, ZIP bundles per device or per sensor, and a manifest of what exists                       |
 | **Backup**               | Whole-database or single-period export, and import in either replace or merge mode                           |
 | **Job progress**         | Status for work that runs longer than a request, so a page can show a progress bar                            |
+| **Live updates**         | One shared loop watching for arriving rows, pushed to every open dashboard over a WebSocket so a tile moves without a refresh |
 | **Login**               | The session check Nginx calls before it lets anything through to `/api/`                                      |
 
 It only ever **reads** study data. The database user it connects as
@@ -48,13 +49,20 @@ Everything under `/api/` sits behind researcher login: Nginx asks
 `GET /auth/validate` before proxying, and redirects to `/auth/login` when there
 is no valid session. That applies to every endpoint below.
 
+The one exception to the redirect is the live WebSocket. `auth_request` guards the
+HTTP request that opens a socket and nothing that travels over it afterwards, so
+`routers/live.py` checks the session again itself; and a socket cannot render a
+login page, so its Nginx location deliberately omits the `error_page 401` every
+other location has. A client sees the handshake refused and lets the page handle
+it.
+
 ---
 
 ## The API surface
 
-137 endpoints. The auto-generated OpenAPI pages (`/docs`, `/redoc`,
-`/openapi.json`) are currently **disabled** in `app/main.py`, so this table is
-the reference.
+140 HTTP endpoints and one WebSocket. The auto-generated OpenAPI pages (`/docs`,
+`/redoc`, `/openapi.json`) are currently **disabled** in `app/main.py`, so this
+table is the reference.
 
 | Route                                        | Purpose                                                          |
 | -------------------------------------------- | ---------------------------------------------------------------- |
@@ -89,12 +97,71 @@ the reference.
 | `GET /coverage/study.xlsx`                   | That grid as an Excel workbook: counts, colours, row/column totals |
 | `GET /coverage/device/{platform}/{id}/workbook.xlsx` | One phone's grid as the same workbook                      |
 | `GET /coverage/matrix`                       | The grid as a ZIP of CSVs, one per sensor, hours across            |
+| `WS /live`                                   | The live channel: what arrived since a moment ago, pushed as it does|
 | `GET /health`                                | Liveness, used by the container healthcheck                       |
 | `/auth/login`, `/auth/logout`, `/auth/validate` | Session handling for the Nginx login check                     |
 
 The per-sensor routes are the bulk of the count and all share one shape: a
 `device_id` in the path, a sensor slug, and `from_ts` / `to_ts` / `limit` query
 parameters.
+
+---
+
+## The live channel
+
+`services/live_watch.py` and `routers/live.py`. A minute-old count is an interim
+answer; this closes the gap between a row landing and a tile moving.
+
+**One loop, not one per connection.** Ten open dashboards must not mean ten times
+the database work, so the watching happens once and the result is handed to whoever
+is listening. A subscriber is a queue, not a poller. The loop is started from the
+application lifespan, so there is exactly one per worker process, and with nobody
+subscribed it does nothing at all — a feature nobody has open does not make the
+study more expensive to run.
+
+**Watermarks come from `MAX(_id)`, asked of the tables directly.** The tempting
+shortcut is `AUTO_INCREMENT` from `information_schema`, one query covering every
+table. It is wrong: that value is cached, and a scratch table reported 4 while
+already holding 5 rows, stale for up to a day by default. A watcher built on it
+would look live and silently miss changes. The tables are asked instead, in one
+`UNION ALL` rather than a round trip each.
+
+**Which tables get asked comes from the rollup, and is remembered between ticks.**
+Only tables `coverage_hourly` has seen data in, narrowed again to those a sensor
+claims. That list grows only when the refresher folds rows from a table it has
+never seen, so re-reading it every two seconds would buy the same answer thirty
+times over; it is held for `TABLE_LIST_SECONDS`. A read that fails keeps the
+previous list rather than emptying it, since a bad query is not an empty study.
+
+**Deltas are per `(device, sensor)`, not per table.** That is what a tile shows. An
+iPhone stores `wifi` across two tables and `esm` across two more, and they are
+summed here rather than leaving the interface to reconstruct a mapping only the API
+holds.
+
+**A tick that found rows folds them into the caches before announcing them.** Every
+number the dashboard shows is read from `record_counts` and `coverage_hourly`.
+Announcing an arrival while those still held the old totals would send every open
+page to refetch exactly the numbers it already had. So the tick runs the same
+incremental pass the `counts-refresher` container runs, under the same advisory
+lock, and a pass already in progress is skipped rather than double-counted.
+
+**A first look reports nothing.** The watcher has to learn where each table stands
+before it can say what arrived; announcing the whole stored history as "just now"
+would move every tile the moment a dashboard opened.
+
+Resume is by sequence number. A client names the last one it saw and receives the
+gap from a bounded history, or is told to refetch — when the gap is longer than the
+history holds, when its queue overflowed, or when it names a sequence *ahead* of the
+server's, which is what a client that outlived a restart looks like. Heartbeats go
+out every `HEARTBEAT_SECONDS` through a quiet study and deliberately consume no
+sequence number, so resuming from one cannot skip an unseen change.
+
+| Knob                  | Default | What it sets                                              |
+| --------------------- | ------- | ----------------------------------------------------------- |
+| `TICK_SECONDS`        | `2.0`   | How often the loop looks, while anyone is listening         |
+| `HEARTBEAT_SECONDS`   | `20.0`  | Silence before the socket proves itself alive               |
+| `TABLE_LIST_SECONDS`  | `60.0`  | How long the watched-table list is trusted before re-reading |
+| `HISTORY`             | `200`   | Messages kept for a reconnecting client to resume from      |
 
 ---
 
@@ -116,6 +183,7 @@ The services, roughly in the order a newcomer meets them:
 | `series.py`              | Bucketed aggregation, and the window clamping every read goes through |
 | `record_counts.py`       | The per-sensor, per-phone count cache and its incremental refresh     |
 | `coverage_rollup.py`     | How many records arrived per table, per phone, per hour                |
+| `live_watch.py`          | The shared loop behind the live channel, and the subscribers it feeds  |
 | `enrolment.py`           | When each phone was in the study, stored as windows (Android only)     |
 | `study_state.py`         | Derives enrolment from a phone's study event log                      |
 | `study_config.py`        | Reads study configs and redacts the credentials they contain          |
