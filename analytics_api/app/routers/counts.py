@@ -16,12 +16,14 @@ from app.database import android_engine, get_android_db, get_ios_db
 from app.models import (
     AndroidCoverageHourly,
     AndroidRecordCount,
+    AndroidRefusal,
     IosCoverageHourly,
     IosRecordCount,
+    IosRefusal,
 )
 from app.routers.android import _EXPORT_MODELS as ANDROID_EXPORT_MODELS
 from app.routers.ios import _EXPORT_MODELS as IOS_EXPORT_MODELS
-from app.services import orphan_rows, record_counts
+from app.services import orphan_rows, record_counts, refusals
 
 router = APIRouter(prefix="/counts", tags=["counts"])
 
@@ -161,4 +163,31 @@ async def orphan_counts(
         # Android's `device_id` column defaults to the empty string, so an insert
         # that omits it succeeds; every iOS table declares the column NOT NULL.
         "cause": "an insert with no device_id, which Android stores as ''",
+    }
+
+
+@router.get("/refusals")
+async def refusal_counts(
+    android_db: AsyncSession = Depends(get_android_db),
+    ios_db: AsyncSession = Depends(get_ios_db),
+):
+    """Writes the micro-server turned away, per platform and per device.
+
+    Everything else on screen about a device is read from rows that device wrote,
+    so a device refused at ingest is one the dashboard cannot otherwise see. The
+    counts are cumulative and nothing clears them: a refusal is a thing that
+    happened, and `first_seen` beside `last_seen` is what says whether it was one
+    afternoon or is still going on.
+    """
+    platforms = {
+        name: await refusals.summary(db, model)
+        for name, db, model in (
+            ("android", android_db, AndroidRefusal),
+            ("ios", ios_db, IosRefusal),
+        )
+    }
+    return {
+        "attempts": sum(entry["attempts"] for entry in platforms.values()),
+        "devices": sum(entry["devices"] for entry in platforms.values()),
+        "platforms": platforms,
     }

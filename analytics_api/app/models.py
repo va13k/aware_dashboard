@@ -109,6 +109,24 @@ class AndroidDeviceEnrolment(AndroidBase):
     left_source = Column(String(16), nullable=True)
 
 
+class AndroidRefusal(AndroidBase):
+    """Writes the micro-server turned away, one row per (device, reason).
+
+    A refused write stores nothing, so the attempt leaves no trace among the data
+    and the dashboard has nothing to notice. This is that trace. Counted up rather
+    than appended, so a phone retrying every minute is one line with a rising
+    count: `first_seen` holds still and `last_seen` moves."""
+
+    __tablename__ = "refusals"
+    device_id = Column(String(150), primary_key=True)
+    reason = Column(String(32), primary_key=True)
+    attempts = Column(BigInteger, default=0)
+    rows_refused = Column(BigInteger, default=0)
+    last_table = Column(String(64), default="")
+    first_seen = Column(BigInteger, default=0)
+    last_seen = Column(BigInteger, default=0)
+
+
 class AndroidAccelerometer(AndroidBase):
     __tablename__ = "accelerometer"
     _id = Column(BigInteger, primary_key=True, autoincrement=True)
@@ -595,6 +613,19 @@ class IosRecordCount(IosBase):
     count = Column(BigInteger, default=0)
     last_id = Column(BigInteger, default=0)
     last_ts = Column(Double, default=0)
+
+
+class IosRefusal(IosBase):
+    """The iOS copy of the refusal record, written by the micro-server."""
+
+    __tablename__ = "refusals"
+    device_id = Column(String(150), primary_key=True)
+    reason = Column(String(32), primary_key=True)
+    attempts = Column(BigInteger, default=0)
+    rows_refused = Column(BigInteger, default=0)
+    last_table = Column(String(64), default="")
+    first_seen = Column(BigInteger, default=0)
+    last_seen = Column(BigInteger, default=0)
 
 
 class IosCoverageHourly(IosBase):
