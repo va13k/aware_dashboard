@@ -46,14 +46,29 @@ MERGE = "merge"
 #: give the merge a rule for reconciling two deployments' windows.
 #:
 #: `refusals` is here for the `timestamp` reason rather than the reproducible one:
-#: it is the one table in this list that cannot be rebuilt from what arrived, since
-#: a refused write left nothing behind to rebuild it from. Moving a study to
+#: it is one of the tables in this list that cannot be rebuilt from what arrived,
+#: since a refused write left nothing behind to rebuild it from. Moving a study to
 #: another server therefore leaves its refusal history behind, which is accepted —
 #: the record describes attempts against one deployment's ingest path, and giving
 #: the merge a rule for adding two deployments' counters is more machinery than the
 #: question deserves.
+#:
+#: `device_exclusions` is here for the same `timestamp` reason and shares
+#: `device_enrolment`'s problem rather than `refusals`' acceptance of it: an
+#: exclusion is a researcher's decision about a participant, reproducible from
+#: nothing, and a round trip through this list loses it. Three of these four
+#: entries now hold something a dump cannot rebuild, so the list has outgrown being
+#: one set — separating "reproducible, never carried" from "has no timestamp, so a
+#: ranged dump cannot filter it" is what lets the decisions travel, and it needs the
+#: merge to be given a rule for reconciling two deployments' answers first.
 CACHE_TABLES = frozenset(
-    {"record_counts", "coverage_hourly", "device_enrolment", "refusals"}
+    {
+        "record_counts",
+        "coverage_hourly",
+        "device_enrolment",
+        "refusals",
+        "device_exclusions",
+    }
 )
 
 _QUOTE = ord("'")

@@ -49,6 +49,14 @@
 -- that account is granted more than INSERT on this one table: the record is an
 -- upsert whose `attempts = attempts + 1` reads the column it writes, so MySQL
 -- requires SELECT on it as well as UPDATE.
+--
+-- `device_exclusions` names the devices a researcher has taken out of the
+-- analysis. Withdrawal stops new data arriving; this answers the separate
+-- question of what happens to the data already collected, which consent forms
+-- answer differently. The rows stay in the database and stay on screen: an
+-- exclusion the dashboard hid would be indistinguishable from a participant who
+-- never took part. What it changes is the exports, which is where the analysis
+-- dataset actually leaves.
 
 USE `aware_android`;
 
@@ -129,6 +137,21 @@ CREATE TABLE IF NOT EXISTS `refusals` (
 
 GRANT SELECT, INSERT, UPDATE ON `aware_android`.`refusals` TO 'aware_android_participant'@'%';
 
+-- One row per excluded device. `excluded_at` is when the researcher decided,
+-- which is not necessarily when the participant left: a study can exclude
+-- somebody who completed it. Undoing an exclusion deletes the row, since the
+-- default state is to keep the data and there is nothing to record about a
+-- device nobody excluded.
+CREATE TABLE IF NOT EXISTS `device_exclusions` (
+  `device_id`   varchar(150)    NOT NULL,
+  `excluded_at` bigint unsigned NOT NULL,
+  `note`        varchar(255)    NOT NULL DEFAULT '',
+  `updated_at`  timestamp       NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`device_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+GRANT SELECT, INSERT, UPDATE, DELETE ON `aware_android`.`device_exclusions` TO 'aware_analytics'@'%';
+
 USE `aware_ios`;
 
 CREATE TABLE IF NOT EXISTS `record_counts` (
@@ -185,5 +208,20 @@ CREATE TABLE IF NOT EXISTS `refusals` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 GRANT SELECT, INSERT, UPDATE ON `aware_ios`.`refusals` TO 'aware_ios_participant'@'%';
+
+-- One row per excluded device. `excluded_at` is when the researcher decided,
+-- which is not necessarily when the participant left: a study can exclude
+-- somebody who completed it. Undoing an exclusion deletes the row, since the
+-- default state is to keep the data and there is nothing to record about a
+-- device nobody excluded.
+CREATE TABLE IF NOT EXISTS `device_exclusions` (
+  `device_id`   varchar(150)    NOT NULL,
+  `excluded_at` bigint unsigned NOT NULL,
+  `note`        varchar(255)    NOT NULL DEFAULT '',
+  `updated_at`  timestamp       NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`device_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+GRANT SELECT, INSERT, UPDATE, DELETE ON `aware_ios`.`device_exclusions` TO 'aware_analytics'@'%';
 
 FLUSH PRIVILEGES;
