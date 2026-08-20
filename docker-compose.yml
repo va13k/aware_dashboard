@@ -17,6 +17,11 @@ services:
       - --init-file=/etc/mysql/init_all.sql
       - --connect-timeout=5
       - --max-user-connections=${MYSQL_MAX_USER_CONNECTIONS_PER_ACCOUNT:-100}
+      - --performance-schema=OFF
+      - --max-connections=100
+      - --table-open-cache=400
+      - --table-definition-cache=400
+      - --innodb-buffer-pool-size=256M
     environment:
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-CHANGE_ME}
       PARTICIPANT_DB_PASSWORD: ${PARTICIPANT_DB_PASSWORD:-}
@@ -66,6 +71,9 @@ services:
     build: ./aware-micro-server
     container_name: aware_micro
     restart: unless-stopped
+    mem_limit: 512m
+    environment:
+      JAVA_TOOL_OPTIONS: "-XX:MaxRAMPercentage=60 -XX:+UseSerialGC -Xss512k"
     develop:
       watch:
         - path: ./aware-micro-server/aware-config.json
