@@ -106,6 +106,18 @@ class MainVerticle : AbstractVerticle() {
     return formData
   }
 
+  /** How many rows a payload carried, for a refusal that never got to count them. */
+  private fun payloadRowCount(payload: String?): Int {
+    if (payload.isNullOrBlank()) {
+      return 0
+    }
+    return try {
+      JsonArray(payload).size()
+    } catch (_: Exception) {
+      0
+    }
+  }
+
   private fun requestDeviceId(route: RoutingContext, payload: String?): String? {
     val formDeviceId = route.request().getFormAttribute("device_id")
     if (!formDeviceId.isNullOrBlank()) return formDeviceId
@@ -332,6 +344,18 @@ class MainVerticle : AbstractVerticle() {
 	                    "refused an insert into ${route.request().getParam("table")} " +
 	                      "with no device_id from ${route.request().remoteAddress()}"
 	                  }
+	                  // Recorded as well as logged. The write never happens, so the
+	                  // refusal is the only trace of the attempt, and a container log
+	                  // is not somewhere a researcher looks.
+	                  eventBus.publish(
+	                    Refusal.ADDRESS,
+	                    Refusal.message(
+	                      deviceId = "",
+	                      table = route.request().getParam("table") ?: "",
+	                      reason = Refusal.NO_DEVICE_ID,
+	                      rows = payloadRowCount(payload)
+	                    )
+	                  )
 	                  route.response().statusCode = 400
 	                  route.response().end("device_id is required")
 	                } else {

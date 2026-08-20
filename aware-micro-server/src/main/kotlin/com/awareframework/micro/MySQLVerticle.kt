@@ -109,6 +109,16 @@ class MySQLVerticle : AbstractVerticle() {
           )
         }
 
+        eventBus.consumer<JsonObject>(Refusal.ADDRESS) { receivedMessage ->
+          val refusal = receivedMessage.body()
+          recordRefusal(
+            device_id = refusal.getString("device_id") ?: "",
+            table = refusal.getString("table") ?: "",
+            reason = refusal.getString("reason") ?: "",
+            rows = refusal.getInteger("rows") ?: 0
+          )
+        }
+
         eventBus.consumer<JsonObject>("updateData") { receivedMessage ->
           val postData = receivedMessage.body()
           updateData(
@@ -369,6 +379,7 @@ class MySQLVerticle : AbstractVerticle() {
     // nothing, and attributable only by its timestamps.
     if (device_id.isBlank()) {
       logger.warn { "refused an insert into $table with no device_id (${data.size()} rows)" }
+      recordRefusal("", table, Refusal.NO_DEVICE_ID, data.size())
       return
     }
 
@@ -387,6 +398,7 @@ class MySQLVerticle : AbstractVerticle() {
             "refused an insert into $table from $device_id with no enrolment window " +
               "(${data.size()} rows)"
           }
+          recordRefusal(device_id, table, Refusal.NO_ENROLMENT, data.size())
         }
       }
       .onFailure { e ->
@@ -399,6 +411,32 @@ class MySQLVerticle : AbstractVerticle() {
             "(${data.size()} rows)"
         }
         storeData(table, device_id, data)
+      }
+  }
+
+  /**
+   * Record a write that was turned away.
+   *
+   * One row per (device, reason), counting up rather than appending, so a phone
+   * retrying every minute stays one line on screen with a rising count instead of
+   * burying everything else. `first_seen` survives the upsert and `last_seen`
+   * moves, which is what separates a single test insert from a week of retries.
+   */
+  private fun recordRefusal(device_id: String, table: String, reason: String, rows: Int) {
+    val seenAt = System.currentTimeMillis()
+    sqlClient
+      .query(
+        "INSERT INTO `refusals` " +
+          "(`device_id`,`reason`,`attempts`,`rows_refused`,`last_table`,`first_seen`,`last_seen`) " +
+          "VALUES ('${sqlValue(device_id)}', '${sqlValue(reason)}', 1, $rows, " +
+          "'${sqlValue(table)}', $seenAt, $seenAt) " +
+          "ON DUPLICATE KEY UPDATE `attempts` = `attempts` + 1, " +
+          "`rows_refused` = `rows_refused` + $rows, " +
+          "`last_table` = '${sqlValue(table)}', `last_seen` = $seenAt"
+      )
+      .execute()
+      .onFailure { e ->
+        logger.error(e) { "Failed to record a refused write from $device_id into $table." }
       }
   }
 
