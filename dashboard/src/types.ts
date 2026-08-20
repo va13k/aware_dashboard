@@ -265,6 +265,35 @@ export interface OrphanCounts {
   platforms: Record<"android" | "ios", OrphanPlatformCounts>;
 }
 
+/** One device the micro-server turned away, with both ends of the attempt. */
+export interface Refusal {
+  device_id: string;
+  reason: string;
+  explanation: string;
+  attempts: number;
+  rows_refused: number;
+  last_table: string;
+  first_seen: number;
+  last_seen: number;
+}
+
+export interface RefusalPlatform {
+  attempts: number;
+  rows_refused: number;
+  devices: number;
+  refusals: Refusal[];
+}
+
+/**
+ * Writes refused at ingest. Nothing was stored, so this is the only trace of the
+ * attempt — a refused device leaves no rows for the device list to notice.
+ */
+export interface RefusalCounts {
+  attempts: number;
+  devices: number;
+  platforms: Record<"android" | "ios", RefusalPlatform>;
+}
+
 export type CoverageAnchor = "data" | "now";
 export type CoveragePeriod = "hour" | "day" | "week" | "month" | "year";
 

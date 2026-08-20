@@ -17,6 +17,7 @@ import type {
   SeriesBucket,
   StudyCoverage,
   StudyRequirements,
+  RefusalCounts,
 } from "../types";
 
 export const BASE = "/api";
@@ -160,6 +161,10 @@ export const fetchCountsStatus = (): Promise<CountsStatus> => get("/counts/statu
 
 /** Rows whose Android insert supplied no device id, reported outside totals. */
 export const fetchOrphanCounts = (): Promise<OrphanCounts> => get("/counts/orphans");
+
+/** Writes refused at ingest, which store nothing and so appear nowhere else. */
+export const fetchRefusals = (): Promise<RefusalCounts> =>
+  get("/counts/refusals");
 
 /** The periods on offer, each resolved to absolute bounds and what it holds. */
 export const fetchCoverageWindows = (): Promise<CoverageWindows> =>
