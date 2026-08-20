@@ -11,7 +11,9 @@ from app.services import record_counts
 from app.routers.android import _EXPORT_MODELS as _ANDROID_EXPORT_MODELS
 from app.models import (
     AndroidCoverageHourly,
+    AndroidDeviceExclusion,
     AndroidRecordCount,
+    IosDeviceExclusion,
     IosCoverageHourly,
     IosRecordCount,
     AndroidDevice,
@@ -71,7 +73,7 @@ from app.schemas import (
     ConfigDiffSchema,
     strip_ios_data_metadata,
 )
-from app.services import config_diff, enrolment, study_state
+from app.services import config_diff, enrolment, exclusions, study_state
 
 router = APIRouter(prefix="/devices", tags=["devices"])
 
@@ -509,6 +511,9 @@ async def list_android_devices(db: AsyncSession = Depends(get_android_db)):
     first_seen_by_device = await enrolment.first_record_by_device(
         db, AndroidCoverageHourly
     )
+    # Read here rather than per row: an exclusion has to be visible wherever the
+    # device is, or it is indistinguishable from a participant who never took part.
+    excluded = await exclusions.exclusions(db, AndroidDeviceExclusion)
 
     devices = []
     # A phone that joined but has not uploaded yet exists only in aware_studies,
@@ -543,6 +548,9 @@ async def list_android_devices(db: AsyncSession = Depends(get_android_db)):
                 # the finding: data arrived from a phone that left no trace of
                 # enrolling, which is what the device gate exists to surface.
                 "recognised": _has_recorded_enrolment(windows),
+                # Left out of the analysis by a researcher's decision. The data is
+                # still here and still counted; what changes is the exports.
+                "excluded": excluded.get(device_id),
             }
         )
 
@@ -559,6 +567,7 @@ async def list_ios_devices(db: AsyncSession = Depends(get_ios_db)):
 
     metadata_by_device = await _device_metadata_by_device(db, IosDevice)
     first_seen_by_device = await enrolment.first_record_by_device(db, IosCoverageHourly)
+    excluded = await exclusions.exclusions(db, IosDeviceExclusion)
 
     devices = []
     for device_id, last_seen in last_seen_by_device.items():
@@ -579,6 +588,7 @@ async def list_ios_devices(db: AsyncSession = Depends(get_ios_db)):
                 # Unknown rather than false: an iPhone is not a suspect for
                 # lacking a record it was never able to send.
                 "recognised": None,
+                "excluded": excluded.get(device_id),
             }
         )
 
@@ -720,3 +730,75 @@ async def reopen_device_enrolment(
         AndroidAwareStudy,
     )
     return {"status": "reopened", "device_id": device_id}
+
+
+class ExclusionRequest(BaseModel):
+    """Why the participant is being left out of the analysis."""
+
+    #: Free text, for the researcher's own record. Consent forms differ on what
+    #: they permit, so the reason is worth keeping beside the decision.
+    note: str = ""
+
+
+#: The exclusion list belonging to each platform.
+_EXCLUSION_MODELS = {
+    "android": (AndroidDeviceExclusion, get_android_db),
+    "ios": (IosDeviceExclusion, get_ios_db),
+}
+
+
+@router.post("/{platform}/{device_id}/exclude")
+async def exclude_device(
+    platform: str,
+    device_id: str,
+    body: ExclusionRequest | None = None,
+    android_db: AsyncSession = Depends(get_android_db),
+    ios_db: AsyncSession = Depends(get_ios_db),
+):
+    """Take a participant's data out of the analysis, keeping it in the database.
+
+    A separate action from withdrawal on purpose. Closing an enrolment window stops
+    new data arriving; this answers what happens to what was already collected,
+    which consent forms answer differently. Nothing is deleted and nothing is
+    hidden: the device stays in the lists and the coverage grids, marked, and it
+    stops appearing in exports — which is where the analysis dataset leaves.
+
+    Removing the rows themselves is a database administrator's job, since the
+    dashboard reads study data and cannot delete it.
+    """
+    if platform not in _EXCLUSION_MODELS:
+        raise HTTPException(status_code=404, detail="Unknown platform")
+
+    model = _EXCLUSION_MODELS[platform][0]
+    db = android_db if platform == "android" else ios_db
+    request = body or ExclusionRequest()
+
+    stored = await exclusions.exclude(
+        db, model, device_id, int(time.time() * 1000), request.note
+    )
+    if stored is None:
+        raise HTTPException(status_code=500, detail="Could not record the exclusion")
+    return {"status": "excluded", "exclusion": stored}
+
+
+@router.post("/{platform}/{device_id}/include")
+async def include_device(
+    platform: str,
+    device_id: str,
+    android_db: AsyncSession = Depends(get_android_db),
+    ios_db: AsyncSession = Depends(get_ios_db),
+):
+    """Put a participant back into the analysis.
+
+    The exclusion row is removed rather than marked undone, because no row is the
+    default state and there is nothing to record about a device nobody excluded.
+    """
+    if platform not in _EXCLUSION_MODELS:
+        raise HTTPException(status_code=404, detail="Unknown platform")
+
+    model = _EXCLUSION_MODELS[platform][0]
+    db = android_db if platform == "android" else ios_db
+
+    if not await exclusions.include(db, model, device_id):
+        raise HTTPException(status_code=500, detail="Could not clear the exclusion")
+    return {"status": "included", "device_id": device_id}

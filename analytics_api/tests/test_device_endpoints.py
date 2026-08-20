@@ -132,6 +132,12 @@ def _database(monkeypatch):
         devices_router.record_counts, "counts_for_device", counts_for_device
     )
 
+    async def no_exclusions(db, model):
+        # Nothing taken out of the analysis, so a row's `excluded` reads as absent.
+        return {}
+
+    monkeypatch.setattr(devices_router.exclusions, "exclusions", no_exclusions)
+
     async def session():
         yield SimpleNamespace()
 

@@ -127,6 +127,20 @@ class AndroidRefusal(AndroidBase):
     last_seen = Column(BigInteger, default=0)
 
 
+class AndroidDeviceExclusion(AndroidBase):
+    """Devices a researcher has taken out of the analysis.
+
+    Withdrawal stops new data arriving; this answers the separate question of what
+    happens to what was already collected. A row here keeps the data in the
+    database and on screen, and takes the device out of the exports — which is
+    where the analysis dataset actually leaves."""
+
+    __tablename__ = "device_exclusions"
+    device_id = Column(String(150), primary_key=True)
+    excluded_at = Column(BigInteger, default=0)
+    note = Column(String(255), default="")
+
+
 class AndroidAccelerometer(AndroidBase):
     __tablename__ = "accelerometer"
     _id = Column(BigInteger, primary_key=True, autoincrement=True)
@@ -626,6 +640,15 @@ class IosRefusal(IosBase):
     last_table = Column(String(64), default="")
     first_seen = Column(BigInteger, default=0)
     last_seen = Column(BigInteger, default=0)
+
+
+class IosDeviceExclusion(IosBase):
+    """The iOS copy of the exclusion list."""
+
+    __tablename__ = "device_exclusions"
+    device_id = Column(String(150), primary_key=True)
+    excluded_at = Column(BigInteger, default=0)
+    note = Column(String(255), default="")
 
 
 class IosCoverageHourly(IosBase):

@@ -29,9 +29,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import get_android_db, get_ios_db
 from app.models import (
     AndroidCoverageHourly,
+    AndroidDeviceExclusion,
     AndroidDeviceEnrolment,
     AndroidRecordCount,
     IosCoverageHourly,
+    IosDeviceExclusion,
     IosRecordCount,
 )
 from app.routers.android import _EXPORT_MODELS as ANDROID_EXPORT_MODELS
@@ -42,6 +44,7 @@ from app.services import (
     coverage_rollup,
     coverage_workbook,
     enrolment,
+    exclusions,
     export_size,
     record_counts,
     sensor_rates,
@@ -57,6 +60,7 @@ PLATFORMS = ("android", "ios")
 _EXPORT_MODELS_FOR = {"android": ANDROID_EXPORT_MODELS, "ios": IOS_EXPORT_MODELS}
 _ROLLUP_FOR = {"android": AndroidCoverageHourly, "ios": IosCoverageHourly}
 _COUNTS_FOR = {"android": AndroidRecordCount, "ios": IosRecordCount}
+_EXCLUSION_FOR = {"android": AndroidDeviceExclusion, "ios": IosDeviceExclusion}
 #: Only Android reports enrolment; an iPhone keeps its study state on the phone.
 _ENROLMENT_FOR = {"android": AndroidDeviceEnrolment, "ios": None}
 
@@ -312,6 +316,10 @@ async def _platform_grid(
     )
     windows = await _expectation_windows(db, platform, now_ms)
     by_device = _sensor_counts_by_device(platform, counted, len(buckets))
+    # A row the exports leave out has to say so here. The grid is where a
+    # researcher reads what the study holds, and a device silently missing from an
+    # archive they later download is the discrepancy this exists to prevent.
+    excluded = await exclusions.exclusions(db, _EXCLUSION_FOR[platform])
 
     rates = _rates_for(platform)
     required = _observable_required(platform)
@@ -344,6 +352,10 @@ async def _platform_grid(
                 "enrolment_windows": device_windows or [],
                 "cells": cells,
                 "records": sum(cell.get("records", 0) for cell in cells),
+                # Present when a researcher has left this device out of the
+                # analysis. The cells still say what arrived: what was collected is
+                # a fact, and the exclusion is a decision about it.
+                "excluded": excluded.get(device),
             }
         )
     return rows
@@ -360,6 +372,43 @@ def _grid_scale(rows: list[dict]) -> int:
         (cell.get("records", 0) for row in rows for cell in row["cells"]),
         default=0,
     )
+
+
+async def _excluded_summary(
+    sessions: dict, wanted: tuple | list
+) -> dict:
+    """Who is left out of the analysis, and how much data that is.
+
+    The count is what makes the decision legible. A grid marking two rows as
+    excluded says nothing about whether the exports are missing a rounding error or
+    a third of the study, and that is the difference a researcher needs.
+
+    All-time rather than the visible span: the exports the exclusion governs are
+    not bounded by whatever the grid happens to be showing.
+    """
+    devices: list[dict] = []
+    for name in wanted:
+        db = sessions[name]
+        excluded = await exclusions.exclusions(db, _EXCLUSION_FOR[name])
+        if not excluded:
+            continue
+        totals = await exclusions.records_by_device(
+            db, _COUNTS_FOR[name], set(excluded)
+        )
+        for device_id, entry in excluded.items():
+            devices.append(
+                {
+                    "device_id": device_id,
+                    "platform": name,
+                    "records": totals.get(device_id, 0),
+                    **entry,
+                }
+            )
+    return {
+        "devices": len(devices),
+        "records": sum(entry["records"] for entry in devices),
+        "rows": sorted(devices, key=lambda entry: entry["records"], reverse=True),
+    }
 
 
 @router.get("/study")
@@ -418,6 +467,9 @@ async def study_coverage(
         "max_records": _grid_scale(rows),
         "required_sensors": {name: _observable_required(name) for name in wanted},
         "hour_granular": True,
+        # What the exports leave out, so the grid and an archive downloaded from it
+        # cannot disagree without saying so.
+        "excluded": await _excluded_summary(sessions, wanted),
     }
 
 

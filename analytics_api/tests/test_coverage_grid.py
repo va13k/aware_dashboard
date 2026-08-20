@@ -50,6 +50,11 @@ def grid(monkeypatch):
         "first_record": {},
         "required": ["battery", "bluetooth", "wifi"],
         "settings": {"frequency_bluetooth": 60, "frequency_wifi": 60},
+        #: Devices a researcher has left out of the analysis, and how much data
+        #: each holds — the figure that says whether an exclusion costs a rounding
+        #: error or a third of the study.
+        "excluded": {},
+        "excluded_records": {},
     }
 
     async def bucketed_by_table(db, model, buckets, tables=None, device_id=None):
@@ -102,7 +107,24 @@ def grid(monkeypatch):
     monkeypatch.setattr(
         coverage_router.sensor_requirements, "study_requirements", study_requirements
     )
+    async def exclusions_for(db, model):
+        platform = "ios" if "Ios" in model.__name__ else "android"
+        return {
+            device: entry
+            for device, entry in state["excluded"].items()
+            if entry.get("platform", "android") == platform
+        }
+
+    async def records_by_device(db, count_model, device_ids):
+        return {
+            device: state["excluded_records"].get(device, 0) for device in device_ids
+        }
+
     monkeypatch.setattr(coverage_router.sensor_rates, "study_rates", study_rates)
+    monkeypatch.setattr(coverage_router.exclusions, "exclusions", exclusions_for)
+    monkeypatch.setattr(
+        coverage_router.exclusions, "records_by_device", records_by_device
+    )
     return state
 
 
@@ -572,3 +594,61 @@ def test_an_empty_matrix_archive_says_so(client):
 
     assert "Sensor files: 0" in text
     assert "No sensor reported anything inside this window" in text
+
+
+def test_an_excluded_device_is_marked_on_the_grid(client, grid):
+    """The grid is where a researcher reads what the study holds. A device the
+    exports leave out has to say so here, or an archive downloaded later is
+    quietly missing a participant the grid showed."""
+    grid["holdings"]["android"][(DEVICE, "battery")] = [5] * 24
+    grid["excluded"][DEVICE] = {
+        "excluded_at": 1_700_000_000_000,
+        "note": "withdrew consent to analysis",
+        "platform": "android",
+    }
+
+    row = row_for(hours(client), DEVICE)
+
+    assert row["excluded"]["note"] == "withdrew consent to analysis"
+
+
+def test_an_excluded_row_still_reports_what_arrived(client, grid):
+    """What was collected is a fact; the exclusion is a decision about it. Zeroing
+    the cells would make the row indistinguishable from a phone that sent
+    nothing."""
+    grid["holdings"]["android"][(DEVICE, "battery")] = [5] * 24
+    grid["excluded"][DEVICE] = {"excluded_at": 1, "note": "", "platform": "android"}
+
+    row = row_for(hours(client), DEVICE)
+
+    assert row["records"] == 120
+
+
+def test_a_device_nobody_excluded_carries_no_exclusion(client, grid):
+    grid["holdings"]["android"][(DEVICE, "battery")] = [5] * 24
+
+    assert row_for(hours(client), DEVICE)["excluded"] is None
+
+
+def test_the_grid_says_how_much_data_the_exclusions_leave_out(client, grid):
+    """A grid marking two rows as excluded says nothing about whether the exports
+    are missing a rounding error or a third of the study."""
+    grid["holdings"]["android"][(DEVICE, "battery")] = [5] * 24
+    grid["excluded"][DEVICE] = {"excluded_at": 1, "note": "", "platform": "android"}
+    grid["excluded_records"][DEVICE] = 37_912
+
+    excluded = hours(client)["excluded"]
+
+    assert excluded["devices"] == 1
+    # All-time, not the visible span: the exports an exclusion governs are not
+    # bounded by whatever the grid happens to be showing.
+    assert excluded["records"] == 37_912
+    assert excluded["rows"][0]["device_id"] == DEVICE
+
+
+def test_a_study_with_nothing_excluded_reports_zero(client, grid):
+    grid["holdings"]["android"][(DEVICE, "battery")] = [5] * 24
+
+    excluded = hours(client)["excluded"]
+
+    assert excluded == {"devices": 0, "records": 0, "rows": []}

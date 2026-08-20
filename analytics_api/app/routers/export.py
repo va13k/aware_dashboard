@@ -11,18 +11,32 @@ from sqlalchemy import and_, func, or_, select
 from sqlalchemy.exc import OperationalError, ProgrammingError, SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.database import AndroidSessionLocal, IosSessionLocal, get_android_db, get_ios_db
+from app.database import (
+    AndroidSessionLocal,
+    IosBase,
+    IosSessionLocal,
+    get_android_db,
+    get_ios_db,
+)
 from app.models import (
     AndroidCoverageHourly,
+    AndroidDeviceExclusion,
     AndroidRecordCount,
     IosCoverageHourly,
+    IosDeviceExclusion,
     IosRecordCount,
 )
 from app.routers.android import _EXPORT_MODELS as ANDROID_EXPORT_MODELS
 from app.routers.ios import _EXPORT_MODELS as IOS_EXPORT_MODELS
 from app.schemas import IosSchema
 from app.services import backup_jobs as jobs
-from app.services import coverage_rollup, record_counts, sensor_tables, study_config
+from app.services import (
+    coverage_rollup,
+    exclusions,
+    record_counts,
+    sensor_tables,
+    study_config,
+)
 
 router = APIRouter(prefix="/export", tags=["export"])
 
@@ -167,14 +181,33 @@ async def _rollback_after_table_error(db: AsyncSession):
         pass
 
 
+def _exclusion_model(model):
+    """The exclusion list belonging to whichever platform this model is from.
+
+    Taken from the model's own declarative base rather than from the session, so a
+    caller cannot pair an iOS table with the Android exclusion list by holding the
+    wrong session.
+    """
+    return IosDeviceExclusion if issubclass(model, IosBase) else AndroidDeviceExclusion
+
+
 async def _device_ids_for_model(db: AsyncSession, model) -> set[str]:
+    """The devices this table holds data for, minus the ones left out.
+
+    Two filters, for two different reasons. An empty or null `device_id` belongs to
+    no device and could never be attributed to one. An excluded device is a real
+    participant a researcher deliberately took out of the analysis — the rows stay
+    in the database and on screen, and this is where the decision takes effect,
+    because an export is the analysis dataset leaving.
+    """
     try:
         result = await db.execute(select(model.device_id).distinct())
     except (OperationalError, ProgrammingError, SQLAlchemyError):
         await _rollback_after_table_error(db)
         return set()
 
-    return {str(row[0]) for row in result.all() if row[0] not in (None, "")}
+    found = {str(row[0]) for row in result.all() if row[0] not in (None, "")}
+    return found - await exclusions.excluded_ids(db, _exclusion_model(model))
 
 
 async def _platform_device_ids(db: AsyncSession, export_models: dict[str, object]) -> list[str]:
