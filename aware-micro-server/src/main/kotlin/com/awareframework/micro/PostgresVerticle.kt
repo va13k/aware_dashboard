@@ -17,6 +17,7 @@ import io.vertx.pgclient.PgPool
 import io.vertx.pgclient.SslMode
 import io.vertx.sqlclient.PoolOptions
 import io.vertx.sqlclient.SqlClient
+import java.util.concurrent.ConcurrentHashMap
 import java.util.stream.Collectors
 import java.util.stream.StreamSupport
 
@@ -41,6 +42,17 @@ class PostgresVerticle : AbstractVerticle() {
 
   private lateinit var parameters: JsonObject
   private lateinit var sqlClient: PgPool
+
+  /** Whether a write is checked against the enrolment registry before it is stored. */
+  private var requireEnrolment = false
+
+  /**
+   * Devices whose enrolment window has been read once.
+   *
+   * Positive answers only, so the set holds one entry per participating device and
+   * a device that enrols later is admitted as soon as it writes again.
+   */
+  private val enrolledDevices: MutableSet<String> = ConcurrentHashMap.newKeySet()
 
   override fun start(startPromise: Promise<Void>?) {
     super.start(startPromise)
@@ -70,6 +82,15 @@ class PostgresVerticle : AbstractVerticle() {
           .setUser(serverConfig.getString("database_user"))
           .setPassword(serverConfig.getString("database_pwd"))
         setDatabaseSslMode(serverConfig, connectOptions)
+
+        requireEnrolment = serverConfig.getBoolean("require_enrolment", false)
+        logger.info {
+          if (requireEnrolment) {
+            "AWARE Micro: writes are checked against device_enrolment"
+          } else {
+            "AWARE Micro: writes are stored without an enrolment check"
+          }
+        }
 
         val poolOptions = PoolOptions().setMaxSize(5)
 
@@ -387,6 +408,52 @@ class PostgresVerticle : AbstractVerticle() {
       return
     }
 
+    if (!EnrolmentGate.mustConsultRegistry(requireEnrolment, table, device_id in enrolledDevices)) {
+      storeData(table, device_id, data)
+      return
+    }
+
+    hasEnrolmentWindow(device_id)
+      .onSuccess { enrolled ->
+        if (enrolled) {
+          enrolledDevices.add(device_id)
+          storeData(table, device_id, data)
+        } else {
+          logger.warn {
+            "refused an insert into $table from $device_id with no enrolment window " +
+              "(${data.size()} rows)"
+          }
+        }
+      }
+      .onFailure { e ->
+        // Stored, and the failure carried at error level, on the same reading the
+        // MySQL path takes: a registry that cannot be read says nothing about any
+        // device, and a participant's collection is not recoverable once dropped.
+        logger.error(e) {
+          "stored an insert into $table from $device_id without reading device_enrolment " +
+            "(${data.size()} rows)"
+        }
+        storeData(table, device_id, data)
+      }
+  }
+
+  /**
+   * Whether the registry holds a window this device earned by joining.
+   */
+  private fun hasEnrolmentWindow(device_id: String): Future<Boolean> {
+    val enrolmentPromise: Promise<Boolean> = Promise.promise()
+    sqlClient
+      .query(
+        "SELECT 1 FROM \"device_enrolment\" WHERE \"device_id\" = '${sqlValue(device_id)}' " +
+          "AND \"join_source\" IN (${EnrolmentGate.joinSourceList}) LIMIT 1"
+      )
+      .execute()
+      .onFailure { e -> enrolmentPromise.fail(e) }
+      .onSuccess { rows -> enrolmentPromise.complete(rows.size() > 0) }
+    return enrolmentPromise.future()
+  }
+
+  private fun storeData(table: String, device_id: String, data: JsonArray) {
     if (table == "aware_device") {
       insertAwareDeviceData(device_id, data)
       return
