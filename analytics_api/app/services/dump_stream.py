@@ -44,7 +44,17 @@ MERGE = "merge"
 #: being reproducible from anything in the dump and this list would silently
 #: discard it on import — so that change has to take the table out of here and
 #: give the merge a rule for reconciling two deployments' windows.
-CACHE_TABLES = frozenset({"record_counts", "coverage_hourly", "device_enrolment"})
+#:
+#: `refusals` is here for the `timestamp` reason rather than the reproducible one:
+#: it is the one table in this list that cannot be rebuilt from what arrived, since
+#: a refused write left nothing behind to rebuild it from. Moving a study to
+#: another server therefore leaves its refusal history behind, which is accepted —
+#: the record describes attempts against one deployment's ingest path, and giving
+#: the merge a rule for adding two deployments' counters is more machinery than the
+#: question deserves.
+CACHE_TABLES = frozenset(
+    {"record_counts", "coverage_hourly", "device_enrolment", "refusals"}
+)
 
 _QUOTE = ord("'")
 _BACKSLASH = ord("\\")

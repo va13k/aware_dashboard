@@ -38,6 +38,18 @@
 -- devices are left without enrolment information rather than given an invented
 -- join time.
 
+-- `refusals` holds what the micro-server turned away, one row per
+-- (device, reason) rather than one per attempt: a refused write stores nothing,
+-- so without this the only trace is a line in a container log and the dashboard
+-- has nothing to show. It carries the attempt and row counts, the table last
+-- tried, and when the first and last attempt happened, which is what tells a
+-- one-off test insert from a phone that has been retrying for a week.
+--
+-- Written by the participant account the micro-server connects as, which is why
+-- that account is granted more than INSERT on this one table: the record is an
+-- upsert whose `attempts = attempts + 1` reads the column it writes, so MySQL
+-- requires SELECT on it as well as UPDATE.
+
 USE `aware_android`;
 
 CREATE TABLE IF NOT EXISTS `record_counts` (
@@ -94,6 +106,29 @@ CREATE TABLE IF NOT EXISTS `device_enrolment` (
 
 GRANT SELECT, INSERT, UPDATE, DELETE ON `aware_android`.`device_enrolment` TO 'aware_analytics'@'%';
 
+-- The micro-server reads this table to decide whether a device may write, so the
+-- account it connects as needs to see it. Read-only: windows are derived by the
+-- dashboard from the phone's own study log, never by the ingest path.
+GRANT SELECT ON `aware_android`.`device_enrolment` TO 'aware_android_participant'@'%';
+
+-- `reason` is why the write was turned away: `no_enrolment` for a device with no
+-- window the study log put there, `no_device_id` for a request that named no
+-- device at all. The latter aggregates under an empty `device_id`, since there is
+-- no device to attribute it to.
+CREATE TABLE IF NOT EXISTS `refusals` (
+  `device_id`    varchar(150)    NOT NULL,
+  `reason`       varchar(32)     NOT NULL,
+  `attempts`     bigint unsigned NOT NULL DEFAULT 0,
+  `rows_refused` bigint unsigned NOT NULL DEFAULT 0,
+  `last_table`   varchar(64)     NOT NULL DEFAULT '',
+  `first_seen`   bigint unsigned NOT NULL,
+  `last_seen`    bigint unsigned NOT NULL,
+  PRIMARY KEY (`device_id`, `reason`),
+  KEY `last_seen_idx` (`last_seen`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+GRANT SELECT, INSERT, UPDATE ON `aware_android`.`refusals` TO 'aware_android_participant'@'%';
+
 USE `aware_ios`;
 
 CREATE TABLE IF NOT EXISTS `record_counts` (
@@ -132,5 +167,23 @@ CREATE TABLE IF NOT EXISTS `coverage_hourly` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 GRANT SELECT, INSERT, UPDATE, DELETE ON `aware_ios`.`coverage_hourly` TO 'aware_analytics'@'%';
+
+-- `reason` is why the write was turned away: `no_enrolment` for a device with no
+-- window the study log put there, `no_device_id` for a request that named no
+-- device at all. The latter aggregates under an empty `device_id`, since there is
+-- no device to attribute it to.
+CREATE TABLE IF NOT EXISTS `refusals` (
+  `device_id`    varchar(150)    NOT NULL,
+  `reason`       varchar(32)     NOT NULL,
+  `attempts`     bigint unsigned NOT NULL DEFAULT 0,
+  `rows_refused` bigint unsigned NOT NULL DEFAULT 0,
+  `last_table`   varchar(64)     NOT NULL DEFAULT '',
+  `first_seen`   bigint unsigned NOT NULL,
+  `last_seen`    bigint unsigned NOT NULL,
+  PRIMARY KEY (`device_id`, `reason`),
+  KEY `last_seen_idx` (`last_seen`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+GRANT SELECT, INSERT, UPDATE ON `aware_ios`.`refusals` TO 'aware_ios_participant'@'%';
 
 FLUSH PRIVILEGES;
