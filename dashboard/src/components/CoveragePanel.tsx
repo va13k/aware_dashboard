@@ -96,6 +96,21 @@ export default function CoveragePanel() {
           <span className="truncate font-mono text-[13px]">
             #{row.device_id.slice(0, 8)}
           </span>
+          {/* The exports leave this device out, so the grid says so. A row that
+              looked ordinary here and then went missing from an archive is the
+              discrepancy worth preventing. */}
+          {row.excluded ? (
+            <span
+              title={
+                row.excluded.note
+                  ? `Left out of the analysis: ${row.excluded.note}`
+                  : "Left out of the analysis"
+              }
+              className="shrink-0 rounded border border-short/40 bg-short/10 px-1 py-0.5 text-[9px] font-semibold uppercase tracking-[0.3px] text-short"
+            >
+              excl
+            </span>
+          ) : null}
         </Link>
       ),
       cells: row.cells,
@@ -227,6 +242,20 @@ export default function CoveragePanel() {
                 : "No devices have enrolled yet."
             }
           />
+          {/* How much the exclusions leave out. Marking rows says who is out; this
+              says whether that is a rounding error or a third of the study, which
+              is the difference a reader needs before trusting an export. */}
+          {grid.excluded.devices > 0 ? (
+            <p className="mt-3 rounded-xl border border-short/40 bg-short/10 px-3 py-2 text-[12px] text-short">
+              {grid.excluded.records.toLocaleString()}{" "}
+              {grid.excluded.records === 1 ? "record" : "records"} from{" "}
+              {grid.excluded.devices.toLocaleString()}{" "}
+              {grid.excluded.devices === 1 ? "device" : "devices"} are left out of
+              the analysis and will not appear in an export. The rows below still
+              show what those devices collected.
+            </p>
+          ) : null}
+
           <div className="mt-3 flex flex-col gap-2 border-t border-wire pt-2.5 sm:flex-row sm:items-center sm:justify-between">
             <CoverageLegend />
             <span className="flex items-center gap-3 text-[11px] text-sage/80">

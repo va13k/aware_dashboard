@@ -56,6 +56,14 @@ export default function DeviceListRow({
         {/* Data arrived from a phone the study has no record of joining. Worth a
             badge rather than a page of its own: whoever is looking at the list is
             the person who can say who it is. */}
+        {device.excluded ? (
+          <span
+            title="Left out of the analysis by a researcher. The data is kept and still shown here."
+            className="rounded border border-short/40 bg-short/10 px-1.5 py-0.5 text-[10px] uppercase tracking-[0.3px] text-short"
+          >
+            excluded
+          </span>
+        ) : null}
         {device.recognised === false ? (
           <span
             title="This phone is sending data, and the study has no record of it joining. Open it to see what it wrote and how much."

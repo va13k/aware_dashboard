@@ -121,6 +121,20 @@ export interface AndroidDevice {
    * data arrived from a phone that left no trace of enrolling.
    */
   recognised?: boolean | null;
+  /** Present when a researcher has taken this device out of the analysis. */
+  excluded?: DeviceExclusion | null;
+}
+
+/**
+ * A device a researcher has taken out of the analysis.
+ *
+ * Withdrawal stops new data arriving; this says what happens to the data already
+ * collected. The rows stay in the database and the device stays on screen — what
+ * changes is that it leaves the exports.
+ */
+export interface DeviceExclusion {
+  excluded_at: number;
+  note: string;
 }
 
 /** What a device row shows about enrolment: the span, and how it is known. */
@@ -154,6 +168,8 @@ export interface IosDevice {
    * it, so the server holds nothing to recognise it by.
    */
   recognised?: null;
+  /** Present when a researcher has taken this device out of the analysis. */
+  excluded?: DeviceExclusion | null;
 }
 
 export type Device = AndroidDevice | IosDevice;
@@ -388,6 +404,30 @@ export interface CoverageRow {
   enrolment_windows: EnrolmentWindow[];
   cells: CoverageCell[];
   records: number;
+  /**
+   * Present when a researcher has left this device out of the analysis. The cells
+   * still report what arrived: what was collected is a fact, and the exclusion is
+   * a decision about it.
+   */
+  excluded?: DeviceExclusion | null;
+}
+
+/** One excluded device, with the amount of data the exclusion leaves out. */
+export interface ExcludedRow extends DeviceExclusion {
+  device_id: string;
+  platform: "android" | "ios";
+  records: number;
+}
+
+/**
+ * What the exports leave out. Counted all-time rather than over the visible span,
+ * because the exports an exclusion governs are not bounded by what the grid is
+ * showing.
+ */
+export interface ExcludedSummary {
+  devices: number;
+  records: number;
+  rows: ExcludedRow[];
 }
 
 interface CoverageGridBase {
@@ -409,6 +449,7 @@ export interface StudyCoverage extends CoverageGridBase {
   platforms: ("android" | "ios")[];
   rows: CoverageRow[];
   required_sensors: Record<string, string[]>;
+  excluded: ExcludedSummary;
 }
 
 export interface DeviceCoverageRow {

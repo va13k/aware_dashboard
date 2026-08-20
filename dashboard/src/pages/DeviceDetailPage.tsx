@@ -24,6 +24,7 @@ import StudyStatusPanel from "../components/StudyStatusPanel";
 import ConfigDiffPanel from "../components/ConfigDiffPanel";
 import StudyEventsTimeline from "../components/StudyEventsTimeline";
 import WithdrawDevice from "../components/WithdrawDevice";
+import ExcludeDevice from "../components/ExcludeDevice";
 import SensorViewFilter from "../components/SensorViewFilter";
 import { useSensorView } from "../utils/sensorView";
 import { RequiredStreamNote } from "../components/RequiredByConfig";
@@ -430,6 +431,34 @@ export default function DeviceDetailPage() {
                 deviceId={selected.device_id}
                 enrolment={currentDetail.enrolment}
                 windows={currentDetail.enrolment_windows ?? []}
+                onChanged={refreshParticipation}
+              />
+            </section>
+          ) : null}
+
+          {/* Both platforms, unlike the enrolment window above: an iPhone has no
+              study log to close, but its data can still be left out of the
+              analysis. */}
+          {selected ? (
+            <section className="rounded-3xl border border-wire bg-card p-5 shadow-card backdrop-blur-xl">
+              <div className="mb-3">
+                <p className="text-[12px] uppercase tracking-[0.5px] text-sage">
+                  Participation
+                </p>
+                <h2 className="text-[16px] font-bold text-ink">
+                  Data already collected
+                </h2>
+              </div>
+              <ExcludeDevice
+                platform={selected.platform}
+                deviceId={selected.device_id}
+                excluded={selected.excluded}
+                // What the decision costs. Excluding a phone means one thing at
+                // two hundred rows and another at two million.
+                records={currentDetail?.streams.reduce(
+                  (sum, stream) => sum + (stream.count ?? 0),
+                  0,
+                )}
                 onChanged={refreshParticipation}
               />
             </section>

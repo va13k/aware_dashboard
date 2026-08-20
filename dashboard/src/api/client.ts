@@ -9,6 +9,7 @@ import type {
   DeviceCoverage,
   DeviceDetail,
   EnrolmentWindow,
+  DeviceExclusion,
   DevicesResponse,
   ExportPlatform,
   Manifest,
@@ -202,6 +203,27 @@ export const withdrawDevice = (
   post(`/devices/android/${encodeURIComponent(deviceId)}/withdraw`, {
     left_at: opts.leftAt ?? null,
   });
+
+/**
+ * Take a device out of the analysis, keeping its data in the database.
+ *
+ * Separate from withdrawal on purpose: withdrawal stops new data arriving, this
+ * decides what happens to what was already collected. The device stays on screen
+ * and leaves the exports.
+ */
+export const excludeDevice = (
+  platform: "android" | "ios",
+  deviceId: string,
+  note = "",
+): Promise<{ status: string; exclusion: DeviceExclusion }> =>
+  post(`/devices/${platform}/${encodeURIComponent(deviceId)}/exclude`, { note });
+
+/** Put a device back into the analysis, clearing the exclusion. */
+export const includeDevice = (
+  platform: "android" | "ios",
+  deviceId: string,
+): Promise<{ status: string }> =>
+  post(`/devices/${platform}/${encodeURIComponent(deviceId)}/include`, {});
 
 /** Undo a withdrawal, handing the device back to its own study log. */
 export const reopenDeviceEnrolment = (
