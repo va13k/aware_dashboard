@@ -22,14 +22,24 @@ iOS is ``webservice`` and cannot be anything else: the micro-server *is* the iOS
 path, and an iPhone has no direct-database client.
 
 Android is ``direct`` for now, and ``webservice`` is refused rather than offered
-(see :func:`unsupported_reason`). The AWARE Android client in this deployment has
-no HTTP upload path --- ``AwareSyncAdapter.offloadData`` uploads through
-``Jdbc.insertData`` alone, its ``Http``/``Https`` imports are vestiges with no call
-sites, and the two places that once read ``status_webservice`` are commented out.
-Offering the choice anyway would produce a config the client silently ignores: the
-phone keeps collecting, buffers locally, uploads nothing, and the gap surfaces in
-the coverage grid weeks later. A refusal that names the missing piece is the
-honest answer until the client has one.
+(see :func:`unsupported_reason`). The client can do it: it uploads through
+``Webservice.insertData`` when a study asks, and a direct-mode regression run on an
+emulator confirmed the branch. What is missing is on this side, and all of it:
+
+* The study URL answers a GET with an HTML QR page, not a study configuration ---
+  and a GET there is exactly how the client fetches its config. The client also
+  ignores ``webservice_server`` from the config it receives, using the URL it was
+  joined with, so the join URL and the config URL have to be the same one.
+* The micro-server writes ``(device_id, timestamp, data)``. Android's tables are
+  columnar (``double_values_0``, ``accuracy``, ``label``), and have no ``data``
+  column to put a blob in.
+* The micro-server writes to one configured schema. Android rows and study events
+  would land in the iOS database, so no ``aware_android.device_enrolment`` window
+  would ever be derived and the enrolment gate would refuse the device forever.
+
+Offering the choice before those are closed would produce a study that looks
+configured and collects nothing: the phone buffers locally, uploads into the wrong
+place or not at all, and the gap surfaces in the coverage grid weeks later.
 """
 
 #: The phone opens the database itself.
@@ -40,7 +50,7 @@ WEBSERVICE = "webservice"
 CHOICES = (DIRECT, WEBSERVICE)
 
 #: What each platform may be set to today. iOS has no direct-database client;
-#: Android has no webservice upload path.
+#: Android's webservice path has a client but not yet a server to receive it.
 SUPPORTED = {
     "android": (DIRECT,),
     "ios": (WEBSERVICE,),
@@ -78,11 +88,13 @@ def unsupported_reason(platform: str, choice: str) -> str | None:
         return None
     if platform == "android" and choice == WEBSERVICE:
         return (
-            "The Android client cannot upload over HTTP/S. Its sync adapter writes "
-            "to MySQL directly and has no webservice upload path, so a phone given "
-            "this configuration would keep collecting and never deliver, with "
-            "nothing on the phone or the server saying so. Android stays on "
-            f"{DIRECT!r} until the client gains an HTTP upload path."
+            "The server cannot yet receive Android data over HTTP/S. The client can "
+            "send it, but the study URL serves a QR page rather than a study "
+            "configuration, the micro-server writes the iOS row shape into one "
+            "configured schema, and Android's tables are columnar and live in "
+            "another. A phone given this configuration would collect and never "
+            "deliver, or deliver where nothing reads it. Android stays on "
+            f"{DIRECT!r} until the micro-server can serve and store it."
         )
     if platform == "ios" and choice == DIRECT:
         return (

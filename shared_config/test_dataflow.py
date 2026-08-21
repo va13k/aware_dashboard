@@ -4,11 +4,13 @@ A dataflow is several settings that have to agree, so these check the derived
 config rather than the field on its own: whether the phone is handed database
 coordinates, what address it is given, and whether the webservice channel is on.
 
-The Android webservice case is tested for its *refusal* as much as its output.
-This deployment's Android client uploads through `Jdbc.insertData` and has no HTTP
-upload path, so a config telling a phone to use one would be silently ignored ---
-the phone would collect, buffer and never deliver. The check exists so that cannot
-be configured by accident.
+The Android webservice case is tested for its *refusal* as much as its output. The
+client can upload over HTTP; what it cannot yet do is be received --- the study URL
+serves a QR page rather than a config, and the micro-server writes the iOS row shape
+into a single schema. A config telling a phone to use that path would leave it
+collecting and delivering nowhere, so the refusal exists to keep it from being
+configured by accident, and its wording has to point at this side rather than the
+client.
 """
 
 import copy
@@ -89,8 +91,10 @@ def test_android_webservice_is_refused_and_says_why():
 
     assert reason is not None
     # The reason has to name the missing piece; "unsupported" alone sends a
-    # researcher hunting for a setting that does not exist.
-    assert "no webservice upload path" in reason
+    # researcher hunting for a setting that does not exist. The missing piece is
+    # this side's -- the client can send -- so the reason must not blame it.
+    assert "The server cannot yet receive" in reason
+    assert "client can" in reason
 
 
 def test_ios_direct_is_refused_and_says_why():

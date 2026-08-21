@@ -57,6 +57,9 @@ class MySQLVerticle : AbstractVerticle() {
    */
   private val enrolledDevices: MutableSet<String> = ConcurrentHashMap.newKeySet()
 
+  /** Each table's columns, so a batch is shaped like the table it is going into. */
+  private val tableColumns: MutableMap<String, Set<String>> = ConcurrentHashMap()
+
   override fun start(startPromise: Promise<Void>?) {
     super.start(startPromise)
 
@@ -465,6 +468,70 @@ class MySQLVerticle : AbstractVerticle() {
       return
     }
 
+    // The shape has to be the table's, not one shape for every table. The iOS
+    // schema keeps a row's fields in a `data` column; the Android schema gives each
+    // field its own column and has no `data` to put a blob in. One hardcoded column
+    // list can serve one of them and silently fails the other.
+    columnsOf(table)
+      .onFailure { e ->
+        logger.error(e) { "Could not read the columns of $table; nothing was stored." }
+      }
+      .onSuccess { columns -> writeBatch(table, device_id, data, columns) }
+  }
+
+  /**
+   * The columns a table actually has, read once and remembered.
+   *
+   * Read from the schema rather than assumed, because the two platforms' tables
+   * disagree about how a row is stored and the request does not say which it is
+   * talking to. Cached because it changes only when somebody alters the table, and
+   * a lookup per batch would be a round trip for an answer that does not move.
+   */
+  private fun columnsOf(table: String): Future<Set<String>> {
+    tableColumns[table]?.let { return Future.succeededFuture(it) }
+
+    val promise: Promise<Set<String>> = Promise.promise()
+    sqlClient
+      .query(
+        "SELECT `COLUMN_NAME` FROM `information_schema`.`COLUMNS` " +
+          "WHERE `TABLE_SCHEMA` = DATABASE() AND `TABLE_NAME` = '${sqlValue(table)}'"
+      )
+      .execute()
+      .onFailure { e -> promise.fail(e) }
+      .onSuccess { rows ->
+        val found = rows.map { it.getString("COLUMN_NAME") }.toSet()
+        if (found.isEmpty()) {
+          promise.fail(IllegalStateException("table $table does not exist"))
+        } else {
+          tableColumns[table] = found
+          promise.complete(found)
+        }
+      }
+    return promise.future()
+  }
+
+  private fun writeBatch(
+    table: String,
+    device_id: String,
+    data: JsonArray,
+    columns: Set<String>
+  ) {
+    // A `data` column means this table stores a row whole, which is the iOS shape
+    // and the behaviour every existing deployment relies on. Anything else is
+    // columnar, and each of the row's own fields goes to the column of that name.
+    val blobShaped = columns.contains("data")
+    val written: List<String> =
+      if (blobShaped) listOf("device_id", "timestamp", "data")
+      else columnsFor(data, columns)
+
+    if (written.size <= 1) {
+      logger.warn {
+        "refused an insert into $table from $device_id: none of the row's fields " +
+          "match its columns (${data.size()} rows)"
+      }
+      return
+    }
+
     sqlClient.getConnection { connectionResult ->
       if (connectionResult.succeeded()) {
         val connection = connectionResult.result()
@@ -472,11 +539,11 @@ class MySQLVerticle : AbstractVerticle() {
         val values = ArrayList<String>()
         for (i in 0 until data.size()) {
           val entry = data.getJsonObject(i)
-          // https://github.com/eclipse-vertx/vert.x/commit/ea0eddb129530ab3719c0ef86b471894876ec519#diff-07f061e092a63da24a06ab4507d15125e3377034f21eee18c6d4261f6714e709L241
-          values.add("('$device_id', '${timestampFrom(entry)}', '${StringEscapeUtils.escapeJavaScript(entry.encode())}')")
+          values.add(rowValues(entry, device_id, written, blobShaped))
         }
+        val columnList = written.joinToString(",") { "`$it`" }
         val insertBatch =
-          "INSERT INTO `$table` (`device_id`,`timestamp`,`data`) VALUES ${values.stream().map(Any::toString).collect(
+          "INSERT INTO `$table` ($columnList) VALUES ${values.stream().map(Any::toString).collect(
             Collectors.joining(",")
           )}"
         connection.query(insertBatch)
@@ -491,6 +558,53 @@ class MySQLVerticle : AbstractVerticle() {
           }
       }
     }
+  }
+
+  /**
+   * Which columns a columnar batch writes: `device_id` plus every field the rows
+   * carry that the table has a column for.
+   *
+   * The union across the batch rather than the first row's keys, because a sensor
+   * may omit a field it had nothing to report for, and taking the first row alone
+   * would drop that column for the whole batch. Fields the table does not have are
+   * left out rather than refused: a client newer than the schema should not lose
+   * everything it sent for the sake of one column nobody added yet.
+   */
+  private fun columnsFor(data: JsonArray, columns: Set<String>): List<String> {
+    val present = LinkedHashSet<String>()
+    present.add("device_id")
+    for (i in 0 until data.size()) {
+      for (field in data.getJsonObject(i).fieldNames()) {
+        if (field != "device_id" && columns.contains(field)) present.add(field)
+      }
+    }
+    return present.toList()
+  }
+
+  private fun rowValues(
+    entry: JsonObject,
+    device_id: String,
+    written: List<String>,
+    blobShaped: Boolean
+  ): String {
+    if (blobShaped) {
+      // https://github.com/eclipse-vertx/vert.x/commit/ea0eddb129530ab3719c0ef86b471894876ec519#diff-07f061e092a63da24a06ab4507d15125e3377034f21eee18c6d4261f6714e709L241
+      return "('$device_id', '${timestampFrom(entry)}', '${escapedJson(entry)}')"
+    }
+    val rendered = written.map { column ->
+      when (column) {
+        "device_id" -> "'${sqlValue(device_id)}'"
+        "timestamp" -> "'${timestampFrom(entry)}'"
+        else -> {
+          val value = entry.getValue(column)
+          // NULL rather than the empty string: a field the row did not carry is
+          // absent, and a column's own default is a better answer than a value
+          // invented here.
+          if (value == null) "NULL" else "'${sqlValue(value.toString())}'"
+        }
+      }
+    }
+    return "(${rendered.joinToString(", ")})"
   }
 
   override fun stop() {
