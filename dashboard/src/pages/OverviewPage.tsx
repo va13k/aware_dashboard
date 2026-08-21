@@ -8,6 +8,7 @@ import {
   fetchDevices,
   fetchManifest,
   fetchOrphanCounts,
+  fetchStudyDataflow,
   fetchStudyRequirements,
 } from "../api/client";
 import {
@@ -35,6 +36,7 @@ import type {
   Manifest,
   OrphanCounts,
   SensorManifestEntry,
+  StudyDataflow,
   StudyRequirements,
 } from "../types";
 
@@ -43,6 +45,13 @@ const CLOCK_INTERVAL_MS = 10000;
 interface Section {
   title: string;
   sensors: SensorConfig[];
+}
+
+/** Plain words for a dataflow, since "webservice" is our name and not a reader's. */
+function dataflowLabel(dataflow: string | null): string {
+  if (dataflow === "webservice") return "through the server";
+  if (dataflow === "direct") return "straight to the database";
+  return "by an unknown route";
 }
 
 export default function OverviewPage() {
@@ -54,6 +63,7 @@ export default function OverviewPage() {
   );
   const [countsStatus, setCountsStatus] = useState<CountsStatus | null>(null);
   const [orphanCounts, setOrphanCounts] = useState<OrphanCounts | null>(null);
+  const [studyDataflow, setStudyDataflow] = useState<StudyDataflow | null>(null);
   // The period is chosen in the dialog rather than defaulted, so a
   // study-scale download is never something a single click can start.
   const [exporting, setExporting] = useState(false);
@@ -105,6 +115,11 @@ export default function OverviewPage() {
     fetchStudyRequirements()
       .then((data) => setRequirements(data))
       .catch(() => setRequirements(null));
+    // Read once: the dataflow changes when a study is reconfigured, not while
+    // somebody is looking at the page.
+    fetchStudyDataflow()
+      .then(setStudyDataflow)
+      .catch(() => setStudyDataflow(null));
   }, []);
 
   useEffect(() => {
@@ -358,6 +373,45 @@ export default function OverviewPage() {
             </p>
           </div>
         </details>
+      ) : null}
+
+      {/* Where the study's data comes in. Two platforms, two answers, and on
+          Android it is a choice a researcher made -- so it belongs on screen
+          rather than only in a config file. */}
+      {studyDataflow ? (
+        <div className="mb-5 flex flex-wrap items-center gap-x-5 gap-y-1 rounded-2xl border border-wire bg-card px-4 py-3 text-[13px] text-sage shadow-card">
+          <span className="text-[12px] font-semibold uppercase tracking-[0.6px] text-sage">
+            Data arrives
+          </span>
+          <span>
+            Android:{" "}
+            <span className="font-semibold text-ink">
+              {dataflowLabel(studyDataflow.android.dataflow)}
+            </span>
+            {studyDataflow.android.source === "inferred" ? (
+              <span
+                className="text-sage/80"
+                title="Read from the config's webservice setting. It says so outright once the study is regenerated."
+              >
+                {" "}
+                (inferred)
+              </span>
+            ) : null}
+          </span>
+          <span>
+            iPhone:{" "}
+            <span className="font-semibold text-ink">
+              {dataflowLabel(studyDataflow.ios.dataflow)}
+            </span>
+            <span
+              className="text-sage/80"
+              title="An iPhone has no direct-database client, so this is not a choice a study makes."
+            >
+              {" "}
+              (always)
+            </span>
+          </span>
+        </div>
       ) : null}
 
       <CoveragePanel />

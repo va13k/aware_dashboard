@@ -68,6 +68,17 @@ export interface ConfigDiff {
   status_reason: StudyConfigStatusReason | null;
   config_update_enabled: boolean;
   device_config_update_enabled: boolean;
+  /**
+   * Where the study sends its data, and where this phone currently thinks it
+   * does. They differ across a switch until the phone fetches the new config.
+   * `*_source` is "declared" when the config names it and "inferred" when it was
+   * read back out of the webservice setting, which every config predating the
+   * field is.
+   */
+  dataflow: string | null;
+  dataflow_source: string | null;
+  device_dataflow: string | null;
+  device_dataflow_source: string | null;
   server_updated_at: string | null;
   device_updated_at: string | null;
   diff_count: number;
@@ -308,6 +319,18 @@ export interface RefusalCounts {
   attempts: number;
   devices: number;
   platforms: Record<"android" | "ios", RefusalPlatform>;
+}
+
+/** Where a platform's data goes, and how the answer was established. */
+export interface PlatformDataflow {
+  dataflow: string | null;
+  source: string | null;
+}
+
+export interface StudyDataflow {
+  android: PlatformDataflow;
+  ios: PlatformDataflow;
+  config_available: boolean;
 }
 
 export type CoverageAnchor = "data" | "now";

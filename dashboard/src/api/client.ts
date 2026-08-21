@@ -17,6 +17,7 @@ import type {
   SensorRecord,
   SeriesBucket,
   StudyCoverage,
+  StudyDataflow,
   StudyRequirements,
   RefusalCounts,
 } from "../types";
@@ -162,6 +163,10 @@ export const fetchCountsStatus = (): Promise<CountsStatus> => get("/counts/statu
 
 /** Rows whose Android insert supplied no device id, reported outside totals. */
 export const fetchOrphanCounts = (): Promise<OrphanCounts> => get("/counts/orphans");
+
+/** Where each platform's data goes, read from the config the phones were given. */
+export const fetchStudyDataflow = (): Promise<StudyDataflow> =>
+  get("/study/dataflow");
 
 /** Writes refused at ingest, which store nothing and so appear nowhere else. */
 export const fetchRefusals = (): Promise<RefusalCounts> =>

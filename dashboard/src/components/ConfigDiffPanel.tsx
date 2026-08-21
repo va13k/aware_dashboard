@@ -72,6 +72,13 @@ function DiffGroup({
  * Both sides are compared server-side over an allowlist, so no credential ever
  * reaches this component - a differing secret produces no row at all.
  */
+/** Plain words for a dataflow, since "webservice" is our name and not a reader's. */
+function dataflowLabel(dataflow: string | null): string {
+  if (dataflow === "webservice") return "through the server";
+  if (dataflow === "direct") return "straight to the database";
+  return "by an unknown route";
+}
+
 export default function ConfigDiffPanel({ diff }: { diff: ConfigDiff }) {
   const unknown = diff.config_status === "unknown";
   const empty = !unknown && diff.rows.length === 0;
@@ -85,6 +92,32 @@ export default function ConfigDiffPanel({ diff }: { diff: ConfigDiff }) {
           {isoDateTime(diff.device_updated_at)}
         </p>
       </div>
+
+      {/* Where this phone sends its data, beside where the study says it should.
+          They come apart across a dataflow switch, and a phone still on the old
+          path is the thing a researcher has to be able to find. */}
+      {diff.dataflow || diff.device_dataflow ? (
+        <p className="mb-3 text-[13px] text-sage">
+          This phone uploads{" "}
+          <span className="font-semibold text-ink">
+            {dataflowLabel(diff.device_dataflow)}
+          </span>
+          {diff.device_dataflow_source === "inferred" ? (
+            <span className="text-sage/80"> (read from its settings)</span>
+          ) : null}
+          {diff.device_dataflow && diff.dataflow &&
+          diff.device_dataflow !== diff.dataflow ? (
+            <>
+              , but the study now asks for{" "}
+              <span className="font-semibold text-short">
+                {dataflowLabel(diff.dataflow)}
+              </span>
+              . It keeps using the old path until it picks up the new config
+            </>
+          ) : null}
+          .
+        </p>
+      ) : null}
 
       <p className="mb-3 text-[13px] text-sage">
         Device-side config updates are{" "}
