@@ -56,6 +56,13 @@ class ConfigDiff:
     config_update_enabled: bool = False
     #: The same flag as the phone currently has it, which can lag the server.
     device_config_update_enabled: bool = False
+    #: Where the study sends its data, and where this phone currently thinks it
+    #: does. They differ across a dataflow switch until the phone updates, which
+    #: is the whole reason the pair is reported rather than one figure.
+    dataflow: str | None = None
+    dataflow_source: str | None = None
+    device_dataflow: str | None = None
+    device_dataflow_source: str | None = None
     server_updated_at: str | None = None
     device_updated_at: str | None = None
     diff_count: int = 0
@@ -128,9 +135,15 @@ def compare(server: dict | None, device: dict | None) -> ConfigDiff:
     """
     server_updated_at = _updated_at(server)
     device_updated_at = _updated_at(device)
+    server_flow, server_flow_source = study_config.dataflow(server or {})
+    device_flow, device_flow_source = study_config.dataflow(device or {})
     flags = {
         "config_update_enabled": _update_flag(server),
         "device_config_update_enabled": _update_flag(device),
+        "dataflow": server_flow,
+        "dataflow_source": server_flow_source,
+        "device_dataflow": device_flow,
+        "device_dataflow_source": device_flow_source,
         "server_updated_at": server_updated_at,
         "device_updated_at": device_updated_at,
     }

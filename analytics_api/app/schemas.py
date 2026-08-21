@@ -459,6 +459,14 @@ class ConfigDiffSchema(_Derived):
     status_reason: Literal["no_device_config", "no_server_config"] | None = None
     config_update_enabled: bool = False
     device_config_update_enabled: bool = False
+    # Where the study sends its data and where this phone still thinks it does.
+    # Not constrained to the two names: a config predating the field is read back
+    # out of a setting, and an unrecognised value should reach the screen rather
+    # than be dropped for being unfamiliar.
+    dataflow: str | None = None
+    dataflow_source: str | None = None
+    device_dataflow: str | None = None
+    device_dataflow_source: str | None = None
     server_updated_at: str | None = None
     device_updated_at: str | None = None
     diff_count: int = 0

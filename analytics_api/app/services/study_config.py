@@ -212,6 +212,51 @@ def content_fingerprint(config: dict) -> str:
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
 
+
+#: The key the generated config carries once the dataflow is declared explicitly.
+DATAFLOW_KEY = "dataflow"
+
+#: The setting that betrays the dataflow in a config generated before the key
+#: existed. Its value is derived from the choice, so reading it backwards is sound.
+WEBSERVICE_SETTING = "status_webservice"
+
+DIRECT = "direct"
+WEBSERVICE = "webservice"
+
+#: How the answer was arrived at, in the same spirit as an enrolment window's
+#: `join_source`: a value is worth less without knowing what it rests on.
+DECLARED = "declared"
+INFERRED = "inferred"
+
+
+def dataflow(config: dict) -> tuple[str | None, str | None]:
+    """Where this config sends its data, and how that was established.
+
+    Declared when the config carries the field. Inferred from
+    `status_webservice` when it does not, which is every config generated before
+    the field existed --- including the copy every already-enrolled phone is
+    holding. Without the fallback the answer would read as unknown everywhere
+    until the last phone updated, which is precisely the stretch the question
+    matters most.
+
+    ``(None, None)`` when there is no config to read at all.
+    """
+    if not isinstance(config, dict) or not config:
+        return None, None
+
+    declared = as_text(config.get(DATAFLOW_KEY))
+    if declared in {DIRECT, WEBSERVICE}:
+        return declared, DECLARED
+
+    settings = settings_map(config)
+    if WEBSERVICE_SETTING not in settings:
+        return None, None
+    return (
+        WEBSERVICE if is_enabled(settings.get(WEBSERVICE_SETTING)) else DIRECT,
+        INFERRED,
+    )
+
+
 def safe_summary(config: dict) -> dict[str, Any]:
     """The config facts that may be returned to a browser."""
     safe = redact(config)
@@ -228,9 +273,15 @@ def safe_summary(config: dict) -> dict[str, Any]:
         if name.startswith("status_plugin_")
     }
 
+    flow, flow_source = dataflow(config)
+
     return {
         "config_id": safe.get("_id") or None,
         "config_updated_at": safe.get("updatedAt") or None,
+        # Where the phones this config governs send their data, and whether that
+        # is the config's own word or read back out of the webservice setting.
+        "dataflow": flow,
+        "dataflow_source": flow_source,
         "study_title": study_info.get("study_title") or None,
         "config_fingerprint": content_fingerprint(config),
         "require_ssl": is_enabled(database.get("require_ssl")),
