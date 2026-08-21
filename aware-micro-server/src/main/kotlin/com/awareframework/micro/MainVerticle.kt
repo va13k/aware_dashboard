@@ -161,7 +161,15 @@ class MainVerticle : AbstractVerticle() {
     router.route("/cache/*").handler(StaticHandler.create("cache"))
     router.route("/esm/*").handler(StaticHandler.create("esm"))
     router.route().handler {
-      logger.info { "Processing ${it.request().scheme()} ${it.request().method()} : ${it.request().path()} with the following data ${it.request().params().toList()}" }
+      // Names, not values: a participant's sensor rows arrive as request
+      // parameters, and logging them copied the data out of the study database
+      // into container logs nothing governs. The path drops the study key, which
+      // is the credential a phone joins and writes with.
+      logger.info {
+        "Processing ${it.request().scheme()} ${it.request().method()} : " +
+          "${LogSafe.path(it.request().path(), LogSafe.studyKeyOf(currentStudyInfo()))} " +
+          "with parameters ${LogSafe.paramNames(it.request().params().names())}"
+      }
       it.next()
     }
 
@@ -203,7 +211,10 @@ class MainVerticle : AbstractVerticle() {
                 "study_number"
               )}/${currentStudy.getString("study_key")}"
 
-            logger.info { "URL encoded for the QRCode is: $serverURL" }
+            logger.info {
+              "URL encoded for the QRCode is: " +
+                LogSafe.joinUrl(serverURL, currentStudy.getString("study_key"))
+            }
 
             val qrPng = generateQrCodePng(serverURL)
             vertx.fileSystem().writeFile("./cache/qrcode.png", Buffer.buffer(qrPng)) { write ->
@@ -282,7 +293,7 @@ class MainVerticle : AbstractVerticle() {
               route.response().end(JsonArray().add(status).encode())
               route.next()
             } else {
-              logger.info { "Study configuration: ${getStudyConfig().encodePrettily()}" }
+              logger.info { "Study configuration: ${LogSafe.configSummary(getStudyConfig())}" }
               route.response().end(getStudyConfig().encode())
             }
           } else {
@@ -461,7 +472,7 @@ class MainVerticle : AbstractVerticle() {
               vertx.deployVerticle("com.awareframework.micro.WebsocketVerticle")
 
               logger.info { "AWARE Micro API at ${getExternalServerHost(serverConfig)}:${getExternalServerPort(serverConfig)}" }
-              logger.info { "Serving study config: ${getStudyConfig()}" }
+              logger.info { "Serving study config: ${LogSafe.configSummary(getStudyConfig())}" }
               startPromise.complete()
             } else {
               logger.error(server.cause()) { "AWARE Micro initialisation failed!" }
