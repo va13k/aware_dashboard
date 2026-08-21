@@ -100,6 +100,36 @@ services:
       retries: 10
       start_period: 30s
 
+  # The Android instance. One micro-server holds one study and one database, and
+  # the platforms share neither: their schemas keep a row in different shapes, so a
+  # single instance cannot write both. Same image, its own configuration.
+  micro-server-android:
+    build: ./aware-micro-server
+    container_name: aware_micro_android
+    restart: unless-stopped
+    mem_limit: 512m
+    environment:
+      JAVA_TOOL_OPTIONS: "-XX:MaxRAMPercentage=60 -XX:+UseSerialGC -Xss512k"
+    develop:
+      watch:
+        - path: ./aware-micro-server/aware-config.android.json
+          action: restart
+    volumes:
+      - ./aware-micro-server/aware-config.android.json:/app/aware-config.json:ro
+    expose:
+      - "8080"
+    networks:
+      - aware_network
+    depends_on:
+      mysql:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -s -o /dev/null http://localhost:8080/"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
   configurator:
     build:
       context: ./AWARE-Configurator

@@ -86,15 +86,12 @@ def test_an_unrecognisable_value_falls_back_rather_than_propagating(source):
     assert dataflow.declared(source, "android") == dataflow.DIRECT
 
 
-def test_android_webservice_is_refused_and_says_why():
-    reason = dataflow.unsupported_reason("android", dataflow.WEBSERVICE)
-
-    assert reason is not None
-    # The reason has to name the missing piece; "unsupported" alone sends a
-    # researcher hunting for a setting that does not exist. The missing piece is
-    # this side's -- the client can send -- so the reason must not blame it.
-    assert "The server cannot yet receive" in reason
-    assert "client can" in reason
+def test_android_can_now_take_either_path():
+    """Both halves exist: the client uploads over HTTP, and Android has its own
+    micro-server instance serving the Android config and writing the Android
+    schema."""
+    assert dataflow.unsupported_reason("android", dataflow.DIRECT) is None
+    assert dataflow.unsupported_reason("android", dataflow.WEBSERVICE) is None
 
 
 def test_ios_direct_is_refused_and_says_why():
@@ -114,7 +111,10 @@ def test_the_default_study_validates(source):
     assert dataflow.validate(source) == []
 
 
-def test_validate_collects_every_problem_rather_than_the_first(source):
+def test_validate_collects_every_problem_rather_than_the_first(source, monkeypatch):
+    """Tested against a narrowed support matrix rather than today's, so the test
+    keeps checking the collecting and not what happens to be supported."""
+    monkeypatch.setitem(dataflow.SUPPORTED, "android", (dataflow.DIRECT,))
     source["deployment"]["dataflow"] = {"android": "webservice", "ios": "direct"}
 
     problems = dataflow.validate(source)

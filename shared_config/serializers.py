@@ -618,6 +618,67 @@ def serialize_android_config(
     return config
 
 
+def build_android_micro_config(
+    source: dict, settings: dict[str, str | int], study_key: str, study_number: int
+) -> dict:
+    """A micro-server configuration for the Android schema.
+
+    The micro-server holds one study and one database, chosen at startup. Android
+    and iOS keep their data in different schemas *and* in different row shapes, so
+    one instance cannot serve both: it is one instance per platform, and this is the
+    Android one's configuration.
+
+    Deliberately minimal. Its job is to accept inserts and refuse what should not be
+    stored; the study configuration a joining phone downloads is the Android one
+    served statically, not this. So `sensors` and `plugins` are present but empty --
+    the server reads them when asked for a config and must not find them missing --
+    and nothing here is what a participant ever sees.
+
+    The enrolment gate is on. This is the path it was written for: a write from a
+    device the study log never recorded joining is refused here, and the study log
+    itself is exempt, so a phone's own join event still gets through to be derived
+    from.
+    """
+    android_db = source["database"]["android"]
+    return {
+        "server": {
+            "database_engine": "mysql",
+            "database_host": resolve_database_host(
+                source["database"],
+                str(settings["micro_database_host"]),
+                "android",
+            ),
+            "database_name": android_db["name"],
+            "database_user": android_db["username"],
+            "database_pwd": android_db["password"],
+            "database_port": android_db["port"],
+            "server_host": "0.0.0.0",
+            "server_port": settings.get("android_micro_server_port", 8082),
+            "websocket_port": settings.get("android_micro_websocket_port", 8083),
+            "external_server_host": settings["external_server_host"],
+            "external_server_port": settings["public_port"],
+            "path_fullchain_pem": "",
+            "path_key_pem": "",
+            # The gate's home. Android is the platform with an enrolment registry
+            # to check against, and this is the only path our code sits in.
+            "require_enrolment": True,
+        },
+        "study": {
+            "study_key": study_key,
+            "study_number": study_number,
+            "study_name": source["study"]["title"],
+            "study_description": source["study"]["description"],
+            "study_active": bool(source["study"].get("active", True)),
+            "study_start": source["study"].get("start_timestamp", 0),
+            "researcher_first": source["researcher"]["first_name"],
+            "researcher_last": source["researcher"]["last_name"],
+            "researcher_contact": source["researcher"]["contact"],
+        },
+        "sensors": [],
+        "plugins": [],
+    }
+
+
 def update_ios_server_config(
     config: dict,
     source_database: dict[str, object],

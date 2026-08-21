@@ -261,16 +261,17 @@ export default function StudyInformation() {
               <MenuItem value="direct">
                 Straight to the database (phones open MySQL themselves)
               </MenuItem>
-              <MenuItem value="webservice" disabled>
-                Through the server — not available yet
+              <MenuItem value="webservice">
+                Through the server (phones post over HTTPS, no credential)
               </MenuItem>
             </Select>
             <p style={DB_HELPER_STYLE}>
               iPhones always go through the server: an iPhone has no
               direct-database client, so it is not a choice this study makes.
-              Through the server would let Android phones carry no database
-              credential at all — the phone side is built, the server cannot
-              receive it yet.
+              Through the server lets Android phones carry no database
+              credential at all, so the database can stay private — and a write
+              from a device the study log never recorded joining is refused and
+              reported.
             </p>
             <Alert severity="warning" sx={{ mt: 1 }}>
               <AlertTitle>

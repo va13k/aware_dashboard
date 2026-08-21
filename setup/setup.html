@@ -157,8 +157,8 @@
             <option value="direct" selected>
               Straight to the database (phones open MySQL themselves)
             </option>
-            <option value="webservice" disabled>
-              Through the server — not available yet
+            <option value="webservice">
+              Through the server (phones post over HTTPS, no database credential)
             </option>
           </select>
           <p class="hint">
@@ -169,11 +169,11 @@
             delivers, and the gap shows up in the coverage grid weeks later. The
             database has to sit somewhere you can deliberately expose.
             <br /><br />
-            <b>Through the server</b> would mean phones post over HTTPS, which
-            nearly every network allows, and carry no database credential at all —
-            so the database could stay private. The phone side of that is built;
-            the server cannot receive it yet, so the option is shown rather than
-            hidden and will open when it can.
+            <b>Through the server</b> means phones post over HTTPS, which nearly
+            every network allows, and carry no database credential at all — so the
+            database can stay private, remote, or managed by someone else. Android
+            gets its own micro-server instance, and a write from a device the study
+            log never recorded joining is refused there and reported.
             <br /><br />
             iPhones always go through the server: an iPhone has no
             direct-database client, so it is not a choice this study makes.

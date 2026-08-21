@@ -48,12 +48,18 @@ class TestBoundaryValidation:
 
         assert "must be one of" in str(refused.value)
 
-    def test_a_choice_this_deployment_cannot_honour_is_refused_with_the_reason(self):
+    def test_a_choice_this_deployment_cannot_honour_is_refused_with_the_reason(
+        self, monkeypatch
+    ):
+        """Against a narrowed matrix, so this keeps testing that the boundary
+        refuses an unhonourable choice rather than which choices are honourable
+        today."""
+        monkeypatch.setitem(dataflow.SUPPORTED, "android", (dataflow.DIRECT,))
+
         with pytest.raises(SystemExit) as refused:
             write_request_env.clean_dataflow("webservice", "")
 
-        # The reason names what is missing, and it is this side's.
-        assert "The server cannot yet receive" in str(refused.value)
+        assert "does not support" in str(refused.value)
 
 
 class TestApplication:
@@ -72,7 +78,8 @@ class TestApplication:
 
     def test_an_unhonourable_dataflow_writes_nothing_at_all(self, tmp_path, monkeypatch):
         """Refused before the first write, so there is no study half-applied for two
-        dataflows to unpick afterwards."""
+        dataflows to unpick afterwards. Narrowed matrix, as above."""
+        monkeypatch.setitem(dataflow.SUPPORTED, "android", (dataflow.DIRECT,))
         env_file = tmp_path / ".env"
         env_file.write_text("PROTOCOL=http\n")
         monkeypatch.setattr(deploy_config, "ENV_PATH", env_file)

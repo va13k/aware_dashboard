@@ -31,6 +31,7 @@ from shared_config.runtime import (
 )
 from shared_config.serializers import (
     IOS_ESM_CONFIG_FILENAME,
+    build_android_micro_config,
     build_ios_esm_config,
     serialize_android_config,
     serialize_ios_config,
@@ -40,6 +41,9 @@ SOURCE_PATH = PROJECT / "source.json"
 ENV_PATH = PROJECT / ".env"
 REQUEST_ENV_PATH = pathlib.Path("/tmp/aware-dashboard-request.env")
 CONFIG_PATH = PROJECT / "aware-micro-server" / "aware-config.json"
+#: The Android instance's own configuration. One micro-server holds one study and
+#: one database, and the two platforms share neither, so there is one of each.
+ANDROID_CONFIG_PATH = PROJECT / "aware-micro-server" / "aware-config.android.json"
 EXAMPLE_PATH = PROJECT / "aware-micro-server" / "aware-config.example.json"
 ESM_CONFIG_PATH = PROJECT / "aware-micro-server" / "esm" / IOS_ESM_CONFIG_FILENAME
 ANDROID_TEMPLATE_PATH = PROJECT / "AWARE-Configurator" / "reactapp" / "public" / "study-config.json"
@@ -55,6 +59,10 @@ def load_merged_env() -> dict[str, str]:
 
 
 PLACEHOLDER_SECRETS = {"", "CHANGE_ME"}
+
+#: Android's study number. Distinct from iOS's so one path can be routed to each
+#: platform's instance; the study key is shared, since it is the same study.
+ANDROID_STUDY_NUMBER = 2
 
 
 def ensure_participant_password(env: dict[str, str]) -> None:
@@ -461,6 +469,17 @@ def main() -> None:
     )
     android_config = serialize_android_config(source, settings, ANDROID_TEMPLATE_PATH, env["STUDY_ID"], android_study_url)
     write_android_config(android_config)
+
+    # The Android micro-server's own configuration. Written whichever dataflow is
+    # chosen: an instance that is running and unused costs nothing, and generating
+    # it only on the webservice path would mean a switch needed a re-deploy rather
+    # than a restart.
+    android_micro = build_android_micro_config(
+        source, settings, env["STUDY_KEY"], ANDROID_STUDY_NUMBER
+    )
+    atomic_write_text(
+        ANDROID_CONFIG_PATH, json.dumps(android_micro, indent=2) + "\n", SECRET_MODE
+    )
 
     config, study = serialize_ios_config(source, settings, EXAMPLE_PATH, CONFIG_PATH, env["STUDY_KEY"])
     write_micro_config(config)
