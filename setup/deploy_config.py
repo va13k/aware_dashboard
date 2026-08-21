@@ -17,7 +17,7 @@ else:
 if str(PROJECT) not in sys.path:
     sys.path.insert(0, str(PROJECT))
 
-from shared_config import dataflow
+from shared_config import database, dataflow
 from shared_config.source_store import update_source
 from shared_config.runtime import (
     SECRET_MODE,
@@ -109,6 +109,27 @@ def seed_source_secrets(env: dict[str, str]) -> dict:
         return source
 
     return update_source(mutate)
+
+
+
+def resolve_database_readers(env: dict[str, str], source: dict) -> dict[str, str]:
+    """Point every service inside the deployment at the declared database.
+
+    The study model declares the database once. The phones' configs already derive
+    from it; this is the other side of the boundary --- the API, its refresher and
+    the backup job, which reached it by an address written down separately in the
+    compose file and so could not follow a change.
+
+    The analytics password is the deployment's own, not the study's, so it comes
+    from the environment rather than the model. Its default matches the account the
+    bootstrap SQL creates, which is what keeps an existing deployment working
+    without being re-provisioned.
+    """
+    analytics_password = env.get("ANALYTICS_DB_PASSWORD", "analyticspass")
+    resolved = database.resolved_env(source.get("database") or {}, analytics_password)
+    for key, value in resolved.items():
+        set_env_value(ENV_PATH, key, value)
+    return resolved
 
 
 def apply_dataflow(env: dict[str, str], source: dict) -> str:
@@ -426,6 +447,7 @@ def main() -> None:
     # Applied before anything is generated: a refusal here means no half-written
     # study, and the bind address is settled alongside the config that depends on it.
     bind = apply_dataflow(env, source)
+    resolve_database_readers(env, source)
     print(f"dataflow: android={dataflow.declared(source, 'android')} "
           f"ios={dataflow.declared(source, 'ios')} mysql_bind={bind}")
 

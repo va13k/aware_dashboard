@@ -54,7 +54,8 @@ services:
     container_name: aware_mysql_backup
     restart: unless-stopped
     environment:
-      MYSQL_HOST: mysql
+      # The same declaration, resolved for a service inside the deployment.
+      MYSQL_HOST: ${DB_SERVICE_HOST:-mysql}
       MYSQL_PORT: 3306
       MYSQL_USER: root
       MYSQL_PASSWORD: ${MYSQL_ROOT_PASSWORD:-CHANGE_ME}
@@ -173,8 +174,12 @@ services:
     restart: unless-stopped
     mem_limit: 512m
     environment:
-      ANDROID_DATABASE_URL: mysql+aiomysql://aware_analytics:analyticspass@mysql:3306/aware_android
-      IOS_DATABASE_URL: mysql+aiomysql://aware_analytics:analyticspass@mysql:3306/aware_ios
+      # Derived from the study model's single database declaration by setup, so
+      # this service and the refresher below cannot drift apart from each other or
+      # from what the phones were told. The default preserves the bundled database
+      # for a deployment that has not run setup since this became a variable.
+      ANDROID_DATABASE_URL: ${ANDROID_DATABASE_URL:-mysql+aiomysql://aware_analytics:analyticspass@mysql:3306/aware_android}
+      IOS_DATABASE_URL: ${IOS_DATABASE_URL:-mysql+aiomysql://aware_analytics:analyticspass@mysql:3306/aware_ios}
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-CHANGE_ME}
       RESEARCHER_USERNAME: ${RESEARCHER_USERNAME:-}
       RESEARCHER_PASSWORD: ${RESEARCHER_PASSWORD:-}
@@ -221,8 +226,8 @@ services:
     mem_limit: 256m
     command: ["python", "-m", "app.refresh_counts"]
     environment:
-      ANDROID_DATABASE_URL: mysql+aiomysql://aware_analytics:analyticspass@mysql:3306/aware_android
-      IOS_DATABASE_URL: mysql+aiomysql://aware_analytics:analyticspass@mysql:3306/aware_ios
+      ANDROID_DATABASE_URL: ${ANDROID_DATABASE_URL:-mysql+aiomysql://aware_analytics:analyticspass@mysql:3306/aware_android}
+      IOS_DATABASE_URL: ${IOS_DATABASE_URL:-mysql+aiomysql://aware_analytics:analyticspass@mysql:3306/aware_ios}
       # How often a pass runs, and the file each completed pass stamps. The
       # healthcheck below reads both.
       COUNTS_REFRESH_INTERVAL_SECONDS: ${COUNTS_REFRESH_INTERVAL_SECONDS:-60}
