@@ -3,6 +3,12 @@ import pathlib
 import re
 import sys
 
+# The dataflow vocabulary and its rules live with the study model rather than
+# being restated here, so the wizard cannot accept a choice the generation
+# refuses.
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent.parent))
+from shared_config import dataflow  # noqa: E402
+
 # Characters that survive .env, the wizard's JSON responses and MySQL quoting
 # unambiguously, and that a participant can retype from a printed sheet. Kept
 # in step with PASSWORD_PATTERN in script.js.
@@ -52,6 +58,26 @@ def clean_path(value: object, fallback: str) -> str:
     return text
 
 
+
+def clean_dataflow(value: object, fallback: str) -> str:
+    """The Android dataflow, refused here rather than downstream when unknown.
+
+    A value nothing recognises would otherwise reach the study model and be
+    silently replaced by a default, which is the study quietly collecting the
+    wrong way. Refusing at the boundary keeps the answer the researcher gave.
+    """
+    chosen = str(value or fallback or dataflow.DIRECT).strip().lower()
+    if chosen not in dataflow.CHOICES:
+        raise SystemExit(
+            f"ANDROID_DATAFLOW must be one of {', '.join(dataflow.CHOICES)}, "
+            f"not {chosen!r}"
+        )
+    reason = dataflow.unsupported_reason("android", chosen)
+    if reason is not None:
+        raise SystemExit(reason)
+    return chosen
+
+
 def main() -> None:
     if len(sys.argv) != 2:
         raise SystemExit("usage: write_request_env.py <output-path>")
@@ -77,6 +103,10 @@ def main() -> None:
     protocol = (
         str(payload.get("protocol", env_fallback.get("PROTOCOL", "http"))).strip().lower()
         or "http"
+    )
+    android_dataflow = clean_dataflow(
+        payload.get("android_dataflow"),
+        env_fallback.get("ANDROID_DATAFLOW", ""),
     )
     ssl_cert = str(
         payload.get(
@@ -136,6 +166,7 @@ def main() -> None:
         f"PUBLIC_HOST={public_host}",
         f"PUBLIC_PORT={public_port}",
         f"PROTOCOL={protocol}",
+        f"ANDROID_DATAFLOW={android_dataflow}",
         f"MYSQL_BACKUP_HOST_DIR={backup_host_dir}",
         f"MYSQL_BACKUP_INTERVAL_SECONDS={backup_interval_seconds}",
         f"MYSQL_BACKUP_RETENTION_DAYS={backup_retention_days}",

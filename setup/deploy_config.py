@@ -27,6 +27,7 @@ from shared_config.runtime import (
     get_runtime_settings,
     load_env,
     normalize_public_env,
+    set_env_value,
 )
 from shared_config.serializers import (
     IOS_ESM_CONFIG_FILENAME,
@@ -95,9 +96,47 @@ def seed_source_secrets(env: dict[str, str]) -> dict:
         }:
             study["id"] = env["STUDY_ID"]
 
+        # The dataflow the researcher chose at setup. Declared here and nowhere
+        # else, so every generated file downstream derives from one answer rather
+        # than each being set by hand -- a study half-configured for two dataflows
+        # is a study that looks set up and collects nothing.
+        chosen = env.get("ANDROID_DATAFLOW", "").strip().lower()
+        if chosen:
+            declared = source.setdefault("deployment", {}).setdefault("dataflow", {})
+            declared["android"] = chosen
+            declared.setdefault("ios", dataflow.WEBSERVICE)
+
         return source
 
     return update_source(mutate)
+
+
+def apply_dataflow(env: dict[str, str], source: dict) -> str:
+    """Everything the chosen dataflow decides, settled in one place.
+
+    The published config is handled by the serializers, which read the same
+    declaration. What is left is the deployment's own half: whether MySQL is
+    reachable from outside this machine at all. A phone on the direct path has to
+    open it itself; on the webservice path only the micro-server does, and it
+    reaches MySQL over the compose network, so the published port has no audience
+    beyond this host.
+
+    Refuses rather than half-applies: a dataflow this platform cannot honour is a
+    configuration that would leave phones collecting and delivering nowhere.
+    """
+    problems = dataflow.validate(source)
+    if problems:
+        raise SystemExit(
+            "This dataflow cannot be applied. " + " ".join(problems)
+        )
+
+    android = dataflow.declared(source, "android")
+    # Loopback rather than removing the mapping: the mapping is what the compose
+    # file declares, and narrowing the address is the part that decides who can
+    # reach it.
+    bind = "0.0.0.0" if android == dataflow.DIRECT else "127.0.0.1"
+    set_env_value(ENV_PATH, "MYSQL_BIND_ADDRESS", bind)
+    return bind
 
 
 def ensure_django_secret_key(env: dict[str, str]) -> None:
@@ -384,6 +423,12 @@ def main() -> None:
     # answers into one setting again. The identifiers come from the env and the
     # source rather than from the iOS config's study block, which is not built
     # until below.
+    # Applied before anything is generated: a refusal here means no half-written
+    # study, and the bind address is settled alongside the config that depends on it.
+    bind = apply_dataflow(env, source)
+    print(f"dataflow: android={dataflow.declared(source, 'android')} "
+          f"ios={dataflow.declared(source, 'ios')} mysql_bind={bind}")
+
     android_study_url = dataflow.webservice_server(
         dataflow.declared(source, "android"),
         study_url=(

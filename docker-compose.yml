@@ -26,7 +26,12 @@ services:
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-CHANGE_ME}
       PARTICIPANT_DB_PASSWORD: ${PARTICIPANT_DB_PASSWORD:-}
     ports:
-      - 3306:3306
+      # Published only so participant phones can reach MySQL themselves, which is
+      # what the direct dataflow requires. On the webservice dataflow nothing
+      # outside this machine has any business here, so setup binds it to loopback
+      # instead: every service in this file reaches MySQL as `mysql:3306` over the
+      # compose network, so narrowing the published address costs them nothing.
+      - ${MYSQL_BIND_ADDRESS:-0.0.0.0}:3306:3306
     volumes:
       - mysql_data:/var/lib/mysql
       - ./db:/docker-entrypoint-initdb.d

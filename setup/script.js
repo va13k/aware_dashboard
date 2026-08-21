@@ -307,6 +307,7 @@ function getPayload() {
     public_host: host || "localhost",
     public_port: publicPort,
     protocol: proto,
+    android_dataflow: androidDataflow(),
     mysql_backup_host_dir:
       (document.getElementById("backupHostDir").value || "").trim() ||
       "./backups/mysql",
@@ -319,6 +320,15 @@ function getPayload() {
       ? (document.getElementById("keyPath").value || "").trim()
       : "",
   };
+}
+
+
+// The chosen Android dataflow. A disabled option cannot be selected, so this
+// reads what the researcher actually picked rather than assuming the default --
+// and the server validates it again, because a form is not a boundary.
+function androidDataflow() {
+  var el = document.getElementById("androidDataflow");
+  return (el && el.value ? el.value : "direct").trim();
 }
 
 function getEnv() {
@@ -338,6 +348,9 @@ function getEnv() {
     "\n" +
     "PROTOCOL=" +
     payload.protocol +
+    "\n" +
+    "ANDROID_DATAFLOW=" +
+    payload.android_dataflow +
     "\n" +
     "MYSQL_BACKUP_HOST_DIR=" +
     payload.mysql_backup_host_dir +

@@ -151,6 +151,34 @@
             <b>Mac</b> — System Settings → Network → your active adapter.
           </p>
         </div>
+        <div class="field">
+          <label>How Android phones send their data</label>
+          <select id="androidDataflow">
+            <option value="direct" selected>
+              Straight to the database (phones open MySQL themselves)
+            </option>
+            <option value="webservice" disabled>
+              Through the server — not available yet
+            </option>
+          </select>
+          <p class="hint">
+            <b>Straight to the database</b> means every participant's phone must
+            reach MySQL on port 3306 from whatever network they happen to be on,
+            for the length of the study. Fewer moving parts, but a phone that
+            cannot open 3306 does not fail loudly — it collects data it never
+            delivers, and the gap shows up in the coverage grid weeks later. The
+            database has to sit somewhere you can deliberately expose.
+            <br /><br />
+            <b>Through the server</b> would mean phones post over HTTPS, which
+            nearly every network allows, and carry no database credential at all —
+            so the database could stay private. The phone side of that is built;
+            the server cannot receive it yet, so the option is shown rather than
+            hidden and will open when it can.
+            <br /><br />
+            iPhones always go through the server: an iPhone has no
+            direct-database client, so it is not a choice this study makes.
+          </p>
+        </div>
         <div class="toggle-row">
           <div class="toggle" id="sslToggle" onclick="toggleSSL()">
             <div class="toggle-knob"></div>
