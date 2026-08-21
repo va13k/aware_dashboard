@@ -103,6 +103,16 @@ def save_json_file(request):
 
     try:
         file_name = save(content)
+    except ValueError as exc:
+        # write_outputs refuses a dataflow this deployment cannot honour, before
+        # anything is generated. The reason names what is missing, so it is worth
+        # showing rather than collapsing into a server error.
+        logger.error("Save refused: %s", exc)
+        return HttpResponse(
+            json.dumps({"success": False, "msg": str(exc)}),
+            status=400,
+            content_type="application/json",
+        )
     except ParticipantDbError as exc:
         # The credential change was rejected, so nothing was written: the served
         # config and the database stay on their previous, consistent values.
@@ -246,6 +256,17 @@ def sync_database_host(source: dict, raw_host: object) -> None:
 def update_source_from_android_config(source, content):
     study_info = content.get("study_info", {})
     database = content.get("database", {})
+
+    # The dataflow travels in the config the Configurator round-trips, so a
+    # researcher changing it here reaches the one place it is declared. Only a
+    # recognised value is taken: an unrecognised one would otherwise be written
+    # into the study model and quietly resolved to a default, which is the study
+    # collecting the other way without saying so.
+    submitted = str(content.get("dataflow") or "").strip().lower()
+    if submitted in dataflow.CHOICES:
+        declared = source.setdefault("deployment", {}).setdefault("dataflow", {})
+        declared["android"] = submitted
+        declared.setdefault("ios", dataflow.WEBSERVICE)
 
     source["study"]["id"] = content.get("_id", source["study"]["id"])
     source["study"]["title"] = study_info.get("study_title", source["study"]["title"])

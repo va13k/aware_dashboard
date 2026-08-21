@@ -68,6 +68,15 @@ export const sensorDataState = atom({
   effects_UNSTABLE: [localStorageEffect("sensorDataState")],
 });
 
+// Where Android data goes. Its own atom rather than a field on the database
+// information: that object is spread into the config's `database` block, and on the
+// webservice path there is no database block at all -- the dataflow sits above it.
+export const dataflowState = atom({
+  key: "dataflowState",
+  default: "direct",
+  effects_UNSTABLE: [localStorageEffect("dataflowState")],
+});
+
 export const databaseInformationState = atom({
   key: "databaseDataState",
   default: {},

@@ -4,7 +4,14 @@ import Grid from "@mui/material/Unstable_Grid2";
 import Box from "@mui/material/Box";
 import { useRecoilState } from "recoil";
 import { useNavigate } from "react-router-dom";
-import { Alert, AlertTitle, Button, ThemeProvider } from "@mui/material";
+import {
+  Alert,
+  AlertTitle,
+  Button,
+  MenuItem,
+  Select,
+  ThemeProvider,
+} from "@mui/material";
 import Dialog from "@mui/material/Dialog";
 import DialogTitle from "@mui/material/DialogTitle";
 import DialogContent from "@mui/material/DialogContent";
@@ -13,6 +20,7 @@ import DialogActions from "@mui/material/DialogActions";
 import {
   studyFormStudyInformationState,
   databaseInformationState,
+  dataflowState,
 } from "../functions/atom";
 import Field from "../components/Field/Field";
 import customisedTheme from "../functions/theme";
@@ -77,6 +85,7 @@ function describeDatabaseSecurity(databaseInfo) {
 export default function StudyInformation() {
   const [studyInformation] = useRecoilState(studyFormStudyInformationState);
   const [databaseInfo] = useRecoilState(databaseInformationState);
+  const [dataflow, setDataflow] = useRecoilState(dataflowState);
   const dbSecurity = describeDatabaseSecurity(databaseInfo);
   const navigateTo = useNavigate();
 
@@ -239,6 +248,42 @@ export default function StudyInformation() {
             out of the study config. Password and SSL changes are applied to the
             participant database account when you save.
           </p>
+          <Box sx={{ ml: 5, mt: 1, mb: 1, maxWidth: "680px" }}>
+            <p style={{ fontWeight: 600, marginBottom: "6px" }}>
+              How Android phones send their data
+            </p>
+            <Select
+              size="small"
+              fullWidth
+              value={dataflow}
+              onChange={(event) => setDataflow(event.target.value)}
+            >
+              <MenuItem value="direct">
+                Straight to the database (phones open MySQL themselves)
+              </MenuItem>
+              <MenuItem value="webservice" disabled>
+                Through the server — not available yet
+              </MenuItem>
+            </Select>
+            <p style={DB_HELPER_STYLE}>
+              iPhones always go through the server: an iPhone has no
+              direct-database client, so it is not a choice this study makes.
+              Through the server would let Android phones carry no database
+              credential at all — the phone side is built, the server cannot
+              receive it yet.
+            </p>
+            <Alert severity="warning" sx={{ mt: 1 }}>
+              <AlertTitle>
+                Changing this means every participant re-joins
+              </AlertTitle>
+              It cannot be pushed to a phone. The study address a device joined
+              with is how it identifies the study it belongs to, so it cannot be
+              moved underneath them. Enrolled phones keep collecting but stop
+              delivering until each one joins again from a new link or QR code —
+              so changing it on a running study is a decision about contacting
+              every participant.
+            </Alert>
+          </Box>
           <Grid container direction="column" sx={{ ml: 5, mt: 1 }}>
             <CustomizedCheckbox
               recoilState={databaseInformationState}

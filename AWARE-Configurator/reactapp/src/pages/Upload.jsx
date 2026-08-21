@@ -12,6 +12,7 @@ import {
   communicationSensorState,
   createTimeState,
   databaseInformationState,
+  dataflowState,
   gravityState,
   gyroscopeState,
   lightState,
@@ -58,6 +59,7 @@ export default function Upload() {
   const setCreateTime = useSetRecoilState(createTimeState);
   const setStudyInformation = useSetRecoilState(studyFormStudyInformationState);
   const setDatabaseInfo = useSetRecoilState(databaseInformationState);
+  const setDataflow = useSetRecoilState(dataflowState);
   const setQuestions = useSetRecoilState(studyFormQuestionsState);
   const setSchedules = useSetRecoilState(studyFormScheduleConfigurationState);
   const setSensorData = useSetRecoilState(sensorDataState);
@@ -102,6 +104,9 @@ export default function Upload() {
       databaseBlock.database_password = "";
     }
     setDatabaseInfo(databaseBlock);
+    // A config written before the dataflow was declared reads as `direct`, which
+    // is what such a study was already doing.
+    setDataflow(jsonValue.dataflow === "webservice" ? "webservice" : "direct");
     setCreateTime(jsonValue.createdAt);
 
     setQuestions(

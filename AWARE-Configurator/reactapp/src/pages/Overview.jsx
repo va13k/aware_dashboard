@@ -26,6 +26,7 @@ import {
   communicationSensorState,
   createTimeState,
   databaseInformationState,
+  dataflowState,
   gravityState,
   gyroscopeState,
   lightState,
@@ -74,6 +75,7 @@ export default function Overview() {
 
   const studyInformation = useRecoilValue(studyFormStudyInformationState);
   const databaseInfo = useRecoilValue(databaseInformationState);
+  const dataflow = useRecoilValue(dataflowState);
   const questions = useRecoilValue(studyFormQuestionsState);
   const schedules = useRecoilValue(studyFormScheduleConfigurationState);
   const sensorData = useRecoilValue(sensorDataState);
@@ -279,6 +281,9 @@ export default function Overview() {
     return {
       _id: studyId,
       study_info: studyInformation,
+      // Declared above the database block, because on the webservice path there is
+      // no database block to carry it.
+      dataflow,
       database: {
         ...databaseInfo,
         config_without_password: !!(
