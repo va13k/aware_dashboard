@@ -17,6 +17,7 @@ else:
 if str(PROJECT) not in sys.path:
     sys.path.insert(0, str(PROJECT))
 
+from shared_config import dataflow
 from shared_config.source_store import update_source
 from shared_config.runtime import (
     SECRET_MODE,
@@ -379,7 +380,18 @@ def main() -> None:
         str(settings["public_host"]),
         int(settings["public_port"]),
     )
-    android_study_url = f"{base_url}/studies/files/{STUDY_CONFIG_PATH.name}"
+    # The same resolver the Configurator uses, so the two cannot write different
+    # answers into one setting again. The identifiers come from the env and the
+    # source rather than from the iOS config's study block, which is not built
+    # until below.
+    android_study_url = dataflow.webservice_server(
+        dataflow.declared(source, "android"),
+        study_url=(
+            f"{base_url}/{source.get('ios', {}).get('study_number', 1)}"
+            f"/{env['STUDY_KEY']}"
+        ),
+        config_url=f"{base_url}/studies/files/{STUDY_CONFIG_PATH.name}",
+    )
     android_config = serialize_android_config(source, settings, ANDROID_TEMPLATE_PATH, env["STUDY_ID"], android_study_url)
     write_android_config(android_config)
 

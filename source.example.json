@@ -15,7 +15,11 @@
   "deployment": {
     "public_host": "",
     "public_port": 80,
-    "protocol": "http"
+    "protocol": "http",
+    "dataflow": {
+      "android": "direct",
+      "ios": "webservice"
+    }
   },
   "database": {
     "host": "db.internal",

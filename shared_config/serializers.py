@@ -3,6 +3,7 @@ import pathlib
 import secrets
 from datetime import datetime, timezone
 
+from shared_config import dataflow
 from shared_config.runtime import build_public_base_url
 from shared_config.source_store import read_source
 
@@ -551,28 +552,46 @@ def serialize_android_config(
         "researcher_last": researcher["last_name"],
         "researcher_contact": researcher["contact"],
     }
-    config["database"] = {
-        "database_host": resolve_database_host(
-            source["database"],
-            str(settings["android_database_host"]),
-            "android",
-        ),
-        "database_port": str(android_db["port"]),
-        "database_name": android_db["name"],
-        "database_username": android_db["username"],
-        # config_without_password omits the real password from the served config
-        # ("-"), so participants enter it when joining. The account keeps its
-        # password regardless; only what devices receive here changes.
-        "database_password": (
-            "-"
-            if android_db.get("config_without_password", False)
-            else android_db["password"]
-        ),
-        "rootUsername": "-",
-        "rootPassword": "-",
-        "config_without_password": android_db.get("config_without_password", False),
-        "require_ssl": android_db.get("require_ssl", False),
-    }
+    # The dataflow decides whether this config carries database coordinates at
+    # all. A phone on the webservice path never contacts MySQL, so publishing the
+    # address and the account would hand every participant a credential for a
+    # database they do not use -- and this config is served from a public path.
+    android_dataflow = dataflow.declared(source, "android")
+    if dataflow.carries_database_credentials("android", android_dataflow):
+        config["database"] = {
+            "database_host": resolve_database_host(
+                source["database"],
+                str(settings["android_database_host"]),
+                "android",
+            ),
+            "database_port": str(android_db["port"]),
+            "database_name": android_db["name"],
+            "database_username": android_db["username"],
+            # config_without_password omits the real password from the served
+            # config ("-"), so participants enter it when joining. The account
+            # keeps its password regardless; only what devices receive here
+            # changes.
+            "database_password": (
+                "-"
+                if android_db.get("config_without_password", False)
+                else android_db["password"]
+            ),
+            "rootUsername": "-",
+            "rootPassword": "-",
+            "config_without_password": android_db.get(
+                "config_without_password", False
+            ),
+            "require_ssl": android_db.get("require_ssl", False),
+        }
+    else:
+        # Absent rather than blanked. A block of empty strings still tells a
+        # reader the phone is expected to connect somewhere, and the client reads
+        # this block to decide whether it has a database to open at all.
+        config.pop("database", None)
+    # Stated in the config the phone holds, so the dataflow a device is running is
+    # readable from the device's own copy rather than inferred from which settings
+    # happen to be filled in.
+    config["dataflow"] = android_dataflow
     config["createdAt"] = android.get("created_at", "")
     config["updatedAt"] = android.get("updated_at") or datetime.now(timezone.utc).isoformat()
     config["questions"] = build_android_esm_questions(source)
@@ -582,6 +601,10 @@ def serialize_android_config(
         sensor_name: bool(ios_sensors.get(sensor_name, False))
         for sensor_name in IOS_ONLY_SENSOR_NAMES
     }
+    # Derived, not carried: a study whose android.settings said one thing and whose
+    # dataflow said another would be exactly the half-configured state the single
+    # choice exists to prevent.
+    android_settings["status_webservice"] = android_dataflow == dataflow.WEBSERVICE
     update_sensor_settings(config["sensors"], android_settings)
     if webservice_server:
         existing = next(

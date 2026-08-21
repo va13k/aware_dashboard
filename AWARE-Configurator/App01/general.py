@@ -12,6 +12,7 @@ from aware_light_config_Django import settings
 # repo root locally) and adds it to sys.path, so shared_config is importable.
 PROJECT_ROOT = settings.PROJECT_ROOT
 
+from shared_config import dataflow
 from shared_config.source_store import read_source, update_source
 from shared_config.runtime import (
     SHARED_MODE,
@@ -456,7 +457,18 @@ def write_outputs(source):
         str(settings["public_host"]),
         int(settings["public_port"]),
     )
-    android_webservice_url = f"{base_url}/{study['study_number']}/{study['study_key']}"
+    # Refused before anything is written. A study half-applied for two dataflows
+    # is the failure this check exists to prevent, and the reason names the piece
+    # that is missing rather than leaving a researcher hunting for a setting.
+    problems = dataflow.validate(source)
+    if problems:
+        raise ValueError("This dataflow cannot be applied. " + " ".join(problems))
+
+    android_webservice_url = dataflow.webservice_server(
+        dataflow.declared(source, "android"),
+        study_url=f"{base_url}/{study['study_number']}/{study['study_key']}",
+        config_url=f"{base_url}/studies/files/{STUDY_CONFIG_FILE_NAME}",
+    )
     android_config = serialize_android_config(
         source, settings, ANDROID_TEMPLATE_PATH, webservice_server=android_webservice_url
     )
