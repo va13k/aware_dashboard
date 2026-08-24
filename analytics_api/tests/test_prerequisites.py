@@ -12,6 +12,8 @@ import re
 import pytest
 import yaml
 
+from app.services import study_config
+
 CONFIG_PATH_ENV = "CURRENT_STUDY_CONFIG_PATH"
 CONTAINER_CONFIG_PATH = "/app/studies/studyConfig.json"
 STUDIES_MOUNT = "./studies:/app/studies:ro"
@@ -83,15 +85,22 @@ def test_deployed_study_config_has_the_fields_later_phases_read(
     assert any(name.startswith("status_") for name in settings)
 
 
-def test_deployed_study_config_still_carries_credentials(
+def test_deployed_study_config_carries_credentials_on_the_direct_path(
     deployed_study_config: dict,
 ):
     """Documents why the diff is built server-side over an allowlist.
 
-    If this ever stops holding, the redaction work does not become optional -
-    the phone's own copy of the config is the other half of the comparison and
-    can still carry a password.
+    The dataflow decides whether there is a credential to keep out of a diff. A
+    phone on the direct path opens the database itself, so its config carries the
+    password and the phone's own copy is the other half of the comparison. On the
+    webservice path the micro-server holds the credential and the published config
+    has no database block, which is what makes a config served from a public path
+    safe to serve.
     """
+    declared, _ = study_config.dataflow(deployed_study_config)
     database = deployed_study_config.get("database", {})
 
-    assert "database_password" in database
+    if declared == study_config.WEBSERVICE:
+        assert "database_password" not in database
+    else:
+        assert "database_password" in database
