@@ -12,6 +12,7 @@ import io.vertx.config.ConfigStoreOptions
 import io.vertx.core.AbstractVerticle
 import io.vertx.core.Promise
 import io.vertx.core.buffer.Buffer
+import io.vertx.core.eventbus.DeliveryOptions
 import io.vertx.core.file.OpenOptions
 import io.vertx.core.http.HttpHeaders
 import io.vertx.core.http.HttpMethod
@@ -34,6 +35,37 @@ import java.io.ByteArrayOutputStream
 import java.net.URL
 import javax.imageio.ImageIO
 import javax.xml.parsers.DocumentBuilderFactory
+
+/** The largest request body an upload may arrive in. */
+private const val MAX_BODY_BYTES = 1024 * 1024 * 50
+
+/**
+ * How long an insert waits for the database to say whether it took the batch.
+ *
+ * Long enough for a large batch to be written, since a client told the write failed
+ * sends the same rows again and a slow success answered as a failure arrives twice.
+ */
+private const val INSERT_REPLY_TIMEOUT_MS = 120_000L
+
+/** The largest websocket message the server accepts. */
+private const val MAX_WEBSOCKET_MESSAGE_BYTES = 1024 * 1024 * 20
+
+/**
+ * The size limits an upload has to fit through, as one answer both the first server
+ * and a server rebuilt on a configuration change are built from.
+ *
+ * A client sends one batch as a single form attribute, so the attribute allowance is
+ * what decides how much a phone delivers at once. Its own batch ceiling is 8 MiB of
+ * JSON and url-encoding a batch of quotes and braces expands that, so the attribute
+ * allowance is the whole body allowance.
+ */
+private fun serverOptions(): HttpServerOptions =
+  HttpServerOptions()
+    .setMaxWebSocketMessageSize(MAX_WEBSOCKET_MESSAGE_BYTES)
+    .setMaxChunkSize(MAX_BODY_BYTES)
+    .setMaxInitialLineLength(MAX_BODY_BYTES)
+    .setMaxHeaderSize(MAX_BODY_BYTES)
+    .setMaxFormAttributeSize(MAX_BODY_BYTES)
 
 private fun generateQrCodePng(data: String, size: Int = 250): ByteArray {
   val hints = mapOf(EncodeHintType.ERROR_CORRECTION to ErrorCorrectionLevel.M)
@@ -152,12 +184,12 @@ class MainVerticle : AbstractVerticle() {
 
     logger.info { "AWARE Micro initializing..." }
 
-    val serverOptions = HttpServerOptions().setMaxWebSocketMessageSize(1024 * 1024 * 20).setMaxChunkSize(1024 * 1024 * 50).setMaxInitialLineLength(1024 * 1024 * 50).setMaxHeaderSize(1024 * 1024 * 50); 
+    val serverOptions = serverOptions()
     val pebbleEngine = PebbleTemplateEngine.create(vertx, PebbleEngine.Builder().cacheActive(false).build())
     val eventBus = vertx.eventBus()
 
     val router = Router.router(vertx)
-    router.route().handler(BodyHandler.create().setBodyLimit(1024 * 1024 * 50));
+    router.route().handler(BodyHandler.create().setBodyLimit(MAX_BODY_BYTES.toLong()));
     router.route("/cache/*").handler(StaticHandler.create("cache"))
     router.route("/esm/*").handler(StaticHandler.create("esm"))
     router.route().handler {
@@ -193,6 +225,29 @@ class MainVerticle : AbstractVerticle() {
         // HttpServerOptions.host is the host to listen on. So using |server_host|, not |external_server_host| here.
         // See also: https://vertx.io/docs/4.3.3/apidocs/io/vertx/core/net/NetServerOptions.html#DEFAULT_HOST
         serverOptions.host = serverConfig.getString("server_host")
+
+        /**
+         * The QR code for a study whose configuration declares the link to join it.
+         *
+         * The encoded string is `study.join_url` verbatim, because a client uploads to
+         * the address it joined with: a QR encoding any other spelling of the same
+         * study would send a phone's data somewhere its platform's schema is not.
+         * Declared rather than assembled here, so setup and this code give a
+         * participant one address.
+         */
+        router.route(HttpMethod.GET, "/qr.png").handler { route ->
+          val joinUrl = currentStudyInfo().getString("join_url") ?: ""
+          if (joinUrl.isEmpty()) {
+            route.response().statusCode = 404
+            route.response().end()
+          } else {
+            route.response().statusCode = 200
+            route.response()
+              .putHeader(HttpHeaders.CONTENT_TYPE, "image/png")
+              .putHeader(HttpHeaders.CACHE_CONTROL, "no-store")
+              .end(Buffer.buffer(generateQrCodePng(joinUrl)))
+          }
+        }
 
         /**
          * Generate QRCode to join the study
@@ -370,15 +425,37 @@ class MainVerticle : AbstractVerticle() {
 	                  route.response().statusCode = 400
 	                  route.response().end("device_id is required")
 	                } else {
-	                  eventBus.publish(
+	                  // Answered once the batch's fate is known, because the client
+	                  // reads this response as "are these rows on the server" and
+	                  // moves its own watermark past them on a 200. A batch the rule
+	                  // turned away and a batch the database could not take are both
+	                  // still on the phone, and both get a status that says so, so the
+	                  // next sync offers them again.
+	                  eventBus.request<JsonObject>(
 	                    "insertData",
 	                    JsonObject()
 	                      .put("table", route.request().getParam("table"))
 	                      .put("device_id", deviceId)
-	                      .put("data", payload)
+	                      .put("data", payload),
+	                    DeliveryOptions().setSendTimeout(INSERT_REPLY_TIMEOUT_MS)
 	                  )
-	                  route.response().statusCode = 200
-	                  route.response().end()
+	                    .onSuccess { reply ->
+	                      if (reply.body().getBoolean("stored", false)) {
+	                        route.response().statusCode = 200
+	                        route.response().end()
+	                      } else {
+	                        route.response().statusCode = 403
+	                        route.response().end("this device may not write to this study")
+	                      }
+	                    }
+	                    .onFailure { e ->
+	                      logger.error(e) {
+	                        "could not store an insert into " +
+	                          "${route.request().getParam("table")} from $deviceId"
+	                      }
+	                      route.response().statusCode = 503
+	                      route.response().end("the study database could not take this batch")
+	                    }
 	                }
 	              }
               "update" -> {
@@ -486,7 +563,7 @@ class MainVerticle : AbstractVerticle() {
           httpServer.close()
 
           val newServerConfig = newConfig.getJsonObject("server")
-          val newServerOptions = HttpServerOptions()
+          val newServerOptions = serverOptions()
           newServerOptions.host = newServerConfig.getString("server_host")
 
           if (newServerConfig.getString("path_fullchain_pem").isNotEmpty() && newServerConfig.getString("path_key_pem").isNotEmpty()) {

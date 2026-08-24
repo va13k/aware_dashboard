@@ -103,6 +103,10 @@ class MySQLVerticle : AbstractVerticle() {
         // Create the client pool
         sqlClient = MySQLPool.pool(vertx, connectOptions, poolOptions)
 
+        // The reply is what lets a client know whether its rows are on the server.
+        // `stored` false is a batch the rule turned away, and a failed reply is a
+        // batch the database could not take, so the two arrive at the caller as
+        // different answers.
         eventBus.consumer<JsonObject>("insertData") { receivedMessage ->
           val postData = receivedMessage.body()
           insertData(
@@ -110,6 +114,8 @@ class MySQLVerticle : AbstractVerticle() {
             table = postData.getString("table"),
             data = JsonArray(postData.getString("data"))
           )
+            .onSuccess { stored -> receivedMessage.reply(JsonObject().put("stored", stored)) }
+            .onFailure { e -> receivedMessage.fail(500, e.message ?: "insert failed") }
         }
 
         eventBus.consumer<JsonObject>(Refusal.ADDRESS) { receivedMessage ->
@@ -315,14 +321,17 @@ class MySQLVerticle : AbstractVerticle() {
     return StringEscapeUtils.escapeJavaScript(entry.encode())
   }
 
-  private fun insertAwareDeviceData(device_id: String, data: JsonArray) {
+  private fun insertAwareDeviceData(device_id: String, data: JsonArray): Future<Boolean> {
     val entry = firstAwareDeviceEntry(device_id, data)
     if (entry == null) {
       logger.warn { "$device_id ignored empty aware_device insert" }
-      return
+      return Future.succeededFuture(true)
     }
     val entryIsComplete = isCompleteDeviceMetadata(entry)
 
+    // Metadata the server already holds counts as stored: the row is there, so the
+    // client has nothing left to deliver.
+    val stored: Promise<Boolean> = Promise.promise()
     sqlClient.getConnection { connectionResult ->
       if (connectionResult.succeeded()) {
         val connection = connectionResult.result()
@@ -332,12 +341,14 @@ class MySQLVerticle : AbstractVerticle() {
           .onFailure { e ->
             logger.error(e) { "Failed to check existing aware_device metadata." }
             connection.close()
+            stored.fail(e)
           }
           .onSuccess { rows ->
             val existingRows = rows.toList()
             if (hasCompleteAwareDeviceRow(rows)) {
               logger.info { "$device_id ignored duplicate complete aware_device metadata" }
               connection.close()
+              stored.complete(true)
               return@onSuccess
             }
 
@@ -346,6 +357,7 @@ class MySQLVerticle : AbstractVerticle() {
               if (!entryIsComplete) {
                 logger.info { "$device_id ignored duplicate pending aware_device metadata" }
                 connection.close()
+                stored.complete(true)
                 return@onSuccess
               }
               "UPDATE `aware_device` SET `timestamp` = '${timestampFrom(entry)}', `data` = '${escapedJson(entry)}' WHERE `_id` = $existingRowId"
@@ -357,22 +369,33 @@ class MySQLVerticle : AbstractVerticle() {
               .onFailure { e ->
                 logger.error(e) { "Failed to insert aware_device metadata." }
                 connection.close()
+                stored.fail(e)
               }
               .onSuccess { _ ->
                 logger.info { "$device_id saved to aware_device: 1 records" }
                 connection.close()
+                stored.complete(true)
               }
           }
       } else {
         logger.error(connectionResult.cause()) { "Failed to establish connection." }
+        stored.fail(connectionResult.cause())
       }
     }
+    return stored.future()
   }
 
-  fun insertData(table: String, device_id: String, data: JsonArray) {
+  /**
+   * Store a batch, and report what became of it.
+   *
+   * `true` is stored, `false` is turned away by the rule, and a failed future is a
+   * database that could not take it. The caller answers its client from that, so a
+   * batch the server does not hold is a batch the client still has.
+   */
+  fun insertData(table: String, device_id: String, data: JsonArray): Future<Boolean> {
     if (data.isEmpty()) {
       logger.warn { "$device_id ignored empty insert for $table" }
-      return
+      return Future.succeededFuture(true)
     }
 
     // The last gate before the SQL, so the rule holds for every route that
@@ -383,18 +406,35 @@ class MySQLVerticle : AbstractVerticle() {
     if (device_id.isBlank()) {
       logger.warn { "refused an insert into $table with no device_id (${data.size()} rows)" }
       recordRefusal("", table, Refusal.NO_DEVICE_ID, data.size())
-      return
+      return Future.succeededFuture(false)
     }
 
     if (!EnrolmentGate.mustConsultRegistry(requireEnrolment, table, device_id in enrolledDevices)) {
-      storeData(table, device_id, data)
-      return
+      return storeData(table, device_id, data)
     }
 
-    hasEnrolmentWindow(device_id)
-      .onSuccess { enrolled ->
-        if (enrolled) {
-          enrolledDevices.add(device_id)
+    // Recovery sits on the registry read alone, so a database that cannot take the
+    // batch is reported as a failure rather than answered by reading the registry
+    // again.
+    return hasEnrolmentWindow(device_id)
+      .map { enrolled ->
+        if (enrolled) enrolledDevices.add(device_id)
+        enrolled
+      }
+      .recover { e ->
+        // Admitted, and the failure carried at error level. The registry says which
+        // devices the study accounts for; unreachable, it says nothing about any of
+        // them, and discarding a participant's collection because a lookup timed out
+        // loses data the study cannot collect again. The answer stays unremembered,
+        // so the next batch asks again.
+        logger.error(e) {
+          "stored an insert into $table from $device_id without reading device_enrolment " +
+            "(${data.size()} rows)"
+        }
+        Future.succeededFuture(true)
+      }
+      .compose { admitted ->
+        if (admitted) {
           storeData(table, device_id, data)
         } else {
           logger.warn {
@@ -402,18 +442,8 @@ class MySQLVerticle : AbstractVerticle() {
               "(${data.size()} rows)"
           }
           recordRefusal(device_id, table, Refusal.NO_ENROLMENT, data.size())
+          Future.succeededFuture(false)
         }
-      }
-      .onFailure { e ->
-        // Stored, and the failure carried at error level. The registry says which
-        // devices the study accounts for; unreachable, it says nothing about any of
-        // them, and discarding a participant's collection because a lookup timed out
-        // loses data the study cannot collect again.
-        logger.error(e) {
-          "stored an insert into $table from $device_id without reading device_enrolment " +
-            "(${data.size()} rows)"
-        }
-        storeData(table, device_id, data)
       }
   }
 
@@ -462,21 +492,21 @@ class MySQLVerticle : AbstractVerticle() {
     return enrolmentPromise.future()
   }
 
-  private fun storeData(table: String, device_id: String, data: JsonArray) {
+  /** Store a batch in the shape its table has, reporting whether the rows landed. */
+  private fun storeData(table: String, device_id: String, data: JsonArray): Future<Boolean> {
     if (table == "aware_device") {
-      insertAwareDeviceData(device_id, data)
-      return
+      return insertAwareDeviceData(device_id, data)
     }
 
     // The shape has to be the table's, not one shape for every table. The iOS
     // schema keeps a row's fields in a `data` column; the Android schema gives each
     // field its own column and has no `data` to put a blob in. One hardcoded column
     // list can serve one of them and silently fails the other.
-    columnsOf(table)
+    return columnsOf(table)
       .onFailure { e ->
         logger.error(e) { "Could not read the columns of $table; nothing was stored." }
       }
-      .onSuccess { columns -> writeBatch(table, device_id, data, columns) }
+      .compose { columns -> writeBatch(table, device_id, data, columns) }
   }
 
   /**
@@ -515,7 +545,7 @@ class MySQLVerticle : AbstractVerticle() {
     device_id: String,
     data: JsonArray,
     columns: Set<String>
-  ) {
+  ): Future<Boolean> {
     // A `data` column means this table stores a row whole, which is the iOS shape
     // and the behaviour every existing deployment relies on. Anything else is
     // columnar, and each of the row's own fields goes to the column of that name.
@@ -529,9 +559,10 @@ class MySQLVerticle : AbstractVerticle() {
         "refused an insert into $table from $device_id: none of the row's fields " +
           "match its columns (${data.size()} rows)"
       }
-      return
+      return Future.succeededFuture(false)
     }
 
+    val stored: Promise<Boolean> = Promise.promise()
     sqlClient.getConnection { connectionResult ->
       if (connectionResult.succeeded()) {
         val connection = connectionResult.result()
@@ -551,13 +582,19 @@ class MySQLVerticle : AbstractVerticle() {
           .onFailure { e ->
             logger.error(e) { "Failed to process batch." }
             connection.close()
+            stored.fail(e)
           }
           .onSuccess { _ ->
             logger.info { "$device_id inserted to $table: $rows records" }
             connection.close()
+            stored.complete(true)
           }
+      } else {
+        logger.error(connectionResult.cause()) { "Failed to establish connection." }
+        stored.fail(connectionResult.cause())
       }
     }
+    return stored.future()
   }
 
   /**
