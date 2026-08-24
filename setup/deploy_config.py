@@ -60,10 +60,6 @@ def load_merged_env() -> dict[str, str]:
 
 PLACEHOLDER_SECRETS = {"", "CHANGE_ME"}
 
-#: Android's study number. Distinct from iOS's so one path can be routed to each
-#: platform's instance; the study key is shared, since it is the same study.
-ANDROID_STUDY_NUMBER = 2
-
 
 def ensure_participant_password(env: dict[str, str]) -> None:
     """Settle on the password devices use, preferring the researcher's own.
@@ -448,10 +444,8 @@ def main() -> None:
         str(settings["public_host"]),
         int(settings["public_port"]),
     )
-    # The same resolver the Configurator uses, so the two cannot write different
-    # answers into one setting again. The identifiers come from the env and the
-    # source rather than from the iOS config's study block, which is not built
-    # until below.
+    # The same resolver the Configurator uses, so the two write one answer into
+    # one setting.
     # Applied before anything is generated: a refusal here means no half-written
     # study, and the bind address is settled alongside the config that depends on it.
     bind = apply_dataflow(env, source)
@@ -459,13 +453,11 @@ def main() -> None:
     print(f"dataflow: android={dataflow.declared(source, 'android')} "
           f"ios={dataflow.declared(source, 'ios')} mysql_bind={bind}")
 
-    android_study_url = dataflow.webservice_server(
+    android_study_url = dataflow.android_study_url(
         dataflow.declared(source, "android"),
-        study_url=(
-            f"{base_url}/{source.get('ios', {}).get('study_number', 1)}"
-            f"/{env['STUDY_KEY']}"
-        ),
-        config_url=f"{base_url}/studies/files/{STUDY_CONFIG_PATH.name}",
+        base_url,
+        env["STUDY_KEY"],
+        STUDY_CONFIG_PATH.name,
     )
     android_config = serialize_android_config(source, settings, ANDROID_TEMPLATE_PATH, env["STUDY_ID"], android_study_url)
     write_android_config(android_config)
@@ -475,7 +467,7 @@ def main() -> None:
     # it only on the webservice path would mean a switch needed a re-deploy rather
     # than a restart.
     android_micro = build_android_micro_config(
-        source, settings, env["STUDY_KEY"], ANDROID_STUDY_NUMBER
+        source, settings, env["STUDY_KEY"], dataflow.ANDROID_STUDY_NUMBER
     )
     atomic_write_text(
         ANDROID_CONFIG_PATH, json.dumps(android_micro, indent=2) + "\n", SECRET_MODE

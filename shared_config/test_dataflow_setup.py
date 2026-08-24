@@ -27,6 +27,8 @@ sys.path.insert(0, str(SETUP))
 import deploy_config  # noqa: E402
 import write_request_env  # noqa: E402
 
+from shared_config.serializers import build_android_micro_config  # noqa: E402
+
 
 class TestBoundaryValidation:
     """write_request_env.clean_dataflow: the wizard's answer, checked."""
@@ -97,3 +99,79 @@ class TestApplication:
         monkeypatch.setattr(deploy_config, "ENV_PATH", env_file)
 
         assert deploy_config.apply_dataflow({}, {}) == "0.0.0.0"
+
+
+class TestAndroidJoinUrl:
+    """dataflow.android_study_url: the address an Android phone is given.
+
+    On the webservice path the client posts its data to the URL it joined with, so
+    this URL decides which micro-server instance, and therefore which schema, an
+    Android phone writes into. iOS holds study number 1 in this deployment, and
+    Android's own number is what routes a request to the instance that writes the
+    Android schema and runs the enrolment gate. Setup and the Configurator both call
+    this, so a phone is given one address whichever regenerated the config.
+    """
+
+    def _url(self, android, base_url="http://host", study_key="KEY"):
+        return dataflow.android_study_url(
+            dataflow.declared(
+                {"deployment": {"dataflow": {"android": android}}}, "android"
+            ),
+            base_url,
+            study_key,
+            "studyConfig.json",
+        )
+
+    def test_the_webservice_path_addresses_androids_own_study_number(self):
+        assert self._url("webservice") == (
+            f"http://host/{dataflow.ANDROID_STUDY_NUMBER}/KEY"
+        )
+
+    def test_the_study_number_is_androids_rather_than_ios(self):
+        """A URL carrying iOS's number reaches the iOS instance, which stores a row
+        in the iOS shape in the iOS schema and derives no Android enrolment window.
+        """
+        assert "/1/" not in self._url("webservice")
+
+    def test_the_direct_path_addresses_the_published_config(self):
+        """The client opens the database itself and reads this URL for config
+        updates, which the deployment serves as a file."""
+        assert self._url("direct") == "http://host/studies/files/studyConfig.json"
+
+    def test_the_url_and_the_android_instance_name_one_study(self):
+        """A phone is routed to the instance by study number, and the instance
+        accepts the study number it was configured with, so the two agree.
+        """
+        source = {
+            "database": {
+                "android": {
+                    "name": "aware_android",
+                    "username": "participant",
+                    "password": "secret",
+                    "port": 3306,
+                }
+            },
+            "study": {
+                "title": "Study",
+                "description": "",
+                "active": True,
+                "start_timestamp": 0,
+            },
+            "researcher": {
+                "first_name": "First",
+                "last_name": "Last",
+                "contact": "researcher@example.com",
+            },
+        }
+        settings = {
+            "micro_database_host": "mysql",
+            "external_server_host": "http://host",
+            "public_port": 80,
+        }
+        micro = build_android_micro_config(
+            source, settings, "KEY", dataflow.ANDROID_STUDY_NUMBER
+        )
+
+        assert self._url("webservice").endswith(
+            f"/{micro['study']['study_number']}/KEY"
+        )

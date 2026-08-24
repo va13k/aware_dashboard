@@ -51,6 +51,12 @@ SUPPORTED = {
 #: Used when a study predates the field, and when a platform's entry is missing.
 DEFAULTS = {"android": DIRECT, "ios": WEBSERVICE}
 
+#: Android's study number. Distinct from iOS's so one path routes to each platform's
+#: micro-server instance; the study key is shared, since it is the same study. The
+#: nginx configurations route this number to the Android instance and serve the
+#: Android config at it, so they name it too.
+ANDROID_STUDY_NUMBER = 2
+
 
 def declared(source: dict, platform: str) -> str:
     """The dataflow this study declares for a platform.
@@ -125,3 +131,25 @@ def webservice_server(choice: str, study_url: str, config_url: str) -> str:
     One function so the two generators cannot disagree again.
     """
     return study_url if choice == WEBSERVICE else config_url
+
+
+def android_study_url(
+    choice: str, base_url: str, study_key: str, config_file_name: str
+) -> str:
+    """The URL an Android phone is given to join with, for the declared dataflow.
+
+    On the webservice path the client posts its data to the URL it joined with, so
+    this addresses the Android micro-server's study: ``ANDROID_STUDY_NUMBER`` routes
+    a request to the instance that writes the Android schema and runs the enrolment
+    gate, and the same constant configures that instance, so the URL and the
+    instance name one study. On the direct path the client opens the database itself
+    and reads this URL for configuration updates, so it addresses the published
+    Android config.
+
+    One function, so setup and the Configurator hand a phone the same address.
+    """
+    return webservice_server(
+        choice,
+        study_url=f"{base_url}/{ANDROID_STUDY_NUMBER}/{study_key}",
+        config_url=f"{base_url}/studies/files/{config_file_name}",
+    )

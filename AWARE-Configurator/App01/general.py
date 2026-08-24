@@ -485,10 +485,11 @@ def write_outputs(source):
     if problems:
         raise ValueError("This dataflow cannot be applied. " + " ".join(problems))
 
-    android_webservice_url = dataflow.webservice_server(
+    android_webservice_url = dataflow.android_study_url(
         dataflow.declared(source, "android"),
-        study_url=f"{base_url}/{study['study_number']}/{study['study_key']}",
-        config_url=f"{base_url}/studies/files/{STUDY_CONFIG_FILE_NAME}",
+        base_url,
+        study["study_key"],
+        STUDY_CONFIG_FILE_NAME,
     )
     android_config = serialize_android_config(
         source, settings, ANDROID_TEMPLATE_PATH, webservice_server=android_webservice_url
