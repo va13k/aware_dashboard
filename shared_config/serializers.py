@@ -619,7 +619,11 @@ def serialize_android_config(
 
 
 def build_android_micro_config(
-    source: dict, settings: dict[str, str | int], study_key: str, study_number: int
+    source: dict,
+    settings: dict[str, str | int],
+    study_key: str,
+    study_number: int,
+    join_url: str = "",
 ) -> dict:
     """A micro-server configuration for the Android schema.
 
@@ -638,6 +642,10 @@ def build_android_micro_config(
     device the study log never recorded joining is refused here, and the study log
     itself is exempt, so a phone's own join event still gets through to be derived
     from.
+
+    `join_url` is the address a phone joins with, carried so the instance can render
+    the QR code for it. A client uploads to the address it joined with, so the QR and
+    the published link are one string.
     """
     android_db = source["database"]["android"]
     return {
@@ -666,6 +674,7 @@ def build_android_micro_config(
         "study": {
             "study_key": study_key,
             "study_number": study_number,
+            "join_url": join_url,
             "study_name": source["study"]["title"],
             "study_description": source["study"]["description"],
             "study_active": bool(source["study"].get("active", True)),

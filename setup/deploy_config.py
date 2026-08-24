@@ -467,7 +467,11 @@ def main() -> None:
     # it only on the webservice path would mean a switch needed a re-deploy rather
     # than a restart.
     android_micro = build_android_micro_config(
-        source, settings, env["STUDY_KEY"], dataflow.ANDROID_STUDY_NUMBER
+        source,
+        settings,
+        env["STUDY_KEY"],
+        dataflow.ANDROID_STUDY_NUMBER,
+        join_url=android_study_url,
     )
     atomic_write_text(
         ANDROID_CONFIG_PATH, json.dumps(android_micro, indent=2) + "\n", SECRET_MODE

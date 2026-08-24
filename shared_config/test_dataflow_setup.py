@@ -175,3 +175,67 @@ class TestAndroidJoinUrl:
         assert self._url("webservice").endswith(
             f"/{micro['study']['study_number']}/KEY"
         )
+
+class TestAndroidQrCode:
+    """The join link the Android instance renders its QR code from.
+
+    A client uploads to the address it joined with, so the QR and the published link
+    have to be one string: a code encoding another spelling of the same study would
+    route a phone's data to the instance that writes the other platform's schema.
+    """
+
+    def _micro(self, join_url):
+        source = {
+            "database": {
+                "android": {
+                    "name": "aware_android",
+                    "username": "participant",
+                    "password": "secret",
+                    "port": 3306,
+                }
+            },
+            "study": {
+                "title": "Study",
+                "description": "",
+                "active": True,
+                "start_timestamp": 0,
+            },
+            "researcher": {
+                "first_name": "First",
+                "last_name": "Last",
+                "contact": "researcher@example.com",
+            },
+        }
+        settings = {
+            "micro_database_host": "mysql",
+            "external_server_host": "http://host",
+            "public_port": 80,
+        }
+        return build_android_micro_config(
+            source, settings, "KEY", dataflow.ANDROID_STUDY_NUMBER, join_url=join_url
+        )
+
+    def test_the_config_carries_the_join_url_it_is_given(self):
+        url = dataflow.android_study_url(
+            dataflow.WEBSERVICE, "http://host", "KEY", "studyConfig.json"
+        )
+
+        assert self._micro(url)["study"]["join_url"] == url
+
+    def test_the_join_url_matches_the_study_number_the_instance_serves(self):
+        """The QR sends a phone to the instance that accepts its study number."""
+        micro = self._micro(
+            dataflow.android_study_url(
+                dataflow.WEBSERVICE, "http://host", "KEY", "studyConfig.json"
+            )
+        )
+
+        assert micro["study"]["join_url"].endswith(
+            f"/{micro['study']['study_number']}/KEY"
+        )
+
+    def test_a_study_with_no_declared_link_renders_no_code(self):
+        """An empty join_url is what the route answers 404 for, rather than encoding
+        a guess at the address."""
+        assert self._micro("")["study"]["join_url"] == ""
+
