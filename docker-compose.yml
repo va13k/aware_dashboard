@@ -116,15 +116,17 @@ services:
           action: restart
     volumes:
       - ./aware-micro-server/aware-config.android.json:/app/aware-config.json:ro
+    # The port its own configuration gives it, and the one nginx proxies the
+    # Android insert path to.
     expose:
-      - "8080"
+      - "8082"
     networks:
       - aware_network
     depends_on:
       mysql:
         condition: service_healthy
     healthcheck:
-      test: ["CMD-SHELL", "curl -s -o /dev/null http://localhost:8080/"]
+      test: ["CMD-SHELL", "curl -s -o /dev/null http://localhost:8082/"]
       interval: 10s
       timeout: 5s
       retries: 10
