@@ -130,6 +130,9 @@ async def test_a_cold_manifest_excludes_orphans_from_every_statistic():
     assert stats == {
         "row_count": 7,
         "devices_with_data": 1,
+        # Nothing excluded, so the fallback accounts for no held-back rows.
+        "excluded_row_count": 0,
+        "excluded_devices": 0,
         "first_timestamp": 100.0,
         "last_timestamp": 200.0,
     }

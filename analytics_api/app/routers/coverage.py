@@ -81,14 +81,32 @@ def _window(from_ts: float | None, to_ts: float | None) -> tuple:
     return (from_ts, to_ts)
 
 
+def _wanted_tables(platform: str, sensor: str | None):
+    """The tables one scope covers: a sensor's own, or every table when unscoped.
+
+    Shared so a figure and the amount reported beside it are read over the same
+    tables.
+    """
+    if sensor is None:
+        return None
+    return sensor_tables.tables_for(_EXPORT_MODELS_FOR[platform], sensor)
+
+
 async def _platform_counts(
     db: AsyncSession,
     platform: str,
     window: tuple,
     sensor: str | None,
     device: str | None = None,
+    exclude=None,
+    only=None,
 ) -> tuple[int, dict[str, int], dict[str, int]]:
     """One platform's total for the window, its split by sensor, and by table.
+
+    `exclude` leaves the devices a researcher took out of the analysis out of
+    every figure, which is what makes them the ones an export writes. `only`
+    asks the opposite question — what those devices hold — so a dialog can
+    report the amount the exclusion accounts for beside the amount on offer.
 
     The per-table figures come back too, because a size estimate is per table:
     a million magnetometer rows and a million bluetooth rows are not the same
@@ -102,14 +120,12 @@ async def _platform_counts(
     export_models = _EXPORT_MODELS_FOR[platform]
     by_table = sensor_tables.sensor_by_table(export_models)
 
-    wanted = None
-    if sensor is not None:
-        wanted = sensor_tables.tables_for(export_models, sensor)
-        if not wanted:
-            return 0, {}, {}
+    wanted = _wanted_tables(platform, sensor)
+    if sensor is not None and not wanted:
+        return 0, {}, {}
 
     counted = await coverage_rollup.records_by_table(
-        db, _ROLLUP_FOR[platform], window, wanted, device
+        db, _ROLLUP_FOR[platform], window, wanted, device, exclude, only
     )
 
     by_sensor: dict[str, int] = {}
@@ -154,8 +170,13 @@ async def offered_windows(sessions: dict, newest: float | None, now_ms: float) -
     bounds = [(entry["from"], entry["to"]) for entry in askable]
     totals = {name: [0] * len(bounds) for name in sessions}
     for name, db in sessions.items():
+        # Counted over the analysis dataset, so a period offering a figure and
+        # the export it starts report the same number.
         totals[name] = await coverage_rollup.records_for_windows(
-            db, _ROLLUP_FOR[name], bounds
+            db,
+            _ROLLUP_FOR[name],
+            bounds,
+            exclude=await exclusions.excluded_ids(db, _EXCLUSION_FOR[name]),
         )
 
     for index, entry in enumerate(askable):
@@ -932,13 +953,39 @@ async def coverage_counts(
     totals: dict[str, int] = {}
     sensors: dict[str, dict[str, int]] = {}
     estimated = 0
+    held_back = 0
+    held_back_devices = 0
     for name in wanted:
         db = sessions[name]
+        # A device scope names one phone and the export for it writes that
+        # phone's rows, so the figure beside it is that phone's own. Exclusion
+        # governs the study and sensor scopes, where the archive is assembled
+        # from the devices that remain in the analysis.
+        left_out = (
+            set()
+            if device is not None
+            else await exclusions.excluded_ids(db, _EXCLUSION_FOR[name])
+        )
         total, by_sensor, by_table = await _platform_counts(
-            db, name, window, sensor, device
+            db, name, window, sensor, device, exclude=left_out
         )
         totals[name] = total
         sensors[name] = by_sensor
+        if left_out:
+            # Asked of the same window and scope as the figure above, so the two
+            # add up to what arrived and the difference is the decision.
+            excluded_total, _, _ = await _platform_counts(
+                db, name, window, sensor, device, only=left_out
+            )
+            held_back += excluded_total
+            held_back_devices += await coverage_rollup.devices_with_records(
+                db,
+                _ROLLUP_FOR[name],
+                window,
+                _wanted_tables(name, sensor),
+                device,
+                only=left_out,
+            )
         if by_table:
             per_row = await export_size.bytes_per_row(db, databases[name])
             estimated += export_size.estimate(by_table, per_row)
@@ -949,6 +996,13 @@ async def coverage_counts(
         "total": sum(totals.values()),
         "platforms": totals,
         "sensors": sensors,
+        # What the counts above leave out, so a dialog offering a figure can say
+        # why it is smaller than the study. Scoped exactly like the figure: a
+        # sensor dialog reports that sensor, and a window reports that window.
+        "excluded": {
+            "devices": held_back_devices,
+            "records": held_back,
+        },
         # Roughly what the download will weigh. A magnitude, not a promise —
         # see services/export_size.py for how far it can be out.
         "estimated_bytes": estimated,

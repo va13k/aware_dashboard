@@ -264,13 +264,18 @@ async def _sensor_members_across(entries, sensor: str, window=ALL_TIME):
 
 
 
-async def _sensor_stats(db: AsyncSession, models: tuple, cached=None) -> dict:
+async def _sensor_stats(
+    db: AsyncSession, models: tuple, cached=None, held_back=None
+) -> dict:
     """Per-sensor manifest stats.
 
     ``cached`` is the ``(row_count, devices_with_data)`` from the record-count
     cache when available; it replaces the O(rows) ``COUNT`` + ``DISTINCT
     device_id`` scans. First/last timestamps stay live — ``MIN``/``MAX`` on the
     indexed ``timestamp`` is cheap — and a cache miss falls back to live counts.
+
+    ``held_back`` is the same pair for the devices a researcher excluded, which
+    is the part of what arrived that the exports leave out.
     """
     row_count = 0
     device_ids: set[str] = set()
@@ -321,9 +326,16 @@ async def _sensor_stats(db: AsyncSession, models: tuple, cached=None) -> dict:
     else:
         devices_with_data = len(device_ids)
 
+    excluded_rows, excluded_devices = held_back or (0, 0)
+
     return {
         "row_count": row_count,
         "devices_with_data": devices_with_data,
+        # What this sensor loses to exclusion. Reported beside the figure rather
+        # than folded into it, so a card can show the number an export writes and
+        # still account for the difference from what arrived.
+        "excluded_row_count": excluded_rows,
+        "excluded_devices": excluded_devices,
         "first_timestamp": first_timestamp,
         "last_timestamp": last_timestamp,
     }
@@ -537,10 +549,12 @@ def _sensor_tables(platform: str, sensor: str) -> list[str]:
     return sensor_tables.tables_for(_EXPORT_MODELS_FOR[platform], sensor)
 
 
-# The totals below are what a progress bar is measured against. Without a period
-# they come from the count cache, which holds exactly the rows an export writes.
-# With one they come from the rollup, whose buckets are whole hours — so a window
-# landing mid-hour reads slightly high. The bar is completed when the job
+# The totals below are what a progress bar is measured against, and they count
+# the analysis dataset: the excluded devices an export skips are left out of the
+# denominator too, so the bar measures the rows that are actually coming. Without
+# a period the figures come from the count cache, which holds exactly the rows an
+# export writes. With one they come from the rollup, whose buckets are whole
+# hours — so a window landing mid-hour reads slightly high. The bar is completed when the job
 # finishes rather than by reaching its denominator, so the difference is not
 # visible; what would be visible is measuring a windowed export against the whole
 # table, which is what these replace.
@@ -549,11 +563,16 @@ def _sensor_tables(platform: str, sensor: str) -> list[str]:
 async def _sensor_row_total(
     db: AsyncSession, platform: str, count_model, sensor: str, window=ALL_TIME
 ) -> int:
+    left_out = await exclusions.excluded_ids(db, _exclusion_model(count_model))
     if window == ALL_TIME:
-        totals = await record_counts.sensor_totals(db, count_model)
+        totals = await record_counts.sensor_totals(db, count_model, exclude=left_out)
         return int(totals.get(sensor, (0, 0))[0])
     return await coverage_rollup.records_in(
-        db, _rollup_model(platform), window, _sensor_tables(platform, sensor)
+        db,
+        _rollup_model(platform),
+        window,
+        _sensor_tables(platform, sensor),
+        exclude=left_out,
     )
 
 
@@ -571,10 +590,13 @@ async def _device_row_total(
 async def _platform_row_total(
     db: AsyncSession, platform: str, count_model, window=ALL_TIME
 ) -> int:
+    left_out = await exclusions.excluded_ids(db, _exclusion_model(count_model))
     if window == ALL_TIME:
-        totals = await record_counts.sensor_totals(db, count_model)
+        totals = await record_counts.sensor_totals(db, count_model, exclude=left_out)
         return sum(count for count, _ in totals.values())
-    return await coverage_rollup.records_in(db, _rollup_model(platform), window)
+    return await coverage_rollup.records_in(
+        db, _rollup_model(platform), window, exclude=left_out
+    )
 
 
 def _zip_streaming_response(
@@ -708,6 +730,12 @@ async def export_manifest(
     android_db: AsyncSession = Depends(get_android_db),
     ios_db: AsyncSession = Depends(get_ios_db),
 ):
+    # The devices a researcher took out of the analysis. Every count below is
+    # read against them, so the manifest describes the dataset an export writes
+    # and says separately how much the decision leaves out.
+    android_left_out = await exclusions.excluded_ids(android_db, AndroidDeviceExclusion)
+    ios_left_out = await exclusions.excluded_ids(ios_db, IosDeviceExclusion)
+
     platforms = {
         "android": {
             "device_count": len(await _platform_device_ids(android_db, ANDROID_EXPORT_MODELS)),
@@ -721,20 +749,50 @@ async def export_manifest(
 
     # Exact counts come from the cache in one lookup per platform; the manifest
     # only adds cheap MIN/MAX timestamps on top (see _sensor_stats).
-    android_totals = await record_counts.sensor_totals(android_db, AndroidRecordCount)
-    ios_totals = await record_counts.sensor_totals(ios_db, IosRecordCount)
+    android_totals = await record_counts.sensor_totals(
+        android_db, AndroidRecordCount, exclude=android_left_out
+    )
+    ios_totals = await record_counts.sensor_totals(
+        ios_db, IosRecordCount, exclude=ios_left_out
+    )
+    android_held_back = await record_counts.sensor_totals_within(
+        android_db, AndroidRecordCount, android_left_out
+    )
+    ios_held_back = await record_counts.sensor_totals_within(
+        ios_db, IosRecordCount, ios_left_out
+    )
 
     for sensor, (model, schema) in ANDROID_EXPORT_MODELS.items():
         platforms["android"]["sensors"][sensor] = {
-            **await _sensor_stats(android_db, (model,), android_totals.get(sensor)),
+            **await _sensor_stats(
+                android_db,
+                (model,),
+                android_totals.get(sensor),
+                android_held_back.get(sensor),
+            ),
             "fields": list(dict.fromkeys(schema.model_fields.keys())),
         }
 
     for sensor, model_entry in IOS_EXPORT_MODELS.items():
         models = _ios_models(model_entry)
         platforms["ios"]["sensors"][sensor] = {
-            **await _sensor_stats(ios_db, models, ios_totals.get(sensor)),
+            **await _sensor_stats(
+                ios_db, models, ios_totals.get(sensor), ios_held_back.get(sensor)
+            ),
             "fields": await _ios_field_union(ios_db, models),
+        }
+
+    # Counted per device rather than summed over the per-sensor figures: one
+    # excluded phone contributes to as many sensors as it collected, and the
+    # study-wide answer is how many phones and how many rows.
+    for name, db, count_model, left_out in (
+        ("android", android_db, AndroidRecordCount, android_left_out),
+        ("ios", ios_db, IosRecordCount, ios_left_out),
+    ):
+        by_device = await exclusions.records_by_device(db, count_model, left_out)
+        platforms[name]["excluded"] = {
+            "devices": sum(1 for records in by_device.values() if records > 0),
+            "records": sum(by_device.values()),
         }
 
     return {

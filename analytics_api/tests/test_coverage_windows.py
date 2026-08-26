@@ -25,14 +25,18 @@ def rollup(monkeypatch):
     """Lets a test say what each asked-for window holds, per platform."""
     holdings = {"android": 0, "ios": 0}
     asked: list[tuple] = []
+    excluded: dict[str, set] = {"android": set(), "ios": set()}
 
-    async def records_for_windows(db, model, windows, tables=None):
+    async def records_for_windows(db, model, windows, tables=None, exclude=None):
         platform = "ios" if "Ios" in model.__name__ else "android"
-        asked.append((platform, tuple(windows)))
+        asked.append((platform, tuple(windows), frozenset(exclude or ())))
         return [holdings[platform]] * len(windows)
 
     async def newest_timestamp(db, model):
         return NEWEST
+
+    async def excluded_ids(db, model):
+        return set(excluded["ios" if "Ios" in model.__name__ else "android"])
 
     monkeypatch.setattr(
         coverage_router.coverage_rollup, "records_for_windows", records_for_windows
@@ -40,7 +44,8 @@ def rollup(monkeypatch):
     monkeypatch.setattr(
         coverage_router.record_counts, "newest_timestamp", newest_timestamp
     )
-    return holdings, asked
+    monkeypatch.setattr(coverage_router.exclusions, "excluded_ids", excluded_ids)
+    return holdings, asked, excluded
 
 
 @pytest.fixture
@@ -83,7 +88,7 @@ def test_a_relative_period_is_offered_as_the_instants_it_resolves_to(client):
 
 
 def test_a_window_carries_what_it_holds(client, rollup):
-    holdings, _ = rollup
+    holdings, _, _ = rollup
     holdings["android"], holdings["ios"] = 30, 12
 
     hour = window(client.get("/coverage/windows").json(), "data", "hour")
@@ -96,7 +101,7 @@ def test_a_window_carries_what_it_holds(client, rollup):
 def test_an_empty_period_is_offered_as_unavailable(client, rollup):
     """The page greys it out, which is the case the old table probe was slowest
     at: it walked every table before concluding nothing was there."""
-    holdings, _ = rollup
+    holdings, _, _ = rollup
     holdings["android"] = holdings["ios"] = 0
 
     assert window(client.get("/coverage/windows").json(), "now", "hour")["available"] is False
@@ -104,12 +109,12 @@ def test_an_empty_period_is_offered_as_unavailable(client, rollup):
 
 def test_every_bounded_window_is_asked_in_one_read_per_platform(client, rollup):
     """Ten periods asked one at a time is ten aggregates per platform."""
-    _, asked = rollup
+    _, asked, _ = rollup
     client.get("/coverage/windows")
 
     assert len(asked) == 2
-    assert {platform for platform, _ in asked} == {"android", "ios"}
-    assert all(len(windows) == len(coverage.PERIODS) * 2 for _, windows in asked)
+    assert {platform for platform, _, _ in asked} == {"android", "ios"}
+    assert all(len(windows) == len(coverage.PERIODS) * 2 for _, windows, _ in asked)
 
 
 def test_a_period_with_no_anchor_is_unavailable_rather_than_everything(monkeypatch):
@@ -120,7 +125,7 @@ def test_a_period_with_no_anchor_is_unavailable_rather_than_everything(monkeypat
     async def nothing_stored(db, model):
         return None
 
-    async def records_for_windows(db, model, windows, tables=None):
+    async def records_for_windows(db, model, windows, tables=None, exclude=None):
         # The clock-anchored periods still have bounds and are fair to ask
         # about. A boundless one reaching the rollup would count everything.
         assert all(
@@ -128,10 +133,14 @@ def test_a_period_with_no_anchor_is_unavailable_rather_than_everything(monkeypat
         ), windows
         return [0] * len(windows)
 
+    async def nothing_excluded(db, model):
+        return set()
+
     monkeypatch.setattr(coverage_router.record_counts, "newest_timestamp", nothing_stored)
     monkeypatch.setattr(
         coverage_router.coverage_rollup, "records_for_windows", records_for_windows
     )
+    monkeypatch.setattr(coverage_router.exclusions, "excluded_ids", nothing_excluded)
 
     app = FastAPI()
     app.include_router(coverage_router.router)
