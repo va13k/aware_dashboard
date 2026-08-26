@@ -127,7 +127,8 @@ CREATE TABLE IF NOT EXISTS `aware_device` (
   `label` text,
   PRIMARY KEY (`_id`),
   KEY `time_device` (`timestamp`,`device_id`),
-  -- Intentionally non-unique: the client inserts a new row for each change.
+  -- One row per device, rewritten in place when the reported metadata changes,
+  -- so this index serves that lookup rather than a per-change history.
   KEY `device_time` (`device_id`,`timestamp`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 

@@ -25,21 +25,6 @@ import java.util.stream.StreamSupport
 class MySQLVerticle : AbstractVerticle() {
 
   private val logger = KotlinLogging.logger {}
-  private val deviceMetadataFields = listOf(
-    "board",
-    "brand",
-    "device",
-    "build_id",
-    "hardware",
-    "manufacturer",
-    "model",
-    "product",
-    "serial",
-    "release",
-    "release_type",
-    "sdk",
-    "label"
-  )
 
   private lateinit var parameters: JsonObject
   private lateinit var sqlClient: MySQLPool
@@ -264,13 +249,6 @@ class MySQLVerticle : AbstractVerticle() {
     return value.replace("\\", "\\\\").replace("'", "\\'")
   }
 
-  private fun isCompleteDeviceMetadata(entry: JsonObject): Boolean {
-    return deviceMetadataFields.all { field ->
-      val value = entry.getValue(field)
-      value != null && value.toString().isNotBlank()
-    }
-  }
-
   private fun dataJsonFrom(value: Any?): JsonObject? {
     return when (value) {
       is JsonObject -> value
@@ -283,17 +261,28 @@ class MySQLVerticle : AbstractVerticle() {
     }
   }
 
-  private fun hasCompleteAwareDeviceRow(rows: Iterable<io.vertx.sqlclient.Row>): Boolean {
-    return rows.any { row ->
-      val data = dataJsonFrom(row.getValue("data"))
-      data != null && isCompleteDeviceMetadata(data)
+  /** What the row on record says about the device, read in the shape it has. */
+  private fun storedDeviceMetadata(
+    row: io.vertx.sqlclient.Row,
+    fields: List<String>,
+    blobShaped: Boolean
+  ): JsonObject {
+    if (blobShaped) return dataJsonFrom(row.getValue("data")) ?: JsonObject()
+    val stored = JsonObject()
+    for (field in fields) {
+      row.getValue(field)?.let { stored.put(field, it.toString()) }
     }
+    return stored
   }
 
-  private fun firstAwareDeviceEntry(device_id: String, data: JsonArray): JsonObject? {
+  private fun firstAwareDeviceEntry(
+    device_id: String,
+    data: JsonArray,
+    fields: List<String>
+  ): JsonObject? {
     for (i in 0 until data.size()) {
       val entry = data.getJsonObject(i)
-      if (isCompleteDeviceMetadata(entry)) {
+      if (DeviceMetadata.isComplete(entry, fields)) {
         return entry
       }
       logger.warn {
@@ -321,22 +310,48 @@ class MySQLVerticle : AbstractVerticle() {
     return StringEscapeUtils.escapeJavaScript(entry.encode())
   }
 
+  /**
+   * Keep one row per device, and write only when what it says changes.
+   *
+   * The phone reports its make, model and label on every sync. Appending each
+   * report would grow a row a minute per device, every one carrying the same
+   * answer under a moving timestamp, so a write happens when a field differs from
+   * the record and is skipped otherwise. The timestamp then marks when the
+   * metadata last changed rather than when it was last repeated.
+   */
   private fun insertAwareDeviceData(device_id: String, data: JsonArray): Future<Boolean> {
-    val entry = firstAwareDeviceEntry(device_id, data)
+    return columnsOf("aware_device")
+      .onFailure { e ->
+        logger.error(e) { "Could not read the columns of aware_device; nothing was stored." }
+      }
+      .compose { columns -> storeDeviceMetadata(device_id, data, columns) }
+  }
+
+  private fun storeDeviceMetadata(
+    device_id: String,
+    data: JsonArray,
+    columns: Set<String>
+  ): Future<Boolean> {
+    val blobShaped = columns.contains("data")
+    val fields = DeviceMetadata.fieldsKeptBy(columns)
+    val entry = firstAwareDeviceEntry(device_id, data, fields)
     if (entry == null) {
       logger.warn { "$device_id ignored empty aware_device insert" }
       return Future.succeededFuture(true)
     }
-    val entryIsComplete = isCompleteDeviceMetadata(entry)
+    val entryIsComplete = DeviceMetadata.isComplete(entry, fields)
+    val written =
+      if (blobShaped) listOf("device_id", "timestamp", "data")
+      else columnsFor(JsonArray().add(entry), columns)
+    val selected = (listOf("_id") + if (blobShaped) listOf("data") else fields)
+      .joinToString(",") { "`$it`" }
 
-    // Metadata the server already holds counts as stored: the row is there, so the
-    // client has nothing left to deliver.
     val stored: Promise<Boolean> = Promise.promise()
     sqlClient.getConnection { connectionResult ->
       if (connectionResult.succeeded()) {
         val connection = connectionResult.result()
         connection
-          .query("SELECT `_id`, `data` FROM `aware_device` WHERE `device_id` = '${sqlValue(device_id)}'")
+          .query("SELECT $selected FROM `aware_device` WHERE `device_id` = '${sqlValue(device_id)}'")
           .execute()
           .onFailure { e ->
             logger.error(e) { "Failed to check existing aware_device metadata." }
@@ -344,25 +359,37 @@ class MySQLVerticle : AbstractVerticle() {
             stored.fail(e)
           }
           .onSuccess { rows ->
-            val existingRows = rows.toList()
-            if (hasCompleteAwareDeviceRow(rows)) {
-              logger.info { "$device_id ignored duplicate complete aware_device metadata" }
+            val existingRow = rows.toList().firstOrNull()
+            val onRecord = existingRow?.let { storedDeviceMetadata(it, fields, blobShaped) }
+
+            // Metadata the server already holds counts as stored: the row is
+            // there, so the client has nothing left to deliver.
+            if (onRecord != null && DeviceMetadata.isUnchanged(onRecord, entry, fields)) {
+              logger.info { "$device_id ignored unchanged aware_device metadata" }
               connection.close()
               stored.complete(true)
               return@onSuccess
             }
 
-            val existingRowId = existingRows.firstOrNull()?.let { rowId(it) }
+            val existingRowId = existingRow?.let { rowId(it) }
             val query = if (existingRowId != null) {
-              if (!entryIsComplete) {
-                logger.info { "$device_id ignored duplicate pending aware_device metadata" }
+              // A placeholder must not talk over an answer the phone already gave.
+              if (!entryIsComplete && onRecord != null &&
+                DeviceMetadata.isComplete(onRecord, fields)
+              ) {
+                logger.info { "$device_id ignored pending aware_device metadata" }
                 connection.close()
                 stored.complete(true)
                 return@onSuccess
               }
-              "UPDATE `aware_device` SET `timestamp` = '${timestampFrom(entry)}', `data` = '${escapedJson(entry)}' WHERE `_id` = $existingRowId"
+              val assignments = written
+                .filter { it != "device_id" }
+                .joinToString(", ") { column -> "`$column` = ${deviceValue(entry, column)}" }
+              "UPDATE `aware_device` SET $assignments WHERE `_id` = $existingRowId"
             } else {
-              "INSERT INTO `aware_device` (`device_id`,`timestamp`,`data`) VALUES ('${sqlValue(device_id)}', '${timestampFrom(entry)}', '${escapedJson(entry)}')"
+              val columnList = written.joinToString(",") { "`$it`" }
+              "INSERT INTO `aware_device` ($columnList) " +
+                "VALUES ${rowValues(entry, device_id, written, blobShaped)}"
             }
             connection.query(query)
               .execute()
@@ -383,6 +410,18 @@ class MySQLVerticle : AbstractVerticle() {
       }
     }
     return stored.future()
+  }
+
+  /** One column's value, rendered for a SET clause. */
+  private fun deviceValue(entry: JsonObject, column: String): String {
+    return when (column) {
+      "timestamp" -> "'${timestampFrom(entry)}'"
+      "data" -> "'${escapedJson(entry)}'"
+      else -> {
+        val value = entry.getValue(column)
+        if (value == null) "NULL" else "'${sqlValue(value.toString())}'"
+      }
+    }
   }
 
   /**
