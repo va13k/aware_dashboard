@@ -154,8 +154,13 @@ async def counts_for_device(db: AsyncSession, count_model, device_id: str) -> di
     }
 
 
-async def sensor_totals(db: AsyncSession, count_model) -> dict:
-    """``{sensor: (total_count, devices_with_data)}`` across all devices."""
+async def _totals_where(db: AsyncSession, count_model, *conditions) -> dict:
+    """``{sensor: (total_count, devices_with_data)}`` over the rows matching `conditions`.
+
+    The two conditions every caller shares are applied here: a sensor a device
+    holds nothing for contributes no device, and the orphan row is cache
+    bookkeeping rather than a participant's data.
+    """
     try:
         rows = (
             await db.execute(
@@ -167,6 +172,7 @@ async def sensor_totals(db: AsyncSession, count_model) -> dict:
                 .where(
                     count_model.count > 0,
                     count_model.device_id != ORPHAN_DEVICE,
+                    *conditions,
                 )
                 .group_by(count_model.sensor)
             )
@@ -175,6 +181,34 @@ async def sensor_totals(db: AsyncSession, count_model) -> dict:
         await _rollback(db)
         return {}
     return {sensor: (int(total or 0), int(devices)) for sensor, total, devices in rows}
+
+
+async def sensor_totals(db: AsyncSession, count_model, exclude=None) -> dict:
+    """``{sensor: (total_count, devices_with_data)}`` for the analysis dataset.
+
+    `exclude` names the devices a researcher has taken out, and leaving them out
+    here is what makes the figure the one an export writes. Called without it the
+    answer covers every device that uploaded.
+    """
+    if exclude:
+        return await _totals_where(
+            db, count_model, count_model.device_id.not_in(list(exclude))
+        )
+    return await _totals_where(db, count_model)
+
+
+async def sensor_totals_within(db: AsyncSession, count_model, devices) -> dict:
+    """The same figures restricted to `devices`, which is what an exclusion holds back.
+
+    Reported beside the analysis total so a card can say how much data the
+    decision covers: an exclusion is worth very different consideration at two
+    hundred rows and at two million.
+    """
+    if not devices:
+        return {}
+    return await _totals_where(
+        db, count_model, count_model.device_id.in_(list(devices))
+    )
 
 
 async def newest_timestamp(db: AsyncSession, count_model) -> float | None:

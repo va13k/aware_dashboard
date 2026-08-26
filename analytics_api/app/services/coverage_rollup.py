@@ -234,12 +234,23 @@ def _overlapping(model, window):
 
 
 async def records_by_table(
-    db: AsyncSession, model, window, tables=None, device_id: str | None = None
+    db: AsyncSession,
+    model,
+    window,
+    tables=None,
+    device_id: str | None = None,
+    exclude=None,
+    only=None,
 ) -> dict[str, int]:
     """How many records each table holds inside `window`, per the rollup.
 
     `tables` restricts the answer to a set of table names; `device_id` to one
     phone. A table with nothing in the window is absent rather than zero.
+
+    `exclude` leaves a set of devices out, which is what turns this into the
+    figure an export writes; `only` restricts to that same set, which is the
+    figure the exclusion holds back. An empty `only` matches no device, so a
+    study with nothing excluded holds nothing back.
     """
     query = select(model.table_name, func.sum(model.records).label("records"))
     for condition in _overlapping(model, window):
@@ -248,6 +259,10 @@ async def records_by_table(
         query = query.where(model.table_name.in_(list(tables)))
     if device_id is not None:
         query = query.where(model.device_id == device_id)
+    if exclude:
+        query = query.where(model.device_id.not_in(list(exclude)))
+    if only is not None:
+        query = query.where(model.device_id.in_(list(only)))
 
     try:
         rows = (await db.execute(query.group_by(model.table_name))).all()
@@ -263,14 +278,55 @@ async def records_by_table(
 
 
 async def records_in(
-    db: AsyncSession, model, window, tables=None, device_id: str | None = None
+    db: AsyncSession,
+    model,
+    window,
+    tables=None,
+    device_id: str | None = None,
+    exclude=None,
+    only=None,
 ) -> int:
     """The total the rollup reports for `window`, across `tables`."""
-    return sum((await records_by_table(db, model, window, tables, device_id)).values())
+    return sum(
+        (
+            await records_by_table(
+                db, model, window, tables, device_id, exclude, only
+            )
+        ).values()
+    )
+
+
+async def devices_with_records(
+    db: AsyncSession, model, window, tables=None, device_id=None, only=None
+) -> int:
+    """How many distinct devices the rollup shows records for in `window`.
+
+    Counted rather than derived from a device list, so the figure reported beside
+    a record total covers the same window and tables that total does: a device
+    excluded from the study but silent in the chosen period holds nothing back
+    from it.
+    """
+    query = select(func.count(func.distinct(model.device_id)))
+    for condition in _overlapping(model, window):
+        query = query.where(condition)
+    query = query.where(model.records > 0)
+    if tables is not None:
+        query = query.where(model.table_name.in_(list(tables)))
+    if device_id is not None:
+        query = query.where(model.device_id == device_id)
+    if only is not None:
+        query = query.where(model.device_id.in_(list(only)))
+
+    try:
+        counted = (await db.execute(query)).scalar()
+    except (ProgrammingError, OperationalError, SQLAlchemyError):
+        await _rollback(db)
+        return 0
+    return int(counted or 0)
 
 
 async def records_for_windows(
-    db: AsyncSession, model, windows: list, tables=None
+    db: AsyncSession, model, windows: list, tables=None, exclude=None
 ) -> list[int]:
     """How many records each of several windows holds, in one read.
 
@@ -297,6 +353,8 @@ async def records_for_windows(
     query = select(*columns)
     if tables is not None:
         query = query.where(model.table_name.in_(list(tables)))
+    if exclude:
+        query = query.where(model.device_id.not_in(list(exclude)))
 
     try:
         row = (await db.execute(query)).one()
