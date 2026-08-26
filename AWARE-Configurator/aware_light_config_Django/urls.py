@@ -24,6 +24,7 @@ urlpatterns = [
     path('test_connection/', database_operations.test_connection),
     path('get_token/', general.get_token),
     path('get_participant_password/', general.get_participant_password),
+    path('deployment_facts/', general.deployment_facts),
     path('initialize_database/', database_operations.initialize_database),
     path('save_json_file/', general.save_json_file),
     # Mirrors nginx's `location /studies/files/` alias (nginx/http.conf) so

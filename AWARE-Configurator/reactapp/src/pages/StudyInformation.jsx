@@ -4,14 +4,7 @@ import Grid from "@mui/material/Unstable_Grid2";
 import Box from "@mui/material/Box";
 import { useRecoilState } from "recoil";
 import { useNavigate } from "react-router-dom";
-import {
-  Alert,
-  AlertTitle,
-  Button,
-  MenuItem,
-  Select,
-  ThemeProvider,
-} from "@mui/material";
+import { Alert, AlertTitle, Button, ThemeProvider } from "@mui/material";
 import Dialog from "@mui/material/Dialog";
 import DialogTitle from "@mui/material/DialogTitle";
 import DialogContent from "@mui/material/DialogContent";
@@ -46,6 +39,54 @@ const loadParticipantPassword = () =>
   Axios({ method: "get", url: "get_participant_password/" })
     .then((response) => response.data?.password || "")
     .catch(() => "");
+
+// What the deployment is running, read from the study model and the environment
+// rather than from this browser. Until it answers, the page describes nothing.
+const loadDeploymentFacts = () =>
+  Axios({ method: "get", url: "deployment_facts/" })
+    .then((response) => response.data || null)
+    .catch(() => null);
+
+const DATAFLOW_LABEL = {
+  direct: "Straight to the database — phones open MySQL themselves",
+  webservice:
+    "Through the server — phones post over HTTP/S, carrying no database credential",
+};
+
+// Describes the webservice path, where phones hold no database credential at
+// all. What is worth judging there is the hop a phone actually makes and whether
+// the database the server writes to is reachable beyond this host.
+function describeWebserviceSecurity(facts) {
+  const https = facts.protocol === "https";
+  const dbPrivate = !facts.mysql_reachable_externally;
+
+  if (https && dbPrivate) {
+    return {
+      severity: "success",
+      title: "Recommended setup",
+      body: "Phones post over HTTPS and carry no database credential, and the database is reachable only from this host. This is the strongest combination available.",
+    };
+  }
+  if (!https && dbPrivate) {
+    return {
+      severity: "warning",
+      title: "Phones post over plain HTTP",
+      body: "The database is private and phones carry no credential for it, but the upload itself is unencrypted, so sensor data travels in plaintext between the phone and this server. Serve the deployment over HTTPS to close that.",
+    };
+  }
+  if (https && !dbPrivate) {
+    return {
+      severity: "warning",
+      title: "The database port is published",
+      body: "Uploads are encrypted and phones hold no credential, but MySQL is still published beyond this host even though nothing outside it needs to reach the database on this path. Redeploy to narrow the published port to this machine.",
+    };
+  }
+  return {
+    severity: "error",
+    title: "Weakest option",
+    body: "Uploads travel in plaintext and MySQL is published beyond this host, though nothing outside it needs the database on this path. Serve the deployment over HTTPS and redeploy to narrow the published port.",
+  };
+}
 
 // Describes the security of the current SSL + password-in-config combination
 // and recommends the stronger option (encrypted connection, password kept out
@@ -85,9 +126,29 @@ function describeDatabaseSecurity(databaseInfo) {
 export default function StudyInformation() {
   const [studyInformation] = useRecoilState(studyFormStudyInformationState);
   const [databaseInfo] = useRecoilState(databaseInformationState);
-  const [dataflow, setDataflow] = useRecoilState(dataflowState);
-  const dbSecurity = describeDatabaseSecurity(databaseInfo);
+  const [, setDataflow] = useRecoilState(dataflowState);
+  const [facts, setFacts] = React.useState(null);
   const navigateTo = useNavigate();
+
+  React.useEffect(() => {
+    let cancelled = false;
+    loadDeploymentFacts().then((loaded) => {
+      if (cancelled || !loaded) return;
+      setFacts(loaded);
+      // Kept in the shared state the rest of the form reads, so the study's own
+      // dataflow is what any other page sees.
+      setDataflow(loaded.android_dataflow);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [setDataflow]);
+
+  const dataflow = facts?.android_dataflow ?? null;
+  const direct = dataflow === "direct";
+  const dbSecurity = direct
+    ? describeDatabaseSecurity(databaseInfo)
+    : describeWebserviceSecurity(facts ?? {});
 
   const [blankFields, setBlankFields] = React.useState([]);
   const [open, setOpen] = React.useState(false);
@@ -234,6 +295,42 @@ export default function StudyInformation() {
 
         <div className="border">
           <Grid width={400} ml={5} mt={3}>
+            <p className="title">How data reaches the study</p>
+          </Grid>
+          <Box sx={{ ml: 5, mt: 1, mb: 2, maxWidth: "680px" }}>
+            <p style={{ fontWeight: 600, marginBottom: "6px" }}>
+              Android phones send their data
+            </p>
+            <p
+              style={{
+                background: "#f1f5f9",
+                border: "1px solid #e2e8f0",
+                borderRadius: "6px",
+                padding: "10px 12px",
+                margin: 0,
+                fontSize: "0.95rem",
+              }}
+            >
+              {dataflow ? DATAFLOW_LABEL[dataflow] : "Reading the deployment…"}
+            </p>
+            <p style={DB_HELPER_STYLE}>
+              iPhones always go through the server: an iPhone has no
+              direct-database client, so it is not a choice this study makes.
+            </p>
+            <Alert severity="info" sx={{ mt: 1 }}>
+              <AlertTitle>Changed by redeploying, not here</AlertTitle>
+              The study address a device joined with is how it identifies the
+              study it belongs to, so it cannot be moved underneath enrolled
+              phones — every participant joins again from a new link or QR code.
+              It also decides whether the database port is published, which
+              takes effect only when the deployment is brought up again. Run{" "}
+              <code>./setup.sh</code> to change it.
+            </Alert>
+          </Box>
+        </div>
+
+        <div className="border">
+          <Grid width={400} ml={5} mt={3}>
             <p className="title">Database access</p>
           </Grid>
           <p
@@ -243,48 +340,10 @@ export default function StudyInformation() {
               marginLeft: "40px",
             }}
           >
-            Controls how participant devices reach the study database.
-            Recommended: require an encrypted connection and keep the password
-            out of the study config. Password and SSL changes are applied to the
-            participant database account when you save.
+            {direct
+              ? "Controls how participant devices reach the study database. Recommended: require an encrypted connection and keep the password out of the study config. Password and SSL changes are applied to the participant database account when you save."
+              : "Controls how this server reaches the study database. Participant phones never open it on this path — they post to the server, which performs the write. Password and SSL changes are applied to the database account when you save."}
           </p>
-          <Box sx={{ ml: 5, mt: 1, mb: 1, maxWidth: "680px" }}>
-            <p style={{ fontWeight: 600, marginBottom: "6px" }}>
-              How Android phones send their data
-            </p>
-            <Select
-              size="small"
-              fullWidth
-              value={dataflow}
-              onChange={(event) => setDataflow(event.target.value)}
-            >
-              <MenuItem value="direct">
-                Straight to the database (phones open MySQL themselves)
-              </MenuItem>
-              <MenuItem value="webservice">
-                Through the server (phones post over HTTPS, no credential)
-              </MenuItem>
-            </Select>
-            <p style={DB_HELPER_STYLE}>
-              iPhones always go through the server: an iPhone has no
-              direct-database client, so it is not a choice this study makes.
-              Through the server lets Android phones carry no database
-              credential at all, so the database can stay private — and a write
-              from a device the study log never recorded joining is refused and
-              reported.
-            </p>
-            <Alert severity="warning" sx={{ mt: 1 }}>
-              <AlertTitle>
-                Changing this means every participant re-joins
-              </AlertTitle>
-              It cannot be pushed to a phone. The study address a device joined
-              with is how it identifies the study it belongs to, so it cannot be
-              moved underneath them. Enrolled phones keep collecting but stop
-              delivering until each one joins again from a new link or QR code —
-              so changing it on a running study is a decision about contacting
-              every participant.
-            </Alert>
-          </Box>
           <Grid container direction="column" sx={{ ml: 5, mt: 1 }}>
             <CustomizedCheckbox
               recoilState={databaseInformationState}
@@ -292,32 +351,45 @@ export default function StudyInformation() {
               label="Require an encrypted (SSL/TLS) connection"
             />
             <p style={DB_HELPER_STYLE}>
-              Participant devices must connect to the database over an encrypted
-              (TLS) connection, so sensor data is never sent in plaintext. Only
-              enable this if the devices support TLS — otherwise their uploads
-              are rejected.
+              {direct
+                ? "Participant devices must connect to the database over an encrypted (TLS) connection, so sensor data is never sent in plaintext. Only enable this if the devices support TLS — otherwise their uploads are rejected."
+                : "The account must connect to the database over an encrypted (TLS) connection. On this path that account belongs to the server, so enable it only if the server reaches MySQL over TLS — otherwise its writes are rejected."}
             </p>
-            <CustomizedCheckbox
-              recoilState={databaseInformationState}
-              field="config_without_password"
-              label="Keep the password out of the study config"
-            />
-            <p style={DB_HELPER_STYLE}>
-              When on, the password is not written into the study config — each
-              participant enters it when joining, so it never travels in the
-              downloaded config. When off, the config includes the password and
-              joining is automatic. The database account keeps its password
-              either way.
-            </p>
+            {/* Only the direct path publishes a config carrying the password, so
+                this is the one control that has nothing to govern otherwise. */}
+            {direct ? (
+              <>
+                <CustomizedCheckbox
+                  recoilState={databaseInformationState}
+                  field="config_without_password"
+                  label="Keep the password out of the study config"
+                />
+                <p style={DB_HELPER_STYLE}>
+                  When on, the password is not written into the study config —
+                  each participant enters it when joining, so it never travels
+                  in the downloaded config. When off, the config includes the
+                  password and joining is automatic. The database account keeps
+                  its password either way.
+                </p>
+              </>
+            ) : null}
           </Grid>
           <Box sx={{ ml: 5, mt: 1, mb: 2, maxWidth: "680px" }}>
             <PasswordField
-              fieldName="Participant database password"
+              fieldName={
+                direct
+                  ? "Participant database password"
+                  : "Database password (used by the server)"
+              }
               recoilState={databaseInformationState}
               field="database_password"
               inputLabel="Password"
               onReveal={loadParticipantPassword}
-              description="The database account password. Click the eye to reveal the one in use, or type a new one. Leaving it blank keeps the current password."
+              description={
+                direct
+                  ? "The database account password. Click the eye to reveal the one in use, or type a new one. Leaving it blank keeps the current password."
+                  : "The database account password. On this path the server authenticates with it and phones never see it. Click the eye to reveal the one in use, or type a new one. Leaving it blank keeps the current password."
+              }
             />
           </Box>
           <Box sx={{ ml: 5, mb: 2, maxWidth: "680px" }}>

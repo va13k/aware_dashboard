@@ -57,6 +57,45 @@ def get_token(request):
     return HttpResponse("success")
 
 
+def deployment_facts(request):
+    """What the study is running on, for the form that describes it.
+
+    The dataflow is read from the study model rather than from the browser, so the
+    Configurator shows the study's own answer instead of whatever a form last
+    defaulted to. It is reported rather than offered: changing it re-addresses the
+    study, so every enrolled participant has to join again, and it takes effect
+    only when the deployment is brought up again -- neither of which a page inside
+    a container can do.
+
+    `protocol` and `mysql_reachable_externally` are the two facts the webservice
+    path is judged on: whether the hop a phone makes is encrypted, and whether the
+    database the server writes to is reachable beyond this host.
+    """
+    if request.method != "GET":
+        return HttpResponse(
+            json.dumps({"success": False, "msg": "Invalid request method"}),
+            status=405,
+            content_type="application/json",
+        )
+
+    source = read_source()
+    env = load_env(ENV_PATH)
+    bind = str(env.get("MYSQL_BIND_ADDRESS", "0.0.0.0")).strip()
+    return HttpResponse(
+        json.dumps(
+            {
+                "android_dataflow": dataflow.declared(source, "android"),
+                "ios_dataflow": dataflow.declared(source, "ios"),
+                "protocol": str(env.get("PROTOCOL", "http")).strip().lower(),
+                # A published port narrowed to loopback is reachable only from the
+                # host itself, which is where the micro-server's own hop starts.
+                "mysql_reachable_externally": bind not in ("127.0.0.1", "::1", "localhost"),
+            }
+        ),
+        content_type="application/json",
+    )
+
+
 def get_participant_password(request):
     """Return the participant account password for the study form.
 
