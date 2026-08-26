@@ -176,7 +176,7 @@ If `.env` already exists, the script detects them and offers a choice:
 - **Option 1** — skips the wizard and redeploys immediately with the saved config.
 - **Option 2** — opens the wizard again so you can change any settings before deploying.
 
-Both options re-apply `PARTICIPANT_DB_PASSWORD` to the participant MySQL accounts, so the password in `.env` and the one devices need never drift apart. If you edited the password directly in `.env`, run `setup.sh` (or `python3 setup/init_android_tables.py`) rather than `docker compose up` on its own — starting the containers by hand leaves the existing database untouched, and the accounts keep their old password.
+Both options re-apply `PARTICIPANT_DB_PASSWORD` and `ANDROID_SERVER_DB_PASSWORD` to their MySQL accounts, so the passwords in `.env` and the ones the study needs never drift apart. If you edited a password directly in `.env`, run `setup.sh` (or `python3 setup/init_android_tables.py`) rather than `docker compose up` on its own — starting the containers by hand leaves the existing database untouched, and the accounts keep their old passwords.
 
 ### Remote server deployment
 
@@ -212,6 +212,18 @@ Set the **participant device password** as well. This is the password of the MyS
 - Leave it blank to keep the password the deployment already uses, or to have one generated on a fresh install.
 - On a re-run, the field is pre-filled with the current password. Changing it here applies the new password to the MySQL accounts on the next deployment, so any device still holding the old one must be given the new password.
 - The wizard shows the password again on the completion screen, and it is stored as `PARTICIPANT_DB_PASSWORD` in `.env`. You can also set it there before running `setup.sh`.
+
+This password belongs to the account a phone opens the database with, which is what the **straight to the database** dataflow asks of a phone. On the **through the server** dataflow no phone opens MySQL at all: the micro-server performs every write, with an account of its own — `aware_android_server` — and its own password, generated into `ANDROID_SERVER_DB_PASSWORD`. Nothing publishes that one, and the Configurator's Database access step edits whichever of the two the study's dataflow puts on the ingest path, naming the account it is changing.
+
+The two accounts are granted different things, because they do different work:
+
+| Account | Granted | Used by |
+| --- | --- | --- |
+| `aware_android_participant` | `INSERT` on the Android schema | A participant's phone, on the straight-to-the-database dataflow |
+| `aware_android_server` | `INSERT` on the Android schema, plus reading `device_enrolment`, keeping `refusals`, and updating `aware_device` | The Android micro-server, on the through-the-server dataflow |
+| `aware_analytics` | `SELECT` on both schemas, with write on the dashboard's own cache tables | The dashboard's API and its refresher |
+
+Separate passwords, because the participant one is embedded in the study config every phone downloads, while the server's account can read the enrolment registry a phone's account cannot.
 
 The database also applies built-in connection protection for participant devices:
 
