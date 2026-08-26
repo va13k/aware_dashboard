@@ -342,6 +342,21 @@ def test_the_aggregate_band_follows_the_share_that_reported():
     assert band(10, 10) == coverage_matrix.BAND_EXPECTED
 
 
+def test_the_aggregate_short_band_begins_below_half():
+    """The all-sensors legend names this boundary: red reads "under half the
+    required sensors reported". A threshold moved away from half leaves that
+    wording describing a colour the grid no longer paints there."""
+    assert coverage_matrix.aggregate_band(4, 10) == coverage_matrix.BAND_SHORT
+    assert coverage_matrix.aggregate_band(5, 10) == coverage_matrix.BAND_MODERATE
+    assert coverage_matrix.SHORT_BELOW == 0.5
+
+
+def test_only_a_full_share_reads_as_expected():
+    """The legend names this too: green is "every required sensor reported"."""
+    assert coverage_matrix.aggregate_band(9, 10) == coverage_matrix.BAND_MODERATE
+    assert coverage_matrix.aggregate_band(10, 10) == coverage_matrix.BAND_EXPECTED
+
+
 def test_the_aggregate_has_no_far_above_band():
     """Its share is a fraction of what was asked for and cannot exceed it."""
     assert coverage_matrix.aggregate_band(20, 10) == coverage_matrix.BAND_EXPECTED

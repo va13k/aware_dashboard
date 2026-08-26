@@ -257,7 +257,9 @@ export default function CoveragePanel() {
           ) : null}
 
           <div className="mt-3 flex flex-col gap-2 border-t border-wire pt-2.5 sm:flex-row sm:items-center sm:justify-between">
-            <CoverageLegend />
+            {/* No sensor chosen means every required sensor at once, where the
+                colours grade breadth rather than one sensor's rate. */}
+            <CoverageLegend aggregate={!sensor} />
             <span className="flex items-center gap-3 text-[11px] text-sage/80">
               Buckets are whole hours, in {grid.timezone}.
               {/* The grid as it stands, so the file a researcher circulates

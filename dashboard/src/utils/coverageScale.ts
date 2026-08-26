@@ -29,6 +29,10 @@ import type { CoverageCell } from "../types";
  * The bands themselves are decided by the API (`services/coverage_matrix.py`);
  * what lives here is which colour each one wears. Both grids and the legend read
  * it from here, so a colour on screen and its entry in the key cannot disagree.
+ *
+ * The all-sensors grid wears these colours for a different measurement: its band
+ * counts how many of the required sensors reported, not how much one of them
+ * sent. `AGGREGATE_BAND_LEGEND` is what they claim there.
  */
 
 export type CoverageBand =
@@ -93,7 +97,7 @@ export function cellFill(cell: CoverageCell, ceiling: number): string {
   return BAND_FILL[band];
 }
 
-/** What each colour means, for the key beside a grid. */
+/** What each colour means, for the key beside a single sensor's grid. */
 export const BAND_LEGEND: { band: CoverageBand; fill: string; label: string }[] = [
   { band: "short", fill: BAND_FILL.short, label: "Well under expected" },
   { band: "moderate", fill: BAND_FILL.moderate, label: "Approaching expected" },
@@ -102,4 +106,31 @@ export const BAND_LEGEND: { band: CoverageBand; fill: string; label: string }[] 
   { band: "none", fill: BAND_FILL.none, label: "Nothing arrived" },
   { band: "blank", fill: BAND_FILL.blank, label: "Nothing expected" },
   { band: "unjudged", fill: "bg-plain/70", label: "Arrived · nothing to judge by" },
+];
+
+/**
+ * The same colours, for the grid showing every required sensor at once.
+ *
+ * There the band comes from `aggregate_band`, which counts how many of the
+ * required sensors reported anything rather than how much any one of them sent.
+ * The scale carries no `over`, because a share of what the study asked for cannot
+ * exceed it. One colour meaning two things needs two keys: red on a sensor grid is
+ * a stream running below its configured rate, and red here is a phone reporting
+ * under half the sensors the study asked for.
+ */
+export const AGGREGATE_BAND_LEGEND: {
+  band: CoverageBand;
+  fill: string;
+  label: string;
+}[] = [
+  { band: "short", fill: BAND_FILL.short, label: "Under half the sensors reported" },
+  { band: "moderate", fill: BAND_FILL.moderate, label: "Most sensors reported" },
+  { band: "expected", fill: BAND_FILL.expected, label: "Every sensor reported" },
+  { band: "none", fill: BAND_FILL.none, label: "No sensor reported" },
+  { band: "blank", fill: BAND_FILL.blank, label: "Nothing expected" },
+  {
+    band: "unjudged",
+    fill: "bg-plain/70",
+    label: "Arrived · outside the enrolment",
+  },
 ];

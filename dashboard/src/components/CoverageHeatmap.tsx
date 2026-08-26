@@ -1,6 +1,11 @@
 import { useMemo, useState, type ReactNode } from "react";
 import type { CoverageBucket, CoverageCell } from "../types";
-import { BAND_LEGEND, bandOf, cellFill } from "../utils/coverageScale";
+import {
+  AGGREGATE_BAND_LEGEND,
+  BAND_LEGEND,
+  bandOf,
+  cellFill,
+} from "../utils/coverageScale";
 
 /**
  * The coverage grid: one row per device or per sensor, one column per bucket.
@@ -90,6 +95,29 @@ const BAND_SUMMARY: Record<string, string> = {
   unjudged: "Arrived. No configured rate to compare it with.",
 };
 
+/**
+ * The same bands on the all-sensors grid, where they count sensors rather than rows.
+ *
+ * `aggregate_band` decides the colour from the share of required sensors that
+ * reported anything, so the rate wording above describes a different
+ * measurement. A cell reading "well under the configured rate" when it means
+ * "six of eighteen sensors reported" sends a reader looking at volume for a
+ * problem that is one of breadth.
+ */
+const AGGREGATE_BAND_SUMMARY: Record<string, string> = {
+  blank: "Nothing expected — outside this device's enrolment.",
+  none: "Expected, and no required sensor reported.",
+  short: "Under half the required sensors reported.",
+  moderate: "Most of the required sensors reported, but not all.",
+  expected: "Every required sensor reported.",
+  unjudged: "Arrived outside the enrolment — the study asked for none.",
+};
+
+/** Whether a cell is judged by how many sensors reported rather than by a rate. */
+function isAggregate(cell: CoverageCell): boolean {
+  return cell.required != null;
+}
+
 /** What a cell's detail says, in the order a reader needs it. */
 function cellDetail(
   cell: CoverageCell,
@@ -98,17 +126,23 @@ function cellDetail(
   timezone: string,
 ): string[] {
   const band = bandOf(cell);
+  const aggregate = isAggregate(cell);
   const lines = [
     `${rowLabel} · ${bucketRange(bucket, timezone)}`,
-    BAND_SUMMARY[band],
+    // The rate wording is the fallback: `aggregate_band` produces no `over`, and
+    // a band this table has yet to learn still gets a sentence.
+    (aggregate ? AGGREGATE_BAND_SUMMARY[band] : null) ?? BAND_SUMMARY[band],
   ];
 
   if (band === "blank") return lines;
 
-  if (cell.required != null) {
+  if (aggregate) {
     lines.push(
       `${cell.reporting} of ${cell.required} required sensors reported`,
       recordCount(cell.records ?? 0),
+      // The colour is a count of streams, so the row total says nothing about
+      // it: a phone sending one sensor hard reads red beside a large number.
+      "The colour counts sensors, not records. Pick a sensor above to judge amounts.",
     );
     return lines;
   }
@@ -396,11 +430,17 @@ export default function CoverageHeatmap({
   );
 }
 
-/** What each colour claims, beside the grid. */
-export function CoverageLegend() {
+/**
+ * What each colour claims, beside the grid.
+ *
+ * `aggregate` picks the key for the all-sensors grid, whose colours grade the
+ * share of required sensors that reported rather than one sensor's rate.
+ */
+export function CoverageLegend({ aggregate = false }: { aggregate?: boolean }) {
+  const entries = aggregate ? AGGREGATE_BAND_LEGEND : BAND_LEGEND;
   return (
     <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-[13px] text-sage">
-      {BAND_LEGEND.map((entry) => (
+      {entries.map((entry) => (
         <span key={entry.band} className="flex items-center gap-1.5">
           <span className={`h-3.5 w-3.5 shrink-0 rounded-[2px] ${entry.fill}`} />
           {entry.label}
