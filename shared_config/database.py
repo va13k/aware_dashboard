@@ -8,6 +8,11 @@ configured in different files, so changing one left the others pointing at the o
 server --- and a dashboard still reporting on a database nobody writes to any more
 looks exactly like a study that stopped collecting.
 
+Who writes is resolved here too. Each dataflow puts a different holder on the ingest
+path --- a participant's phone on the direct one, the micro-server on the webservice
+one --- so each has its own account with its own credential and its own grants, and
+the accounts are named below.
+
 Resolution is not copying the address around. Who is asking changes the answer:
 
 *A phone* needs an address reachable from wherever the participant happens to be,
@@ -24,6 +29,8 @@ So one declaration, two resolutions, and the distinction is which side of the
 deployment boundary the reader sits on.
 """
 
+from shared_config import dataflow
+
 #: Names that mean "the database this deployment runs", rather than a host that
 #: exists on a network. Kept in step with resolve_database_host in serializers.
 INTERNAL_HOSTS = frozenset({"", "db.internal", "mysql", "localhost", "127.0.0.1", "0.0.0.0"})
@@ -34,6 +41,74 @@ COMPOSE_HOST = "mysql"
 #: The account the dashboard reads with. Read-only on the study tables, with write
 #: granted on its own cache tables only (see db/dashboard-tables.sql).
 ANALYTICS_USER = "aware_analytics"
+
+#: The account a participant's phone opens the database with on the direct dataflow.
+#: Granted inserts on the platform schema and nothing more: a phone delivers rows and
+#: reads nothing back.
+ANDROID_PARTICIPANT_USER = "aware_android_participant"
+
+#: The account the Android micro-server writes with. Every write on the webservice
+#: dataflow is the server's, so ingest authenticates as the server: inserts on the
+#: platform schema, the enrolment registry it reads to decide whether a device may
+#: write, the refusal counters it keeps, and the device-metadata row it fills in.
+ANDROID_SERVER_USER = "aware_android_server"
+
+#: Which account each Android dataflow puts on the ingest path: the study-model keys
+#: holding its name and password, and the ``.env`` variable the deployment keeps that
+#: password in.
+#:
+#: One table because several readers need the same answer --- the generated
+#: micro-server configuration, the deploy that settles the credential, and the
+#: Configurator's password field as it is revealed, stored and applied to MySQL. A
+#: field that changed one account's password while the study wrote with the other
+#: would report success and collect nothing.
+ANDROID_INGEST_ACCOUNTS = {
+    dataflow.DIRECT: {
+        "name_key": "username",
+        "password_key": "password",
+        "env_key": "PARTICIPANT_DB_PASSWORD",
+        "default_name": ANDROID_PARTICIPANT_USER,
+    },
+    dataflow.WEBSERVICE: {
+        "name_key": "server_username",
+        "password_key": "server_password",
+        "env_key": "ANDROID_SERVER_DB_PASSWORD",
+        "default_name": ANDROID_SERVER_USER,
+    },
+}
+
+
+def android_ingest_account(choice: str) -> dict:
+    """Where the account this dataflow's Android writes authenticate as is kept.
+
+    Anything other than a declared dataflow reads as the direct path, which is the
+    answer :func:`shared_config.dataflow.declared` gives such a study too.
+    """
+    return ANDROID_INGEST_ACCOUNTS.get(choice, ANDROID_INGEST_ACCOUNTS[dataflow.DIRECT])
+
+
+def android_credentials(database: dict, choice: str) -> tuple[str, str]:
+    """The name and password of the account that writes the Android schema.
+
+    The name falls back to the one the bootstrap SQL creates, so a study model
+    carrying no account still names an account that exists.
+    """
+    account = android_ingest_account(choice)
+    entry = (database or {}).get("android") or {}
+    return (
+        str(entry.get(account["name_key"]) or account["default_name"]).strip(),
+        str(entry.get(account["password_key"]) or ""),
+    )
+
+
+def android_server_credentials(database: dict) -> tuple[str, str]:
+    """The name and password the Android micro-server authenticates with.
+
+    Read without consulting the dataflow: the instance is configured whichever one
+    the study runs, and the server is this credential's only holder, so on the direct
+    path it is the same account with no traffic to write.
+    """
+    return android_credentials(database, dataflow.WEBSERVICE)
 
 
 def declared_host(database: dict) -> str:

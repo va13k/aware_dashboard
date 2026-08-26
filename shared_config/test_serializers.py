@@ -882,6 +882,14 @@ class TestSourceJsonCoverage:
         for field in ("port", "name", "username", "password"):
             assert field in db, f"Missing database.android.{field}"
 
+    def test_database_android_carries_the_servers_own_account(self, real_source):
+        """The micro-server writes with an account of its own, so the template names
+        it: on the webservice dataflow that credential is what ingest uses."""
+        db = real_source["database"]["android"]
+        for field in ("server_username", "server_password"):
+            assert field in db, f"Missing database.android.{field}"
+        assert db["server_username"] != db["username"]
+
     def test_database_ios_fields(self, real_source):
         db = real_source["database"]["ios"]
         for field in ("port", "name", "username", "password"):

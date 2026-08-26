@@ -4,6 +4,7 @@ import secrets
 from datetime import datetime, timezone
 
 from shared_config import dataflow
+from shared_config.database import android_server_credentials
 from shared_config.runtime import build_public_base_url
 from shared_config.source_store import read_source
 
@@ -646,8 +647,14 @@ def build_android_micro_config(
     `join_url` is the address a phone joins with, carried so the instance can render
     the QR code for it. A client uploads to the address it joined with, so the QR and
     the published link are one string.
+
+    The account named here is the server's own, not a participant's. The server
+    performs every write on this path and reads the enrolment registry to decide
+    which writes to keep, so its account is granted what ingest does and a phone's is
+    left to the path phones write on.
     """
     android_db = source["database"]["android"]
+    server_user, server_password = android_server_credentials(source["database"])
     return {
         "server": {
             "database_engine": "mysql",
@@ -657,8 +664,8 @@ def build_android_micro_config(
                 "android",
             ),
             "database_name": android_db["name"],
-            "database_user": android_db["username"],
-            "database_pwd": android_db["password"],
+            "database_user": server_user,
+            "database_pwd": server_password,
             "database_port": android_db["port"],
             "database_ssl_mode": database_ssl_mode(android_db),
             "server_host": "0.0.0.0",
