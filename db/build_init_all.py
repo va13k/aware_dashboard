@@ -102,10 +102,27 @@ def main() -> int:
         for table in sorted(set(client) - set(server) - local_only):
             print(f"MISSING TABLE: client writes `{table}`, schema lacks it", file=sys.stderr)
             failed = True
+        # `_id` is the server's own identity column, which some providers declare
+        # and others leave to the database.
+        server_owned = {"_id"}
         for table in sorted(set(client) & set(server)):
             gap = [c for c in client[table] if c not in server[table]]
             if gap:
                 print(f"MISSING COLUMNS: `{table}` lacks {gap}", file=sys.stderr)
+                failed = True
+            # A column the client stopped declaring stays behind holding a default
+            # per row, on tables that carry the most rows in the deployment. The
+            # check runs both ways so a column's removal travels as far as its
+            # addition does.
+            stale = [
+                c for c in server[table]
+                if c not in client[table] and c not in server_owned
+            ]
+            if stale:
+                print(
+                    f"STALE COLUMNS: `{table}` declares {stale}, the client does not",
+                    file=sys.stderr,
+                )
                 failed = True
         if not failed:
             print("Android schema matches the client's declared tables and columns.")
