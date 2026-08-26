@@ -29,7 +29,6 @@ def sensor_row(_id, timestamp, **values):
         double_values_1=values.get("y", 0.0),
         double_values_2=values.get("z", 0.0),
         accuracy=values.get("accuracy", 0),
-        label=values.get("label"),
     )
 
 
@@ -47,19 +46,18 @@ def test_the_header_comes_from_the_schema_not_the_first_row():
         "double_values_1",
         "double_values_2",
         "accuracy",
-        "label",
     ]
 
 
 def test_a_row_is_rendered_with_a_readable_timestamp_and_no_device():
-    row = sensor_row(7, 1_785_929_738_186, x=1.5, label="here")
+    row = sensor_row(7, 1_785_929_738_186, x=1.5, accuracy=3)
     record = android_router._export_row(row, AndroidAccelerometerSchema)
 
     assert record["id"] == 7
     assert record["timestamp"] == "2026-08-05 11:35:38 UTC"
     assert "device_id" not in record
     assert record["double_values_0"] == 1.5
-    assert record["label"] == "here"
+    assert record["accuracy"] == 3
 
 
 def test_a_seconds_timestamp_is_read_as_seconds():
