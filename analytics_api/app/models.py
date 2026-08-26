@@ -20,6 +20,7 @@ class AndroidDevice(AndroidBase):
     product = Column(Text)
     release = Column(Text)
     sdk = Column(Text)
+    label = Column(Text)
 
 
 class AndroidAwareStudy(AndroidBase):
@@ -150,7 +151,6 @@ class AndroidAccelerometer(AndroidBase):
     double_values_1 = Column(Double, default=0)
     double_values_2 = Column(Double, default=0)
     accuracy = Column(Integer, default=0)
-    label = Column(Text)
 
 
 class AndroidApplicationsCrashes(AndroidBase):
@@ -211,7 +211,6 @@ class AndroidBarometer(AndroidBase):
     device_id = Column(String(150), default="")
     double_values_0 = Column(Double, default=0)
     accuracy = Column(Integer, default=0)
-    label = Column(Text)
 
 
 class AndroidScheduler(AndroidBase):
@@ -299,6 +298,7 @@ class AndroidBluetooth(AndroidBase):
     bt_address = Column(String(150), default="")
     bt_name = Column(Text)
     bt_rssi = Column(Integer, default=0)
+    bt_status = Column(Integer, default=0)
     label = Column(Text)
 
 
@@ -335,7 +335,6 @@ class AndroidGravity(AndroidBase):
     double_values_1 = Column(Double, default=0)
     double_values_2 = Column(Double, default=0)
     accuracy = Column(Integer, default=0)
-    label = Column(Text)
 
 
 class AndroidGyroscope(AndroidBase):
@@ -347,7 +346,6 @@ class AndroidGyroscope(AndroidBase):
     double_values_1 = Column(Double, default=0)
     double_values_2 = Column(Double, default=0)
     accuracy = Column(Integer, default=0)
-    label = Column(Text)
 
 
 class AndroidInstallations(AndroidBase):
@@ -380,7 +378,6 @@ class AndroidLight(AndroidBase):
     device_id = Column(String(150), default="")
     double_light_lux = Column(Double, default=0)
     accuracy = Column(Integer, default=0)
-    label = Column(Text)
 
 
 class AndroidLinearAccelerometer(AndroidBase):
@@ -392,7 +389,6 @@ class AndroidLinearAccelerometer(AndroidBase):
     double_values_1 = Column(Double, default=0)
     double_values_2 = Column(Double, default=0)
     accuracy = Column(Integer, default=0)
-    label = Column(Text)
 
 
 class AndroidLocations(AndroidBase):
@@ -419,7 +415,6 @@ class AndroidMagnetometer(AndroidBase):
     double_values_1 = Column(Double, default=0)
     double_values_2 = Column(Double, default=0)
     accuracy = Column(Integer, default=0)
-    label = Column(Text)
 
 
 class AndroidMessages(AndroidBase):
@@ -503,7 +498,6 @@ class AndroidProximity(AndroidBase):
     device_id = Column(String(150), default="")
     double_proximity = Column(Double, default=0)
     accuracy = Column(Integer, default=0)
-    label = Column(Text)
 
 
 class AndroidRotation(AndroidBase):
@@ -516,7 +510,6 @@ class AndroidRotation(AndroidBase):
     double_values_2 = Column(Double, default=0)
     double_values_3 = Column(Double, default=0)
     accuracy = Column(Integer, default=0)
-    label = Column(Text)
 
 
 class AndroidScreen(AndroidBase):
@@ -575,7 +568,6 @@ class AndroidTemperature(AndroidBase):
     device_id = Column(String(150), default="")
     temperature_celsius = Column(Double, default=0)
     accuracy = Column(Integer, default=0)
-    label = Column(Text)
 
 
 class AndroidTimezone(AndroidBase):

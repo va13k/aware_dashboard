@@ -6,7 +6,6 @@ CREATE TABLE IF NOT EXISTS `accelerometer` (
   `double_values_1` double DEFAULT '0',
   `double_values_2` double DEFAULT '0',
   `accuracy` int DEFAULT '0',
-  `label` text,
   PRIMARY KEY (`_id`),
   KEY `time_device` (`timestamp`,`device_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
@@ -79,11 +78,27 @@ CREATE TABLE IF NOT EXISTS `aware_device` (
   `product` text,
   `release` text,
   `sdk` text,
+  `label` text,
   PRIMARY KEY (`_id`),
   KEY `time_device` (`timestamp`,`device_id`),
   -- Intentionally non-unique: the client inserts a new row for each change.
   KEY `device_time` (`device_id`,`timestamp`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Reconciles a deployed table with the shape declared above: CREATE TABLE applies
+-- to a table that is absent, so a column the declaration gained lands through this
+-- block instead. The client's device-profile insert names `label` and the
+-- dashboard's device list reads the row whole, so both require it to be present.
+SET @ddl := IF(
+  (SELECT COUNT(*) FROM information_schema.COLUMNS
+     WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'aware_device'
+       AND COLUMN_NAME = 'label') = 0,
+  'ALTER TABLE `aware_device` ADD COLUMN `label` text AFTER `sdk`',
+  'DO 0'
+);
+PREPARE _mig FROM @ddl;
+EXECUTE _mig;
+DEALLOCATE PREPARE _mig;
 
 -- The micro-server keeps one row per device current here: it reads the row it
 -- already holds and fills in the hardware fields when the phone reports them, so
@@ -127,7 +142,6 @@ CREATE TABLE IF NOT EXISTS `barometer` (
   `device_id` varchar(150) DEFAULT '',
   `double_values_0` double DEFAULT '0',
   `accuracy` int DEFAULT '0',
-  `label` text,
   PRIMARY KEY (`_id`),
   KEY `time_device` (`timestamp`,`device_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
@@ -235,7 +249,6 @@ CREATE TABLE IF NOT EXISTS `gravity` (
   `double_values_1` double DEFAULT '0',
   `double_values_2` double DEFAULT '0',
   `accuracy` int DEFAULT '0',
-  `label` text,
   PRIMARY KEY (`_id`),
   KEY `time_device` (`timestamp`,`device_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
@@ -273,7 +286,6 @@ CREATE TABLE IF NOT EXISTS `gyroscope` (
   `double_values_1` double DEFAULT '0',
   `double_values_2` double DEFAULT '0',
   `accuracy` int DEFAULT '0',
-  `label` text,
   PRIMARY KEY (`_id`),
   KEY `time_device` (`timestamp`,`device_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
@@ -309,7 +321,6 @@ CREATE TABLE IF NOT EXISTS `light` (
   `device_id` varchar(150) DEFAULT '',
   `double_light_lux` double DEFAULT '0',
   `accuracy` int DEFAULT '0',
-  `label` text,
   PRIMARY KEY (`_id`),
   KEY `time_device` (`timestamp`,`device_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
@@ -322,7 +333,6 @@ CREATE TABLE IF NOT EXISTS `linear_accelerometer` (
   `double_values_1` double DEFAULT '0',
   `double_values_2` double DEFAULT '0',
   `accuracy` int DEFAULT '0',
-  `label` text,
   PRIMARY KEY (`_id`),
   KEY `time_device` (`timestamp`,`device_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
@@ -351,7 +361,6 @@ CREATE TABLE IF NOT EXISTS `magnetometer` (
   `double_values_1` double DEFAULT '0',
   `double_values_2` double DEFAULT '0',
   `accuracy` int DEFAULT '0',
-  `label` text,
   PRIMARY KEY (`_id`),
   KEY `time_device` (`timestamp`,`device_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
@@ -453,7 +462,6 @@ CREATE TABLE IF NOT EXISTS `proximity` (
   `device_id` varchar(150) DEFAULT '',
   `double_proximity` double DEFAULT '0',
   `accuracy` int DEFAULT '0',
-  `label` text,
   PRIMARY KEY (`_id`),
   KEY `time_device` (`timestamp`,`device_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
@@ -467,7 +475,6 @@ CREATE TABLE IF NOT EXISTS `rotation` (
   `double_values_2` double DEFAULT '0',
   `double_values_3` double DEFAULT '0',
   `accuracy` int DEFAULT '0',
-  `label` text,
   PRIMARY KEY (`_id`),
   KEY `time_device` (`timestamp`,`device_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
@@ -699,7 +706,6 @@ CREATE TABLE IF NOT EXISTS `temperature` (
   `device_id` varchar(150) DEFAULT '',
   `temperature_celsius` double DEFAULT '0',
   `accuracy` int DEFAULT '0',
-  `label` text,
   PRIMARY KEY (`_id`),
   KEY `time_device` (`timestamp`,`device_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

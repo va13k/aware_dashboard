@@ -54,7 +54,6 @@ class AndroidAccelerometerSchema(_Base):
     double_values_1: float = 0
     double_values_2: float = 0
     accuracy: int = 0
-    label: str | None = None
 
 
 class AndroidApplicationsCrashesSchema(_Base):
@@ -95,7 +94,6 @@ class AndroidApplicationsNotificationsSchema(_Base):
 class AndroidBarometerSchema(_Base):
     double_values_0: float = 0
     accuracy: int = 0
-    label: str | None = None
 
 
 class AndroidProcessorSchema(_Base):
@@ -134,6 +132,7 @@ class AndroidBluetoothSchema(_Base):
     bt_address: str = ""
     bt_name: str | None = None
     bt_rssi: int = 0
+    bt_status: int = 0
     label: str | None = None
 
 
@@ -180,7 +179,6 @@ class AndroidGravitySchema(_Base):
     double_values_1: float = 0
     double_values_2: float = 0
     accuracy: int = 0
-    label: str | None = None
 
 
 class AndroidGyroscopeSchema(_Base):
@@ -188,7 +186,6 @@ class AndroidGyroscopeSchema(_Base):
     double_values_1: float = 0
     double_values_2: float = 0
     accuracy: int = 0
-    label: str | None = None
 
 
 class AndroidInstallationsSchema(_Base):
@@ -209,7 +206,6 @@ class AndroidKeyboardSchema(_Base):
 class AndroidLightSchema(_Base):
     double_light_lux: float = 0
     accuracy: int = 0
-    label: str | None = None
 
 
 class AndroidLinearAccelerometerSchema(_Base):
@@ -217,7 +213,6 @@ class AndroidLinearAccelerometerSchema(_Base):
     double_values_1: float = 0
     double_values_2: float = 0
     accuracy: int = 0
-    label: str | None = None
 
 
 class AndroidLocationsSchema(_Base):
@@ -236,7 +231,6 @@ class AndroidMagnetometerSchema(_Base):
     double_values_1: float = 0
     double_values_2: float = 0
     accuracy: int = 0
-    label: str | None = None
 
 
 class AndroidMessagesSchema(_Base):
@@ -292,7 +286,6 @@ class AndroidPluginOpenweatherSchema(_Base):
 class AndroidProximitySchema(_Base):
     double_proximity: float = 0
     accuracy: int = 0
-    label: str | None = None
 
 
 class AndroidRotationSchema(_Base):
@@ -301,7 +294,6 @@ class AndroidRotationSchema(_Base):
     double_values_2: float = 0
     double_values_3: float = 0
     accuracy: int = 0
-    label: str | None = None
 
 
 class AndroidScreenSchema(_Base):
@@ -340,7 +332,6 @@ class AndroidTelephonySchema(_Base):
 class AndroidTemperatureSchema(_Base):
     temperature_celsius: float = 0
     accuracy: int = 0
-    label: str | None = None
 
 
 class AndroidTimezoneSchema(_Base):
