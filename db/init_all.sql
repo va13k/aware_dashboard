@@ -5,15 +5,36 @@
 CREATE DATABASE IF NOT EXISTS aware_ios;
 CREATE DATABASE IF NOT EXISTS aware_android;
 
--- The participant passwords below are only a first-boot seed: on a fresh data
--- directory zz-participant-password.sh replaces them with the per-deployment
--- password generated into .env. CREATE USER IF NOT EXISTS means replaying this
--- file on later restarts never resets that password.
+-- The passwords below are only a first-boot seed: on a fresh data directory
+-- zz-participant-password.sh replaces them with the per-deployment passwords
+-- generated into .env. CREATE USER IF NOT EXISTS means replaying this file on later
+-- restarts never resets those passwords.
+
+-- The account an Android phone opens the database with itself, which is what the
+-- direct dataflow asks of a phone. Inserts and nothing else: a phone delivers rows
+-- and reads nothing back, and its credential travels in the study config every phone
+-- downloads.
 CREATE USER IF NOT EXISTS 'aware_android_participant'@'%' IDENTIFIED BY 'participantpass';
 GRANT INSERT ON aware_android.* TO 'aware_android_participant'@'%';
 
+-- The account the iOS micro-server writes with. iOS is webservice-only --- an iPhone
+-- has no direct-database client --- so this is a server's credential, and the reads
+-- its ingest makes are granted beside the tables they name.
 CREATE USER IF NOT EXISTS 'aware_ios_participant'@'%' IDENTIFIED BY 'participantpass';
 GRANT INSERT ON aware_ios.* TO 'aware_ios_participant'@'%';
+
+-- The Android micro-server's own account. On the webservice dataflow every write is
+-- the server's and no phone opens MySQL at all, so ingest authenticates as the server
+-- rather than as a participant.
+--
+-- Schema-wide INSERT is the data itself, and it is also what makes each table visible
+-- in information_schema, which is where ingest reads the column list it writes a table
+-- in the shape of: a table is listed there for an account holding any privilege on it.
+-- The rows ingest reads back are granted table by table, beside the tables they name,
+-- so this account sees the registry it checks and the metadata row it fills in rather
+-- than the sensor data it writes.
+CREATE USER IF NOT EXISTS 'aware_android_server'@'%' IDENTIFIED BY 'serverpass';
+GRANT INSERT ON aware_android.* TO 'aware_android_server'@'%';
 
 CREATE USER IF NOT EXISTS 'aware_analytics'@'%' IDENTIFIED BY 'analyticspass';
 GRANT SELECT ON aware_android.* TO 'aware_analytics'@'%';
@@ -109,6 +130,11 @@ CREATE TABLE IF NOT EXISTS `aware_device` (
   -- Intentionally non-unique: the client inserts a new row for each change.
   KEY `device_time` (`device_id`,`timestamp`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- The micro-server keeps one row per device current here: it reads the row it
+-- already holds and fills in the hardware fields when the phone reports them, so
+-- ingest needs to see and update this table as well as insert into it.
+GRANT SELECT, UPDATE ON aware_android.aware_device TO 'aware_android_server'@'%';
 
 CREATE TABLE IF NOT EXISTS `aware_log` (
   `_id` bigint unsigned NOT NULL AUTO_INCREMENT,
@@ -1008,8 +1034,14 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON `aware_android`.`device_enrolment` TO 'a
 
 -- The micro-server reads this table to decide whether a device may write, so the
 -- account it connects as needs to see it. Read-only: windows are derived by the
--- dashboard from the phone's own study log, never by the ingest path.
-GRANT SELECT ON `aware_android`.`device_enrolment` TO 'aware_android_participant'@'%';
+-- dashboard from the phone's own study log, never by the ingest path. Granted to the
+-- server's account alone -- the gate runs in the server, and a phone writing straight
+-- to the database reads nothing here.
+GRANT SELECT ON `aware_android`.`device_enrolment` TO 'aware_android_server'@'%';
+-- A deployment that once granted this to the participant account narrows it here.
+-- The registry names every device in the study and when it joined, and the direct
+-- path publishes the participant password to every phone.
+REVOKE IF EXISTS SELECT ON `aware_android`.`device_enrolment` FROM 'aware_android_participant'@'%';
 
 -- `reason` is why the write was turned away: `no_enrolment` for a device with no
 -- window the study log put there, `no_device_id` for a request that named no
@@ -1027,7 +1059,10 @@ CREATE TABLE IF NOT EXISTS `refusals` (
   KEY `last_seen_idx` (`last_seen`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
-GRANT SELECT, INSERT, UPDATE ON `aware_android`.`refusals` TO 'aware_android_participant'@'%';
+-- Counted up by the micro-server as it turns writes away, so the account the gate
+-- runs as is the one that keeps this table.
+GRANT SELECT, INSERT, UPDATE ON `aware_android`.`refusals` TO 'aware_android_server'@'%';
+REVOKE IF EXISTS SELECT, INSERT, UPDATE ON `aware_android`.`refusals` FROM 'aware_android_participant'@'%';
 
 -- One row per excluded device. `excluded_at` is when the researcher decided,
 -- which is not necessarily when the participant left: a study can exclude

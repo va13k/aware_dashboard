@@ -85,6 +85,11 @@ CREATE TABLE IF NOT EXISTS `aware_device` (
   KEY `device_time` (`device_id`,`timestamp`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+-- The micro-server keeps one row per device current here: it reads the row it
+-- already holds and fills in the hardware fields when the phone reports them, so
+-- ingest needs to see and update this table as well as insert into it.
+GRANT SELECT, UPDATE ON aware_android.aware_device TO 'aware_android_server'@'%';
+
 CREATE TABLE IF NOT EXISTS `aware_log` (
   `_id` bigint unsigned NOT NULL AUTO_INCREMENT,
   `timestamp` double DEFAULT '0',

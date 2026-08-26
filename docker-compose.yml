@@ -25,6 +25,7 @@ services:
     environment:
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-CHANGE_ME}
       PARTICIPANT_DB_PASSWORD: ${PARTICIPANT_DB_PASSWORD:-}
+      ANDROID_SERVER_DB_PASSWORD: ${ANDROID_SERVER_DB_PASSWORD:-}
     ports:
       # Published only so participant phones can reach MySQL themselves, which is
       # what the direct dataflow requires. On the webservice dataflow nothing

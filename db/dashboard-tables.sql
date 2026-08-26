@@ -116,8 +116,14 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON `aware_android`.`device_enrolment` TO 'a
 
 -- The micro-server reads this table to decide whether a device may write, so the
 -- account it connects as needs to see it. Read-only: windows are derived by the
--- dashboard from the phone's own study log, never by the ingest path.
-GRANT SELECT ON `aware_android`.`device_enrolment` TO 'aware_android_participant'@'%';
+-- dashboard from the phone's own study log, never by the ingest path. Granted to the
+-- server's account alone -- the gate runs in the server, and a phone writing straight
+-- to the database reads nothing here.
+GRANT SELECT ON `aware_android`.`device_enrolment` TO 'aware_android_server'@'%';
+-- A deployment that once granted this to the participant account narrows it here.
+-- The registry names every device in the study and when it joined, and the direct
+-- path publishes the participant password to every phone.
+REVOKE IF EXISTS SELECT ON `aware_android`.`device_enrolment` FROM 'aware_android_participant'@'%';
 
 -- `reason` is why the write was turned away: `no_enrolment` for a device with no
 -- window the study log put there, `no_device_id` for a request that named no
@@ -135,7 +141,10 @@ CREATE TABLE IF NOT EXISTS `refusals` (
   KEY `last_seen_idx` (`last_seen`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
-GRANT SELECT, INSERT, UPDATE ON `aware_android`.`refusals` TO 'aware_android_participant'@'%';
+-- Counted up by the micro-server as it turns writes away, so the account the gate
+-- runs as is the one that keeps this table.
+GRANT SELECT, INSERT, UPDATE ON `aware_android`.`refusals` TO 'aware_android_server'@'%';
+REVOKE IF EXISTS SELECT, INSERT, UPDATE ON `aware_android`.`refusals` FROM 'aware_android_participant'@'%';
 
 -- One row per excluded device. `excluded_at` is when the researcher decided,
 -- which is not necessarily when the participant left: a study can exclude
