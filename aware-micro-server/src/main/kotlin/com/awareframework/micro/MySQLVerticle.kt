@@ -650,23 +650,100 @@ class MySQLVerticle : AbstractVerticle() {
     sqlClient.close()
   }
 
+  /**
+   * The client's TLS setting for the database connection.
+   *
+   * Every encrypting mode reaches a completed handshake by way of trust material.
+   * `database_ssl_path_ca_cert_pem` names a CA to check the server against; where
+   * the configuration leaves it out, the client takes the server's certificate as
+   * presented, so the traffic is encrypted and the server is the one the network
+   * route leads to. That is this deployment's own shape: the database answers on a
+   * private network under a certificate it generated for itself.
+   *
+   * `verify-ca` and `verify-identity` are the modes whose subject is that identity,
+   * so each asks for the CA. `verify-identity` also matches the certificate against
+   * the host it was reached at, which asks that certificate to carry the host as a
+   * subject alternative name.
+   *
+   * A mode outside this set is logged and read as `preferred`, which encrypts
+   * against a server offering TLS and connects to one serving plaintext.
+   */
   private fun setDatabaseSslMode(serverConfig: JsonObject, options: MySQLConnectOptions) {
-    val sslMode = serverConfig.getString("database_ssl_mode")
-    when (sslMode) {
+    when (val sslMode = serverConfig.getString("database_ssl_mode")?.trim()?.lowercase()) {
       null, "", "disable", "disabled" -> {
         options.setSslMode(SslMode.DISABLED)
+        logger.info { "AWARE Micro: MySQL connection is plaintext" }
       }
-      "prefer", "preferred" -> {
-        options.setSslMode(SslMode.PREFERRED)
-        if (serverConfig.containsKey("database_ssl_path_ca_cert_pem")) {
-          options.setPemTrustOptions(PemTrustOptions().addCertPath(serverConfig.getString("database_ssl_path_ca_cert_pem")))
-          if (serverConfig.containsKey("database_ssl_path_client_key_pem")) {
-            options.setPemKeyCertOptions(PemKeyCertOptions()
-                .setKeyPath(serverConfig.getString("database_ssl_path_client_key_pem"))
-                .setCertPath(serverConfig.getString("database_ssl_path_client_cert_pem")))
-          }
+      "prefer", "preferred" -> encryptConnection(serverConfig, options, SslMode.PREFERRED)
+      "require", "required" -> encryptConnection(serverConfig, options, SslMode.REQUIRED)
+      "verify-ca", "verify_ca" -> verifyServer(serverConfig, options, SslMode.VERIFY_CA)
+      "verify-identity", "verify_identity" ->
+        verifyServer(serverConfig, options, SslMode.VERIFY_IDENTITY)
+      else -> {
+        logger.warn {
+          "AWARE Micro: database_ssl_mode '$sslMode' reads as 'preferred'. " +
+            "The modes are disabled, preferred, required, verify-ca and verify-identity"
         }
+        encryptConnection(serverConfig, options, SslMode.PREFERRED)
       }
+    }
+  }
+
+  /** Encrypts the connection, against the configured CA or the server as presented. */
+  private fun encryptConnection(
+    serverConfig: JsonObject,
+    options: MySQLConnectOptions,
+    mode: SslMode
+  ) {
+    options.setSslMode(mode)
+    val caCertPath = serverConfig.getString("database_ssl_path_ca_cert_pem")
+    if (caCertPath.isNullOrBlank()) {
+      options.setTrustAll(true)
+      logger.info { "AWARE Micro: MySQL connection is '$mode', trusting the server as presented" }
+    } else {
+      trustCaCert(serverConfig, options, caCertPath)
+      logger.info { "AWARE Micro: MySQL connection is '$mode', trusting $caCertPath" }
+    }
+  }
+
+  /** Encrypts the connection and checks the server's certificate against the configured CA. */
+  private fun verifyServer(
+    serverConfig: JsonObject,
+    options: MySQLConnectOptions,
+    mode: SslMode
+  ) {
+    val caCertPath = serverConfig.getString("database_ssl_path_ca_cert_pem")
+    if (caCertPath.isNullOrBlank()) {
+      logger.warn {
+        "AWARE Micro: database_ssl_mode '$mode' reads as 'required'. " +
+          "Checking the server's certificate asks for database_ssl_path_ca_cert_pem"
+      }
+      encryptConnection(serverConfig, options, SslMode.REQUIRED)
+      return
+    }
+    options.setSslMode(mode)
+    trustCaCert(serverConfig, options, caCertPath)
+    if (mode == SslMode.VERIFY_IDENTITY) {
+      options.setHostnameVerificationAlgorithm("HTTPS")
+    }
+    logger.info { "AWARE Micro: MySQL connection is '$mode', trusting $caCertPath" }
+  }
+
+  /** Trusts the configured CA, and presents a client certificate where one is configured. */
+  private fun trustCaCert(
+    serverConfig: JsonObject,
+    options: MySQLConnectOptions,
+    caCertPath: String
+  ) {
+    options.setPemTrustOptions(PemTrustOptions().addCertPath(caCertPath))
+    val clientKeyPath = serverConfig.getString("database_ssl_path_client_key_pem")
+    val clientCertPath = serverConfig.getString("database_ssl_path_client_cert_pem")
+    if (!clientKeyPath.isNullOrBlank() && !clientCertPath.isNullOrBlank()) {
+      options.setPemKeyCertOptions(
+        PemKeyCertOptions()
+          .setKeyPath(clientKeyPath)
+          .setCertPath(clientCertPath)
+      )
     }
   }
 }

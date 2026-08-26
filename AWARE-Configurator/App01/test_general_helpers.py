@@ -381,30 +381,39 @@ class TestTheDataflowIsNotSubmittable:
         assert source["deployment"]["dataflow"]["android"] == "direct"
 
 
-class TestDirectPathSettingsAreHeldOnWebservice:
-    """`require_ssl` and `config_without_password` describe a phone opening the
-    database itself, so a study whose phones never do must not receive them.
+class TestWhichDatabaseSettingsEachPathDecides:
+    """`require_ssl` reaches the account on both paths; the published password on one.
 
-    `require_ssl` is the one that bites: it is applied to the database account,
-    and on the webservice path the holder of that account is the micro-server,
-    whose client is refused every connection once TLS is demanded of it. The form
-    no longer offers either control there, but a browser keeps its own copy of
-    that section, so the value still arrives and is stopped here.
+    The REQUIRE clause describes what the database grants the account, and each
+    dataflow has a holder for it: the phone's own client on the direct path, the
+    micro-server on the webservice one. Both reach the database over TLS, so the
+    clause is a condition either can meet.
+
+    `config_without_password` governs the config a phone downloads, and the direct
+    path is the one that publishes a password in it. A browser keeps its own copy of
+    this section, so a value left in it from the other path arrives here either way.
     """
 
-    def test_require_ssl_is_ignored_on_the_webservice_path(self):
+    def test_require_ssl_reaches_the_account_on_the_webservice_path(self):
         source = _saveable("webservice", require_ssl=False)
 
         _submit(source, require_ssl=True)
 
-        assert source["database"]["android"]["require_ssl"] is False
+        assert source["database"]["android"]["require_ssl"] is True
 
-    def test_require_ssl_is_honoured_on_the_direct_path(self):
+    def test_require_ssl_reaches_the_account_on_the_direct_path(self):
         source = _saveable("direct", require_ssl=False)
 
         _submit(source, require_ssl=True)
 
         assert source["database"]["android"]["require_ssl"] is True
+
+    def test_require_ssl_is_cleared_from_the_account_too(self):
+        source = _saveable("webservice", require_ssl=True)
+
+        _submit(source, require_ssl=False)
+
+        assert source["database"]["android"]["require_ssl"] is False
 
     def test_config_without_password_is_held_on_the_webservice_path(self):
         source = _saveable("webservice", config_without_password=True)

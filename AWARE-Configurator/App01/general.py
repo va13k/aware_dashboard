@@ -392,19 +392,22 @@ def update_source_from_android_config(source, content):
         incoming_password = database.get("database_password")
         if incoming_password and incoming_password != "-":
             android_db[_ingest_account(source)["password_key"]] = incoming_password
-        # Both settings describe a phone opening the database itself, so they are
-        # taken from the form only on the path that has one. On the webservice
-        # path the holder of this account is the micro-server: `require_ssl` there
-        # refuses its every write, and the published config carries no password to
-        # keep out of it. A browser keeps its own copy of this section, so a value
-        # left in it from the other path reaches this boundary either way.
+        # The account's REQUIRE clause, which both dataflows have a holder for: the
+        # phone on the direct path, the micro-server on the webservice one. Each
+        # reaches the database over TLS wherever the server offers it, so the clause
+        # describes what that database grants the account rather than deciding
+        # whether the holder can connect.
+        android_db["require_ssl"] = database.get(
+            "require_ssl", android_db.get("require_ssl", False)
+        )
+        # Whether the published config carries the password. The direct path is the
+        # one that publishes it, so it is the path that governs the setting; a
+        # browser keeps its own copy of this section, and a value left in it from
+        # the other path reaches this boundary either way.
         if android_dataflow == dataflow.DIRECT:
             android_db["config_without_password"] = database.get(
                 "config_without_password",
                 android_db.get("config_without_password", False),
-            )
-            android_db["require_ssl"] = database.get(
-                "require_ssl", android_db.get("require_ssl", False)
             )
 
     source["android"]["created_at"] = content.get(

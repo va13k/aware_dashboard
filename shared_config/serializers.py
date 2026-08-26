@@ -697,26 +697,25 @@ def build_android_micro_config(
 
 
 #: The client TLS mode written into a micro-server config, keyed by the account's
-#: REQUIRE clause. ``preferred`` and ``disabled`` are the two values
-#: MySQLVerticle.setDatabaseSslMode maps; every other string falls through its
-#: ``when`` to the client default, which is TLS off.
-DATABASE_SSL_MODES = {True: "preferred", False: "disabled"}
+#: REQUIRE clause. Both encrypt: the clause decides whether a connection that
+#: arrives in plaintext is served or refused, and the mode follows it so a client
+#: asks for what the account grants.
+DATABASE_SSL_MODES = {True: "required", False: "preferred"}
 
 
 def database_ssl_mode(database: dict) -> str:
     """The client TLS mode matching this account's REQUIRE clause.
 
-    ``require_ssl`` is applied to the database account itself, so a client that
-    connects with TLS off is refused every connection. Stating the mode here
-    keeps the config explicit about a setting whose absence also means off.
+    ``require_ssl`` is applied to the database account, where it makes TLS the
+    condition of every connection. ``required`` matches that on the client side, so
+    a connection that fails to encrypt is reported as the TLS failure it is.
 
-    ``preferred`` completes a TLS handshake only where the client trusts the
-    server's certificate. The micro-server takes that trust from
-    ``database_ssl_path_ca_cert_pem``, which nothing generates yet, so against a
-    server holding MySQL's own generated certificate the handshake falls back to
-    plaintext and a ``REQUIRE SSL`` account then refuses it. Until that CA path is
-    filled in, ``require_ssl`` belongs to the direct path, where the phone's own
-    client negotiates the connection.
+    An account left without the clause takes ``preferred``, which encrypts against
+    a server offering TLS and connects to one serving plaintext. Encryption is then
+    what a connection has by default, and turning the clause on meets a client that
+    is already encrypting -- so the account and the server holding it stay in step
+    across the moment the setting changes, which lands on the account as it is saved
+    and in this config as the deployment is next generated.
     """
     return DATABASE_SSL_MODES[bool(database.get("require_ssl", False))]
 

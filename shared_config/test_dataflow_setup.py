@@ -680,15 +680,15 @@ class TestTheServersOwnTlsSetting:
     """serializers.database_ssl_mode: the account's REQUIRE clause, told to the client.
 
     `require_ssl` runs `ALTER USER ... REQUIRE SSL` on the database account. On the
-    webservice path the holder of that account is the micro-server, so a client
-    left with TLS disabled is refused every connection and Android ingest stops --
-    from ticking a box that reads as a security improvement. The generated config
-    carries the matching client mode so the two describe one decision.
+    webservice path the holder of that account is the micro-server, so the client
+    mode written into its config decides whether that account is reachable at all.
+    Both modes encrypt, which leaves ingest running across the moment the clause
+    changes: the Configurator applies it to the account as a study is saved, and
+    this config is written as the deployment is next generated.
     """
 
-    #: The values MySQLVerticle.setDatabaseSslMode maps. Anything else falls
-    #: through its `when` to the client default, which is TLS off.
-    RECOGNISED = {"disable", "disabled", "prefer", "preferred", "", None}
+    #: The values MySQLVerticle.setDatabaseSslMode maps to an encrypting client.
+    ENCRYPTING = {"prefer", "preferred", "require", "required"}
 
     def _android(self, require_ssl):
         return {
@@ -708,24 +708,24 @@ class TestTheServersOwnTlsSetting:
         settings = {"micro_database_host": "mysql", "external_server_host": "host", "public_port": 80}
         return build_android_micro_config(source, settings, "KEY", 2, join_url="http://host/2/KEY")
 
-    def test_a_required_account_gets_the_clients_tls_mode(self):
-        """Which the client honours only where it trusts the server certificate;
-        see database_ssl_mode for the CA path that is not generated yet."""
-        assert self._micro(True)["server"]["database_ssl_mode"] == "preferred"
+    def test_a_required_account_gets_a_client_that_insists_on_tls(self):
+        """`required` reports a connection that fails to encrypt as the TLS failure
+        it is, which is the account's own condition stated on the client side."""
+        assert self._micro(True)["server"]["database_ssl_mode"] == "required"
 
-    def test_an_unrestricted_account_leaves_the_client_plain(self):
-        assert self._micro(False)["server"]["database_ssl_mode"] == "disabled"
+    def test_an_unrestricted_account_still_encrypts_where_the_server_offers_it(self):
+        assert self._micro(False)["server"]["database_ssl_mode"] == "preferred"
 
     def test_the_setting_is_always_stated_rather_than_left_out(self):
         """An absent mode reads as TLS off, which is a decision worth writing down."""
         for require_ssl in (True, False):
             assert "database_ssl_mode" in self._micro(require_ssl)["server"]
 
-    def test_every_mode_written_is_one_the_client_maps(self):
-        """A value outside this set is silently ignored by MySQLVerticle's `when`,
-        leaving TLS off while the account demands it."""
+    def test_every_mode_written_encrypts_the_connection(self):
+        """Both sides of the clause reach an encrypted connection, so turning it on
+        meets a client that is already encrypting."""
         for mode in serializers.DATABASE_SSL_MODES.values():
-            assert mode in self.RECOGNISED
+            assert mode in self.ENCRYPTING
 
-    def test_a_study_predating_the_field_reads_as_no_requirement(self):
-        assert serializers.database_ssl_mode({}) == "disabled"
+    def test_a_study_predating_the_field_encrypts_without_requiring_it(self):
+        assert serializers.database_ssl_mode({}) == "preferred"
