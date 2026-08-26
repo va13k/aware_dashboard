@@ -246,9 +246,25 @@ export interface AwareLogPage {
   rows: AwareLogRow[];
 }
 
+/**
+ * How much data a decision leaves out of the analysis, as a pair.
+ *
+ * Reported beside a figure rather than folded into it: the figure is what an
+ * export writes, and this is what accounts for the difference from what
+ * arrived.
+ */
+export interface ExcludedTotals {
+  devices: number;
+  records: number;
+}
+
 export interface SensorManifestEntry {
+  /** Rows an export writes for this sensor: excluded devices are already out. */
   row_count: number;
   devices_with_data: number;
+  /** The part of what arrived that exclusion holds back from this sensor. */
+  excluded_row_count: number;
+  excluded_devices: number;
   first_timestamp: number | null;
   last_timestamp: number | null;
   fields: string[];
@@ -257,6 +273,8 @@ export interface SensorManifestEntry {
 export interface PlatformManifest {
   device_count: number;
   sensors: Record<string, SensorManifestEntry>;
+  /** This platform's excluded devices and the rows they hold, study-wide. */
+  excluded: ExcludedTotals;
 }
 
 export interface Manifest {
@@ -360,9 +378,12 @@ export interface CoverageWindows {
 export interface CoverageCounts {
   from: number | null;
   to: number | null;
+  /** What the download holds: the excluded devices are already left out. */
   total: number;
   platforms: Record<string, number>;
   sensors: Record<string, Record<string, number>>;
+  /** What exclusion holds back, over the same period, sensor and platform. */
+  excluded: ExcludedTotals;
   available: boolean;
   hour_granular: boolean;
   /** Roughly what the download will weigh. A magnitude, not a promise. */

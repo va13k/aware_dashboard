@@ -2,7 +2,7 @@ import { useState } from "react";
 import { fetchManifest } from "../api/client";
 import { useLiveRefresh } from "../api/live";
 import { SENSOR_CONFIGS } from "../config/sensors";
-import type { Manifest, SensorManifestEntry } from "../types";
+import type { ExcludedTotals, Manifest, SensorManifestEntry } from "../types";
 import { absoluteDate, isoDateTime } from "../utils/time";
 
 function studySpan(manifest: Manifest): {
@@ -36,6 +36,23 @@ function totalRecords(manifest: Manifest): number {
   );
 }
 
+/**
+ * The devices and rows exclusion keeps out of every figure above.
+ *
+ * Read from each platform's own summary rather than summed over its sensors: one
+ * excluded phone appears under as many sensors as it collected, and the study-wide
+ * answer is how many phones and how many rows.
+ */
+function totalExcluded(manifest: Manifest): ExcludedTotals {
+  return Object.values(manifest.platforms).reduce(
+    (sum, p) => ({
+      devices: sum.devices + (p.excluded?.devices ?? 0),
+      records: sum.records + (p.excluded?.records ?? 0),
+    }),
+    { devices: 0, records: 0 },
+  );
+}
+
 function downloadJson(manifest: Manifest) {
   const blob = new Blob([JSON.stringify(manifest, null, 2)], {
     type: "application/json",
@@ -63,7 +80,7 @@ interface SensorRowProps {
 function SensorRow({ name, entry, deviceCount }: SensorRowProps) {
   const [fieldsOpen, setFieldsOpen] = useState(false);
   const config = sensorConfigMap[name];
-  const hasData = entry.row_count > 0;
+  const hasData = entry.row_count > 0 || entry.excluded_row_count > 0;
 
   return (
     <div
@@ -103,6 +120,14 @@ function SensorRow({ name, entry, deviceCount }: SensorRowProps) {
             >
               {entry.row_count.toLocaleString()}
             </div>
+            {entry.excluded_row_count > 0 ? (
+              <div
+                className="text-[11px] text-sage"
+                title={`${entry.excluded_row_count.toLocaleString()} records from ${entry.excluded_devices} excluded device(s) are left out of exports`}
+              >
+                +{entry.excluded_row_count.toLocaleString()} excluded
+              </div>
+            ) : null}
           </div>
 
           <div className="text-right">
@@ -243,6 +268,7 @@ export default function ManifestPage() {
 
   const span = manifest ? studySpan(manifest) : null;
   const total = manifest ? totalRecords(manifest) : null;
+  const excluded = manifest ? totalExcluded(manifest) : null;
   const allDevices = manifest
     ? manifest.platforms.android.device_count +
       manifest.platforms.ios.device_count
@@ -292,7 +318,7 @@ export default function ManifestPage() {
               value: manifest?.platforms.ios.device_count ?? "—",
             },
             {
-              label: "Total records",
+              label: "Records in exports",
               value: total != null ? total.toLocaleString() : "—",
             },
             {
@@ -314,6 +340,19 @@ export default function ManifestPage() {
             </div>
           ))}
         </div>
+
+        {excluded && excluded.records > 0 ? (
+          <p className="mt-4 rounded-xl border border-wire bg-card-strong/70 px-4 py-3 text-[13px] text-sage">
+            <span className="font-semibold text-ink">
+              {excluded.records.toLocaleString()}
+            </span>{" "}
+            {excluded.records === 1 ? "record" : "records"} from{" "}
+            <span className="font-semibold text-ink">{excluded.devices}</span>{" "}
+            excluded {excluded.devices === 1 ? "device" : "devices"}{" "}
+            {excluded.devices === 1 ? "is" : "are"} left out of every count on
+            this page, and out of the exports. The rows stay in the database.
+          </p>
+        ) : null}
 
         {loading && allDevices == null && (
           <div className="mt-5 h-16 rounded-xl shimmer" />

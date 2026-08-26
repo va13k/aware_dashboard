@@ -1,9 +1,19 @@
 import { useEffect, useMemo, useState } from "react";
 import { fetchCoverageCounts, fetchCoverageWindows } from "../api/client";
-import type { ChosenPeriod, CoverageWindow, CoverageWindows } from "../types";
+import type {
+  ChosenPeriod,
+  CoverageWindow,
+  CoverageWindows,
+  ExcludedTotals,
+} from "../types";
 import { absoluteTime } from "../utils/time";
 import { localInputToTs, tsToLocalInput } from "../utils/timeRange";
 import { ALL_TIME, countKey, recordsLabel as records, sizeLabel } from "../utils/period";
+
+//: What a period holds back before an answer has arrived, and after one that
+//: could not be read: a count the dialog does not have says nothing about
+//: exclusion either.
+const NOTHING_EXCLUDED: ExcludedTotals = { devices: 0, records: 0 };
 
 const ANCHORS: { key: "data" | "now"; label: string; hint: string }[] = [
   { key: "data", label: "Newest data", hint: "counted back from the last row stored" },
@@ -64,6 +74,7 @@ export default function PeriodPicker({
     key: string;
     total: number | null;
     bytes: number;
+    excluded: ExcludedTotals;
   } | null>(null);
 
   useEffect(() => {
@@ -81,12 +92,17 @@ export default function PeriodPicker({
     fetchCoverageCounts({ from: value.from, to: value.to, platform, sensor, device })
       .then((body) => {
         if (cancelled) return;
-        setCounted({ key, total: body.total, bytes: body.estimated_bytes ?? 0 });
+        setCounted({
+          key,
+          total: body.total,
+          bytes: body.estimated_bytes ?? 0,
+          excluded: body.excluded ?? NOTHING_EXCLUDED,
+        });
         onCount?.(body.total);
       })
       .catch(() => {
         if (cancelled) return;
-        setCounted({ key, total: null, bytes: 0 });
+        setCounted({ key, total: null, bytes: 0, excluded: NOTHING_EXCLUDED });
         // Unknown, not empty: a count that failed to load must not be the
         // reason a researcher cannot download something that is there.
         onCount?.(null);
@@ -102,6 +118,8 @@ export default function PeriodPicker({
   const counting = Boolean(value) && counted?.key !== key;
   const count = counted?.key === key ? counted.total : null;
   const bytes = counted?.key === key ? counted.bytes : 0;
+  const excluded =
+    counted?.key === key ? counted.excluded : NOTHING_EXCLUDED;
 
   const byAnchor = useMemo(() => {
     const grouped: Record<string, CoverageWindow[]> = { data: [], now: [] };
@@ -265,6 +283,17 @@ export default function PeriodPicker({
                 <span className="font-semibold text-ink"> · {sizeLabel(bytes)}</span>
               ) : null}
             </p>
+            {!counting && excluded.records > 0 ? (
+              <p className="mt-1 text-[12px] text-sage">
+                <span className="font-semibold text-ink">
+                  {excluded.records.toLocaleString()}
+                </span>{" "}
+                {excluded.records === 1 ? "record" : "records"} from{" "}
+                {excluded.devices.toLocaleString()} excluded{" "}
+                {excluded.devices === 1 ? "device" : "devices"}{" "}
+                {excluded.devices === 1 ? "is" : "are"} left out of this download
+              </p>
+            ) : null}
             {!counting && count ? (
               <p className="mt-0.5 text-[11px] text-sage/60">
                 Counted to the hour. The size is a rough estimate — the file is

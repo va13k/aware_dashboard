@@ -179,9 +179,14 @@ export default function OverviewPage() {
     key: string,
   ): SensorManifestEntry | null =>
     manifest?.platforms[platform].sensors[key] ?? null;
+  // Counting excluded rows too: a required sensor that collected and was then
+  // left out of the analysis is not the same finding as one that never
+  // collected, and only the second is the gap the required view flags.
   const hasSensorRecords = (key: string) =>
-    (entryFor("android", key)?.row_count ?? 0) > 0 ||
-    (entryFor("ios", key)?.row_count ?? 0) > 0;
+    ["android", "ios"].some((platform) => {
+      const entry = entryFor(platform as "android" | "ios", key);
+      return (entry?.row_count ?? 0) > 0 || (entry?.excluded_row_count ?? 0) > 0;
+    });
 
   const required = combinedRequirements(requirements);
 

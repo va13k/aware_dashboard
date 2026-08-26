@@ -13,7 +13,19 @@ interface Props {
   onExport?: () => void;
 }
 
+/**
+ * Whether this platform has anything to report for the sensor.
+ *
+ * True for a sensor whose rows all belong to excluded devices: those rows
+ * arrived, and a card reading "No data" for them would make an excluded
+ * participant look like one who never took part.
+ */
 function hasRows(entry: SensorManifestEntry | null): entry is SensorManifestEntry {
+  return !!entry && (entry.row_count > 0 || entry.excluded_row_count > 0);
+}
+
+/** Whether an export would produce anything, which excluded rows do not. */
+function hasExportableRows(entry: SensorManifestEntry | null): boolean {
   return !!entry && entry.row_count > 0;
 }
 
@@ -33,6 +45,29 @@ function StatItem({
         {children}
       </span>
     </div>
+  );
+}
+
+/**
+ * What an exclusion holds back from this sensor, beneath the figure it explains.
+ *
+ * The record count above is the one an export writes, so a study with an
+ * excluded participant shows a number smaller than the rows the database holds.
+ * This is what accounts for the difference, and it is shown wherever the
+ * difference exists.
+ */
+function HeldBack({ entry }: { entry: SensorManifestEntry }) {
+  if (entry.excluded_row_count <= 0) return null;
+  const devices = entry.excluded_devices;
+  return (
+    <p className="mt-3 text-[12px] leading-snug text-sage">
+      <span className="font-semibold text-ink">
+        {entry.excluded_row_count.toLocaleString()}
+      </span>{" "}
+      more {entry.excluded_row_count === 1 ? "record" : "records"} from{" "}
+      {devices.toLocaleString()} excluded{" "}
+      {devices === 1 ? "device" : "devices"} are left out of exports
+    </p>
   );
 }
 
@@ -64,6 +99,7 @@ function PlatformStats({
             : "—"}
         </StatItem>
       </div>
+      <HeldBack entry={entry} />
     </div>
   );
 }
@@ -84,6 +120,7 @@ export default function SensorStatCard({
   const androidHasRows = hasRows(android);
   const iosHasRows = hasRows(ios);
   const hasData = androidHasRows || iosHasRows;
+  const exportable = hasExportableRows(android) || hasExportableRows(ios);
 
   return (
     <div
@@ -106,7 +143,7 @@ export default function SensorStatCard({
             asks which platforms and which period, and those two questions
             belong together. */}
         {onExport ? (
-          androidHasRows || iosHasRows || loading ? (
+          exportable || loading ? (
             <button
               type="button"
               onClick={onExport}
@@ -117,7 +154,11 @@ export default function SensorStatCard({
             </button>
           ) : (
             <span
-              title="No records to export"
+              title={
+                hasData
+                  ? "Every record for this sensor belongs to an excluded device"
+                  : "No records to export"
+              }
               className="inline-flex h-7 cursor-not-allowed items-center justify-center rounded-lg border border-wire bg-card-strong px-2 text-[11px] font-semibold uppercase tracking-[0.4px] text-sage/30"
             >
               ↓ Export
