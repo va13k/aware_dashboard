@@ -28,6 +28,7 @@ sys.path.insert(0, str(SETUP))
 import deploy_config  # noqa: E402
 import write_request_env  # noqa: E402
 
+from shared_config import serializers  # noqa: E402
 from shared_config.serializers import build_android_micro_config  # noqa: E402
 
 
@@ -464,3 +465,58 @@ class TestTheDeployIsChecked:
             "0.0.0.0",
             direct_url,
         )
+
+
+class TestTheServersOwnTlsSetting:
+    """serializers.database_ssl_mode: the account's REQUIRE clause, told to the client.
+
+    `require_ssl` runs `ALTER USER ... REQUIRE SSL` on the database account. On the
+    webservice path the holder of that account is the micro-server, so a client
+    left with TLS disabled is refused every connection and Android ingest stops --
+    from ticking a box that reads as a security improvement. The generated config
+    carries the matching client mode so the two describe one decision.
+    """
+
+    #: The values MySQLVerticle.setDatabaseSslMode maps. Anything else falls
+    #: through its `when` to the client default, which is TLS off.
+    RECOGNISED = {"disable", "disabled", "prefer", "preferred", "", None}
+
+    def _android(self, require_ssl):
+        return {
+            "name": "aware_android",
+            "username": "aware_android_participant",
+            "password": "secret",
+            "port": 3306,
+            "require_ssl": require_ssl,
+        }
+
+    def _micro(self, require_ssl):
+        source = {
+            "database": {"android": self._android(require_ssl)},
+            "study": {"title": "T", "description": "D", "active": True},
+            "researcher": {"first_name": "F", "last_name": "L", "contact": "c@x"},
+        }
+        settings = {"micro_database_host": "mysql", "external_server_host": "host", "public_port": 80}
+        return build_android_micro_config(source, settings, "KEY", 2, join_url="http://host/2/KEY")
+
+    def test_a_required_account_gets_the_clients_tls_mode(self):
+        """Which the client honours only where it trusts the server certificate;
+        see database_ssl_mode for the CA path that is not generated yet."""
+        assert self._micro(True)["server"]["database_ssl_mode"] == "preferred"
+
+    def test_an_unrestricted_account_leaves_the_client_plain(self):
+        assert self._micro(False)["server"]["database_ssl_mode"] == "disabled"
+
+    def test_the_setting_is_always_stated_rather_than_left_out(self):
+        """An absent mode reads as TLS off, which is a decision worth writing down."""
+        for require_ssl in (True, False):
+            assert "database_ssl_mode" in self._micro(require_ssl)["server"]
+
+    def test_every_mode_written_is_one_the_client_maps(self):
+        """A value outside this set is silently ignored by MySQLVerticle's `when`,
+        leaving TLS off while the account demands it."""
+        for mode in serializers.DATABASE_SSL_MODES.values():
+            assert mode in self.RECOGNISED
+
+    def test_a_study_predating_the_field_reads_as_no_requirement(self):
+        assert serializers.database_ssl_mode({}) == "disabled"

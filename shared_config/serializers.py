@@ -660,6 +660,7 @@ def build_android_micro_config(
             "database_user": android_db["username"],
             "database_pwd": android_db["password"],
             "database_port": android_db["port"],
+            "database_ssl_mode": database_ssl_mode(android_db),
             "server_host": "0.0.0.0",
             "server_port": settings.get("android_micro_server_port", 8082),
             "websocket_port": settings.get("android_micro_websocket_port", 8083),
@@ -688,6 +689,31 @@ def build_android_micro_config(
     }
 
 
+#: The client TLS mode written into a micro-server config, keyed by the account's
+#: REQUIRE clause. ``preferred`` and ``disabled`` are the two values
+#: MySQLVerticle.setDatabaseSslMode maps; every other string falls through its
+#: ``when`` to the client default, which is TLS off.
+DATABASE_SSL_MODES = {True: "preferred", False: "disabled"}
+
+
+def database_ssl_mode(database: dict) -> str:
+    """The client TLS mode matching this account's REQUIRE clause.
+
+    ``require_ssl`` is applied to the database account itself, so a client that
+    connects with TLS off is refused every connection. Stating the mode here
+    keeps the config explicit about a setting whose absence also means off.
+
+    ``preferred`` completes a TLS handshake only where the client trusts the
+    server's certificate. The micro-server takes that trust from
+    ``database_ssl_path_ca_cert_pem``, which nothing generates yet, so against a
+    server holding MySQL's own generated certificate the handshake falls back to
+    plaintext and a ``REQUIRE SSL`` account then refuses it. Until that CA path is
+    filled in, ``require_ssl`` belongs to the direct path, where the phone's own
+    client negotiates the connection.
+    """
+    return DATABASE_SSL_MODES[bool(database.get("require_ssl", False))]
+
+
 def update_ios_server_config(
     config: dict,
     source_database: dict[str, object],
@@ -704,6 +730,9 @@ def update_ios_server_config(
     server["database_user"] = settings["ios_database_user"]
     server["database_pwd"] = settings["ios_database_password"]
     server["database_port"] = settings["ios_database_port"]
+    server["database_ssl_mode"] = database_ssl_mode(
+        (source_database or {}).get("ios", {})
+    )
     server["server_host"] = settings["ios_server_host"]
     server["server_port"] = settings["ios_server_port"]
     server["websocket_port"] = settings["ios_websocket_port"]

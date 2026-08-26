@@ -296,16 +296,17 @@ def update_source_from_android_config(source, content):
     study_info = content.get("study_info", {})
     database = content.get("database", {})
 
-    # The dataflow travels in the config the Configurator round-trips, so a
-    # researcher changing it here reaches the one place it is declared. Only a
-    # recognised value is taken: an unrecognised one would otherwise be written
-    # into the study model and quietly resolved to a default, which is the study
-    # collecting the other way without saying so.
-    submitted = str(content.get("dataflow") or "").strip().lower()
-    if submitted in dataflow.CHOICES:
-        declared = source.setdefault("deployment", {}).setdefault("dataflow", {})
-        declared["android"] = submitted
-        declared.setdefault("ios", dataflow.WEBSERVICE)
+    # The dataflow the study already declares, kept as it is. It travels in the
+    # config this round-trips, and a browser holds its own copy of that config, so
+    # taking the submitted value would let a stale form re-address a running study
+    # -- every enrolled phone joined at an address this decides. It is also half a
+    # deployment setting: the published database port follows from it, and only
+    # bringing the deployment up again applies that. So it is reported here and
+    # changed by running setup.
+    declared = source.setdefault("deployment", {}).setdefault("dataflow", {})
+    declared.setdefault("android", dataflow.DEFAULTS["android"])
+    declared.setdefault("ios", dataflow.WEBSERVICE)
+    android_dataflow = dataflow.declared(source, "android")
 
     source["study"]["id"] = content.get("_id", source["study"]["id"])
     source["study"]["title"] = study_info.get("study_title", source["study"]["title"])
@@ -337,12 +338,20 @@ def update_source_from_android_config(source, content):
         incoming_password = database.get("database_password")
         if incoming_password and incoming_password != "-":
             android_db["password"] = incoming_password
-        android_db["config_without_password"] = database.get(
-            "config_without_password", android_db.get("config_without_password", False)
-        )
-        android_db["require_ssl"] = database.get(
-            "require_ssl", android_db.get("require_ssl", False)
-        )
+        # Both settings describe a phone opening the database itself, so they are
+        # taken from the form only on the path that has one. On the webservice
+        # path the holder of this account is the micro-server: `require_ssl` there
+        # refuses its every write, and the published config carries no password to
+        # keep out of it. A browser keeps its own copy of this section, so a value
+        # left in it from the other path reaches this boundary either way.
+        if android_dataflow == dataflow.DIRECT:
+            android_db["config_without_password"] = database.get(
+                "config_without_password",
+                android_db.get("config_without_password", False),
+            )
+            android_db["require_ssl"] = database.get(
+                "require_ssl", android_db.get("require_ssl", False)
+            )
 
     source["android"]["created_at"] = content.get(
         "createdAt", source["android"].get("created_at", "")

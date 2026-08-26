@@ -233,3 +233,122 @@ def test_get_participant_password_rejects_writes(monkeypatch, method):
 
     assert response.status_code == 405
     assert b"secret" not in response.content
+
+
+# --------------------------------------------------------------------------
+# update_source_from_android_config: what a submitted config may decide
+# --------------------------------------------------------------------------
+
+
+def _saveable(android_dataflow="webservice", **android_db):
+    """A study model shaped enough for the save path to merge into."""
+    database = {
+        "port": 3306,
+        "name": "aware_android",
+        "username": "aware_android_participant",
+        "password": "stored",
+        "require_ssl": False,
+        "config_without_password": True,
+    }
+    database.update(android_db)
+    return {
+        "deployment": {"dataflow": {"android": android_dataflow, "ios": "webservice"}},
+        "database": {"host": "db.internal", "android": database, "ios": {}},
+        "study": {"id": "s", "title": "t", "description": "d"},
+        "researcher": {"first_name": "f", "last_name": "l", "contact": "c"},
+        "android": {"settings": {}},
+        "shared": {"sensors": {}, "esms": {"questions": [], "schedules": []}},
+    }
+
+
+def _submit(source, **database):
+    """One save, carrying whatever a browser held in its database section."""
+    content = {
+        "_id": "s",
+        "study_info": {},
+        "database": {"database_host": "db.internal", **database},
+    }
+    if "dataflow" in database:
+        content["dataflow"] = database.pop("dataflow")
+        content["database"].pop("dataflow", None)
+    return general.update_source_from_android_config(source, content)
+
+
+class TestTheDataflowIsNotSubmittable:
+    """The study address every enrolled phone joined at, held against the form.
+
+    A browser keeps its own copy of the config this round-trips, so a stale one
+    would otherwise re-address a running study on the next save. The published
+    database port follows from the same choice and changes only when the
+    deployment is brought up again, so this is reported here and set by setup.
+    """
+
+    def test_a_submitted_dataflow_does_not_change_the_study(self):
+        source = _saveable("webservice")
+
+        general.update_source_from_android_config(
+            source, {"_id": "s", "study_info": {}, "dataflow": "direct", "database": {}}
+        )
+
+        assert source["deployment"]["dataflow"]["android"] == "webservice"
+
+    def test_the_other_direction_is_held_too(self):
+        source = _saveable("direct")
+
+        general.update_source_from_android_config(
+            source,
+            {"_id": "s", "study_info": {}, "dataflow": "webservice", "database": {}},
+        )
+
+        assert source["deployment"]["dataflow"]["android"] == "direct"
+
+    def test_a_study_carrying_none_reads_as_the_default(self):
+        source = _saveable("webservice")
+        del source["deployment"]["dataflow"]["android"]
+
+        general.update_source_from_android_config(
+            source, {"_id": "s", "study_info": {}, "database": {}}
+        )
+
+        assert source["deployment"]["dataflow"]["android"] == "direct"
+
+
+class TestDirectPathSettingsAreHeldOnWebservice:
+    """`require_ssl` and `config_without_password` describe a phone opening the
+    database itself, so a study whose phones never do must not receive them.
+
+    `require_ssl` is the one that bites: it is applied to the database account,
+    and on the webservice path the holder of that account is the micro-server,
+    whose client is refused every connection once TLS is demanded of it. The form
+    no longer offers either control there, but a browser keeps its own copy of
+    that section, so the value still arrives and is stopped here.
+    """
+
+    def test_require_ssl_is_ignored_on_the_webservice_path(self):
+        source = _saveable("webservice", require_ssl=False)
+
+        _submit(source, require_ssl=True)
+
+        assert source["database"]["android"]["require_ssl"] is False
+
+    def test_require_ssl_is_honoured_on_the_direct_path(self):
+        source = _saveable("direct", require_ssl=False)
+
+        _submit(source, require_ssl=True)
+
+        assert source["database"]["android"]["require_ssl"] is True
+
+    def test_config_without_password_is_held_on_the_webservice_path(self):
+        source = _saveable("webservice", config_without_password=True)
+
+        _submit(source, config_without_password=False)
+
+        assert source["database"]["android"]["config_without_password"] is True
+
+    def test_a_password_change_still_reaches_the_account(self):
+        """The credential the micro-server authenticates with stays rotatable."""
+        source = _saveable("webservice", password="stored")
+
+        _submit(source, database_password="rotated")
+
+        assert source["database"]["android"]["password"] == "rotated"

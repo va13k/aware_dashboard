@@ -345,16 +345,35 @@ export default function StudyInformation() {
               : "Controls how this server reaches the study database. Participant phones never open it on this path — they post to the server, which performs the write. Password and SSL changes are applied to the database account when you save."}
           </p>
           <Grid container direction="column" sx={{ ml: 5, mt: 1 }}>
-            <CustomizedCheckbox
-              recoilState={databaseInformationState}
-              field="require_ssl"
-              label="Require an encrypted (SSL/TLS) connection"
-            />
-            <p style={DB_HELPER_STYLE}>
-              {direct
-                ? "Participant devices must connect to the database over an encrypted (TLS) connection, so sensor data is never sent in plaintext. Only enable this if the devices support TLS — otherwise their uploads are rejected."
-                : "The account must connect to the database over an encrypted (TLS) connection. On this path that account belongs to the server, so enable it only if the server reaches MySQL over TLS — otherwise its writes are rejected."}
-            </p>
+            {/* Offered on the direct path, where the phone's own client
+                negotiates the connection. On the webservice path the holder of
+                this account is the micro-server, whose client trusts no
+                certificate until a CA path is generated for it, so requiring TLS
+                there refuses every write. */}
+            {direct ? (
+              <>
+                <CustomizedCheckbox
+                  recoilState={databaseInformationState}
+                  field="require_ssl"
+                  label="Require an encrypted (SSL/TLS) connection"
+                />
+                <p style={DB_HELPER_STYLE}>
+                  Participant devices must connect to the database over an
+                  encrypted (TLS) connection, so sensor data is never sent in
+                  plaintext. Only enable this if the devices support TLS —
+                  otherwise their uploads are rejected.
+                </p>
+              </>
+            ) : (
+              <p style={DB_HELPER_STYLE}>
+                The server holds the database account and is given its
+                credential with the deployment, the way the iPhone side already
+                works, so there is nothing here to set. The connection is made
+                over the deployment&apos;s own network and the database port is
+                published only to this machine; what travels between a phone and
+                the server is protected by serving the deployment over HTTPS.
+              </p>
+            )}
             {/* Only the direct path publishes a config carrying the password, so
                 this is the one control that has nothing to govern otherwise. */}
             {direct ? (
@@ -374,24 +393,22 @@ export default function StudyInformation() {
               </>
             ) : null}
           </Grid>
-          <Box sx={{ ml: 5, mt: 1, mb: 2, maxWidth: "680px" }}>
-            <PasswordField
-              fieldName={
-                direct
-                  ? "Participant database password"
-                  : "Database password (used by the server)"
-              }
-              recoilState={databaseInformationState}
-              field="database_password"
-              inputLabel="Password"
-              onReveal={loadParticipantPassword}
-              description={
-                direct
-                  ? "The database account password. Click the eye to reveal the one in use, or type a new one. Leaving it blank keeps the current password."
-                  : "The database account password. On this path the server authenticates with it and phones never see it. Click the eye to reveal the one in use, or type a new one. Leaving it blank keeps the current password."
-              }
-            />
-          </Box>
+          {/* Offered on the direct path, where a participant may have to type it
+              when joining. On the webservice path the account belongs to the
+              micro-server and is generated with the deployment, the way the iOS
+              one already is -- there is nobody to show it to. */}
+          {direct ? (
+            <Box sx={{ ml: 5, mt: 1, mb: 2, maxWidth: "680px" }}>
+              <PasswordField
+                fieldName="Participant database password"
+                recoilState={databaseInformationState}
+                field="database_password"
+                inputLabel="Password"
+                onReveal={loadParticipantPassword}
+                description="The database account password. Click the eye to reveal the one in use, or type a new one. Leaving it blank keeps the current password."
+              />
+            </Box>
+          ) : null}
           <Box sx={{ ml: 5, mb: 2, maxWidth: "680px" }}>
             <Alert severity={dbSecurity.severity}>
               <AlertTitle>{dbSecurity.title}</AlertTitle>
