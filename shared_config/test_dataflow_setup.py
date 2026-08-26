@@ -30,6 +30,47 @@ import write_request_env  # noqa: E402
 from shared_config.serializers import build_android_micro_config  # noqa: E402
 
 
+class TestProjectRoot:
+    """write_request_env.project_root: where the dataflow vocabulary is imported from.
+
+    The wizard runs the same file from two layouts. A checkout keeps it in the
+    project's setup directory, so the root is one level up. The wizard container
+    keeps it in a flat /wizard directory and mounts the project at /project, so
+    the root is the mount. Finding the root by the package it contains lets one
+    import serve both.
+    """
+
+    def test_a_checkout_resolves_to_the_directory_holding_shared_config(self):
+        root = write_request_env.project_root()
+
+        assert (root / "shared_config").is_dir()
+        assert (root / "shared_config" / "dataflow.py").is_file()
+
+    def test_the_container_mount_is_among_the_candidates(self):
+        """The wizard image copies this file into /wizard and mounts /project."""
+        candidates = [str(c) for c in write_request_env.PROJECT_CANDIDATES]
+
+        assert "/project" in candidates
+
+    def test_a_flat_layout_resolves_to_the_mounted_project(self, tmp_path):
+        """The container's layout: this file's parent holds no package, and the
+        project sits somewhere else entirely."""
+        flat = tmp_path / "wizard"
+        flat.mkdir()
+        mounted = tmp_path / "project"
+        (mounted / "shared_config").mkdir(parents=True)
+
+        assert write_request_env.project_root([flat, mounted]) == mounted
+
+    def test_the_checkout_is_preferred_when_both_layouts_are_present(self, tmp_path):
+        checkout = tmp_path / "checkout"
+        (checkout / "shared_config").mkdir(parents=True)
+        mounted = tmp_path / "project"
+        (mounted / "shared_config").mkdir(parents=True)
+
+        assert write_request_env.project_root([checkout, mounted]) == checkout
+
+
 class TestBoundaryValidation:
     """write_request_env.clean_dataflow: the wizard's answer, checked."""
 

@@ -3,10 +3,31 @@ import pathlib
 import re
 import sys
 
+#: Where the project root can be, in the order tried. A checkout keeps this file
+#: in the project's setup directory; the wizard container keeps it in a flat
+#: /wizard directory and mounts the project at /project.
+PROJECT_CANDIDATES = (
+    pathlib.Path(__file__).resolve().parent.parent,
+    pathlib.Path("/project"),
+)
+
+
+def project_root(candidates=PROJECT_CANDIDATES) -> pathlib.Path:
+    """The candidate that holds shared_config, which is the project root.
+
+    Both layouts serve the same wizard, so the root is found by the package it
+    has to contain rather than by this file's position in it.
+    """
+    for candidate in candidates:
+        if (candidate / "shared_config").is_dir():
+            return candidate
+    return candidates[0]
+
+
 # The dataflow vocabulary and its rules live with the study model rather than
 # being restated here, so the wizard cannot accept a choice the generation
 # refuses.
-sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent.parent))
+sys.path.insert(0, str(project_root()))
 from shared_config import dataflow  # noqa: E402
 
 # Characters that survive .env, the wizard's JSON responses and MySQL quoting
