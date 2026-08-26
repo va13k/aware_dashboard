@@ -30,6 +30,10 @@ if [ "$REQUEST_METHOD" = "GET" ]; then
     MYSQL_BACKUP_RETENTION_DAYS="30"
     RESEARCHER_USERNAME=""
     PARTICIPANT_DB_PASSWORD=""
+    # Empty means a study with no dataflow declared yet, which the form opens on
+    # its own default. A deployed study sends its own, so reopening the wizard
+    # shows the dataflow the study is running.
+    ANDROID_DATAFLOW=""
     EXISTS=false
 
     if [ -f /project/.setup-defaults.env ]; then
@@ -54,6 +58,7 @@ if [ "$REQUEST_METHOD" = "GET" ]; then
             value=$(trim_cr "$value")
             case "$key" in
                 MYSQL_ROOT_PASSWORD) MYSQL_PASS="$value" ;;
+                ANDROID_DATAFLOW) ANDROID_DATAFLOW="$value" ;;
                 PUBLIC_HOST) PUBLIC_HOST="$value" ;;
                 PUBLIC_PORT) PUBLIC_PORT="$value" ;;
                 PROTOCOL) PROTOCOL="$value" ;;
@@ -68,8 +73,8 @@ if [ "$REQUEST_METHOD" = "GET" ]; then
         done < /project/.env
     fi
 
-    printf '{"exists":%s,"MYSQL_ROOT_PASSWORD":"%s","SUGGESTED_PUBLIC_HOST":"%s","PUBLIC_HOST":"%s","PUBLIC_PORT":"%s","PROTOCOL":"%s","MYSQL_BACKUP_HOST_DIR":"%s","MYSQL_BACKUP_INTERVAL_SECONDS":"%s","MYSQL_BACKUP_RETENTION_DAYS":"%s","SSL_CERTIFICATE_PATH":"%s","SSL_CERTIFICATE_KEY_PATH":"%s","RESEARCHER_USERNAME":"%s","PARTICIPANT_DB_PASSWORD":"%s"}' \
-        "$EXISTS" "$MYSQL_PASS" "$SUGGESTED_PUBLIC_HOST" "$PUBLIC_HOST" "$PUBLIC_PORT" "$PROTOCOL" "$MYSQL_BACKUP_HOST_DIR" "$MYSQL_BACKUP_INTERVAL_SECONDS" "$MYSQL_BACKUP_RETENTION_DAYS" "$SSL_CERT" "$SSL_KEY" "$RESEARCHER_USERNAME" "$PARTICIPANT_DB_PASSWORD"
+    printf '{"exists":%s,"MYSQL_ROOT_PASSWORD":"%s","SUGGESTED_PUBLIC_HOST":"%s","PUBLIC_HOST":"%s","PUBLIC_PORT":"%s","PROTOCOL":"%s","MYSQL_BACKUP_HOST_DIR":"%s","MYSQL_BACKUP_INTERVAL_SECONDS":"%s","MYSQL_BACKUP_RETENTION_DAYS":"%s","SSL_CERTIFICATE_PATH":"%s","SSL_CERTIFICATE_KEY_PATH":"%s","RESEARCHER_USERNAME":"%s","PARTICIPANT_DB_PASSWORD":"%s","ANDROID_DATAFLOW":"%s"}' \
+        "$EXISTS" "$MYSQL_PASS" "$SUGGESTED_PUBLIC_HOST" "$PUBLIC_HOST" "$PUBLIC_PORT" "$PROTOCOL" "$MYSQL_BACKUP_HOST_DIR" "$MYSQL_BACKUP_INTERVAL_SECONDS" "$MYSQL_BACKUP_RETENTION_DAYS" "$SSL_CERT" "$SSL_KEY" "$RESEARCHER_USERNAME" "$PARTICIPANT_DB_PASSWORD" "$ANDROID_DATAFLOW"
     exit 0
 fi
 

@@ -566,6 +566,16 @@ function loadExisting() {
   x.onload = function () {
     try {
       var d = JSON.parse(x.responseText);
+      // The dataflow the study is running, so reopening the wizard on a
+      // deployed study shows its own answer. Changing it forces every
+      // participant to re-join, which is not something a redeploy should do
+      // because a form opened on its default value.
+      var deployedDataflow = (d.ANDROID_DATAFLOW || "").trim();
+      var dataflowSelect = document.getElementById("androidDataflow");
+      if (dataflowSelect && deployedDataflow) {
+        dataflowSelect.value = deployedDataflow;
+      }
+
       suggestedPublicHost = (d.SUGGESTED_PUBLIC_HOST || "").trim();
       updateHostPlaceholder();
       if (d.MYSQL_ROOT_PASSWORD)
