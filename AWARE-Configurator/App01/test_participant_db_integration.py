@@ -11,7 +11,7 @@ import pathlib
 import pymysql
 import pytest
 
-from App01.participant_db import ParticipantDbError, apply_participant_credentials
+from App01.participant_db import ParticipantDbError, apply_account_credentials
 
 HOST = "127.0.0.1"
 PORT = 3306
@@ -68,7 +68,7 @@ def test_user(admin):
 
 
 def _apply(admin, username, password, require_ssl):
-    apply_participant_credentials(
+    apply_account_credentials(
         host=admin["host"], port=admin["port"], root_password=admin["root_password"],
         username=username, password=password, require_ssl=require_ssl,
     )

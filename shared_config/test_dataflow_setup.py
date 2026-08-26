@@ -20,7 +20,7 @@ import sys
 
 import pytest
 
-from shared_config import dataflow
+from shared_config import database, dataflow
 
 SETUP = pathlib.Path(__file__).resolve().parent.parent / "setup"
 sys.path.insert(0, str(SETUP))
@@ -29,7 +29,10 @@ import deploy_config  # noqa: E402
 import write_request_env  # noqa: E402
 
 from shared_config import serializers  # noqa: E402
-from shared_config.serializers import build_android_micro_config  # noqa: E402
+from shared_config.serializers import (  # noqa: E402
+    build_android_micro_config,
+    serialize_android_config,
+)
 
 
 class TestProjectRoot:
@@ -283,6 +286,203 @@ class TestAndroidQrCode:
         assert self._micro("")["study"]["join_url"] == ""
 
 
+class TestWhichAccountTheServerWritesWith:
+    """build_android_micro_config: the credential the Android instance authenticates
+    with.
+
+    The server performs every write on the webservice path, so ingest is the server's
+    connection rather than a participant's. Its account is granted what ingest does
+    --- inserts, the enrolment registry it reads to decide which writes to keep, the
+    refusal counters, the device-metadata row it fills in --- and the participant
+    account is left to the path phones write on, where a phone holds the published
+    credential and reads nothing back.
+    """
+
+    SOURCE = {
+        "database": {
+            "android": {
+                "name": "aware_android",
+                "username": "aware_android_participant",
+                "password": "phone-pw",
+                "server_username": "aware_android_server",
+                "server_password": "server-pw",
+                "port": 3306,
+            }
+        },
+        "study": {
+            "title": "Study",
+            "description": "",
+            "active": True,
+            "start_timestamp": 0,
+        },
+        "researcher": {
+            "first_name": "First",
+            "last_name": "Last",
+            "contact": "researcher@example.com",
+        },
+    }
+    SETTINGS = {
+        "micro_database_host": "mysql",
+        "external_server_host": "http://host",
+        "public_port": 80,
+    }
+
+    def _server(self, source=None):
+        import copy
+
+        return build_android_micro_config(
+            copy.deepcopy(source or self.SOURCE),
+            dict(self.SETTINGS),
+            "KEY",
+            dataflow.ANDROID_STUDY_NUMBER,
+        )["server"]
+
+    def test_the_instance_authenticates_as_the_server_account(self):
+        server = self._server()
+
+        assert server["database_user"] == "aware_android_server"
+        assert server["database_pwd"] == "server-pw"
+
+    def test_the_participant_credential_is_not_in_the_instances_configuration(self):
+        """It belongs to the path phones open the database on, and this file is the
+        server's."""
+        server = self._server()
+
+        assert "aware_android_participant" not in server.values()
+        assert "phone-pw" not in server.values()
+
+    def test_a_declared_dataflow_does_not_change_the_account(self):
+        """The instance is configured on either path, and it is the same server."""
+        import copy
+
+        direct = copy.deepcopy(self.SOURCE)
+        direct["deployment"] = {"dataflow": {"android": "direct"}}
+
+        assert self._server(direct)["database_user"] == self._server()["database_user"]
+
+    def test_the_gate_is_on_for_the_account_granted_to_read_the_registry(self):
+        """The enrolment read is this account's, so the two travel together."""
+        assert self._server()["require_enrolment"] is True
+
+
+class TestTheCredentialsADeploySettles:
+    """deploy_config: two Android accounts, two secrets, neither reaching the other's
+    reader.
+
+    The participant password is embedded in the study config every phone downloads,
+    and the server's account can read the enrolment registry and update device
+    metadata that a phone's cannot. Sharing one secret would hand every participant
+    the wider account, so each account carries its own -- and each is seeded whichever
+    dataflow the study runs, since the instance is configured either way.
+    """
+
+    def _seed(self, monkeypatch, env, requested=""):
+        stored = {}
+        template = json.loads(
+            (pathlib.Path(__file__).resolve().parent.parent / "source.example.json")
+            .read_text(encoding="utf-8")
+        )
+
+        def update_source(mutate):
+            stored.clear()
+            stored.update(mutate(template))
+            return stored
+
+        monkeypatch.setattr(deploy_config, "update_source", update_source)
+        monkeypatch.setattr(deploy_config, "requested_dataflow", lambda: requested)
+        return deploy_config.seed_source_secrets(env)
+
+    def _env(self):
+        env = {"STUDY_ID": "study-1"}
+        deploy_config.ensure_participant_password(env)
+        deploy_config.ensure_server_password(env)
+        return env
+
+    def test_each_account_is_given_its_own_generated_password(self, monkeypatch):
+        env = self._env()
+
+        assert env["PARTICIPANT_DB_PASSWORD"] != env["ANDROID_SERVER_DB_PASSWORD"]
+
+    def test_a_password_already_on_record_is_kept(self, monkeypatch):
+        """A change the Configurator made survives the next deploy."""
+        env = {"ANDROID_SERVER_DB_PASSWORD": "chosen-by-the-researcher"}
+        deploy_config.ensure_server_password(env)
+
+        assert env["ANDROID_SERVER_DB_PASSWORD"] == "chosen-by-the-researcher"
+
+    def test_both_credentials_reach_the_study_model(self, monkeypatch):
+        env = self._env()
+        android = self._seed(monkeypatch, env)["database"]["android"]
+
+        assert android["password"] == env["PARTICIPANT_DB_PASSWORD"]
+        assert android["server_password"] == env["ANDROID_SERVER_DB_PASSWORD"]
+
+    def test_the_server_account_is_named_on_a_study_that_carried_none(
+        self, monkeypatch
+    ):
+        env = self._env()
+        stored = {}
+
+        def update_source(mutate):
+            stored.update(mutate({"database": {"android": {}}}))
+            return stored
+
+        monkeypatch.setattr(deploy_config, "update_source", update_source)
+        monkeypatch.setattr(deploy_config, "requested_dataflow", lambda: "")
+        seeded = deploy_config.seed_source_secrets(env)
+
+        assert seeded["database"]["android"]["server_username"] == (
+            database.ANDROID_SERVER_USER
+        )
+
+    def test_the_participant_password_stays_out_of_the_servers_configuration(
+        self, monkeypatch
+    ):
+        env = self._env()
+        source = self._seed(monkeypatch, env, requested="webservice")
+        micro = build_android_micro_config(
+            source,
+            {
+                "micro_database_host": "mysql",
+                "external_server_host": "http://host",
+                "public_port": 80,
+            },
+            "KEY",
+            dataflow.ANDROID_STUDY_NUMBER,
+        )
+
+        assert micro["server"]["database_pwd"] == env["ANDROID_SERVER_DB_PASSWORD"]
+        assert env["PARTICIPANT_DB_PASSWORD"] not in json.dumps(micro)
+
+    def test_the_servers_password_is_never_published_to_phones(self, monkeypatch):
+        """The direct path publishes a config carrying a credential; it is the
+        participants' one, and the server's belongs to nothing a phone downloads."""
+        env = self._env()
+        source = self._seed(monkeypatch, env, requested="direct")
+        template = (
+            pathlib.Path(__file__).resolve().parent.parent
+            / "AWARE-Configurator"
+            / "reactapp"
+            / "public"
+            / "study-config.json"
+        )
+        published = serialize_android_config(
+            source,
+            {
+                "android_database_host": "example.org",
+                "micro_database_host": "mysql",
+                "external_server_host": "http://host",
+                "public_port": 80,
+            },
+            template,
+        )
+
+        assert published["database"]["database_username"] == (
+            database.ANDROID_PARTICIPANT_USER
+        )
+        assert env["ANDROID_SERVER_DB_PASSWORD"] not in json.dumps(published)
+
+
 class TestWhoDeclaresTheDataflow:
     """deploy_config.seed_source_secrets: which answer a deploy honours.
 
@@ -310,7 +510,12 @@ class TestWhoDeclaresTheDataflow:
         monkeypatch.setattr(
             deploy_config, "requested_dataflow", lambda: requested or ""
         )
-        merged = {"PARTICIPANT_DB_PASSWORD": "kept", "STUDY_ID": "study-1", **env}
+        merged = {
+            "PARTICIPANT_DB_PASSWORD": "kept",
+            "ANDROID_SERVER_DB_PASSWORD": "kept-server",
+            "STUDY_ID": "study-1",
+            **env,
+        }
         deploy_config.seed_source_secrets(merged)
         return dataflow.declared(stored, "android")
 
@@ -360,7 +565,11 @@ class TestWhoDeclaresTheDataflow:
         monkeypatch.setattr(deploy_config, "update_source", update_source)
         monkeypatch.setattr(deploy_config, "requested_dataflow", lambda: "")
         deploy_config.seed_source_secrets(
-            {"PARTICIPANT_DB_PASSWORD": "kept", "STUDY_ID": "study-1"}
+            {
+                "PARTICIPANT_DB_PASSWORD": "kept",
+                "ANDROID_SERVER_DB_PASSWORD": "kept-server",
+                "STUDY_ID": "study-1",
+            }
         )
 
         assert dataflow.declared(stored, "ios") == dataflow.WEBSERVICE

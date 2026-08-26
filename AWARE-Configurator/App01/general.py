@@ -13,8 +13,10 @@ from aware_light_config_Django import settings
 PROJECT_ROOT = settings.PROJECT_ROOT
 
 from shared_config import dataflow
+from shared_config.database import android_credentials, android_ingest_account
 from shared_config.source_store import read_source, update_source
 from shared_config.runtime import (
+    SECRET_MODE,
     SHARED_MODE,
     atomic_write_text,
     build_public_base_url,
@@ -28,6 +30,7 @@ from shared_config.serializers import (
     COMMON_SHARED_SENSOR_FIELDS,
     IOS_ESM_CONFIG_FILENAME,
     IOS_ONLY_SENSOR_NAMES,
+    build_android_micro_config,
     build_ios_esm_config,
     build_ios_plugin_settings,
     build_sensor_setting_name,
@@ -35,7 +38,7 @@ from shared_config.serializers import (
     serialize_ios_config,
     update_ios_plugin_settings,
 )
-from App01.participant_db import ParticipantDbError, apply_participant_credentials
+from App01.participant_db import ParticipantDbError, apply_account_credentials
 
 logger = logging.getLogger(__name__)
 storage_path = settings.STORAGE_DIR
@@ -47,6 +50,12 @@ ANDROID_TEMPLATE_PATH = (
 )
 IOS_EXAMPLE_PATH = PROJECT_ROOT / "aware-micro-server" / "aware-config.example.json"
 IOS_CONFIG_PATH = PROJECT_ROOT / "aware-micro-server" / "aware-config.json"
+#: The Android micro-server's own configuration, which carries the account it
+#: authenticates with. Rewritten alongside the study configs so a credential change
+#: reaches the server that uses it.
+ANDROID_MICRO_CONFIG_PATH = (
+    PROJECT_ROOT / "aware-micro-server" / "aware-config.android.json"
+)
 IOS_ESM_CONFIG_PATH = PROJECT_ROOT / "aware-micro-server" / "esm" / IOS_ESM_CONFIG_FILENAME
 STUDY_CONFIG_PATH = pathlib.Path(storage_path) / STUDY_CONFIG_FILE_NAME
 ABSTRACT_DATABASE_HOST = "db.internal"
@@ -70,6 +79,9 @@ def deployment_facts(request):
     `protocol` and `mysql_reachable_externally` are the two facts the webservice
     path is judged on: whether the hop a phone makes is encrypted, and whether the
     database the server writes to is reachable beyond this host.
+
+    `android_ingest_account` is the MySQL account the study's writes authenticate as,
+    which is what the form's password field changes.
     """
     if request.method != "GET":
         return HttpResponse(
@@ -86,6 +98,13 @@ def deployment_facts(request):
             {
                 "android_dataflow": dataflow.declared(source, "android"),
                 "ios_dataflow": dataflow.declared(source, "ios"),
+                # Named so the password field says which account it changes. The
+                # dataflow decides the holder, and a field that reads as the
+                # participants' while it changes the server's invites a researcher
+                # to rotate the wrong credential.
+                "android_ingest_account": android_credentials(
+                    source.get("database", {}), dataflow.declared(source, "android")
+                )[0],
                 "protocol": str(env.get("PROTOCOL", "http")).strip().lower(),
                 # A published port narrowed to loopback is reachable only from the
                 # host itself, which is where the micro-server's own hop starts.
@@ -97,14 +116,19 @@ def deployment_facts(request):
 
 
 def get_participant_password(request):
-    """Return the participant account password for the study form.
+    """Return the ingest account's password for the study form.
+
+    Whichever account the study's dataflow puts on the ingest path, so the field
+    reveals the password it also changes.
 
     serialize_android_config redacts the password to "-" when
     config_without_password is on, and that config is served from the public
     /studies/files/ path devices download, so the Configurator cannot read the
-    real value back from it and the form field would always load empty. This
-    route lives under /configurator/, which nginx gates behind the researcher
-    login, so the password is only handed to an authenticated researcher.
+    real value back from it and the form field would always load empty. On the
+    webservice path the served config carries no database block at all, which
+    leaves the field with nothing to load either. This route lives under
+    /configurator/, which nginx gates behind the researcher login, so the password
+    is only handed to an authenticated researcher.
     """
     if request.method != "GET":
         return HttpResponse(
@@ -113,9 +137,12 @@ def get_participant_password(request):
             content_type="application/json",
         )
 
-    android_db = read_source().get("database", {}).get("android", {})
+    source = read_source()
+    _, password = android_credentials(
+        source.get("database", {}), dataflow.declared(source, "android")
+    )
     response = HttpResponse(
-        json.dumps({"password": str(android_db.get("password", ""))}),
+        json.dumps({"password": password}),
         content_type="application/json",
     )
     # Never let a secret settle in a browser or proxy cache.
@@ -191,28 +218,46 @@ def save(content):
 
 
 def _merge_and_sync_credentials(source, content):
-    previous_credentials = _participant_credentials(source)
+    previous_credentials = _ingest_credentials(source)
     update_source_from_android_config(source, content)
-    new_credentials = _participant_credentials(source)
+    new_credentials = _ingest_credentials(source)
 
-    # Only talk to MySQL when the participant credentials actually change, so
+    # Only talk to MySQL when the ingest credentials actually change, so
     # routine edits (questions, schedules, sensors) never depend on the
     # database being reachable.
     if new_credentials != previous_credentials:
-        _sync_participant_credentials(source)
+        _sync_ingest_credentials(source)
 
     return source
 
 
-def _participant_credentials(source):
-    """Credentials the participant account should have: (password, require_ssl).
+def _ingest_account(source):
+    """Where the account this study's Android ingest authenticates as is kept.
+
+    The dataflow decides the holder: a phone opens the database itself on the direct
+    path, and the micro-server performs every write on the webservice one. So the one
+    password field in the form governs one account at a time, and this is the answer
+    every reader of that field starts from.
+    """
+    return android_ingest_account(dataflow.declared(source, "android"))
+
+
+def _ingest_credentials(source):
+    """Credentials that account should have: (username, password, require_ssl).
+
+    The username rides along because the account is part of what has to be in
+    effect: a study whose dataflow names a different holder needs that holder's
+    credentials applied, not the previous one's.
 
     config_without_password does NOT change the account — it only controls
     whether the served study config embeds the password or omits it so the
     participant enters it when joining. The account always keeps its password.
     """
     android_db = source.get("database", {}).get("android", {})
-    return (str(android_db.get("password", "")), bool(android_db.get("require_ssl")))
+    username, password = android_credentials(
+        source.get("database", {}), dataflow.declared(source, "android")
+    )
+    return (username, password, bool(android_db.get("require_ssl")))
 
 
 def _mysql_admin_settings():
@@ -228,26 +273,31 @@ def _mysql_admin_settings():
     }
 
 
-def _sync_participant_credentials(source):
-    android_db = source["database"]["android"]
-    password, require_ssl = _participant_credentials(source)
+def _sync_ingest_credentials(source):
+    """Apply the study's ingest credentials to the account that holds them.
+
+    One account per dataflow, so the change lands on the one the study writes with:
+    the participant account on the direct path, the micro-server's on the webservice
+    path. Each keeps its own password, so changing one leaves the other as it was.
+    """
+    username, password, require_ssl = _ingest_credentials(source)
     admin = _mysql_admin_settings()
-    apply_participant_credentials(
+    apply_account_credentials(
         host=admin["host"],
         port=admin["port"],
         root_password=admin["root_password"],
-        username=str(android_db.get("username", "")).strip(),
+        username=username,
         password=password,
         require_ssl=require_ssl,
     )
 
-    # .env is the single source of truth for the participant password: the
-    # deployment step seeds source.json from it and MySQL's first-boot script
-    # applies it. Recording the new password here keeps all three in agreement,
-    # so re-running the wizard cannot hand devices a stale password. Only after
-    # MySQL accepted the change, otherwise .env would advertise a password the
-    # account does not have.
-    set_env_value(ENV_PATH, "PARTICIPANT_DB_PASSWORD", password)
+    # .env is the single source of truth for these passwords: the deployment step
+    # seeds source.json from it and MySQL's first-boot script applies it. Recording
+    # the new password under this account's own variable keeps all three in
+    # agreement, so re-running the wizard cannot hand the study a stale password.
+    # Only after MySQL accepted the change, otherwise .env would advertise a
+    # password the account does not have.
+    set_env_value(ENV_PATH, _ingest_account(source)["env_key"], password)
 
 
 def write_json(path, content, mode=SHARED_MODE):
@@ -335,9 +385,13 @@ def update_source_from_android_config(source, content):
         # config_without_password redacts the served password to "-"; never let
         # that sentinel (or a blank) overwrite the real stored password, so the
         # account and the source of truth keep the working password.
+        #
+        # Stored under the key belonging to the account this study's dataflow puts on
+        # the ingest path, which is the account the save then applies it to: one field
+        # in the form, and it governs the credential the study actually writes with.
         incoming_password = database.get("database_password")
         if incoming_password and incoming_password != "-":
-            android_db["password"] = incoming_password
+            android_db[_ingest_account(source)["password_key"]] = incoming_password
         # Both settings describe a phone opening the database itself, so they are
         # taken from the form only on the path that has one. On the webservice
         # path the holder of this account is the micro-server: `require_ssl` there
@@ -542,7 +596,22 @@ def write_outputs(source):
     android_config = serialize_android_config(
         source, settings, ANDROID_TEMPLATE_PATH, webservice_server=android_webservice_url
     )
+    # The Android instance's own configuration, carrying the account it authenticates
+    # as. Written here so a credential change reaches the server that uses it, and
+    # written on either dataflow for the same reason the deploy writes it on either:
+    # the instance runs regardless, and a switch is then a restart rather than a
+    # re-deploy. It takes effect when the container next starts.
+    android_micro = build_android_micro_config(
+        source,
+        settings,
+        study["study_key"],
+        dataflow.ANDROID_STUDY_NUMBER,
+        join_url=android_webservice_url,
+    )
     ios_esm_config = build_ios_esm_config(source)
     write_json(STUDY_CONFIG_PATH, android_config)
     write_json(IOS_CONFIG_PATH, ios_config)
     write_json(IOS_ESM_CONFIG_PATH, ios_esm_config)
+    # The credential inside is the server's own, so it is kept as closely as the
+    # deploy that generates it keeps it.
+    write_json(ANDROID_MICRO_CONFIG_PATH, android_micro, SECRET_MODE)

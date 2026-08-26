@@ -1,7 +1,8 @@
 """Tests for the save-path helpers in App01/general.py.
 
 Covers the pure/near-pure pieces of the hybrid save:
-- _participant_credentials: collapsing config_without_password + password
+- _ingest_credentials: which account the study's writes authenticate as, and
+  collapsing config_without_password + password
 - _merge_and_sync_credentials: MySQL is touched only when credentials change
 - _mysql_admin_settings: env / .env resolution and defaults
 - write_json: atomic round-trip with no leftover temp files
@@ -14,27 +15,78 @@ from App01 import general
 
 
 # --------------------------------------------------------------------------
-# _participant_credentials
+# _ingest_credentials
 # --------------------------------------------------------------------------
+
+PARTICIPANT = "aware_android_participant"
+SERVER = "aware_android_server"
+
 
 @pytest.mark.parametrize(
     "android, expected",
     [
-        ({"password": "pw", "config_without_password": False, "require_ssl": False}, ("pw", False)),
+        (
+            {"password": "pw", "config_without_password": False, "require_ssl": False},
+            (PARTICIPANT, "pw", False),
+        ),
         # config_without_password never blanks the account password
-        ({"password": "pw", "config_without_password": True, "require_ssl": False}, ("pw", False)),
-        ({"password": "pw", "config_without_password": False, "require_ssl": True}, ("pw", True)),
-        ({"password": "pw", "config_without_password": True, "require_ssl": True}, ("pw", True)),
-        ({}, ("", False)),
+        (
+            {"password": "pw", "config_without_password": True, "require_ssl": False},
+            (PARTICIPANT, "pw", False),
+        ),
+        (
+            {"password": "pw", "config_without_password": False, "require_ssl": True},
+            (PARTICIPANT, "pw", True),
+        ),
+        (
+            {"password": "pw", "config_without_password": True, "require_ssl": True},
+            (PARTICIPANT, "pw", True),
+        ),
+        ({}, (PARTICIPANT, "", False)),
     ],
 )
-def test_participant_credentials(android, expected):
+def test_ingest_credentials_on_the_direct_path(android, expected):
+    """A study that declares nothing runs the direct path, where a phone writes."""
     source = {"database": {"android": android}}
-    assert general._participant_credentials(source) == expected
+    assert general._ingest_credentials(source) == expected
 
 
-def test_participant_credentials_missing_database():
-    assert general._participant_credentials({}) == ("", False)
+def test_ingest_credentials_missing_database():
+    assert general._ingest_credentials({}) == (PARTICIPANT, "", False)
+
+
+def test_ingest_credentials_on_the_webservice_path():
+    """The server performs every write there, so its own account is the one in use."""
+    source = {
+        "deployment": {"dataflow": {"android": "webservice"}},
+        "database": {
+            "android": {
+                "password": "phone-pw",
+                "server_username": SERVER,
+                "server_password": "server-pw",
+                "require_ssl": False,
+            }
+        },
+    }
+    assert general._ingest_credentials(source) == (SERVER, "server-pw", False)
+
+
+def test_ingest_credentials_name_the_server_account_without_one_stored():
+    """A study predating the field still names the account the deployment creates."""
+    source = {"deployment": {"dataflow": {"android": "webservice"}}, "database": {"android": {}}}
+    assert general._ingest_credentials(source)[0] == SERVER
+
+
+def test_the_env_variable_follows_the_account():
+    """Each account's password is recorded under its own variable, so a change to one
+    never advertises itself as the other's."""
+    direct = {"database": {"android": {}}}
+    webservice = {"deployment": {"dataflow": {"android": "webservice"}}}
+
+    assert general._ingest_account(direct)["env_key"] == "PARTICIPANT_DB_PASSWORD"
+    assert (
+        general._ingest_account(webservice)["env_key"] == "ANDROID_SERVER_DB_PASSWORD"
+    )
 
 
 # --------------------------------------------------------------------------
@@ -61,7 +113,7 @@ def test_sync_called_when_password_changes(monkeypatch):
         return source
 
     monkeypatch.setattr(general, "update_source_from_android_config", fake_update)
-    monkeypatch.setattr(general, "_sync_participant_credentials", synced.append)
+    monkeypatch.setattr(general, "_sync_ingest_credentials", synced.append)
 
     source = _source(password="old")
     result = general._merge_and_sync_credentials(source, {"any": "content"})
@@ -79,7 +131,7 @@ def test_sync_skipped_when_toggling_config_without_password(monkeypatch):
         return source
 
     monkeypatch.setattr(general, "update_source_from_android_config", fake_update)
-    monkeypatch.setattr(general, "_sync_participant_credentials", synced.append)
+    monkeypatch.setattr(general, "_sync_ingest_credentials", synced.append)
 
     general._merge_and_sync_credentials(_source(password="secret"), {})
     assert synced == []
@@ -93,7 +145,7 @@ def test_sync_called_when_require_ssl_changes(monkeypatch):
         return source
 
     monkeypatch.setattr(general, "update_source_from_android_config", fake_update)
-    monkeypatch.setattr(general, "_sync_participant_credentials", synced.append)
+    monkeypatch.setattr(general, "_sync_ingest_credentials", synced.append)
 
     general._merge_and_sync_credentials(
         _source(password="secret", require_ssl=False), {}
@@ -101,11 +153,27 @@ def test_sync_called_when_require_ssl_changes(monkeypatch):
     assert len(synced) == 1
 
 
+def test_sync_called_when_the_dataflow_moves_the_account(monkeypatch):
+    """A study that changes path writes with a different account, so the credentials
+    it needs in MySQL are a different account's."""
+    synced = []
+
+    def fake_update(source, content):
+        source["deployment"] = {"dataflow": {"android": "webservice"}}
+        return source
+
+    monkeypatch.setattr(general, "update_source_from_android_config", fake_update)
+    monkeypatch.setattr(general, "_sync_ingest_credentials", synced.append)
+
+    general._merge_and_sync_credentials(_source(password="secret"), {})
+    assert len(synced) == 1
+
+
 def test_sync_skipped_when_credentials_unchanged(monkeypatch):
     synced = []
     # update leaves the DB block exactly as-is
     monkeypatch.setattr(general, "update_source_from_android_config", lambda s, c: s)
-    monkeypatch.setattr(general, "_sync_participant_credentials", synced.append)
+    monkeypatch.setattr(general, "_sync_ingest_credentials", synced.append)
 
     general._merge_and_sync_credentials(_source(password="same"), {"questions": []})
     assert synced == []
@@ -346,9 +414,118 @@ class TestDirectPathSettingsAreHeldOnWebservice:
         assert source["database"]["android"]["config_without_password"] is True
 
     def test_a_password_change_still_reaches_the_account(self):
-        """The credential the micro-server authenticates with stays rotatable."""
+        """The credential the micro-server authenticates with stays rotatable, under
+        the key belonging to the account that holds it."""
         source = _saveable("webservice", password="stored")
 
         _submit(source, database_password="rotated")
 
-        assert source["database"]["android"]["password"] == "rotated"
+        assert source["database"]["android"]["server_password"] == "rotated"
+        # The participant account's password is left where it was.
+        assert source["database"]["android"]["password"] == "stored"
+
+def _webservice_source(password="phone-pw", server_password="server-pw"):
+    return {
+        "deployment": {"dataflow": {"android": "webservice"}},
+        "database": {
+            "android": {
+                "password": password,
+                "server_username": SERVER,
+                "server_password": server_password,
+            }
+        },
+    }
+
+
+def test_get_participant_password_reveals_the_account_it_changes(monkeypatch):
+    """On the webservice path the field governs the server's account, so revealing it
+    has to show that account's password rather than the participants'."""
+    monkeypatch.setattr(general, "read_source", _webservice_source)
+    response = general.get_participant_password(_Request())
+
+    assert json.loads(response.content) == {"password": "server-pw"}
+    assert b"phone-pw" not in response.content
+
+
+def test_a_submitted_password_is_stored_for_the_account_on_the_path():
+    """One field in the form, and it governs the credential the study writes with."""
+    source = _saveable("webservice", password="phone-pw", server_password="old-server-pw")
+
+    _submit(source, database_password="new-server-pw")
+
+    android = source["database"]["android"]
+    assert android["server_password"] == "new-server-pw"
+    # A field that governs one account is not a field that rotates both.
+    assert android["password"] == "phone-pw"
+
+
+def test_a_submitted_password_reaches_the_participant_account_on_the_direct_path():
+    source = _saveable("direct", password="old-phone-pw", server_password="server-pw")
+
+    _submit(source, database_password="new-phone-pw")
+
+    android = source["database"]["android"]
+    assert android["password"] == "new-phone-pw"
+    assert android["server_password"] == "server-pw"
+
+
+# --------------------------------------------------------------------------
+# write_outputs: the Android instance's own configuration
+# --------------------------------------------------------------------------
+
+def test_saving_writes_the_servers_credential_into_its_own_configuration(
+    monkeypatch, tmp_path
+):
+    """The micro-server authenticates with the account this field changes, and reads
+    it from its own configuration file, so a save has to rewrite that file too --
+    otherwise the account holds a password the server does not know."""
+    import pathlib as _pathlib
+
+    root = _pathlib.Path(general.PROJECT_ROOT)
+    source = json.loads((root / "source.example.json").read_text(encoding="utf-8"))
+    source["deployment"]["dataflow"]["android"] = "webservice"
+    source["database"]["android"]["password"] = "phone-pw"
+    source["database"]["android"]["server_password"] = "server-pw"
+
+    monkeypatch.setattr(
+        general, "load_env", lambda path: {"PUBLIC_HOST": "example.org", "PROTOCOL": "http"}
+    )
+    monkeypatch.setattr(general, "STUDY_CONFIG_PATH", tmp_path / "studyConfig.json")
+    monkeypatch.setattr(general, "IOS_CONFIG_PATH", tmp_path / "aware-config.json")
+    monkeypatch.setattr(general, "IOS_ESM_CONFIG_PATH", tmp_path / "esm.json")
+    monkeypatch.setattr(
+        general, "ANDROID_MICRO_CONFIG_PATH", tmp_path / "aware-config.android.json"
+    )
+
+    general.write_outputs(source)
+
+    written = json.loads(
+        (tmp_path / "aware-config.android.json").read_text(encoding="utf-8")
+    )
+    assert written["server"]["database_user"] == SERVER
+    assert written["server"]["database_pwd"] == "server-pw"
+    # The participant credential belongs to the path phones open the database on.
+    assert "phone-pw" not in json.dumps(written)
+
+
+def test_the_servers_credential_is_not_left_world_readable(monkeypatch, tmp_path):
+    """It is a database password, kept as closely as the deploy that generates it
+    keeps the same file."""
+    import pathlib as _pathlib
+    import stat
+
+    root = _pathlib.Path(general.PROJECT_ROOT)
+    source = json.loads((root / "source.example.json").read_text(encoding="utf-8"))
+
+    monkeypatch.setattr(
+        general, "load_env", lambda path: {"PUBLIC_HOST": "example.org", "PROTOCOL": "http"}
+    )
+    monkeypatch.setattr(general, "STUDY_CONFIG_PATH", tmp_path / "studyConfig.json")
+    monkeypatch.setattr(general, "IOS_CONFIG_PATH", tmp_path / "aware-config.json")
+    monkeypatch.setattr(general, "IOS_ESM_CONFIG_PATH", tmp_path / "esm.json")
+    target = tmp_path / "aware-config.android.json"
+    monkeypatch.setattr(general, "ANDROID_MICRO_CONFIG_PATH", target)
+
+    general.write_outputs(source)
+
+    assert not stat.S_IMODE(target.stat().st_mode) & (stat.S_IROTH | stat.S_IRGRP)
