@@ -75,6 +75,25 @@ def ensure_participant_password(env: dict[str, str]) -> None:
     )
 
 
+def ensure_server_password(env: dict[str, str]) -> None:
+    """Settle on the password the Android micro-server authenticates with.
+
+    Its own secret, not the participants'. The participant password is published to
+    every phone in the study on the direct dataflow, and the server's account may read
+    the enrolment registry and keep the device-metadata row that a phone's account may
+    not, so one password for both would hand every participant the wider account too.
+
+    Nothing asks a researcher for this one: the server is the only holder, and the
+    Configurator edits it on the dataflow where it is the credential in use. Kept
+    rather than regenerated whenever one is already on record, so a change made there
+    survives the next deploy.
+    """
+    password = str(env.get("ANDROID_SERVER_DB_PASSWORD", "")).strip()
+    env["ANDROID_SERVER_DB_PASSWORD"] = (
+        secrets.token_urlsafe(16) if password in PLACEHOLDER_SECRETS else password
+    )
+
+
 def requested_dataflow() -> str:
     """The dataflow the researcher chose in this wizard run, or "" for none.
 
@@ -92,20 +111,38 @@ def seed_source_secrets(env: dict[str, str]) -> dict:
     """Align source.json with this deployment's credentials.
 
     update_source() creates source.json from source.example.json on first run.
-    The participant password is then taken from .env unconditionally, because
-    .env is what MySQL's first-boot script applies to the accounts: copying any
-    other value here would serve devices a password the accounts do not have.
-    That is safe to overwrite because the Configurator writes every password
-    change back to .env, so .env already holds the researcher's own value.
+    Each password is then taken from .env unconditionally, because .env is what
+    MySQL's first-boot script applies to the accounts: copying any other value here
+    would name a password the accounts do not have. That is safe to overwrite because
+    the Configurator writes every password change back to .env, so .env already holds
+    the researcher's own value.
+
+    Android carries two accounts, one per dataflow, so it carries two passwords:
+    the participant one phones open the database with, and the micro-server's own,
+    which every webservice write authenticates as. Both are seeded whichever dataflow
+    the study runs -- the instance is configured either way, and a study switching
+    paths then finds the account on its new path already holding the password the
+    generated configuration names.
     """
     participant_password = env["PARTICIPANT_DB_PASSWORD"]
+    server_password = env["ANDROID_SERVER_DB_PASSWORD"]
+    server_account = database.android_ingest_account(dataflow.WEBSERVICE)
 
     def mutate(source: dict) -> dict:
         for platform in ("android", "ios"):
-            database = source.get("database", {}).get(platform)
-            if database is None:
+            entry = source.get("database", {}).get(platform)
+            if entry is None:
                 continue
-            database["password"] = participant_password
+            entry["password"] = participant_password
+
+        android = source.get("database", {}).get("android")
+        if android is not None:
+            android[server_account["password_key"]] = server_password
+            # Named here so every reader of the study model finds the account, on a
+            # study written before it carried one as much as on a new one.
+            android.setdefault(
+                server_account["name_key"], server_account["default_name"]
+            )
 
         study = source.setdefault("study", {})
         if str(study.get("id", "")).strip() in PLACEHOLDER_SECRETS | {
@@ -247,6 +284,7 @@ def persist_env(env: dict[str, str]) -> None:
         "RESEARCHER_USERNAME",
         "RESEARCHER_PASSWORD",
         "PARTICIPANT_DB_PASSWORD",
+        "ANDROID_SERVER_DB_PASSWORD",
         "PUBLIC_HOST",
         "PUBLIC_PORT",
         "PROTOCOL",
@@ -496,6 +534,7 @@ def main() -> None:
     ensure_study_id(env)
     ensure_researcher_credentials(env)
     ensure_participant_password(env)
+    ensure_server_password(env)
     env = normalize_public_env(env)
 
     generate_htpasswd(

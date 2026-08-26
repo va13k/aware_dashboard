@@ -11,6 +11,7 @@ PROJECT = SCRIPT_DIR.parent
 if str(PROJECT) not in sys.path:
     sys.path.insert(0, str(PROJECT))
 
+from shared_config import database, dataflow
 from shared_config.source_store import read_source
 from shared_config.runtime import load_env
 
@@ -63,48 +64,66 @@ def build_docker_base(prefix: list[str]) -> list[str]:
     return prefix + ["docker"]
 
 
-def load_android_db_settings() -> tuple[str, str, str, str]:
+def load_android_db_settings() -> tuple[str, str]:
+    """The root password and the schema Android data lives in."""
     env = load_env(ENV_PATH)
     mysql_root_password = str(env.get("MYSQL_ROOT_PASSWORD", "")).strip()
     if not mysql_root_password:
         raise RuntimeError("MYSQL_ROOT_PASSWORD is missing from .env")
 
-    source = read_source()
-    android_db = source["database"]["android"]
     return (
         mysql_root_password,
-        str(android_db["name"]).strip(),
-        str(android_db["username"]).strip(),
-        str(android_db["password"]).strip(),
+        str(read_source()["database"]["android"]["name"]).strip(),
     )
 
 
-def load_participant_accounts() -> list[dict]:
-    """The participant accounts and the credentials this deployment expects.
+def load_database_accounts() -> list[dict]:
+    """The accounts this deployment writes with, and the credentials it expects.
 
-    source.json is authoritative: deploy_config seeds it from
-    PARTICIPANT_DB_PASSWORD in .env, and the Configurator writes any later
-    change back to both. ``require_ssl`` is None when the platform does not
-    configure one, which leaves the account's existing requirement alone.
+    source.json is authoritative: deploy_config seeds each password from .env, and
+    the Configurator writes any later change back to both. Android holds two --- the
+    participant account a phone opens the database with, and the micro-server's own,
+    which performs every write on the webservice dataflow --- so both are listed and
+    each carries its own password.
+
+    ``require_ssl`` is applied to the account the study's dataflow puts on the ingest
+    path and left as None elsewhere, which keeps an account's existing requirement.
+    The requirement describes the connection ingest actually makes, so it lands on
+    the account making it rather than on one nothing is opening.
+
+    Each entry carries the platform whose schema it writes, so a caller provisioning
+    one schema selects the accounts belonging to it.
     """
-    databases = read_source()["database"]
+    source = read_source()
+    databases = source["database"]
+    on_path_name, _ = database.android_credentials(
+        databases, dataflow.declared(source, "android")
+    )
+    server = database.android_ingest_account(dataflow.WEBSERVICE)
+
+    def requirement(entry: dict, username: str):
+        if username != on_path_name or "require_ssl" not in entry:
+            return None
+        return bool(entry["require_ssl"])
+
     accounts = []
-    for platform in ("android", "ios"):
-        database = databases.get(platform)
-        if not database:
+    for platform, name_key, password_key in (
+        ("android", "username", "password"),
+        ("android", server["name_key"], server["password_key"]),
+        ("ios", "username", "password"),
+    ):
+        entry = databases.get(platform)
+        if not entry:
             continue
-        username = str(database.get("username", "")).strip()
+        username = str(entry.get(name_key, "")).strip()
         if not username:
             continue
         accounts.append(
             {
+                "platform": platform,
                 "username": username,
-                "password": str(database.get("password", "")).strip(),
-                "require_ssl": (
-                    bool(database["require_ssl"])
-                    if "require_ssl" in database
-                    else None
-                ),
+                "password": str(entry.get(password_key, "")).strip(),
+                "require_ssl": requirement(entry, username),
             }
         )
     return accounts
@@ -137,23 +156,29 @@ def ensure_android_database(
     docker_base: list[str],
     mysql_root_password: str,
     database_name: str,
-    insert_username: str,
-    insert_password: str,
+    writers: list[dict],
 ) -> None:
-    sql = "\n".join(
-        [
-            f"CREATE DATABASE IF NOT EXISTS {quote_identifier(database_name)} CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;",
-            (
-                "CREATE USER IF NOT EXISTS "
-                f"{quote_sql_string(insert_username)}@'%' IDENTIFIED BY {quote_sql_string(insert_password)};"
-            ),
-            (
-                "GRANT INSERT ON "
-                f"{quote_identifier(database_name)}.* TO {quote_sql_string(insert_username)}@'%';"
-            ),
-            "FLUSH PRIVILEGES;",
-        ]
-    )
+    """The Android schema and the accounts that insert into it.
+
+    One statement list per account, so a deployment holds the participant account
+    phones open the database with and the micro-server's own, each able to write the
+    schema its dataflow sends data to. What each account reads back is granted where
+    those tables are created.
+    """
+    statements = [
+        f"CREATE DATABASE IF NOT EXISTS {quote_identifier(database_name)} CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;",
+    ]
+    for writer in writers:
+        account = f"{quote_sql_string(writer['username'])}@'%'"
+        statements.append(
+            f"CREATE USER IF NOT EXISTS {account} "
+            f"IDENTIFIED BY {quote_sql_string(writer['password'])};"
+        )
+        statements.append(
+            f"GRANT INSERT ON {quote_identifier(database_name)}.* TO {account};"
+        )
+    statements.append("FLUSH PRIVILEGES;")
+    sql = "\n".join(statements)
     command = docker_base + [
         "exec",
         "-i",
@@ -169,18 +194,22 @@ def ensure_android_database(
         raise RuntimeError(result.stderr.strip() or "Failed to ensure Android database exists")
 
 
-def apply_participant_passwords(
+def apply_account_passwords(
     docker_base: list[str],
     mysql_root_password: str,
     accounts: list[dict],
 ) -> None:
-    """Force the participant accounts onto this deployment's password.
+    """Force each account onto the password this deployment expects of it.
 
     db/zz-participant-password.sh only runs on an empty data directory, and
     init_all.sql creates the accounts with CREATE USER IF NOT EXISTS, so
     redeploying onto an existing MySQL volume would otherwise leave the
-    accounts on whatever password they were first given while .env and the
-    served study config advertise a newer one.
+    accounts on whatever password they were first given while .env, the served
+    study config and the micro-server's configuration advertise a newer one.
+
+    Creating what is missing is part of it: this is what gives an existing
+    deployment the micro-server's account with the password its generated
+    configuration already names.
     """
     statements = []
     for account in accounts:
@@ -206,7 +235,7 @@ def apply_participant_passwords(
     result = run_command(command, input_text="\n".join(statements))
     if result.returncode != 0:
         raise RuntimeError(
-            result.stderr.strip() or "Failed to apply the participant account password"
+            result.stderr.strip() or "Failed to apply the database account passwords"
         )
 
 
@@ -235,29 +264,22 @@ def apply_android_tables(
 def main() -> int:
     args = parse_args()
     docker_base = build_docker_base(args.docker_prefix)
-    (
-        mysql_root_password,
-        database_name,
-        insert_username,
-        insert_password,
-    ) = load_android_db_settings()
+    mysql_root_password, database_name = load_android_db_settings()
+    accounts = load_database_accounts()
 
     wait_for_mysql(docker_base, args.timeout_seconds)
     ensure_android_database(
         docker_base,
         mysql_root_password,
         database_name,
-        insert_username,
-        insert_password,
+        [a for a in accounts if a["platform"] == "android"],
     )
-    apply_participant_passwords(
-        docker_base,
-        mysql_root_password,
-        load_participant_accounts(),
-    )
+    apply_account_passwords(docker_base, mysql_root_password, accounts)
+    # Runs after the accounts exist: this file grants the micro-server's account the
+    # reads its device-metadata upsert makes, and a grant needs its grantee.
     apply_android_tables(docker_base, mysql_root_password, database_name)
     print("Android database tables are ready.")
-    print("Participant accounts are using the configured password.")
+    print("Database accounts are using the configured passwords.")
     return 0
 
 
