@@ -178,6 +178,21 @@ If `.env` already exists, the script detects them and offers a choice:
 
 Both options re-apply `PARTICIPANT_DB_PASSWORD` and `ANDROID_SERVER_DB_PASSWORD` to their MySQL accounts, so the passwords in `.env` and the ones the study needs never drift apart. If you edited a password directly in `.env`, run `setup.sh` (or `python3 setup/init_android_tables.py`) rather than `docker compose up` on its own — starting the containers by hand leaves the existing database untouched, and the accounts keep their old passwords.
 
+### Reclaiming sensor label space
+
+The ten physical sensor tables are created without a `label` column. The client
+fills that column from an Android broadcast a study never sends, so on a database
+created before it was dropped it holds one empty string per row across the
+highest-volume tables. `db/reclaim-sensor-label.sql` removes it there:
+
+```bash
+docker exec -i aware_mysql mysql -uroot -p<root-password> aware_android < db/reclaim-sensor-label.sql
+```
+
+The script reports each table it touches and can be re-run: a table already
+matching the schema is left alone. `bluetooth`, `locations` and `wifi` keep their
+`label`, which the client writes.
+
 ### Remote server deployment
 
 On a Linux server without a graphical desktop, the browser cannot open automatically. The URL is still printed in the terminal — copy it and open it from your own computer.
