@@ -14,6 +14,7 @@ network, so on the webservice path the published address has no audience beyond
 this host and is narrowed to loopback.
 """
 
+import json
 import pathlib
 import sys
 
@@ -280,3 +281,186 @@ class TestAndroidQrCode:
         a guess at the address."""
         assert self._micro("")["study"]["join_url"] == ""
 
+
+class TestWhoDeclaresTheDataflow:
+    """deploy_config.seed_source_secrets: which answer a deploy honours.
+
+    Two writers reach this: the setup wizard, which asks the question, and the
+    Configurator, which writes the study model. `.env` keeps the last value the
+    wizard wrote, so treating it as the answer means a deploy nobody asked the
+    question in reverts whatever the Configurator declared -- and reverting the
+    dataflow on a running study changes the address phones joined with, which
+    every enrolled participant has to act on.
+
+    So the rule is: an answer given in this run wins, the study model stands
+    otherwise, and `.env` seeds only a study that has never carried a declaration.
+    """
+
+    def _seed(self, monkeypatch, tmp_path, env, source, requested=None):
+        """Run the seeding against a throwaway source.json, returning what it holds."""
+        stored = dict(source)
+
+        def update_source(mutate):
+            stored.clear()
+            stored.update(mutate(dict(source)))
+            return stored
+
+        monkeypatch.setattr(deploy_config, "update_source", update_source)
+        monkeypatch.setattr(
+            deploy_config, "requested_dataflow", lambda: requested or ""
+        )
+        merged = {"PARTICIPANT_DB_PASSWORD": "kept", "STUDY_ID": "study-1", **env}
+        deploy_config.seed_source_secrets(merged)
+        return dataflow.declared(stored, "android")
+
+    def test_an_answer_given_in_this_run_wins(self, monkeypatch, tmp_path):
+        """The researcher chose it in the wizard just now."""
+        declared = self._seed(
+            monkeypatch,
+            tmp_path,
+            {"ANDROID_DATAFLOW": "direct"},
+            {"deployment": {"dataflow": {"android": "webservice"}}},
+            requested="direct",
+        )
+
+        assert declared == dataflow.DIRECT
+
+    def test_a_stale_env_does_not_revert_the_study(self, monkeypatch, tmp_path):
+        """The case that reverts a running study: `.env` holds the last wizard
+        answer, and a deploy with no question asked must leave the study alone."""
+        declared = self._seed(
+            monkeypatch,
+            tmp_path,
+            {"ANDROID_DATAFLOW": "direct"},
+            {"deployment": {"dataflow": {"android": "webservice"}}},
+        )
+
+        assert declared == dataflow.WEBSERVICE
+
+    def test_env_seeds_a_study_with_no_declaration(self, monkeypatch, tmp_path):
+        """First deploy: the study model carries nothing, so the wizard's answer
+        in `.env` is the only one there is."""
+        declared = self._seed(
+            monkeypatch, tmp_path, {"ANDROID_DATAFLOW": "webservice"}, {}
+        )
+
+        assert declared == dataflow.WEBSERVICE
+
+    def test_a_study_with_neither_reads_as_the_default(self, monkeypatch, tmp_path):
+        assert self._seed(monkeypatch, tmp_path, {}, {}) == dataflow.DEFAULTS["android"]
+
+    def test_ios_is_declared_alongside_android(self, monkeypatch, tmp_path):
+        stored = {}
+
+        def update_source(mutate):
+            stored.update(mutate({"deployment": {"dataflow": {"android": "webservice"}}}))
+            return stored
+
+        monkeypatch.setattr(deploy_config, "update_source", update_source)
+        monkeypatch.setattr(deploy_config, "requested_dataflow", lambda: "")
+        deploy_config.seed_source_secrets(
+            {"PARTICIPANT_DB_PASSWORD": "kept", "STUDY_ID": "study-1"}
+        )
+
+        assert dataflow.declared(stored, "ios") == dataflow.WEBSERVICE
+
+
+class TestEnvMirrorsTheDeclaration:
+    """apply_dataflow writes the resolved dataflow back to `.env`.
+
+    The setup wizard fills its form from `.env`. A mirror is what lets it open on
+    the dataflow the study is running instead of on the form's own default, which
+    is what makes reopening the wizard safe.
+    """
+
+    def test_the_resolved_dataflow_is_written_back(self, tmp_path, monkeypatch):
+        env_file = tmp_path / ".env"
+        env_file.write_text("PROTOCOL=http\nANDROID_DATAFLOW=direct\n")
+        monkeypatch.setattr(deploy_config, "ENV_PATH", env_file)
+
+        deploy_config.apply_dataflow(
+            {}, {"deployment": {"dataflow": {"android": "webservice", "ios": "webservice"}}}
+        )
+
+        assert "ANDROID_DATAFLOW=webservice" in env_file.read_text()
+        assert "ANDROID_DATAFLOW=direct" not in env_file.read_text()
+
+
+class TestTheDeployIsChecked:
+    """deploy_config.check_dataflow_applied: the artefacts, read back.
+
+    A study half-configured for two dataflows starts, serves and looks deployed.
+    Every disagreement here is one a researcher would otherwise find by a phone
+    delivering nothing.
+    """
+
+    def _webservice(self):
+        return {"deployment": {"dataflow": {"android": "webservice", "ios": "webservice"}}}
+
+    def _publish(self, monkeypatch, tmp_path, config, join_url):
+        study = tmp_path / "studyConfig.json"
+        study.write_text(json.dumps(config), encoding="utf-8")
+        monkeypatch.setattr(deploy_config, "STUDY_CONFIG_PATH", study)
+        urls = tmp_path / "deployment-urls.json"
+        urls.write_text(json.dumps({"android_join_url": join_url}), encoding="utf-8")
+        monkeypatch.setattr(deploy_config, "PROJECT", tmp_path)
+
+    def test_a_matching_deployment_passes(self, tmp_path, monkeypatch):
+        self._publish(monkeypatch, tmp_path, {"sensors": {}}, "http://host/2/KEY")
+
+        deploy_config.check_dataflow_applied(
+            self._webservice(), "127.0.0.1", "http://host/2/KEY"
+        )
+
+    def test_an_open_binding_on_the_webservice_path_is_refused(self, tmp_path, monkeypatch):
+        """The failure that publishes MySQL to every network the host is on."""
+        self._publish(monkeypatch, tmp_path, {"sensors": {}}, "http://host/2/KEY")
+
+        with pytest.raises(SystemExit) as refused:
+            deploy_config.check_dataflow_applied(
+                self._webservice(), "0.0.0.0", "http://host/2/KEY"
+            )
+
+        assert "0.0.0.0" in str(refused.value)
+
+    def test_a_published_credential_on_the_webservice_path_is_refused(
+        self, tmp_path, monkeypatch
+    ):
+        """The config is served from a public path, so this hands every participant
+        a credential for a database they never contact."""
+        self._publish(
+            monkeypatch, tmp_path, {"database": {"database_host": "db"}}, "http://host/2/KEY"
+        )
+
+        with pytest.raises(SystemExit) as refused:
+            deploy_config.check_dataflow_applied(
+                self._webservice(), "127.0.0.1", "http://host/2/KEY"
+            )
+
+        assert "database coordinates" in str(refused.value)
+
+    def test_a_join_url_from_the_other_dataflow_is_refused(self, tmp_path, monkeypatch):
+        """Exactly the drift a phone meets as a join that delivers nowhere."""
+        self._publish(
+            monkeypatch,
+            tmp_path,
+            {"sensors": {}},
+            "http://host/studies/files/studyConfig.json",
+        )
+
+        with pytest.raises(SystemExit) as refused:
+            deploy_config.check_dataflow_applied(
+                self._webservice(), "127.0.0.1", "http://host/2/KEY"
+            )
+
+        assert "join URL" in str(refused.value)
+
+    def test_the_direct_path_is_checked_by_its_own_rules(self, tmp_path, monkeypatch):
+        direct_url = "http://host/studies/files/studyConfig.json"
+        self._publish(monkeypatch, tmp_path, {"database": {"database_host": "db"}}, direct_url)
+
+        deploy_config.check_dataflow_applied(
+            {"deployment": {"dataflow": {"android": "direct", "ios": "webservice"}}},
+            "0.0.0.0",
+            direct_url,
+        )

@@ -75,6 +75,19 @@ def ensure_participant_password(env: dict[str, str]) -> None:
     )
 
 
+def requested_dataflow() -> str:
+    """The dataflow the researcher chose in this wizard run, or "" for none.
+
+    Read from the request env rather than the merged one. `.env` keeps the last
+    value written, so a deploy nobody answered the question in — `setup.sh`
+    offering "deploy with current config", or a rerun of this script — reads as
+    no answer and leaves the study's own declaration standing.
+    """
+    if not RUNNING_IN_WIZARD:
+        return ""
+    return str(load_env(REQUEST_ENV_PATH).get("ANDROID_DATAFLOW", "")).strip().lower()
+
+
 def seed_source_secrets(env: dict[str, str]) -> dict:
     """Align source.json with this deployment's credentials.
 
@@ -100,15 +113,24 @@ def seed_source_secrets(env: dict[str, str]) -> dict:
         }:
             study["id"] = env["STUDY_ID"]
 
-        # The dataflow the researcher chose at setup. Declared here and nowhere
-        # else, so every generated file downstream derives from one answer rather
-        # than each being set by hand -- a study half-configured for two dataflows
-        # is a study that looks set up and collects nothing.
-        chosen = env.get("ANDROID_DATAFLOW", "").strip().lower()
+        # The dataflow the study runs on, held here and derived from here, so every
+        # generated file downstream comes from one answer -- a study half-configured
+        # for two dataflows is a study that looks set up and collects nothing.
+        #
+        # An answer given in this wizard run wins, because it is the researcher
+        # deciding. Otherwise the declaration already in the study model stands, and
+        # `.env` seeds it only on a study that has never carried one -- the same rule
+        # the study id above follows. That is what lets the Configurator change the
+        # dataflow and have the change survive the next deploy.
+        declared = source.setdefault("deployment", {}).setdefault("dataflow", {})
+        chosen = requested_dataflow()
         if chosen:
-            declared = source.setdefault("deployment", {}).setdefault("dataflow", {})
             declared["android"] = chosen
-            declared.setdefault("ios", dataflow.WEBSERVICE)
+        elif not str(declared.get("android", "")).strip():
+            seeded = env.get("ANDROID_DATAFLOW", "").strip().lower()
+            if seeded:
+                declared["android"] = seeded
+        declared.setdefault("ios", dataflow.WEBSERVICE)
 
         return source
 
@@ -161,6 +183,10 @@ def apply_dataflow(env: dict[str, str], source: dict) -> str:
     # reach it.
     bind = "0.0.0.0" if android == dataflow.DIRECT else "127.0.0.1"
     set_env_value(ENV_PATH, "MYSQL_BIND_ADDRESS", bind)
+    # Written back so `.env` mirrors the declaration rather than competing with it.
+    # The setup wizard reads `.env` to fill its form, and a mirror is what lets it
+    # open on the dataflow the study is running rather than on a default.
+    set_env_value(ENV_PATH, "ANDROID_DATAFLOW", android)
     return bind
 
 
@@ -402,6 +428,66 @@ def chown_generated_paths(env: dict[str, str]) -> None:
             print(f"deploy_config: could not chown {path}: {exc}", file=sys.stderr)
 
 
+def check_dataflow_applied(source: dict, bind: str, android_study_url: str) -> None:
+    """Every artefact the dataflow decides, checked against the declaration.
+
+    The declaration is one line; what follows from it is a bind address, a join
+    URL and whether the published config carries database coordinates. Each is
+    written by a different function, and a study half-configured for two
+    dataflows still starts, serves and looks deployed -- the phones simply
+    deliver nowhere. Reading them back is what turns that into a failure at
+    deploy time.
+
+    Raises SystemExit naming every disagreement, so one run reports all of them.
+    """
+    android = dataflow.declared(source, "android")
+    expected_bind = "0.0.0.0" if android == dataflow.DIRECT else "127.0.0.1"
+    carries = dataflow.carries_database_credentials("android", android)
+
+    published = {}
+    if STUDY_CONFIG_PATH.exists():
+        try:
+            published = json.loads(STUDY_CONFIG_PATH.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            published = {}
+
+    problems = []
+    if bind != expected_bind:
+        problems.append(
+            f"MySQL is bound to {bind}, but {android!r} implies {expected_bind}."
+        )
+    if ("database" in published) != carries:
+        held = "carries" if "database" in published else "omits"
+        wanted = "carry" if carries else "omit"
+        problems.append(
+            f"The published Android config {held} database coordinates, "
+            f"but {android!r} requires it to {wanted} them."
+        )
+    for name, url in (
+        ("deployment-urls.json", _stored_join_url()),
+        ("the generated config", android_study_url),
+    ):
+        if url and url != android_study_url:
+            problems.append(f"The join URL in {name} is {url}, not {android_study_url}.")
+
+    if problems:
+        raise SystemExit(
+            f"The deployment does not match the declared Android dataflow "
+            f"({android!r}). " + " ".join(problems)
+        )
+
+
+def _stored_join_url() -> str:
+    """The Android join URL the last deploy published, or "" when there is none."""
+    path = PROJECT / "deployment-urls.json"
+    if not path.exists():
+        return ""
+    try:
+        return str(json.loads(path.read_text(encoding="utf-8")).get("android_join_url", ""))
+    except (OSError, json.JSONDecodeError):
+        return ""
+
+
 def main() -> None:
     env = load_merged_env()
     ensure_django_secret_key(env)
@@ -484,6 +570,10 @@ def main() -> None:
     study_join_url = f"{base_url}{study_join_path}"
     write_studies_index(base_url, study_join_path, study_join_url, android_study_url)
     write_deployment_urls(build_deployment_urls(base_url, study_join_url, android_study_url))
+
+    # Read back after everything is written: the check is worth only as much as
+    # the files it inspects, and those are the files a phone will be served.
+    check_dataflow_applied(source, bind, android_study_url)
 
     chown_generated_paths(env)
 
