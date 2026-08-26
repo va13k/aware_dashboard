@@ -5,6 +5,15 @@ trim_cr() {
     printf "%s" "$1" | tr -d '\r'
 }
 
+# An error reaches the browser as JSON. The message is encoded rather than
+# interpolated, so a multi-line traceback, quotes and percent signs all arrive
+# intact and the page can show what actually went wrong.
+fail() {
+    printf "Content-Type: application/json\r\n\r\n"
+    ERROR_MSG="$1" python3 -c 'import json, os; print(json.dumps({"success": False, "error": os.environ["ERROR_MSG"]}))'
+    exit 0
+}
+
 # GET: load existing .env
 if [ "$REQUEST_METHOD" = "GET" ]; then
     printf "Content-Type: application/json\r\n\r\n"
@@ -69,17 +78,13 @@ BODY=$(cat)
 
 REQUEST_ENV_PATH=/tmp/aware-dashboard-request.env
 if ! ERROR_MSG=$(printf "%s" "$BODY" | python3 /wizard/write_request_env.py "$REQUEST_ENV_PATH" 2>&1); then
-    printf "Content-Type: application/json\r\n\r\n"
-    printf '{"success":false,"error":"%s"}' "$ERROR_MSG"
-    exit 0
+    fail "$ERROR_MSG"
 fi
 
 mkdir -p /project/studies /project/aware-micro-server/cache /project/aware-micro-server/esm
 
 if ! ERROR_MSG=$(python3 /wizard/deploy_config.py 2>&1); then
-    printf "Content-Type: application/json\r\n\r\n"
-    printf '{"success":false,"error":"%s"}' "$ERROR_MSG"
-    exit 0
+    fail "$ERROR_MSG"
 fi
 
 rm -f "$REQUEST_ENV_PATH"
