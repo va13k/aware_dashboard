@@ -119,6 +119,8 @@ export interface AndroidDevice {
   product?: string | null;
   release?: string | null;
   sdk?: string | null;
+  /** The participant's own name for the phone, set in the client's settings. */
+  label?: string | null;
   /** When this phone's first record arrived. Null before it has uploaded. */
   first_seen?: number | null;
   /** Null for a phone that joined the study but has never uploaded. */

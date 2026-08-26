@@ -3,8 +3,10 @@ import type { Device } from "../types";
 /** A human-readable name for a phone, falling back to a shortened device id. */
 export function deviceLabel(device: Device): string {
   if (device.platform === "android") {
+    // The participant names their own phone, so that name leads: it is what a
+    // researcher recognises the device by when two of them share a model.
     const name = [device.manufacturer, device.model].filter(Boolean).join(" ");
-    return name || device.device_id.slice(0, 12);
+    return device.label || name || device.device_id.slice(0, 12);
   }
 
   // An iPhone reports "iPhone" for its model, product and device, and its exact
