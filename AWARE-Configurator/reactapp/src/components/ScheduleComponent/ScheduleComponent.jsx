@@ -1,6 +1,13 @@
 import Grid from "@mui/material/Unstable_Grid2";
 import React, { useEffect } from "react";
-import { Button } from "@mui/material";
+import {
+  Button,
+  FormControlLabel,
+  MenuItem,
+  Radio,
+  RadioGroup,
+  Select,
+} from "@mui/material";
 import Box from "@mui/material/Box";
 import "./ScheduleComponent.css";
 import DeleteIcon from "@mui/icons-material/Delete";
@@ -17,6 +24,48 @@ export const SET_SCHEDULES = "interval";
 // Kept for backward compatibility when loading old saved configs
 export const RANDOM_TRIGGERS = "random";
 export const REPEAT_INTERVALS = "repeat";
+
+const DAYS = [
+  "Monday",
+  "Tuesday",
+  "Wednesday",
+  "Thursday",
+  "Friday",
+  "Saturday",
+  "Sunday",
+];
+
+// An iPhone's schedule is a list of hours and nothing else: its config carries
+// `hours` and has no notion of a random draw or a repeating interval. Android's
+// scheduler has all three (`TRIGGER_RANDOM`, `TRIGGER_INTERVAL`), so the two
+// types below are offered and labelled for what they are rather than hidden --
+// a study with Android participants is the ordinary case.
+//
+// What an iPhone does instead is not nothing, and saying so is the point: the
+// generator turns a random window into the hours it spans, and a repeating
+// interval into every hour. A researcher choosing one of these is choosing
+// different behaviour per platform, and should be choosing it knowingly.
+const SCHEDULE_TYPES = [
+  {
+    value: SET_SCHEDULES,
+    label: "Set schedules",
+    androidOnly: false,
+  },
+  {
+    value: RANDOM_TRIGGERS,
+    label: "Random triggers",
+    androidOnly: true,
+    iosNote:
+      "Android draws the triggers at random inside the window. An iPhone has no random scheduler, so it is given every hour the window spans and fires on the hour.",
+  },
+  {
+    value: REPEAT_INTERVALS,
+    label: "Repeat intervals",
+    androidOnly: true,
+    iosNote:
+      "Android repeats on the interval. An iPhone has no repeating scheduler, so it is given every hour of the day.",
+  },
+];
 
 export default function ScheduleComponent(input) {
   const { scheduleIndex, onDelete } = input;
@@ -56,6 +105,40 @@ export default function ScheduleComponent(input) {
       />
     );
   }
+
+  const days = DAYS.map((day, idx) => (
+    <CustomizedCheckbox
+      key={idx}
+      recoilState={studyFormScheduleConfigurationState}
+      field={day}
+      index={scheduleIndex}
+      inGroup
+      groupField="days"
+      label={day}
+      className="schedule-option"
+    />
+  ));
+
+  // The two ends of a random window. Written back on click rather than through
+  // Field, because these are the only two settings here whose value is an hour
+  // chosen from a list rather than typed.
+  const hourOptions = (field) =>
+    Array.from({ length: 24 }, (unusedValue, i) => {
+      const value = `${padding(i, 2)}:00`;
+      return (
+        <MenuItem
+          key={i}
+          value={value}
+          onClick={() => updateFormByField(field, value)}
+        >
+          {value}
+        </MenuItem>
+      );
+    });
+
+  const schedule = schedules[scheduleIndex];
+  const scheduleType = schedule.type || SET_SCHEDULES;
+  const chosenType = SCHEDULE_TYPES.find((each) => each.value === scheduleType);
 
   const questionList = questions.map((question, idx) => {
     return (
@@ -153,32 +236,163 @@ export default function ScheduleComponent(input) {
             columnSpacing={{ xs: 1, sm: 2, md: 3 }}
           >
             <Grid xs={12} md={4}>
-              <p className="schedule_field_name">Hours</p>
+              <p className="schedule_field_name">Schedule type</p>
             </Grid>
             <Grid xs={12} md={8}>
-              <div className="schedule-selection-card">
-                <p className="schedule-selection-title">Time slots</p>
-                <p className="schedule-selection-copy">
-                  Choose every hour when this schedule should trigger.
-                </p>
-                <div className="schedule-options-grid schedule-options-grid--hours">
-                  {hours}
-                </div>
-              </div>
+              <RadioGroup value={scheduleType} name="schedule" row>
+                {SCHEDULE_TYPES.map((each) => (
+                  <FormControlLabel
+                    key={each.value}
+                    value={each.value}
+                    control={
+                      <Radio
+                        onClick={() => updateFormByField("type", each.value)}
+                      />
+                    }
+                    label={
+                      each.androidOnly ? `${each.label} (Android)` : each.label
+                    }
+                  />
+                ))}
+              </RadioGroup>
+              {chosenType?.iosNote && (
+                <p className="schedule-helper-copy">{chosenType.iosNote}</p>
+              )}
             </Grid>
           </Grid>
-          <Grid
-            container
-            rowSpacing={1}
-            columnSpacing={{ xs: 1, sm: 2, md: 3 }}
-          >
-            <Grid xs={12} md={4} />
-            <Grid xs={12} md={8}>
-              <p className="schedule-helper-copy" style={{ width: "100%" }}>
-                Notification sent at the determined hours.
-              </p>
-            </Grid>
-          </Grid>
+
+          {scheduleType === SET_SCHEDULES && (
+            <>
+              <Grid
+                container
+                rowSpacing={1}
+                columnSpacing={{ xs: 1, sm: 2, md: 3 }}
+              >
+                <Grid xs={12} md={4}>
+                  <p className="schedule_field_name">Hours</p>
+                </Grid>
+                <Grid xs={12} md={8}>
+                  <div className="schedule-selection-card">
+                    <p className="schedule-selection-title">Time slots</p>
+                    <p className="schedule-selection-copy">
+                      Choose every hour when this schedule should trigger.
+                    </p>
+                    <div className="schedule-options-grid schedule-options-grid--hours">
+                      {hours}
+                    </div>
+                  </div>
+                </Grid>
+              </Grid>
+              <Grid
+                container
+                rowSpacing={1}
+                columnSpacing={{ xs: 1, sm: 2, md: 3 }}
+              >
+                <Grid xs={12} md={4} />
+                <Grid xs={12} md={8}>
+                  <p className="schedule-helper-copy" style={{ width: "100%" }}>
+                    Notification sent at the determined hours.
+                  </p>
+                </Grid>
+              </Grid>
+              <Grid
+                container
+                rowSpacing={1}
+                columnSpacing={{ xs: 1, sm: 2, md: 3 }}
+              >
+                <Grid xs={12} md={4}>
+                  <p className="schedule_field_name">Days</p>
+                </Grid>
+                <Grid xs={12} md={8}>
+                  <div className="schedule-selection-card">
+                    <p className="schedule-selection-title">Days of the week</p>
+                    <p className="schedule-selection-copy">
+                      Leave every day unticked to trigger on all of them.
+                    </p>
+                    <div className="schedule-options-grid">{days}</div>
+                  </div>
+                </Grid>
+              </Grid>
+              <Grid
+                container
+                rowSpacing={1}
+                columnSpacing={{ xs: 1, sm: 2, md: 3 }}
+              >
+                <Grid xs={12} md={4} />
+                <Grid xs={12} md={8}>
+                  <p className="schedule-helper-copy" style={{ width: "100%" }}>
+                    Notification sent at the determined days.
+                  </p>
+                </Grid>
+              </Grid>
+            </>
+          )}
+
+          {scheduleType === RANDOM_TRIGGERS && (
+            <>
+              <Grid
+                container
+                rowSpacing={1}
+                columnSpacing={{ xs: 1, sm: 2, md: 3 }}
+              >
+                <Grid xs={12} md={4}>
+                  <p className="schedule_field_name">Start time</p>
+                </Grid>
+                <Grid xs={12} md={8}>
+                  <Select
+                    required
+                    style={{ width: "100%" }}
+                    id="random-triggers-first-hour"
+                    value={schedule.firsthour || "08:00"}
+                  >
+                    {hourOptions("firsthour")}
+                  </Select>
+                </Grid>
+                <Grid xs={12} md={4}>
+                  <p className="schedule_field_name">End time</p>
+                </Grid>
+                <Grid xs={12} md={8}>
+                  <Select
+                    required
+                    style={{ width: "100%" }}
+                    id="random-triggers-last-hour"
+                    value={schedule.lasthour || "20:00"}
+                  >
+                    {hourOptions("lasthour")}
+                  </Select>
+                </Grid>
+              </Grid>
+              <Field
+                fieldName="Number of triggers"
+                recoilState={studyFormScheduleConfigurationState}
+                index={scheduleIndex}
+                field="randomCount"
+                inputLabel="Number of notifications across the scheduled hour(s)."
+                type="number"
+              />
+              <Field
+                fieldName="Inter-notification time"
+                recoilState={studyFormScheduleConfigurationState}
+                index={scheduleIndex}
+                field="randomInterval"
+                inputLabel="Minimum time in-between two notifications (in minutes)."
+                type="number"
+              />
+            </>
+          )}
+
+          {scheduleType === REPEAT_INTERVALS && (
+            <Field
+              fieldName="Repeat interval"
+              recoilState={studyFormScheduleConfigurationState}
+              index={scheduleIndex}
+              field="repeatInterval"
+              inputLabel="Triggered every X minutes"
+              description="Schedule is triggered repeatedly in accordance with the specified interval (in minutes)."
+              type="number"
+            />
+          )}
+
           <Field
             fieldName="Expiration (seconds)"
             inputLabel="Time before the ESM expires after delivery"

@@ -50,7 +50,11 @@ import {
   noteState,
   pluginSensorState,
 } from "../functions/atom";
-import { SET_SCHEDULES } from "../components/ScheduleComponent/ScheduleComponent";
+import {
+  SET_SCHEDULES,
+  RANDOM_TRIGGERS,
+  REPEAT_INTERVALS,
+} from "../components/ScheduleComponent/ScheduleComponent";
 import Axios from "../functions/axiosSettings";
 
 const TYPE_MAP = {
@@ -308,16 +312,38 @@ export default function Overview() {
             hours.push(parseInt(key.slice(0, 2), 10));
           }
         }
-        return {
+        const days = Object.keys(schedule.days || {}).filter(
+          (day) => schedule.days[day] === true
+        );
+
+        const type = schedule.type || SET_SCHEDULES;
+        const common = {
           title: schedule.title,
-          type: SET_SCHEDULES,
+          type,
           esm_keep: schedule.esm_keep ? schedule.esm_keep : false,
           questions: normalizeScheduleQuestionIds(schedule),
-          hours,
           expiration:
             schedule.expiration !== undefined ? schedule.expiration : 60,
           notification_body: schedule.notification_body || "Tap to answer",
         };
+
+        // Only the settings the chosen type actually uses are written. A study
+        // that was a random schedule and became a set one would otherwise carry
+        // both, and the generators downstream read whichever they find first --
+        // so a stale field is a schedule that fires on a rule nobody chose.
+        if (type === RANDOM_TRIGGERS) {
+          return {
+            ...common,
+            firsthour: schedule.firsthour || "08:00",
+            lasthour: schedule.lasthour || "20:00",
+            randomCount: schedule.randomCount,
+            randomInterval: schedule.randomInterval,
+          };
+        }
+        if (type === REPEAT_INTERVALS) {
+          return { ...common, repeatInterval: schedule.repeatInterval };
+        }
+        return { ...common, hours, days };
       }),
       sensors: [
         {
