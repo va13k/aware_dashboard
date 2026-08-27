@@ -99,6 +99,11 @@ def _database(monkeypatch):
             }
         return {IOS_DEVICE: {"device_id": IOS_DEVICE, "label": "Test iPhone"}}
 
+    async def contacts(db, model):
+        if model is devices_router.AndroidDeviceContact:
+            return {ANDROID_DEVICE: 5_500}
+        return {IOS_DEVICE: 9_500}
+
     async def study_rows(db, device_id=None):
         if device_id is None:
             return STUDY_ROWS
@@ -122,6 +127,7 @@ def _database(monkeypatch):
 
     monkeypatch.setattr(devices_router, "_combined_last_seen_by_device", last_seen)
     monkeypatch.setattr(devices_router, "_device_metadata_by_device", metadata)
+    monkeypatch.setattr(devices_router, "_last_contact_by_device", contacts)
     monkeypatch.setattr(devices_router, "_android_study_rows", study_rows)
     monkeypatch.setattr(devices_router, "_best_device_row", best_device_row)
     monkeypatch.setattr(devices_router, "_enrolment_windows", enrolment_windows)
@@ -216,7 +222,16 @@ def test_the_list_keeps_sensor_uploads_and_study_activity_apart(client):
     device = by_id(android_devices(client), ANDROID_DEVICE)
 
     assert device["last_seen"] == 5_000.0
+    assert device["last_sensor_data"] == 5_000.0
+    assert device["last_contact"] == 5_500
     assert device["study"]["last_study_event_at"] == 2_000.0
+
+
+def test_a_study_only_phone_has_neither_contact_nor_sensor_data(client):
+    device = by_id(android_devices(client), STUDY_ONLY_DEVICE)
+
+    assert device["last_contact"] is None
+    assert device["last_sensor_data"] is None
 
 
 def test_iphones_carry_no_study_summary(client):

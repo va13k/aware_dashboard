@@ -133,20 +133,20 @@ export default function OverviewPage() {
   }, []);
 
   const allDevices = devices ? [...devices.android, ...devices.ios] : [];
-  // A phone that joined the study but has never uploaded has no timestamp to
-  // compare, so it can never be the most recent upload.
-  const latestUpload = allDevices.reduce<Device | null>((latest, device) => {
-    const uploaded = normalizeTimestamp(device.last_seen);
-    if (uploaded == null) return latest;
+  // Contact is measured by ingestion with the server clock, independently of
+  // whether this request happened to contain a new sensor measurement.
+  const latestContact = allDevices.reduce<Device | null>((latest, device) => {
+    const contacted = normalizeTimestamp(device.last_contact);
+    if (contacted == null) return latest;
     if (!latest) return device;
-    return uploaded > (normalizeTimestamp(latest.last_seen) ?? 0)
+    return contacted > (normalizeTimestamp(latest.last_contact) ?? 0)
       ? device
       : latest;
   }, null);
-  const latestUploadText = (() => {
-    if (latestUpload) return absoluteTime(latestUpload.last_seen);
-    if (devices) return "No uploads yet";
-    return "Checking uploads...";
+  const latestContactText = (() => {
+    if (latestContact) return absoluteTime(latestContact.last_contact);
+    if (devices) return "No contacts yet";
+    return "Checking contacts...";
   })();
 
   // Counts are read from a cache, so the page says how old that cache is. Past
@@ -260,10 +260,10 @@ export default function OverviewPage() {
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <p className="text-[12px] uppercase tracking-[0.5px] text-sage">
-              Last phone data upload
+              Last phone contact
             </p>
             <p className="mt-1 text-[21px] font-bold text-ink">
-              {latestUploadText}
+              {latestContactText}
             </p>
             {countsFreshness && (
               <p
@@ -276,7 +276,7 @@ export default function OverviewPage() {
               </p>
             )}
           </div>
-          {latestUpload && (
+          {latestContact && (
             <div className="flex items-center gap-2">
               <Link
                 to="/manifest"
@@ -300,15 +300,15 @@ export default function OverviewPage() {
               </button>
               <div className="rounded-xl bg-teal-soft px-3 py-2 text-right">
                 <p className="text-[13px] font-semibold text-teal">
-                  {relativeAge(latestUpload.last_seen, now)}
+                  {relativeAge(latestContact.last_contact, now)}
                 </p>
                 <p className="mt-0.5 text-[12px] text-sage">
-                  {latestUpload.platform} - {deviceLabel(latestUpload)}
+                  {latestContact.platform} - {deviceLabel(latestContact)}
                 </p>
               </div>
             </div>
           )}
-          {!latestUpload && devices && (
+          {!latestContact && devices && (
             <div className="flex items-center gap-2 self-start sm:self-center">
               <Link
                 to="/manifest"

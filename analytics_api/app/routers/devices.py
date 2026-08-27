@@ -11,9 +11,11 @@ from app.services import record_counts
 from app.routers.android import _EXPORT_MODELS as _ANDROID_EXPORT_MODELS
 from app.models import (
     AndroidCoverageHourly,
+    AndroidDeviceContact,
     AndroidDeviceExclusion,
     AndroidRecordCount,
     IosDeviceExclusion,
+    IosDeviceContact,
     IosCoverageHourly,
     IosRecordCount,
     AndroidDevice,
@@ -284,6 +286,28 @@ async def _combined_last_seen_by_device(db: AsyncSession, models, count_model=No
     return last_seen_by_device
 
 
+async def _last_contact_by_device(db: AsyncSession, contact_model):
+    """Latest accepted upload per device, measured by the ingestion server.
+
+    Older deployments may not have the contact table until their database init
+    migration runs. Returning no contacts keeps the endpoint usable during that
+    rollout; callers fall back to the newest stored sensor timestamp.
+    """
+    try:
+        result = await db.execute(
+            select(contact_model.device_id, contact_model.last_contact)
+        )
+    except (ProgrammingError, OperationalError, SQLAlchemyError):
+        await _rollback_after_table_error(db)
+        return {}
+
+    return {
+        str(row.device_id): row.last_contact
+        for row in result.all()
+        if row.device_id and row.last_contact
+    }
+
+
 async def _device_metadata_by_device(db: AsyncSession, model):
     try:
         result = await db.execute(select(model).order_by(model.timestamp.desc()))
@@ -414,9 +438,9 @@ def _study_list_summary(state):
 
 
 def _last_seen_sort_key(device):
-    """Sort by most recent upload, with phones that never uploaded last."""
-    last_seen = device.get("last_seen")
-    return (last_seen is not None, last_seen or 0)
+    """Sort by contact, then data, with phones that never uploaded last."""
+    activity = device.get("last_contact") or device.get("last_sensor_data")
+    return (activity is not None, activity or 0)
 
 
 async def _latest_payload_by_id(db: AsyncSession, model, last_id: int):
@@ -500,11 +524,12 @@ async def _device_detail(platform: str, device_id: str, db: AsyncSession):
 
 @router.get("/android")
 async def list_android_devices(db: AsyncSession = Depends(get_android_db)):
-    last_seen_by_device = await _combined_last_seen_by_device(
+    last_sensor_data_by_device = await _combined_last_seen_by_device(
         db,
         [AndroidDevice, *ANDROID_STREAMS.values()],
         AndroidRecordCount,
     )
+    last_contact_by_device = await _last_contact_by_device(db, AndroidDeviceContact)
     metadata_by_device = await _device_metadata_by_device(db, AndroidDevice)
     study_states = await _android_study_states(db)
     enrolment_by_device = await _enrolment_windows(db)
@@ -518,7 +543,12 @@ async def list_android_devices(db: AsyncSession = Depends(get_android_db)):
     devices = []
     # A phone that joined but has not uploaded yet exists only in aware_studies,
     # and still belongs in the list.
-    for device_id in set(last_seen_by_device) | set(study_states) | set(enrolment_by_device):
+    for device_id in (
+        set(last_sensor_data_by_device)
+        | set(last_contact_by_device)
+        | set(study_states)
+        | set(enrolment_by_device)
+    ):
         metadata = metadata_by_device.get(device_id, {})
         state = study_states.get(device_id)
         windows = enrolment_by_device.get(device_id)
@@ -537,7 +567,15 @@ async def list_android_devices(db: AsyncSession = Depends(get_android_db)):
                 # since the study opened, and that is the first thing worth
                 # knowing about a device nobody recognises.
                 "first_seen": first_seen_by_device.get(device_id),
-                "last_seen": last_seen_by_device.get(device_id),
+                # Keep last_seen as the sensor-data timestamp for API clients
+                # written before the contact/data distinction was introduced.
+                "last_seen": last_sensor_data_by_device.get(device_id),
+                "last_sensor_data": last_sensor_data_by_device.get(device_id),
+                # Before the ingestion migration has seen this phone, a stored
+                # sensor row is still proof of contact and is the safe fallback.
+                "last_contact": last_contact_by_device.get(
+                    device_id, last_sensor_data_by_device.get(device_id)
+                ),
                 "platform": "android",
                 "study": _study_list_summary(state) if state else None,
                 # A first-data window still appears here because coverage needs
@@ -559,19 +597,21 @@ async def list_android_devices(db: AsyncSession = Depends(get_android_db)):
 
 @router.get("/ios")
 async def list_ios_devices(db: AsyncSession = Depends(get_ios_db)):
-    last_seen_by_device = await _combined_last_seen_by_device(
+    last_sensor_data_by_device = await _combined_last_seen_by_device(
         db,
         [IosDevice, *IOS_STREAMS.values()],
         IosRecordCount,
     )
+    last_contact_by_device = await _last_contact_by_device(db, IosDeviceContact)
 
     metadata_by_device = await _device_metadata_by_device(db, IosDevice)
     first_seen_by_device = await enrolment.first_record_by_device(db, IosCoverageHourly)
     excluded = await exclusions.exclusions(db, IosDeviceExclusion)
 
     devices = []
-    for device_id, last_seen in last_seen_by_device.items():
+    for device_id in set(last_sensor_data_by_device) | set(last_contact_by_device):
         metadata = metadata_by_device.get(device_id, {})
+        last_sensor_data = last_sensor_data_by_device.get(device_id)
         devices.append(
             {
                 "device_id": device_id,
@@ -581,7 +621,9 @@ async def list_ios_devices(db: AsyncSession = Depends(get_ios_db)):
                     if metadata.get(field) not in (None, "")
                 },
                 "first_seen": first_seen_by_device.get(device_id),
-                "last_seen": last_seen,
+                "last_seen": last_sensor_data,
+                "last_sensor_data": last_sensor_data,
+                "last_contact": last_contact_by_device.get(device_id, last_sensor_data),
                 "platform": "ios",
                 # An iPhone keeps its study state in `NSUserDefaults` and never
                 # uploads it, so the server holds nothing to recognise it by.

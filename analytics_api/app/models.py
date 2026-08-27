@@ -81,6 +81,15 @@ class AndroidRecordCount(AndroidBase):
     last_ts = Column(Double, default=0)
 
 
+class AndroidDeviceContact(AndroidBase):
+    """Latest successful ingestion request, measured with the server clock."""
+
+    __tablename__ = "device_contacts"
+    device_id = Column(String(150), primary_key=True)
+    last_contact = Column(BigInteger, default=0)
+    last_table = Column(String(64), default="")
+
+
 class AndroidCoverageHourly(AndroidBase):
     """How many records each table received per device per hour (see
     services/coverage_rollup.py). Keyed by table, so a sensor stored across
@@ -619,6 +628,15 @@ class IosRecordCount(IosBase):
     count = Column(BigInteger, default=0)
     last_id = Column(BigInteger, default=0)
     last_ts = Column(Double, default=0)
+
+
+class IosDeviceContact(IosBase):
+    """iOS twin of the server-side ingestion contact record."""
+
+    __tablename__ = "device_contacts"
+    device_id = Column(String(150), primary_key=True)
+    last_contact = Column(BigInteger, default=0)
+    last_table = Column(String(64), default="")
 
 
 class IosRefusal(IosBase):

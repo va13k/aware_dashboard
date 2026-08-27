@@ -6,7 +6,7 @@ import DeviceListRow from "./DeviceListRow";
 
 type StatusFilter = "all" | StudyEnrollmentStatus | "not_tracked";
 type PlatformFilter = "all" | "android" | "ios";
-type SortOrder = "upload" | "status" | "name";
+type SortOrder = "contact" | "data" | "status" | "name";
 
 const PLATFORM_OPTIONS: { value: PlatformFilter; label: string }[] = [
   { value: "all", label: "All platforms" },
@@ -23,7 +23,8 @@ const STATUS_OPTIONS: { value: StatusFilter; label: string }[] = [
 ];
 
 const SORT_OPTIONS: { value: SortOrder; label: string }[] = [
-  { value: "upload", label: "Recent upload" },
+  { value: "contact", label: "Recent contact" },
+  { value: "data", label: "Recent data" },
   { value: "status", label: "Needs attention" },
   { value: "name", label: "Name" },
 ];
@@ -52,10 +53,12 @@ function compare(a: Device, b: Device, order: SortOrder): number {
     if (difference !== 0) return difference;
   }
 
-  // Most recent upload first, and phones that never uploaded last rather than
-  // first - a missing timestamp is not a recent one.
-  const uploadedA = normalizeTimestamp(a.last_seen);
-  const uploadedB = normalizeTimestamp(b.last_seen);
+  // Contact is the default operational view; data remains separately sortable
+  // because a reachable phone can legitimately have no new sensor measurement.
+  const timestamp = (device: Device) =>
+    order === "data" ? device.last_sensor_data : device.last_contact;
+  const uploadedA = normalizeTimestamp(timestamp(a));
+  const uploadedB = normalizeTimestamp(timestamp(b));
   if (uploadedA == null && uploadedB == null) return 0;
   if (uploadedA == null) return 1;
   if (uploadedB == null) return -1;
@@ -73,7 +76,7 @@ export default function DeviceList({
 }) {
   const [platform, setPlatform] = useState<PlatformFilter>("all");
   const [status, setStatus] = useState<StatusFilter>("all");
-  const [order, setOrder] = useState<SortOrder>("upload");
+  const [order, setOrder] = useState<SortOrder>("contact");
 
   const all = useMemo(
     () => (devices ? [...devices.android, ...devices.ios] : []),

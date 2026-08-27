@@ -74,11 +74,10 @@ export default function DeviceListRow({
         ) : null}
       </div>
 
-      {/* Three different facts. A phone can be uploading sensor data without
-          reporting a study event, and the reverse — and how long it has been
-          sending is what separates a phone that appeared this week from one
-          reporting since the study opened. */}
-      <div className="mt-2 grid grid-cols-3 gap-x-2 text-[12px]">
+      {/* Separate connectivity, research data, and study events: a phone can be
+          reachable without producing a new measurement, and either can move
+          independently of its enrolment history. */}
+      <div className="mt-2 grid grid-cols-2 gap-2 text-[12px] sm:grid-cols-4">
         <div className="min-w-0">
           <div className="truncate text-sage">First</div>
           <div
@@ -89,9 +88,21 @@ export default function DeviceListRow({
           </div>
         </div>
         <div className="min-w-0">
-          <div className="truncate text-sage">Upload</div>
-          <div className="truncate font-semibold text-ink">
-            {relativeAge(device.last_seen)}
+          <div className="truncate text-sage">Contact</div>
+          <div
+            className="truncate font-semibold text-ink"
+            title={device.last_contact ? absoluteTime(device.last_contact) : undefined}
+          >
+            {relativeAge(device.last_contact)}
+          </div>
+        </div>
+        <div className="min-w-0">
+          <div className="truncate text-sage">Data</div>
+          <div
+            className="truncate font-semibold text-ink"
+            title={device.last_sensor_data ? absoluteTime(device.last_sensor_data) : undefined}
+          >
+            {relativeAge(device.last_sensor_data)}
           </div>
         </div>
         <div className="min-w-0">

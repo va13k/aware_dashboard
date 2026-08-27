@@ -125,6 +125,10 @@ export interface AndroidDevice {
   first_seen?: number | null;
   /** Null for a phone that joined the study but has never uploaded. */
   last_seen: number | null;
+  /** Newest stored research measurement; explicit twin of legacy last_seen. */
+  last_sensor_data: number | null;
+  /** Newest batch accepted by ingestion, measured with the server clock. */
+  last_contact: number | null;
   platform: "android";
   study?: AndroidStudyListSummary | null;
   /** The enrolment span, including a first-data span inferred for coverage. */
@@ -175,6 +179,8 @@ export interface IosDevice {
   label?: string | null;
   first_seen?: number | null;
   last_seen: number | null;
+  last_sensor_data: number | null;
+  last_contact: number | null;
   platform: "ios";
   /**
    * Always null: an iPhone keeps its study state on the phone and never uploads

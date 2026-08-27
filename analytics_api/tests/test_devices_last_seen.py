@@ -30,6 +30,12 @@ class _Row:
         self.last_seen = last_seen
 
 
+class _ContactRow:
+    def __init__(self, device_id, last_contact):
+        self.device_id = device_id
+        self.last_contact = last_contact
+
+
 class _Session:
     """Answers the cache query, and counts how often it was asked."""
 
@@ -111,3 +117,17 @@ async def test_a_device_with_no_timestamp_is_left_out():
     )
 
     assert result == {"phone-c": 5.0}
+
+
+@pytest.mark.asyncio
+async def test_last_contact_comes_from_the_server_contact_table():
+    session = _Session(
+        [_ContactRow("phone-a", 1_700), _ContactRow("phone-b", 2_500)]
+    )
+
+    result = await devices_router._last_contact_by_device(
+        session, devices_router.AndroidDeviceContact
+    )
+
+    assert result == {"phone-a": 1_700, "phone-b": 2_500}
+    assert session.queries == 1
