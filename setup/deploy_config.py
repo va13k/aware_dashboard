@@ -17,7 +17,7 @@ else:
 if str(PROJECT) not in sys.path:
     sys.path.insert(0, str(PROJECT))
 
-from shared_config import database, dataflow
+from shared_config import database, dataflow, messaging, placement
 from shared_config.source_store import update_source
 from shared_config.runtime import (
     SECRET_MODE,
@@ -48,6 +48,13 @@ EXAMPLE_PATH = PROJECT / "aware-micro-server" / "aware-config.example.json"
 ESM_CONFIG_PATH = PROJECT / "aware-micro-server" / "esm" / IOS_ESM_CONFIG_FILENAME
 ANDROID_TEMPLATE_PATH = PROJECT / "AWARE-Configurator" / "reactapp" / "public" / "study-config.json"
 STUDY_CONFIG_PATH = PROJECT / "studies" / "studyConfig.json"
+#: Merged over the compose file when the study names a database of its own. Written
+#: rather than checked in, because it exists only for the placement that needs it.
+COMPOSE_OVERRIDE_PATH = PROJECT / "docker-compose.external-db.yml"
+#: The broker's own files. Generated rather than checked in, because who may
+#: publish and who may only receive is derived from the study, and its passwords
+#: are this deployment's.
+MOSQUITTO_DIR = PROJECT / "mosquitto"
 STUDIES_INDEX_PATH = PROJECT / "studies" / "index.html"
 STUDIES_TEMPLATE_PATH = SCRIPT_DIR / "studies_index_template.html"
 
@@ -105,6 +112,118 @@ def requested_dataflow() -> str:
     if not RUNNING_IN_WIZARD:
         return ""
     return str(load_env(REQUEST_ENV_PATH).get("ANDROID_DATAFLOW", "")).strip().lower()
+
+
+def requested_placement() -> dict[str, str]:
+    """The database the researcher named in this wizard run, or {} for none.
+
+    Read from the request env for the same reason the dataflow is: `.env` keeps the
+    last value written, so a deploy nobody answered the question in leaves the
+    study's own declaration standing rather than reapplying an old answer.
+    """
+    if not RUNNING_IN_WIZARD:
+        return {}
+    request = load_env(REQUEST_ENV_PATH)
+    chosen = str(request.get("DB_PLACEMENT", "")).strip().lower()
+    if chosen not in placement.CHOICES:
+        return {}
+    if chosen == placement.BUNDLED:
+        return {"host": placement.DEFAULT_HOST}
+    return {
+        "host": str(request.get("DB_HOST", "")).strip(),
+        "port": str(request.get("DB_PORT", "")).strip(),
+    }
+
+
+def apply_placement(source: dict) -> str:
+    """Everything the chosen placement decides, settled in one place.
+
+    Two things follow from it. Whether this deployment runs a database at all, which
+    is a compose override rather than a setting: a service that must not start
+    cannot simply be left unstarted while six others wait on its health check, so the
+    override removes the service and the waits together. And whether the combination
+    is honourable at all --- an external database with phones connecting directly
+    would need that host open to every participant's network, which is the one
+    combination refused.
+
+    Refuses rather than half-applies, so a study is never left declaring a database
+    this deployment would not actually use.
+    """
+    problems = placement.validate(source)
+    if problems:
+        raise SystemExit("This database placement cannot be applied. " + " ".join(problems))
+
+    chosen = placement.declared(source)
+    if placement.runs_bundled_mysql(chosen):
+        COMPOSE_OVERRIDE_PATH.unlink(missing_ok=True)
+    else:
+        # Asked before anything is generated, because the alternative is a study
+        # deployed against an address that answers to nobody: every config would name
+        # it, every service would wait on it, and the first sign would be a coverage
+        # grid that stays empty. The bundled database is checked after it is up
+        # instead, since it does not exist to be asked yet.
+        require_reachable_database(source)
+        atomic_write_text(COMPOSE_OVERRIDE_PATH, build_compose_override(), SHARED_MODE)
+    set_env_value(ENV_PATH, "DB_PLACEMENT", chosen)
+    return chosen
+
+
+def require_reachable_database(source: dict) -> None:
+    """Refuse a study whose database cannot take its data.
+
+    Reachability is not the question on its own --- a host that answers and refuses
+    every insert collects exactly as much as one that does not answer --- so this
+    runs the whole check and reports each part of it. Where a step failed for want of
+    a privilege the check has already printed the SQL that settles it, so the message
+    here points at that rather than repeating it.
+    """
+    checker = SCRIPT_DIR / "verify_database.py"
+    result = subprocess.run(
+        [sys.executable, str(checker), "--placement", placement.EXTERNAL],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if result.returncode == 0:
+        return
+    raise SystemExit(
+        "The database this study names cannot take its data. No configuration a "
+        "phone or a service reads has been generated, and the deployment still runs "
+        "whatever it ran before.\n" + (result.stdout or result.stderr).strip()
+    )
+
+
+#: The services that wait on the bundled database's health check. A service kept out
+#: of a deployment is still depended on, and compose starts a dependency whether or
+#: not anyone asked for it, so the waits are cleared alongside the service itself.
+WAITS_ON_BUNDLED_MYSQL = (
+    "mysql-backup",
+    "micro-server",
+    "micro-server-android",
+    "configurator",
+    "dashboard-api",
+    "counts-refresher",
+)
+
+
+def build_compose_override() -> str:
+    """The compose file that takes the bundled database out of the deployment.
+
+    `!reset` clears a value the base file sets rather than merging with it, which is
+    what removing a service and its dependents' waits requires: an override can add
+    to `depends_on` but cannot otherwise take anything out of it.
+    """
+    lines = [
+        "# Generated by setup/deploy_config.py for a study that names its own database.",
+        "# Merged over docker-compose.yml, and absent whenever the study runs the",
+        "# bundled one. Edit the placement in setup rather than this file.",
+        "services:",
+        "  mysql: !reset null",
+    ]
+    for service in WAITS_ON_BUNDLED_MYSQL:
+        lines.append(f"  {service}:")
+        lines.append("    depends_on: !reset null")
+    return "\n".join(lines) + "\n"
 
 
 def seed_source_secrets(env: dict[str, str]) -> dict:
@@ -169,6 +288,41 @@ def seed_source_secrets(env: dict[str, str]) -> dict:
                 declared["android"] = seeded
         declared.setdefault("ios", dataflow.WEBSERVICE)
 
+        # Where the database runs, held as the host it runs on rather than as a
+        # placement of its own: `database.host` is what every reader already
+        # resolves, and a second field would be a second answer that could disagree
+        # with it. An answer given in this run wins; otherwise the study's own
+        # declaration stands, so the placement survives a deploy nobody was asked in.
+        named = requested_placement()
+        if named.get("host"):
+            db = source.setdefault("database", {})
+            db["host"] = named["host"]
+            if named.get("port"):
+                for platform in ("android", "ios"):
+                    entry = db.get(platform)
+                    if entry is not None:
+                        entry["port"] = int(named["port"])
+        source.setdefault("database", {}).setdefault("host", placement.DEFAULT_HOST)
+
+        # The one path that reaches a phone, filled in rather than built: every one of
+        # these keys has been in the study model all along and blank, and the client
+        # subscribes on connect once they carry a server. The address is the public
+        # host for the same reason the database's is on the direct path -- a
+        # participant's phone resolves it from wherever the participant is.
+        android_settings = source.setdefault("android", {}).setdefault("settings", {})
+        android_settings.update(
+            messaging.study_settings(
+                # A study with no public host has no address to hand a phone, and a
+                # block naming a broker that is not there is worse than one that is
+                # off: the client would retry a connection it can never make. Absent
+                # either half, the sensor stays off and says so.
+                server=str(env.get("PUBLIC_HOST", "")).strip(),
+                protocol=env.get("PROTOCOL", "http"),
+                username=messaging.PARTICIPANT_USER,
+                password=str(env.get("MQTT_PARTICIPANT_PASSWORD", "")).strip(),
+            )
+        )
+
         return source
 
     return update_source(mutate)
@@ -225,6 +379,90 @@ def apply_dataflow(env: dict[str, str], source: dict) -> str:
     # open on the dataflow the study is running rather than on a default.
     set_env_value(ENV_PATH, "ANDROID_DATAFLOW", android)
     return bind
+
+
+def ensure_broker_passwords(env: dict[str, str]) -> None:
+    """A credential for each of the broker's two accounts, kept once generated.
+
+    The participant one is served to every phone in the study config, so changing it
+    silently would cut off every phone already carrying the old one until each picks
+    up a new config. Both are therefore generated on the first deploy that needs them
+    and left alone afterwards.
+    """
+    for key in ("MQTT_PARTICIPANT_PASSWORD", "MQTT_PUBLISHER_PASSWORD"):
+        if not str(env.get(key, "")).strip():
+            env[key] = secrets.token_urlsafe(18)
+
+
+def apply_broker(env: dict[str, str], docker_prefix: list[str] | None = None) -> int:
+    """The broker's configuration, its accounts and who may do what with them.
+
+    Written whichever protocol the deployment serves, because the API publishes over
+    the compose network either way and only the participants' port depends on it. The
+    password file is built with the broker's own hashing tool, since mosquitto reads
+    hashes rather than the passwords themselves.
+    """
+    protocol = str(env.get("PROTOCOL", "http")).strip().lower()
+    port = messaging.port_for(protocol)
+
+    MOSQUITTO_DIR.mkdir(parents=True, exist_ok=True)
+    atomic_write_text(
+        MOSQUITTO_DIR / "mosquitto.conf", messaging.broker_config(protocol), SHARED_MODE
+    )
+    atomic_write_text(MOSQUITTO_DIR / "acl", messaging.acl(), SHARED_MODE)
+    write_broker_passwords(env, docker_prefix or [])
+
+    set_env_value(ENV_PATH, "MQTT_PUBLIC_PORT", str(port))
+    # Bound where participants are: the broker is what a phone reaches, so unlike the
+    # database it is published whichever dataflow the study runs.
+    set_env_value(ENV_PATH, "MQTT_BIND_ADDRESS", "0.0.0.0")
+    set_env_value(ENV_PATH, "MQTT_PUBLISHER_USER", messaging.PUBLISHER_USER)
+    set_env_value(ENV_PATH, "MQTT_PARTICIPANT_USER", messaging.PARTICIPANT_USER)
+    for key in ("MQTT_PARTICIPANT_PASSWORD", "MQTT_PUBLISHER_PASSWORD"):
+        set_env_value(ENV_PATH, key, env[key])
+    return port
+
+
+def write_broker_passwords(env: dict[str, str], docker_prefix: list[str]) -> None:
+    """The broker's password file, hashed the way the broker hashes.
+
+    Built by running the broker's own image, so the hash is whatever that version of
+    mosquitto produces rather than a format reimplemented here. A deployment that
+    cannot run it keeps the file it has, which is what lets a redeploy on a machine
+    without the image pulled leave a working broker working.
+    """
+    target = MOSQUITTO_DIR / "passwords"
+    accounts = (
+        (messaging.PARTICIPANT_USER, env["MQTT_PARTICIPANT_PASSWORD"]),
+        (messaging.PUBLISHER_USER, env["MQTT_PUBLISHER_PASSWORD"]),
+    )
+    # Each mosquitto_passwd run announces itself, and the file is read from this
+    # command's own output, so only the cat is allowed to reach it.
+    script = " && ".join(
+        ["touch /tmp/passwords"]
+        + [
+            f"mosquitto_passwd -b /tmp/passwords {user} '{password}' >/dev/null 2>&1"
+            for user, password in accounts
+        ]
+        + ["cat /tmp/passwords"]
+    )
+    result = subprocess.run(
+        (docker_prefix or []) + ["docker", "run", "--rm", "--entrypoint", "sh",
+                                 "eclipse-mosquitto:2", "-c", script],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if result.returncode == 0 and result.stdout.strip():
+        atomic_write_text(target, result.stdout, SHARED_MODE)
+        return
+    if target.exists():
+        print("broker: keeping the password file already in place")
+        return
+    raise SystemExit(
+        "The broker's password file could not be built: "
+        + (result.stderr.strip() or "mosquitto_passwd did not run")
+    )
 
 
 def ensure_django_secret_key(env: dict[str, str]) -> None:
@@ -466,6 +704,26 @@ def chown_generated_paths(env: dict[str, str]) -> None:
             print(f"deploy_config: could not chown {path}: {exc}", file=sys.stderr)
 
 
+def check_placement_applied(source: dict) -> None:
+    """The compose override read back against the placement that decided it.
+
+    The override is what takes the bundled database out of a deployment, so a study
+    declaring an external database while the file is absent brings up a database
+    nobody reads and waits on its health check. Reading it back turns that into a
+    failure at deploy time rather than a container that is running for nobody.
+    """
+    chosen = placement.declared(source)
+    present = COMPOSE_OVERRIDE_PATH.exists()
+    if placement.runs_bundled_mysql(chosen) == present:
+        raise SystemExit(
+            f"The deployment does not match the declared database placement "
+            f"({chosen!r}). {COMPOSE_OVERRIDE_PATH.name} is "
+            + ("present" if present else "absent")
+            + ", and that placement requires it to be "
+            + ("absent." if present else "present.")
+        )
+
+
 def check_dataflow_applied(source: dict, bind: str, android_study_url: str) -> None:
     """Every artefact the dataflow decides, checked against the declaration.
 
@@ -535,6 +793,7 @@ def main() -> None:
     ensure_researcher_credentials(env)
     ensure_participant_password(env)
     ensure_server_password(env)
+    ensure_broker_passwords(env)
     env = normalize_public_env(env)
 
     generate_htpasswd(
@@ -574,9 +833,16 @@ def main() -> None:
     # Applied before anything is generated: a refusal here means no half-written
     # study, and the bind address is settled alongside the config that depends on it.
     bind = apply_dataflow(env, source)
+    # After the dataflow, because the combination is what is refused: an external
+    # database is offered with HTTP/S ingest and not with phones connecting directly.
+    where = apply_placement(source)
+    broker_port = apply_broker(env)
     resolve_database_readers(env, source)
     print(f"dataflow: android={dataflow.declared(source, 'android')} "
           f"ios={dataflow.declared(source, 'ios')} mysql_bind={bind}")
+    print(f"database: {where} at {database.declared_host(source.get('database') or {})}")
+    print(f"broker: {messaging.PARTICIPANT_USER} on port {broker_port} "
+          f"({'TLS' if messaging.uses_tls(env.get('PROTOCOL', 'http')) else 'plaintext'})")
 
     android_study_url = dataflow.android_study_url(
         dataflow.declared(source, "android"),
@@ -613,6 +879,7 @@ def main() -> None:
     # Read back after everything is written: the check is worth only as much as
     # the files it inspects, and those are the files a phone will be served.
     check_dataflow_applied(source, bind, android_study_url)
+    check_placement_applied(source)
 
     chown_generated_paths(env)
 

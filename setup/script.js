@@ -308,6 +308,9 @@ function getPayload() {
     public_port: publicPort,
     protocol: proto,
     android_dataflow: androidDataflow(),
+    db_placement: dbPlacement(),
+    db_host: dbHost(),
+    db_port: dbPort(),
     mysql_backup_host_dir:
       (document.getElementById("backupHostDir").value || "").trim() ||
       "./backups/mysql",
@@ -331,6 +334,49 @@ function androidDataflow() {
   return (el && el.value ? el.value : "direct").trim();
 }
 
+function dbPlacement() {
+  var el = document.getElementById("dbPlacement");
+  return (el && el.value ? el.value : "bundled").trim();
+}
+
+function dbHost() {
+  var el = document.getElementById("dbHost");
+  return el && el.value ? el.value.trim() : "";
+}
+
+function dbPort() {
+  var el = document.getElementById("dbPort");
+  return el && el.value ? el.value.trim() : "3306";
+}
+
+/**
+ * Show the host fields for the placement that has a host, and say when the
+ * placement cannot be had at all.
+ *
+ * An external database is offered with phones going through the server and not
+ * with phones opening the database themselves, so choosing the direct dataflow
+ * takes the option away rather than letting it be chosen and refused at Save.
+ */
+function updateDbPlacement() {
+  var select = document.getElementById("dbPlacement");
+  var external = document.getElementById("dbExternalFields");
+  if (!select || !external) return;
+
+  var directPath = androidDataflow() === "direct";
+  var externalOption = select.querySelector('option[value="external"]');
+  if (externalOption) {
+    externalOption.disabled = directPath;
+    externalOption.textContent = directPath
+      ? "Somewhere I name — needs Android going through the server"
+      : "Somewhere I name (a database I own or my institution runs)";
+  }
+  if (directPath && select.value === "external") {
+    select.value = "bundled";
+  }
+
+  external.classList.toggle("hidden", select.value !== "external");
+}
+
 function getEnv() {
   var payload = getPayload();
   var e =
@@ -351,6 +397,15 @@ function getEnv() {
     "\n" +
     "ANDROID_DATAFLOW=" +
     payload.android_dataflow +
+    "\n" +
+    "DB_PLACEMENT=" +
+    payload.db_placement +
+    "\n" +
+    "DB_HOST=" +
+    payload.db_host +
+    "\n" +
+    "DB_PORT=" +
+    payload.db_port +
     "\n" +
     "MYSQL_BACKUP_HOST_DIR=" +
     payload.mysql_backup_host_dir +
@@ -655,6 +710,18 @@ function loadExisting() {
       if (dataflowSelect && deployedDataflow) {
         dataflowSelect.value = deployedDataflow;
       }
+
+      var placementSelect = document.getElementById("dbPlacement");
+      if (placementSelect && (d.DB_PLACEMENT || "").trim()) {
+        placementSelect.value = (d.DB_PLACEMENT || "").trim();
+      }
+      if ((d.DB_HOST || "").trim() && d.DB_HOST !== "db.internal") {
+        document.getElementById("dbHost").value = d.DB_HOST;
+      }
+      if ((d.DB_PORT || "").trim()) {
+        document.getElementById("dbPort").value = d.DB_PORT;
+      }
+      updateDbPlacement();
 
       suggestedPublicHost = (d.SUGGESTED_PUBLIC_HOST || "").trim();
       updateHostPlaceholder();

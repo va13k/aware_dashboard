@@ -7,6 +7,7 @@
 nginx/auth/.htpasswd
 setup/.wizard_url
 setup/.ingest-check.json
+setup/.database-check.json
 deployment-urls.json
 source.json
 
@@ -46,3 +47,13 @@ docs/plans/
 
 # Internal java version file
 .java-version
+
+# The broker's generated configuration: who may publish, who may only receive, and
+# this deployment's own broker passwords.
+mosquitto/mosquitto.conf
+mosquitto/acl
+mosquitto/passwords
+
+# Generated from the database placement: present when the study names its own
+# database, absent when this deployment runs one.
+docker-compose.external-db.yml

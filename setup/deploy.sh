@@ -34,6 +34,11 @@ if [ "$REQUEST_METHOD" = "GET" ]; then
     # its own default. A deployed study sends its own, so reopening the wizard
     # shows the dataflow the study is running.
     ANDROID_DATAFLOW=""
+    # Empty means a study that has never declared where its database runs, which the
+    # form opens on the bundled default. A deployed study sends its own.
+    DB_PLACEMENT=""
+    DB_HOST=""
+    DB_PORT=""
     EXISTS=false
 
     if [ -f /project/.setup-defaults.env ]; then
@@ -59,6 +64,9 @@ if [ "$REQUEST_METHOD" = "GET" ]; then
             case "$key" in
                 MYSQL_ROOT_PASSWORD) MYSQL_PASS="$value" ;;
                 ANDROID_DATAFLOW) ANDROID_DATAFLOW="$value" ;;
+                DB_PLACEMENT) DB_PLACEMENT="$value" ;;
+                DB_HOST) DB_HOST="$value" ;;
+                DB_PORT) DB_PORT="$value" ;;
                 PUBLIC_HOST) PUBLIC_HOST="$value" ;;
                 PUBLIC_PORT) PUBLIC_PORT="$value" ;;
                 PROTOCOL) PROTOCOL="$value" ;;
@@ -73,8 +81,8 @@ if [ "$REQUEST_METHOD" = "GET" ]; then
         done < /project/.env
     fi
 
-    printf '{"exists":%s,"MYSQL_ROOT_PASSWORD":"%s","SUGGESTED_PUBLIC_HOST":"%s","PUBLIC_HOST":"%s","PUBLIC_PORT":"%s","PROTOCOL":"%s","MYSQL_BACKUP_HOST_DIR":"%s","MYSQL_BACKUP_INTERVAL_SECONDS":"%s","MYSQL_BACKUP_RETENTION_DAYS":"%s","SSL_CERTIFICATE_PATH":"%s","SSL_CERTIFICATE_KEY_PATH":"%s","RESEARCHER_USERNAME":"%s","PARTICIPANT_DB_PASSWORD":"%s","ANDROID_DATAFLOW":"%s"}' \
-        "$EXISTS" "$MYSQL_PASS" "$SUGGESTED_PUBLIC_HOST" "$PUBLIC_HOST" "$PUBLIC_PORT" "$PROTOCOL" "$MYSQL_BACKUP_HOST_DIR" "$MYSQL_BACKUP_INTERVAL_SECONDS" "$MYSQL_BACKUP_RETENTION_DAYS" "$SSL_CERT" "$SSL_KEY" "$RESEARCHER_USERNAME" "$PARTICIPANT_DB_PASSWORD" "$ANDROID_DATAFLOW"
+    printf '{"exists":%s,"MYSQL_ROOT_PASSWORD":"%s","SUGGESTED_PUBLIC_HOST":"%s","PUBLIC_HOST":"%s","PUBLIC_PORT":"%s","PROTOCOL":"%s","MYSQL_BACKUP_HOST_DIR":"%s","MYSQL_BACKUP_INTERVAL_SECONDS":"%s","MYSQL_BACKUP_RETENTION_DAYS":"%s","SSL_CERTIFICATE_PATH":"%s","SSL_CERTIFICATE_KEY_PATH":"%s","RESEARCHER_USERNAME":"%s","PARTICIPANT_DB_PASSWORD":"%s","ANDROID_DATAFLOW":"%s","DB_PLACEMENT":"%s","DB_HOST":"%s","DB_PORT":"%s"}' \
+        "$EXISTS" "$MYSQL_PASS" "$SUGGESTED_PUBLIC_HOST" "$PUBLIC_HOST" "$PUBLIC_PORT" "$PROTOCOL" "$MYSQL_BACKUP_HOST_DIR" "$MYSQL_BACKUP_INTERVAL_SECONDS" "$MYSQL_BACKUP_RETENTION_DAYS" "$SSL_CERT" "$SSL_KEY" "$RESEARCHER_USERNAME" "$PARTICIPANT_DB_PASSWORD" "$ANDROID_DATAFLOW" "$DB_PLACEMENT" "$DB_HOST" "$DB_PORT"
     exit 0
 fi
 

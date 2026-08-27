@@ -11,7 +11,7 @@ PROJECT = SCRIPT_DIR.parent
 if str(PROJECT) not in sys.path:
     sys.path.insert(0, str(PROJECT))
 
-from shared_config import database, dataflow
+from shared_config import database, dataflow, mysql_client, placement
 from shared_config.source_store import read_source
 from shared_config.runtime import load_env
 
@@ -21,7 +21,6 @@ SOURCE_PATH = PROJECT / "source.json"
 # Generated from the AWARE client's providers by db/build_init_all.py, so the
 # tables created here cannot drift from the columns the client actually sends.
 ANDROID_INIT_SQL_PATH = PROJECT / "db" / "android-tables.sql"
-MYSQL_CONTAINER = "aware_mysql"
 
 
 def parse_args() -> argparse.Namespace:
@@ -129,31 +128,48 @@ def load_database_accounts() -> list[dict]:
     return accounts
 
 
-def wait_for_mysql(docker_base: list[str], timeout_seconds: int) -> None:
+def wait_for_mysql(
+    client: mysql_client.Client,
+    docker_base: list[str],
+    root_password: str,
+    timeout_seconds: int,
+) -> None:
+    """Wait until the study's database answers, by whatever means it can be asked.
+
+    A bundled database has a container whose health check is the cheaper and more
+    precise signal. A database the researcher names has none, so the question is put
+    to the database itself --- which is also the only thing that could answer it.
+    """
     deadline = time.time() + timeout_seconds
     inspect_command = docker_base + [
         "inspect",
         "-f",
         "{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}",
-        MYSQL_CONTAINER,
+        mysql_client.BUNDLED_CONTAINER,
     ]
 
+    last = ""
     while time.time() < deadline:
-        result = run_command(inspect_command)
-        status = result.stdout.strip().lower()
-        if result.returncode == 0 and status == "healthy":
-            return
+        if client.bundled:
+            result = run_command(inspect_command)
+            if result.returncode == 0 and result.stdout.strip().lower() == "healthy":
+                return
+            last = result.stderr.strip()
+        else:
+            result = client.run("root", root_password, "SELECT 1;", batch=True)
+            if result.returncode == 0:
+                return
+            last = mysql_client.error_of(result)
         time.sleep(2)
 
-    stderr = result.stderr.strip() if "result" in locals() else ""
     raise RuntimeError(
-        "Timed out waiting for MySQL container to become healthy."
-        + (f" Last error: {stderr}" if stderr else "")
+        f"Timed out waiting for {client.describe()} to answer."
+        + (f" Last error: {last}" if last else "")
     )
 
 
 def ensure_android_database(
-    docker_base: list[str],
+    client: mysql_client.Client,
     mysql_root_password: str,
     database_name: str,
     writers: list[dict],
@@ -179,23 +195,15 @@ def ensure_android_database(
         )
     statements.append("FLUSH PRIVILEGES;")
     sql = "\n".join(statements)
-    command = docker_base + [
-        "exec",
-        "-i",
-        MYSQL_CONTAINER,
-        "mysql",
-        "--protocol=TCP",
-        "-h127.0.0.1",
-        "-uroot",
-        f"-p{mysql_root_password}",
-    ]
-    result = run_command(command, input_text=sql)
+    result = client.run("root", mysql_root_password, sql)
     if result.returncode != 0:
-        raise RuntimeError(result.stderr.strip() or "Failed to ensure Android database exists")
+        raise RuntimeError(
+            mysql_client.error_of(result) or "Failed to ensure Android database exists"
+        )
 
 
 def apply_account_passwords(
-    docker_base: list[str],
+    client: mysql_client.Client,
     mysql_root_password: str,
     accounts: list[dict],
 ) -> None:
@@ -222,41 +230,20 @@ def apply_account_passwords(
         statements.append(f"ALTER USER {user} IDENTIFIED BY {password}{require};")
     statements.append("FLUSH PRIVILEGES;")
 
-    command = docker_base + [
-        "exec",
-        "-i",
-        MYSQL_CONTAINER,
-        "mysql",
-        "--protocol=TCP",
-        "-h127.0.0.1",
-        "-uroot",
-        f"-p{mysql_root_password}",
-    ]
-    result = run_command(command, input_text="\n".join(statements))
+    result = client.run("root", mysql_root_password, "\n".join(statements))
     if result.returncode != 0:
         raise RuntimeError(
-            result.stderr.strip() or "Failed to apply the database account passwords"
+            mysql_client.error_of(result) or "Failed to apply the database account passwords"
         )
 
 
 def apply_android_tables(
-    docker_base: list[str],
+    client: mysql_client.Client,
     mysql_root_password: str,
     database_name: str,
 ) -> None:
-    command = docker_base + [
-        "exec",
-        "-i",
-        MYSQL_CONTAINER,
-        "mysql",
-        "--protocol=TCP",
-        "-h127.0.0.1",
-        "-uroot",
-        f"-p{mysql_root_password}",
-        database_name,
-    ]
     with ANDROID_INIT_SQL_PATH.open("r", encoding="utf-8") as sql_file:
-        result = run_command(command, stdin=sql_file)
+        result = client.run("root", mysql_root_password, schema=database_name, stdin=sql_file)
     if result.returncode != 0:
         raise RuntimeError(result.stderr.strip() or "Failed to initialize Android database tables")
 
@@ -266,18 +253,21 @@ def main() -> int:
     docker_base = build_docker_base(args.docker_prefix)
     mysql_root_password, database_name = load_android_db_settings()
     accounts = load_database_accounts()
+    source = read_source()
+    client = mysql_client.Client.for_study(docker_base, source)
+    print(f"database: {placement.declared(source)} — {client.describe()}")
 
-    wait_for_mysql(docker_base, args.timeout_seconds)
+    wait_for_mysql(client, docker_base, mysql_root_password, args.timeout_seconds)
     ensure_android_database(
-        docker_base,
+        client,
         mysql_root_password,
         database_name,
         [a for a in accounts if a["platform"] == "android"],
     )
-    apply_account_passwords(docker_base, mysql_root_password, accounts)
+    apply_account_passwords(client, mysql_root_password, accounts)
     # Runs after the accounts exist: this file grants the micro-server's account the
     # reads its device-metadata upsert makes, and a grant needs its grantee.
-    apply_android_tables(docker_base, mysql_root_password, database_name)
+    apply_android_tables(client, mysql_root_password, database_name)
     print("Android database tables are ready.")
     print("Database accounts are using the configured passwords.")
     return 0

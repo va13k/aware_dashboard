@@ -153,7 +153,7 @@
         </div>
         <div class="field">
           <label>How Android phones send their data</label>
-          <select id="androidDataflow">
+          <select id="androidDataflow" onchange="updateDbPlacement()">
             <option value="direct" selected>
               Straight to the database (phones open MySQL themselves)
             </option>
@@ -186,6 +186,45 @@
             but stop delivering until each one re-joins from a new link or QR code.
             Choose now if you can; changing it mid-study is a decision about
             contacting every participant.
+          </p>
+        </div>
+        <div class="field">
+          <label>Where the study database runs</label>
+          <select id="dbPlacement" onchange="updateDbPlacement()">
+            <option value="bundled" selected>
+              On this machine (a database container this deployment runs)
+            </option>
+            <option value="external">
+              Somewhere I name (a database I own or my institution runs)
+            </option>
+          </select>
+          <p class="hint">
+            <b>On this machine</b> needs nothing to exist beforehand: the deployment
+            brings up its own MySQL, creates the schema and manages the accounts.
+            <br /><br />
+            <b>Somewhere I name</b> starts no database of its own — no container, no
+            published port, and none of the services waiting on it. It is offered
+            only when Android phones go <b>through the server</b> above: on the
+            direct path every participant's phone would have to reach that host on
+            its database port from whatever network they are on, which is not
+            something an institution opens up.
+            <br /><br />
+            Either way, setup checks that the database answers <i>and</i> that this
+            study can write a row to it before enrolment. If your account cannot
+            create the schema or the accounts, the exact SQL is printed for whoever
+            administers the server.
+          </p>
+        </div>
+        <div class="field hidden" id="dbExternalFields">
+          <label for="dbHost">Database host</label>
+          <input type="text" id="dbHost" placeholder="db.example.edu" />
+          <p class="field-error hidden" id="dbHostError"></p>
+          <label for="dbPort" style="margin-top: 10px">Port</label>
+          <input type="text" id="dbPort" value="3306" />
+          <p class="hint">
+            The address as this deployment's own containers will resolve it. Setup
+            asks from the deployment's network rather than from this machine, so a
+            host that only resolves here is reported rather than accepted.
           </p>
         </div>
         <div class="toggle-row">

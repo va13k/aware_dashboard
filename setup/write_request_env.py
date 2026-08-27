@@ -28,7 +28,7 @@ def project_root(candidates=PROJECT_CANDIDATES) -> pathlib.Path:
 # being restated here, so the wizard cannot accept a choice the generation
 # refuses.
 sys.path.insert(0, str(project_root()))
-from shared_config import dataflow  # noqa: E402
+from shared_config import dataflow, placement  # noqa: E402
 
 # Characters that survive .env, the wizard's JSON responses and MySQL quoting
 # unambiguously, and that a participant can retype from a printed sheet. Kept
@@ -99,6 +99,38 @@ def clean_dataflow(value: object, fallback: str) -> str:
     return chosen
 
 
+def clean_placement(value: object, dataflow_choice: str, host: object) -> tuple[str, str]:
+    """Where the database runs, refused here when the combination cannot be honoured.
+
+    The pairing is the part worth refusing at the boundary. An external database with
+    phones connecting to it directly would need that host reachable from every
+    participant's network for the length of the study, and a researcher who chose it
+    by accident finds out when the coverage grid stays empty.
+    """
+    chosen = str(value or placement.BUNDLED).strip().lower()
+    if chosen not in placement.CHOICES:
+        raise SystemExit(
+            f"DB_PLACEMENT must be one of {', '.join(placement.CHOICES)}, not {chosen!r}"
+        )
+
+    named = str(host or "").strip()
+    if chosen == placement.EXTERNAL and not named:
+        raise SystemExit("DB_HOST is required when the database is external")
+    if chosen == placement.BUNDLED:
+        named = placement.DEFAULT_HOST
+    elif placement.declared_for_host(named) == placement.BUNDLED:
+        raise SystemExit(
+            f"DB_HOST {named!r} names this deployment's own database, which is the "
+            f"bundled placement. Give the address of the database you own, or choose "
+            f"{placement.BUNDLED!r}."
+        )
+
+    reason = placement.unsupported_reason(chosen, dataflow_choice)
+    if reason is not None:
+        raise SystemExit(reason)
+    return chosen, named
+
+
 def main() -> None:
     if len(sys.argv) != 2:
         raise SystemExit("usage: write_request_env.py <output-path>")
@@ -129,6 +161,12 @@ def main() -> None:
         payload.get("android_dataflow"),
         env_fallback.get("ANDROID_DATAFLOW", ""),
     )
+    db_placement, db_host = clean_placement(
+        payload.get("db_placement", env_fallback.get("DB_PLACEMENT", "")),
+        android_dataflow,
+        payload.get("db_host", env_fallback.get("DB_HOST", "")),
+    )
+    db_port = positive_int(payload.get("db_port"), env_fallback.get("DB_PORT", "3306"))
     ssl_cert = str(
         payload.get(
             "ssl_certificate_path",
@@ -188,6 +226,9 @@ def main() -> None:
         f"PUBLIC_PORT={public_port}",
         f"PROTOCOL={protocol}",
         f"ANDROID_DATAFLOW={android_dataflow}",
+        f"DB_PLACEMENT={db_placement}",
+        f"DB_HOST={db_host}",
+        f"DB_PORT={db_port}",
         f"MYSQL_BACKUP_HOST_DIR={backup_host_dir}",
         f"MYSQL_BACKUP_INTERVAL_SECONDS={backup_interval_seconds}",
         f"MYSQL_BACKUP_RETENTION_DAYS={backup_retention_days}",
