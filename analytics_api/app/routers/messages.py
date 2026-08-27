@@ -40,7 +40,16 @@ ALL_DEVICES = "all"
 
 
 class SendRequest(BaseModel):
-    device_id: str = Field(min_length=1)
+    #: One phone, or ``all``. Kept for a caller addressing a single device, which
+    #: is most of them.
+    device_id: str = ""
+    #: Several phones in one request. The clients subscribe only to topics carrying
+    #: their own device id, so a message to a group is a publish per phone whichever
+    #: way it is asked for --- and the fan-out belongs here rather than in a browser
+    #: making one request per recipient. Each phone is rate-limited and recorded on
+    #: its own, so the work is per-device regardless; what this saves is a round trip
+    #: each and the half-sent state a failed request in the middle would leave.
+    device_ids: list[str] = Field(default_factory=list)
     kind: str = Field(default=messaging.QUESTION)
     title: str = ""
     instructions: str = ""
@@ -112,7 +121,12 @@ async def send(payload: SendRequest, db: AsyncSession = Depends(get_android_db))
         if not targets:
             raise HTTPException(status_code=404, detail="No device has joined this study yet.")
     else:
-        targets = [payload.device_id]
+        # Deduplicated and ordered, so a list naming a phone twice sends once and a
+        # result can be read against the request that produced it.
+        named = list(dict.fromkeys([*payload.device_ids, payload.device_id]))
+        targets = [device for device in named if device]
+    if not targets:
+        raise HTTPException(status_code=400, detail="Name at least one device to send to.")
 
     if payload.kind in (messaging.SYNC_REQUEST, messaging.UPDATE_REQUEST):
         channel, body = messaging.SYNC, messaging.action_for(payload.kind)

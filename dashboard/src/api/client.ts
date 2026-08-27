@@ -409,7 +409,8 @@ export interface MessageHistory {
 }
 
 export interface SendMessageRequest {
-  device_id: string;
+  device_id?: string;
+  device_ids?: string[];
   kind: "sync" | "update" | "question" | "notice";
   title?: string;
   instructions?: string;
