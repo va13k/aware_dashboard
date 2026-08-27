@@ -12,7 +12,8 @@ from aware_light_config_Django import settings
 # repo root locally) and adds it to sys.path, so shared_config is importable.
 PROJECT_ROOT = settings.PROJECT_ROOT
 
-from shared_config import dataflow
+from shared_config import dataflow, placement
+from shared_config.certificates import read_certificate
 from shared_config.database import android_credentials, android_ingest_account
 from shared_config.source_store import read_source, update_source
 from shared_config.runtime import (
@@ -97,6 +98,10 @@ def deployment_facts(request):
         json.dumps(
             {
                 "android_dataflow": dataflow.declared(source, "android"),
+                # Where the database runs. The page needs it to say who supplies the
+                # certificate authority: a bundled database publishes its own, a
+                # named one has an authority only its administrator holds.
+                "database_placement": placement.declared(source),
                 "ios_dataflow": dataflow.declared(source, "ios"),
                 # Named so the password field says which account it changes. The
                 # dataflow decides the holder, and a field that reads as the
@@ -400,6 +405,25 @@ def update_source_from_android_config(source, content):
         android_db["require_ssl"] = database.get(
             "require_ssl", android_db.get("require_ssl", False)
         )
+        # The authority a phone verifies the database against. Kept only when it is
+        # a certificate that can actually be read: devices treat an unreadable one
+        # as a database they cannot reach and stop uploading, so storing a bad paste
+        # would halt the study rather than merely fail to protect it. A blank field
+        # clears it, which is how a researcher goes back to encrypted-but-unverified.
+        if "ca_certificate" in database:
+            supplied = str(database.get("ca_certificate") or "").strip()
+            if not supplied:
+                android_db["ca_certificate"] = ""
+            else:
+                cleaned = read_certificate(supplied)
+                if not cleaned:
+                    raise ValueError(
+                        "That is not a certificate this deployment can read. Paste the "
+                        "whole file, from -----BEGIN CERTIFICATE----- to "
+                        "-----END CERTIFICATE-----, or leave the field empty to run "
+                        "encrypted without verifying the server."
+                    )
+                android_db["ca_certificate"] = cleaned
         # Whether the published config carries the password. The direct path is the
         # one that publishes it, so it is the path that governs the setting; a
         # browser keeps its own copy of this section, and a value left in it from
