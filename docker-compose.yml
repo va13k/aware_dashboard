@@ -57,6 +57,8 @@ services:
     environment:
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-CHANGE_ME}
       PARTICIPANT_DB_PASSWORD: ${PARTICIPANT_DB_PASSWORD:-}
+      # Read by the healthcheck, which connects as the account the dashboard uses.
+      ANALYTICS_DB_PASSWORD: ${ANALYTICS_DB_PASSWORD:-analyticspass}
       ANDROID_SERVER_DB_PASSWORD: ${ANDROID_SERVER_DB_PASSWORD:-}
     ports:
       # Published only so participant phones can reach MySQL themselves, which is
@@ -64,7 +66,18 @@ services:
       # outside this machine has any business here, so setup binds it to loopback
       # instead: every service in this file reaches MySQL as `mysql:3306` over the
       # compose network, so narrowing the published address costs them nothing.
-      - ${MYSQL_BIND_ADDRESS:-0.0.0.0}:3306:3306
+      # No default on purpose. The right address depends on who opens the database
+      # and where it runs, and neither answer is safe to guess: 0.0.0.0 would publish
+      # a webservice study's database to the internet, and 127.0.0.1 would cut every
+      # participant off a direct one. deploy_config.py derives it from the study, so
+      # its absence means the study was never applied -- which is a deployment to
+      # stop rather than one to guess at.
+      # Long syntax so the address can carry an error message: in the short form the
+      # colons in one would be read as port separators.
+      - target: 3306
+        published: 3306
+        protocol: tcp
+        host_ip: ${MYSQL_BIND_ADDRESS:?derived from the study by setup/deploy_config.py - run it before bringing the stack up}
     volumes:
       - mysql_data:/var/lib/mysql
       - ./db:/docker-entrypoint-initdb.d
@@ -72,10 +85,14 @@ services:
     networks:
       - aware_network
     healthcheck:
+      # Over TCP with TLS, which is how every service actually reaches this database:
+      # each account requires an encrypted connection, and a unix socket carries no
+      # TLS, so a socket check would be refused however healthy the server is. Asking
+      # the same way the readers ask is also what makes this answer their question.
       test:
         [
           "CMD-SHELL",
-          "mysql -u aware_analytics -panalyticspass aware_android -e 'SELECT 1' 2>/dev/null",
+          "mysql --protocol=TCP -h127.0.0.1 --ssl-mode=REQUIRED -u aware_analytics -p\"$$ANALYTICS_DB_PASSWORD\" aware_android -e 'SELECT 1' 2>/dev/null",
         ]
       interval: 10s
       timeout: 5s

@@ -22,13 +22,13 @@ service does not exist: no container, no published port, and none of the six
 services that wait on its health check. On ``bundled`` it is brought up and the
 published port is whatever the dataflow decides.
 
-One combination is refused. A study running the direct dataflow puts every
-participant's phone on the database itself, from whatever network the participant
-happens to be on, which means the host has to be reachable from the internet for
-the length of the study. That is a thing a researcher can decide to do with a
-database they administer, and it is not a thing an institution does with theirs ---
-so external is offered with HTTP/S ingest, where only the micro-server connects,
-and refused with direct, where every phone would have to.
+One combination is warned about rather than refused. A study running the direct
+dataflow puts every participant's phone on the database itself, from whatever
+network the participant is on, so an external host has to be reachable from the
+internet for the length of the study. An institution does not open its database
+that way; a researcher running their own server legitimately might. Refusing it
+would decide for them, so it is offered with the exposure stated plainly and TLS
+turned on --- which is the part that is not a preference.
 
 Switching placement is a redeploy rather than a live change, for the same reason
 the dataflow is: it decides which containers exist. What it does not do is carry
@@ -63,6 +63,75 @@ def declared_for_host(host: str) -> str:
     return BUNDLED if database.is_internal(host) else EXTERNAL
 
 
+#: Who opens the study database, from where, and what that demands of the
+#: connection. Every setting that used to be decided by the dataflow alone is
+#: decided here instead, because the dataflow only names half of it: the same
+#: webservice study is a connection inside one machine on a bundled database and a
+#: connection across a real network on one the researcher names.
+def connection(placement_choice: str, android_dataflow: str) -> dict:
+    """What the combination of dataflow and placement makes true of the database.
+
+    ``opener``
+        Who opens MySQL. Participants' phones on the direct path; this deployment's
+        micro-server on the webservice one. It decides which account carries the
+        credential and therefore where a password has to be asked for.
+
+    ``crosses_network``
+        Whether the connection leaves the machine running the deployment. True for
+        every combination except a server talking to a database beside it, and it is
+        the whole reason TLS matters: a hop across a bridge on one host and a hop
+        across the internet are the same statement in the config and not the same
+        risk.
+
+    ``bundled_bind``
+        The address the bundled database is published on, or ``None`` when this
+        deployment runs no database of its own. Publishing to ``0.0.0.0`` is not a
+        preference: a phone opening MySQL itself has to reach it from whatever
+        network the participant is on.
+    """
+    direct = android_dataflow == dataflow.DIRECT
+    external = placement_choice == EXTERNAL
+    return {
+        "opener": "participants" if direct else "server",
+        "crosses_network": direct or external,
+        "bundled_bind": None if external else ("0.0.0.0" if direct else "127.0.0.1"),
+        "publishes_port": (not external) and direct,
+    }
+
+
+def requires_tls(placement_choice: str, android_dataflow: str) -> bool:
+    """Whether this connection should be encrypted unless a researcher says otherwise.
+
+    Derived rather than configured, because the honest answer is a property of the
+    topology and not a preference. A researcher may still turn it off --- a closed
+    lab network, or an external certificate that will not verify --- and the
+    interfaces say plainly what that costs.
+    """
+    return connection(placement_choice, android_dataflow)["crosses_network"]
+
+
+def unencrypted_warning(placement_choice: str, android_dataflow: str) -> str | None:
+    """What running this combination without TLS exposes, or None when it exposes little.
+
+    Returned as the sentence an interface shows in red, because the two unsafe cases
+    are unsafe for different reasons and a single generic caution would understate
+    both.
+    """
+    if not requires_tls(placement_choice, android_dataflow):
+        return None
+    if connection(placement_choice, android_dataflow)["opener"] == "participants":
+        return (
+            "Without TLS every participant's phone sends its sensor data, and the "
+            "database password it holds, in clear text across whatever network the "
+            "participant is on. Anyone on that network can read both."
+        )
+    return (
+        "Without TLS this deployment sends the whole study's data to the database "
+        "in clear text across the network between them, with the account password "
+        "in the open alongside it."
+    )
+
+
 def unsupported_reason(placement: str, android_dataflow: str) -> str | None:
     """Why this placement cannot be run beside this dataflow, or None when it can.
 
@@ -72,17 +141,31 @@ def unsupported_reason(placement: str, android_dataflow: str) -> str | None:
     """
     if placement not in CHOICES:
         return f"{placement!r} is not a placement. Choose {BUNDLED!r} or {EXTERNAL!r}."
-    if placement == BUNDLED:
-        return None
-    if android_dataflow == dataflow.DIRECT:
-        return (
-            "An external database cannot be used while Android phones connect to it "
-            "directly: every participant's phone would have to reach that host on its "
-            "database port from whatever network it is on, for the length of the "
-            "study. Send Android data through the server instead, and only the "
-            "micro-server connects to the database."
-        )
     return None
+
+
+def exposure_caution(placement_choice: str, android_dataflow: str) -> str | None:
+    """What this combination requires of the network, or None when it requires nothing.
+
+    The direct path is the one that costs something a researcher has to arrange with
+    somebody else: every participant's phone opens the database, so the host has to
+    accept connections from anywhere for the length of the study. On a database they
+    run themselves that is theirs to decide; on their institution's it is a request
+    that will usually be refused, and better read here than after enrolment.
+    """
+    if android_dataflow != dataflow.DIRECT:
+        return None
+    if placement_choice == EXTERNAL:
+        return (
+            "Every participant's phone opens this database directly, so the host you "
+            "named has to accept connections from any network, for the length of the "
+            "study. An institution will rarely open a database that way --- if this is "
+            "not a server you run yourself, send the data through the server instead."
+        )
+    return (
+        "Every participant's phone opens this database directly, so its port is "
+        "published on this machine's public address for the length of the study."
+    )
 
 
 def runs_bundled_mysql(placement: str) -> bool:

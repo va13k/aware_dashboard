@@ -2,11 +2,12 @@
 
 Three things are worth holding onto. The placement is read from the host the study
 declares rather than kept as a field beside it, so the two can never disagree about
-which database a study is using. The one combination that cannot be honoured is
-refused where the researcher gives it, not discovered when the coverage grid stays
-empty. And taking the bundled database out of a deployment means taking the waits on
-it out too --- a service kept out of a compose file is still depended on, and compose
-starts a dependency whether or not anybody asked for it.
+which database a study is using. What the connection demands --- who opens it, whether
+it leaves the machine, and therefore whether it is encrypted --- is read from the
+combination of placement and dataflow, because either alone names only half of it.
+And taking the bundled database out of a deployment means taking the waits on it out
+too: a service kept out of a compose file is still depended on, and compose starts a
+dependency whether or not anybody asked for it.
 """
 
 import pathlib
@@ -45,41 +46,90 @@ class TestWhereItIsRead:
         assert placement.declared(source) == placement.EXTERNAL
 
 
-class TestWhatCannotBeHonoured:
-    """placement.unsupported_reason: the combination that is refused, and why."""
+class TestWhatTheCombinationDecides:
+    """placement.connection: the dataflow names half of it, the placement the rest."""
 
-    def test_external_with_phones_on_the_database_is_refused(self):
-        reason = placement.unsupported_reason(placement.EXTERNAL, dataflow.DIRECT)
-        assert reason is not None
-        # The sentence has to carry the consequence rather than the word
-        # "unsupported", which invites someone to go looking for the setting that
-        # turns it on.
-        assert "every participant's phone" in reason
+    @pytest.mark.parametrize(
+        "where,flow,opener,crosses,bind",
+        [
+            (placement.BUNDLED, dataflow.DIRECT, "participants", True, "0.0.0.0"),
+            (placement.BUNDLED, dataflow.WEBSERVICE, "server", False, "127.0.0.1"),
+            (placement.EXTERNAL, dataflow.DIRECT, "participants", True, None),
+            (placement.EXTERNAL, dataflow.WEBSERVICE, "server", True, None),
+        ],
+    )
+    def test_every_cell(self, where, flow, opener, crosses, bind):
+        c = placement.connection(where, flow)
+        assert (c["opener"], c["crosses_network"], c["bundled_bind"]) == (opener, crosses, bind)
 
-    def test_external_through_the_server_is_offered(self):
-        assert placement.unsupported_reason(placement.EXTERNAL, dataflow.WEBSERVICE) is None
+    def test_a_phone_opening_the_database_needs_it_published_publicly(self):
+        # Not a preference: a participant's phone reaches it from whatever network
+        # they happen to be on, so loopback would cut off the whole study.
+        assert placement.connection(placement.BUNDLED, dataflow.DIRECT)["bundled_bind"] == "0.0.0.0"
 
-    @pytest.mark.parametrize("choice", [dataflow.DIRECT, dataflow.WEBSERVICE])
-    def test_the_bundled_database_is_offered_either_way(self, choice):
-        # Nothing outside this machine is involved, so the dataflow does not bear on it.
-        assert placement.unsupported_reason(placement.BUNDLED, choice) is None
+    def test_a_server_beside_the_database_publishes_nothing_public(self):
+        # Every service reaches it over the compose network, so the published
+        # address has no audience beyond this host.
+        assert placement.connection(placement.BUNDLED, dataflow.WEBSERVICE)["bundled_bind"] == "127.0.0.1"
 
-    def test_a_placement_nothing_recognises_is_refused(self):
+    def test_a_named_database_has_no_bind_of_ours(self):
+        # This deployment runs no database, so there is nothing to publish.
+        for flow in (dataflow.DIRECT, dataflow.WEBSERVICE):
+            assert placement.connection(placement.EXTERNAL, flow)["bundled_bind"] is None
+
+
+class TestWhenEncryptionIsTheDefault:
+    """placement.requires_tls: derived from whether the connection leaves the host."""
+
+    @pytest.mark.parametrize(
+        "where,flow",
+        [
+            (placement.BUNDLED, dataflow.DIRECT),
+            (placement.EXTERNAL, dataflow.DIRECT),
+            (placement.EXTERNAL, dataflow.WEBSERVICE),
+        ],
+    )
+    def test_a_connection_that_leaves_the_machine_is_encrypted(self, where, flow):
+        assert placement.requires_tls(where, flow)
+        # And the interface has a sentence for what turning it off would cost.
+        assert placement.unencrypted_warning(where, flow)
+
+    def test_a_hop_inside_one_machine_is_not_forced(self):
+        # A bridge on one host and the internet are the same statement in a config
+        # and not the same risk, so only one of them is made non-negotiable.
+        assert not placement.requires_tls(placement.BUNDLED, dataflow.WEBSERVICE)
+        assert placement.unencrypted_warning(placement.BUNDLED, dataflow.WEBSERVICE) is None
+
+    def test_the_two_unsafe_cases_read_differently(self):
+        # One exposes every participant's own network, the other the link between
+        # two servers. A single generic caution would understate both.
+        phones = placement.unencrypted_warning(placement.BUNDLED, dataflow.DIRECT)
+        server = placement.unencrypted_warning(placement.EXTERNAL, dataflow.WEBSERVICE)
+        assert "participant" in phones and phones != server
+
+
+class TestWhatIsRefusedAndWhatIsOnlyWarnedAbout:
+    def test_a_named_database_with_phones_on_it_is_offered(self):
+        # Refusing would decide for a researcher running their own server. The cost
+        # is stated instead.
+        assert placement.unsupported_reason(placement.EXTERNAL, dataflow.DIRECT) is None
+        assert placement.exposure_caution(placement.EXTERNAL, dataflow.DIRECT)
+
+    def test_the_caution_names_who_has_to_open_the_host(self):
+        caution = placement.exposure_caution(placement.EXTERNAL, dataflow.DIRECT)
+        assert "any network" in caution and "institution" in caution
+
+    def test_the_server_path_asks_nothing_of_the_network(self):
+        assert placement.exposure_caution(placement.EXTERNAL, dataflow.WEBSERVICE) is None
+
+    def test_a_placement_nothing_recognises_is_still_refused(self):
         assert placement.unsupported_reason("elsewhere", dataflow.WEBSERVICE) is not None
 
-    def test_validate_reports_a_study_that_cannot_be_run(self):
-        source = {
-            "database": {"host": "db.example.edu"},
-            "deployment": {"dataflow": {"android": dataflow.DIRECT}},
-        }
-        assert placement.validate(source)
-
-    def test_validate_is_empty_for_a_coherent_study(self):
-        source = {
-            "database": {"host": "db.example.edu"},
-            "deployment": {"dataflow": {"android": dataflow.WEBSERVICE}},
-        }
-        assert placement.validate(source) == []
+    def test_validate_is_empty_for_every_real_combination(self):
+        for host in ("db.internal", "db.example.edu"):
+            for flow in (dataflow.DIRECT, dataflow.WEBSERVICE):
+                source = {"database": {"host": host}, "deployment": {"dataflow": {"android": flow}}}
+                assert placement.validate(source) == []
 
 
 class TestWhatASwitchCosts:
@@ -114,9 +164,15 @@ class TestTheBoundary:
             "external", dataflow.WEBSERVICE, " db.example.edu "
         ) == (placement.EXTERNAL, "db.example.edu")
 
-    def test_external_with_the_direct_dataflow_is_refused(self):
-        with pytest.raises(SystemExit):
-            write_request_env.clean_placement("external", dataflow.DIRECT, "db.example.edu")
+    def test_external_with_the_direct_dataflow_is_accepted(self):
+        # It asks something of the network that an institution will usually refuse,
+        # and that is a cost to state rather than a decision to take for a researcher
+        # running their own server. The caution carries it; the boundary does not.
+        assert write_request_env.clean_placement("external", dataflow.DIRECT, "db.example.edu") == (
+            placement.EXTERNAL,
+            "db.example.edu",
+        )
+        assert placement.exposure_caution(placement.EXTERNAL, dataflow.DIRECT)
 
     def test_external_naming_no_host_is_refused(self):
         with pytest.raises(SystemExit):
@@ -168,3 +224,51 @@ class TestWhichPlacementRunsADatabase:
 
     def test_external_runs_none(self):
         assert not placement.runs_bundled_mysql(placement.EXTERNAL)
+
+
+class TestReadingACertificate:
+    """shared_config.certificates: one reader, because two places must agree.
+
+    The Configurator accepts a certificate from a researcher and the deploy publishes
+    it to the phones. If one accepted what the other could not read, it would be
+    stored as valid and then stop every device uploading — which is the failure the
+    check exists to prevent, arriving through the check itself.
+    """
+
+    ONE = (
+        "-----BEGIN CERTIFICATE-----\n"
+        "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA\n"
+        "-----END CERTIFICATE-----"
+    )
+
+    def test_a_certificate_survives_its_wrapper(self):
+        from shared_config.certificates import read_certificate
+
+        # The NUL is what `docker exec` appends, and it would travel into the study
+        # config as the unreadable authority that halts collection.
+        cleaned = read_certificate(self.ONE + "\n\x00")
+        assert cleaned.startswith("-----BEGIN CERTIFICATE-----")
+        assert "\x00" not in cleaned
+
+    def test_a_bundle_is_kept_whole(self):
+        from shared_config.certificates import read_certificate
+
+        # A provider handing over a chain expects all of it to be trusted; dropping
+        # the rest leaves a client unable to build a path to the root.
+        assert read_certificate(self.ONE + "\n" + self.ONE).count("BEGIN CERTIFICATE") == 2
+
+    @pytest.mark.parametrize(
+        "bad",
+        ["", "just text", "-----BEGIN CERTIFICATE-----\nnot base64!!\n-----END CERTIFICATE-----"],
+    )
+    def test_nothing_unreadable_passes(self, bad):
+        from shared_config.certificates import valid_certificate
+
+        assert not valid_certificate(bad)
+
+    def test_the_deploy_and_the_configurator_use_the_same_reader(self):
+        import deploy_config
+        from shared_config import certificates
+
+        # Not two implementations that happen to agree today.
+        assert deploy_config.read_certificate is certificates.read_certificate
