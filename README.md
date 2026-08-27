@@ -178,6 +178,78 @@ If `.env` already exists, the script detects them and offers a choice:
 
 Both options re-apply `PARTICIPANT_DB_PASSWORD` and `ANDROID_SERVER_DB_PASSWORD` to their MySQL accounts, so the passwords in `.env` and the ones the study needs never drift apart. If you edited a password directly in `.env`, run `setup.sh` (or `python3 setup/init_android_tables.py`) rather than `docker compose up` on its own — starting the containers by hand leaves the existing database untouched, and the accounts keep their old passwords.
 
+### Where the study database runs
+
+Setup asks this in the network step, beside the dataflow, because the two decide
+each other:
+
+| Choice | What it means |
+| --- | --- |
+| **On this machine** | The deployment brings up its own MySQL container, creates the schema and manages the accounts. Nothing has to exist beforehand. |
+| **Somewhere I name** | A host you give — your own server, your institution's, a managed instance. The deployment starts no database of its own. |
+
+**External is offered only when Android phones go through the server.** On the direct
+path every participant's phone opens the database itself, from whatever network they
+are on, so the host would have to be reachable from the internet for the length of
+the study — which is a thing you can decide about a database you administer and not
+one your institution does. The wizard disables the option rather than letting it be
+chosen and refused later.
+
+Choosing external takes the bundled database out of the deployment properly. Setup
+writes `docker-compose.external-db.yml`, which removes the `mysql` service *and* the
+`depends_on` of the six services that wait on its health check — a service kept out
+of a compose file is still depended on, and Compose starts a dependency whether or
+not anyone asked for it. The file is generated from the choice and removed again when
+you switch back, so its presence is the placement.
+
+### Checking the database before the study is committed to it
+
+`setup/verify_database.py` runs on both placements and asks four questions:
+
+| Check | What it answers |
+| --- | --- |
+| Reachable | The address answers on its port and the credential authenticates |
+| Schema | The study's schema is there, or this account can create it |
+| Ingest accounts | The account each dataflow writes with exists with the grants its work needs |
+| A row can be written | The account that carries the study's rows can insert one, and it reads back |
+
+Reachability alone is not the question — a host that answers and refuses every insert
+collects exactly as much as one that does not answer — so the write is what the result
+turns on. The client runs on the deployment's own network, so the question asked is
+the one the micro-server and the API will ask; a host that resolves on your machine
+and not inside a container is reported rather than accepted.
+
+**An external database is checked before anything is generated.** If it fails, no
+config a phone or a service reads is written and the deployment keeps running whatever
+it ran before. The bundled one is checked once it is up, since it does not exist to be
+asked before that.
+
+**Missing privileges are reported, not assumed.** If your account cannot create the
+schema or the accounts — the usual case with an institutional database — the exact SQL
+is printed for whoever administers the server. Those statements carry this study's
+account passwords, so send them the way you would send a credential. Once they have
+run, check again:
+
+```bash
+python3 setup/verify_database.py
+```
+
+If the accounts already exist and work, a failure to re-apply the grants is reported
+as a warning rather than a failure: a database somebody else provisioned correctly
+collects exactly as well as one provisioned here.
+
+### Switching between them
+
+Changing the placement is a redeploy, not a live change, for the same reason changing
+the dataflow is: it decides which containers exist. Re-run `setup.sh` and choose the
+other option.
+
+**The data does not move.** Rows already collected stay on the server holding them.
+Export them from the dashboard's backup page before switching, then merge-import them
+into the new server — the backup page's import folds rows in above the watermark
+rather than replacing what is there, which is what makes that a move rather than an
+overwrite.
+
 ### Checking the ingest path before anyone enrols
 
 Setup runs `setup/verify_ingest.py` once the containers report healthy, and both the
