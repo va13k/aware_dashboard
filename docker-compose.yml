@@ -9,6 +9,38 @@ services:
       - .:/project
       - /var/run/docker.sock:/var/run/docker.sock:ro
 
+  # The one path that speaks to a phone. The AWARE clients subscribe on connect and
+  # act on what arrives, so what the deployment was missing is this end of it.
+  # Participants reach it on the port the protocol decides -- 8883 with the
+  # deployment's own certificate, 1883 in clear -- and the API publishes over the
+  # compose network on 1883 whichever it is.
+  mqtt:
+    image: eclipse-mosquitto:2
+    container_name: aware_mqtt
+    restart: unless-stopped
+    ports:
+      - "${MQTT_BIND_ADDRESS:-0.0.0.0}:${MQTT_PUBLIC_PORT:-1883}:${MQTT_PUBLIC_PORT:-1883}"
+    volumes:
+      - ./mosquitto/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+      - ./mosquitto/passwords:/mosquitto/config/passwords:ro
+      - ./mosquitto/acl:/mosquitto/config/acl:ro
+      - mqtt_data:/mosquitto/data
+      - ${SSL_CERTIFICATE_PATH:-/dev/null}:/mosquitto/certs/fullchain.pem:ro
+      - ${SSL_CERTIFICATE_KEY_PATH:-/dev/null}:/mosquitto/certs/privkey.pem:ro
+    healthcheck:
+      # Asked as a client rather than by looking at the process: a broker that is
+      # running and refusing every connection is what this has to catch.
+      test: ["CMD-SHELL", "mosquitto_sub -h 127.0.0.1 -p 1883 -u $$MQTT_PUBLISHER_USER -P $$MQTT_PUBLISHER_PASSWORD -t healthcheck -C 1 -W 3 -E || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 10s
+    environment:
+      MQTT_PUBLISHER_USER: ${MQTT_PUBLISHER_USER:-aware_publisher}
+      MQTT_PUBLISHER_PASSWORD: ${MQTT_PUBLISHER_PASSWORD:-}
+    networks:
+      - aware_network
+
   mysql:
     image: mysql:8.0
     container_name: aware_mysql
@@ -219,6 +251,13 @@ services:
       # Signs the researcher's session cookie. Written once at deployment, so a
       # restart keeps everyone logged in and more than one worker can serve.
       DASHBOARD_SESSION_SECRET: ${DASHBOARD_SESSION_SECRET:-}
+      # The broker, reached over the compose network on its plaintext listener:
+      # the port participants use is a different question, settled by the study's
+      # protocol, and does not concern a publisher already inside the deployment.
+      MQTT_HOST: aware_mqtt
+      MQTT_PORT: "1883"
+      MQTT_PUBLISHER_USER: ${MQTT_PUBLISHER_USER:-aware_publisher}
+      MQTT_PUBLISHER_PASSWORD: ${MQTT_PUBLISHER_PASSWORD:-}
       # The deployed study config, used to tell a phone's installed config apart
       # from the current one. Read-only: the API never writes study configs, and
       # it must never return the file itself - it holds participant credentials.
@@ -236,6 +275,10 @@ services:
       - ./studies:/app/studies:ro
       - ./aware-micro-server/aware-config.json:/app/aware-config.json:ro
       - ${MYSQL_BACKUP_HOST_DIR:-./backups/mysql}:/backups:ro
+      # The study's own vocabulary -- topics, channels, the rate limit -- read from
+      # the one module that defines it rather than restated here, so the API and the
+      # deploy cannot disagree about where a message goes.
+      - ./shared_config:/app/shared_config:ro
     depends_on:
       mysql:
         condition: service_healthy
@@ -306,4 +349,5 @@ networks:
 
 volumes:
   mysql_data:
+  mqtt_data:
   configurator_static:
