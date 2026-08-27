@@ -40,11 +40,40 @@ fi
 # SUDO_UID/SUDO_GID keep the real user's ids under sudo, where id -u reports 0.
 printf 'HOST_UID=%s\nHOST_GID=%s\n' "${SUDO_UID:-$(id -u)}" "${SUDO_GID:-$(id -g)}" >> .env
 
+# Every compose invocation, with the override that takes the bundled database out
+# of the deployment when the study names its own. deploy_config.py writes that file
+# from the placement and removes it again, so its presence is the placement.
+compose() {
+    if [ -f docker-compose.external-db.yml ]; then
+        sudo docker compose -f docker-compose.yml -f docker-compose.external-db.yml "$@"
+    else
+        sudo docker compose "$@"
+    fi
+}
+
+# The containers whose health decides the browser may be redirected. The bundled
+# database is one of them only when this deployment runs one.
+health_checked_services() {
+    if [ -f docker-compose.external-db.yml ]; then
+        echo "aware_micro aware_configurator aware_dashboard_api aware_dashboard aware_nginx"
+    else
+        echo "aware_mysql aware_micro aware_configurator aware_dashboard_api aware_dashboard aware_nginx"
+    fi
+}
+
+# The database is asked the same two questions whichever placement it runs: does it
+# answer, and can this study write a row to it. An external one is asked before
+# anything is generated; the bundled one only exists to be asked once it is up.
+verify_database() {
+    python3 setup/verify_database.py --docker-prefix sudo || true
+}
+
 deploy_stack() {
     mkdir -p studies aware-micro-server/cache aware-micro-server/esm
     python3 setup/deploy_config.py
-    sudo docker compose up --build -d
+    compose up --build -d
     python3 setup/init_android_tables.py --docker-prefix sudo
+    verify_database
 }
 
 # The question a participant's phone will ask, asked before anyone enrols: the
@@ -87,23 +116,27 @@ PY
 }
 
 start_stack_only() {
-    sudo docker compose up --build -d
+    compose up --build -d
     python3 setup/init_android_tables.py --docker-prefix sudo
+    verify_database
 }
 
 wait_for_service_redirect() {
     echo "  Waiting for services to become ready for browser redirect..."
 
+    SERVICES=$(health_checked_services)
+    EXPECTED=$(echo "$SERVICES" | wc -w | tr -d ' ')
+
     i=0
     while [ $i -lt 180 ]; do
         if sudo docker inspect \
             -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' \
-            aware_mysql aware_micro aware_configurator aware_dashboard_api aware_dashboard aware_nginx \
-            2>/dev/null | awk '
+            $SERVICES \
+            2>/dev/null | awk -v want="$EXPECTED" '
                 BEGIN { ok = 1; n = 0 }
                 { n++ }
                 $0 != "healthy" && $0 != "running" { ok = 0 }
-                END { exit (ok && n == 6) ? 0 : 1 }
+                END { exit (ok && n == want) ? 0 : 1 }
             '; then
             echo "  Services are ready. Redirecting browser shortly..."
             sleep 5
@@ -161,13 +194,13 @@ elif [ "$HAS_ENV" -eq 1 ] && [ "$HAS_MICRO_CONFIG" -eq 0 ]; then
 fi
 
 # Remove markers from any previous run
-rm -f .env.saved setup/.wizard_url setup/.ingest-check.json
+rm -f .env.saved setup/.wizard_url setup/.ingest-check.json setup/.database-check.json
 
 SUGGESTED_PUBLIC_HOST=$(python3 setup/detect_public_host.py)
 printf "PUBLIC_HOST=%s\nPUBLIC_PORT=80\nPROTOCOL=http\n" "$SUGGESTED_PUBLIC_HOST" > .setup-defaults.env
 
 # Build and start the wizard
-sudo docker compose --profile setup up --build -d setup-wizard
+compose --profile setup up --build -d setup-wizard
 
 echo ""
 echo "  Waiting for setup wizard to start..."
@@ -227,8 +260,8 @@ if wait_for_service_redirect; then
     # Stop the wizard after the browser has had time to observe readiness and to
     # read the self-test result.
     sleep 3
-    sudo docker compose --profile setup stop setup-wizard 2>/dev/null
-    sudo docker compose --profile setup rm -f setup-wizard 2>/dev/null
+    compose --profile setup stop setup-wizard 2>/dev/null
+    compose --profile setup rm -f setup-wizard 2>/dev/null
 else
     verify_ingest
 fi
