@@ -677,55 +677,197 @@ class TestTheDeployIsChecked:
 
 
 class TestTheServersOwnTlsSetting:
-    """serializers.database_ssl_mode: the account's REQUIRE clause, told to the client.
+    """serializers.database_ssl_mode: one answer, no longer a study's to choose.
 
-    `require_ssl` runs `ALTER USER ... REQUIRE SSL` on the database account. On the
-    webservice path the holder of that account is the micro-server, so the client
-    mode written into its config decides whether that account is reachable at all.
-    Both modes encrypt, which leaves ingest running across the moment the clause
-    changes: the Configurator applies it to the account as a study is saved, and
-    this config is written as the deployment is next generated.
+    Every account is created requiring TLS, so a client asking for less is refused by
+    the server it is asking. The mode used to mirror a per-study clause and the two
+    could disagree; keeping one answer is what stops a config from describing a
+    connection the account will not accept.
     """
 
     #: The values MySQLVerticle.setDatabaseSslMode maps to an encrypting client.
     ENCRYPTING = {"prefer", "preferred", "require", "required"}
 
-    def _android(self, require_ssl):
-        return {
+    def _android(self, require_ssl=None):
+        entry = {
             "name": "aware_android",
             "username": "aware_android_participant",
             "password": "secret",
             "port": 3306,
-            "require_ssl": require_ssl,
         }
+        if require_ssl is not None:
+            entry["require_ssl"] = require_ssl
+        return entry
 
-    def _micro(self, require_ssl):
+    def _micro(self, require_ssl=None):
         source = {
             "database": {"android": self._android(require_ssl)},
-            "study": {"title": "T", "description": "D", "active": True},
-            "researcher": {"first_name": "F", "last_name": "L", "contact": "c@x"},
+            "study": {
+                "title": "Study",
+                "description": "",
+                "active": True,
+                "start_timestamp": 0,
+            },
+            "researcher": {
+                "first_name": "First",
+                "last_name": "Last",
+                "contact": "researcher@example.com",
+            },
         }
-        settings = {"micro_database_host": "mysql", "external_server_host": "host", "public_port": 80}
-        return build_android_micro_config(source, settings, "KEY", 2, join_url="http://host/2/KEY")
+        return build_android_micro_config(
+            source,
+            {
+                "micro_database_host": "mysql",
+                "external_server_host": "http://host",
+                "public_port": 80,
+                "public_host": "h",
+                "protocol": "http",
+            },
+            "k",
+            2,
+            join_url="http://h/2/k",
+        )
 
-    def test_a_required_account_gets_a_client_that_insists_on_tls(self):
-        """`required` reports a connection that fails to encrypt as the TLS failure
-        it is, which is the account's own condition stated on the client side."""
-        assert self._micro(True)["server"]["database_ssl_mode"] == "required"
+    def test_the_connection_is_always_required_to_encrypt(self):
+        assert serializers.database_ssl_mode({}) == "required"
 
-    def test_an_unrestricted_account_still_encrypts_where_the_server_offers_it(self):
-        assert self._micro(False)["server"]["database_ssl_mode"] == "preferred"
+    @pytest.mark.parametrize("stated", [True, False, None])
+    def test_a_study_saying_otherwise_no_longer_changes_it(self, stated):
+        # The clause on the account is unconditional now, so a leftover field in an
+        # old study model must not talk a client into a mode the server refuses.
+        assert serializers.database_ssl_mode(self._android(stated)) == "required"
 
-    def test_the_setting_is_always_stated_rather_than_left_out(self):
-        """An absent mode reads as TLS off, which is a decision worth writing down."""
-        for require_ssl in (True, False):
-            assert "database_ssl_mode" in self._micro(require_ssl)["server"]
+    @pytest.mark.parametrize("stated", [True, False, None])
+    def test_the_micro_server_is_configured_to_encrypt(self, stated):
+        mode = self._micro(stated)["server"]["database_ssl_mode"]
+        assert mode in self.ENCRYPTING
+        assert mode == "required"
 
-    def test_every_mode_written_encrypts_the_connection(self):
-        """Both sides of the clause reach an encrypted connection, so turning it on
-        meets a client that is already encrypting."""
-        for mode in serializers.DATABASE_SSL_MODES.values():
-            assert mode in self.ENCRYPTING
 
-    def test_a_study_predating_the_field_encrypts_without_requiring_it(self):
-        assert serializers.database_ssl_mode({}) == "preferred"
+
+class TestTheDatabaseCertificateAuthority:
+    """The one thing that lets a phone tell which server answered.
+
+    Encryption is unconditional and closes reading the traffic. It cannot close
+    impersonation, because nothing in an encrypted connection says who is on the
+    other end. The client has always been able to check --- it builds a trust store
+    from `database_certificate_authority` and verifies against it --- and the study
+    simply never published one.
+    """
+
+    def _config(self, ca=None):
+        entry = {
+            "name": "aware_android",
+            "username": "aware_android_participant",
+            "password": "phone-pw",
+            "port": 3306,
+            "host": "db.example.edu",
+        }
+        if ca is not None:
+            entry["ca_certificate"] = ca
+        source = {
+            "database": {"android": entry},
+            "deployment": {"dataflow": {"android": dataflow.DIRECT}},
+            "study": {"title": "S", "description": "", "active": True, "start_timestamp": 0},
+            "researcher": {"first_name": "F", "last_name": "L", "contact": "r@example.com"},
+            "android": {"settings": {}, "sensors": {}},
+            "shared": {"sensors": {}, "esms": {"questions": [], "schedules": []}},
+        }
+        return serialize_android_config(
+            source,
+            {
+                "public_host": "h",
+                "protocol": "http",
+                "public_port": 80,
+                "android_database_host": "db.example.edu",
+                "micro_database_host": "mysql",
+                "external_server_host": "http://h",
+            },
+            pathlib.Path("shared_config/android_template.json"),
+            "study-id",
+            "http://h/2/k",
+        )
+
+    def _database_block(self, config):
+        return config.get("database") or {}
+
+    def test_the_key_is_the_clients_own(self):
+        client = (
+            pathlib.Path(__file__).resolve().parent.parent.parent
+            / "aware-client-main/aware-core/src/main/java/com/aware/Aware_Preferences.java"
+        )
+        if not client.exists():
+            pytest.skip("the Android client is not checked out beside this project")
+        # Read from the client rather than restated: a key it does not read is an
+        # authority the phone never learns about, and a connection it cannot verify.
+        assert f'"{serializers.DB_CA_KEY}"' in client.read_text(encoding="utf-8")
+
+    def test_an_authority_reaches_the_phone(self):
+        block = self._database_block(self._config("-----BEGIN CERTIFICATE-----\nabc\n"))
+        assert "BEGIN CERTIFICATE" in block[serializers.DB_CA_KEY]
+
+    def test_a_study_publishing_none_still_says_so_explicitly(self):
+        # An empty string is what the client reads as "no authority, encrypt without
+        # verifying". Omitting the key entirely would read the same, and being
+        # explicit is what makes the absence visible in a config somebody inspects.
+        block = self._database_block(self._config())
+        assert block[serializers.DB_CA_KEY] == ""
+
+    def test_encryption_is_no_longer_something_the_config_can_switch_off(self):
+        assert self._database_block(self._config())["require_ssl"] is True
+
+
+class TestPublishingTheDatabaseAuthority:
+    """deploy_config: what a phone verifies the database against, and what stops it.
+
+    The client treats an authority it cannot parse as a database it cannot reach: it
+    keeps its data and stops uploading rather than falling back to an unverified
+    connection. That is the right behaviour and it makes a malformed certificate a
+    study-wide outage, so nothing unreadable is allowed to reach a config.
+    """
+
+    #: A real certificate, as `docker exec` hands one over -- with the trailing NUL
+    #: byte it appends, which is exactly the wrapper that would reach a phone.
+    REAL = (
+        "-----BEGIN CERTIFICATE-----\n"
+        "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA\n"
+        "-----END CERTIFICATE-----\n\x00"
+    )
+
+    def test_a_certificate_survives_what_it_arrived_wrapped_in(self):
+        cleaned = deploy_config.read_certificate(self.REAL)
+        assert cleaned.startswith("-----BEGIN CERTIFICATE-----")
+        # The NUL would travel into the study config and be the unreadable authority
+        # that stops every phone.
+        assert "\x00" not in cleaned
+
+    @pytest.mark.parametrize(
+        "bad",
+        [
+            "",
+            "just some text",
+            "-----BEGIN CERTIFICATE-----\nnot base64 at all!!\n-----END CERTIFICATE-----",
+            "-----BEGIN CERTIFICATE-----\nMIIBIjANBgkqhkiG9w0",
+        ],
+    )
+    def test_nothing_unreadable_passes(self, bad):
+        assert not deploy_config.valid_certificate(bad)
+
+    def test_a_study_supplying_an_unreadable_authority_is_refused(self):
+        # Refused at deploy rather than published: the alternative is every phone in
+        # the study stopping at once, with nothing on the server saying why.
+        source = {
+            "database": {"host": "db.internal", "android": {"ca_certificate": "broken"}}
+        }
+        with pytest.raises(SystemExit):
+            deploy_config.ensure_database_authority(source)
+
+    def test_a_researchers_own_authority_is_left_alone(self):
+        source = {"database": {"host": "db.internal", "android": {"ca_certificate": self.REAL}}}
+        assert deploy_config.ensure_database_authority(source) == "supplied"
+
+    def test_a_named_database_gets_none_of_ours(self):
+        # Its authority is the researcher's to provide; this deployment has no file
+        # to read and inventing one would verify nothing.
+        source = {"database": {"host": "db.example.edu", "android": {}}}
+        assert deploy_config.ensure_database_authority(source) == "none"

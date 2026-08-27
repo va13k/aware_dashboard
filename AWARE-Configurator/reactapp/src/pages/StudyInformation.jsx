@@ -2,6 +2,7 @@ import "./StudyInformation.css";
 import React from "react";
 import Grid from "@mui/material/Unstable_Grid2";
 import Box from "@mui/material/Box";
+import TextField from "@mui/material/TextField";
 import { useRecoilState } from "recoil";
 import { useNavigate } from "react-router-dom";
 import { Alert, AlertTitle, Button, ThemeProvider } from "@mui/material";
@@ -92,7 +93,9 @@ function describeWebserviceSecurity(facts) {
 // and recommends the stronger option (encrypted connection, password kept out
 // of the study config) without dictating what the researcher must do.
 function describeDatabaseSecurity(databaseInfo) {
-  const ssl = !!databaseInfo.require_ssl;
+  // Encryption is unconditional now, so the only thing left that varies is where
+  // the password lives.
+  const ssl = true;
   const passwordInConfig = !databaseInfo.config_without_password;
 
   if (ssl && !passwordInConfig) {
@@ -125,7 +128,9 @@ function describeDatabaseSecurity(databaseInfo) {
 
 export default function StudyInformation() {
   const [studyInformation] = useRecoilState(studyFormStudyInformationState);
-  const [databaseInfo] = useRecoilState(databaseInformationState);
+  const [databaseInfo, setDatabaseInfo] = useRecoilState(
+    databaseInformationState
+  );
   const [, setDataflow] = useRecoilState(dataflowState);
   const [facts, setFacts] = React.useState(null);
   const navigateTo = useNavigate();
@@ -146,6 +151,11 @@ export default function StudyInformation() {
 
   const dataflow = facts?.android_dataflow ?? null;
   const direct = dataflow === "direct";
+  // A bundled database signs its own certificate and setup publishes the authority
+  // it used, so nobody is asked for anything. A named one has an authority only its
+  // administrator holds, and saying so is the difference between a researcher who
+  // knows to go and ask for it and one who never learns the connection is unverified.
+  const externalDatabase = facts?.database_placement === "external";
   const dbSecurity = direct
     ? describeDatabaseSecurity(databaseInfo)
     : describeWebserviceSecurity(facts ?? {});
@@ -345,19 +355,99 @@ export default function StudyInformation() {
               : "Controls how this server reaches the study database. Participant phones never open it on this path — they post to the server, which performs the write. Password and SSL changes are applied to the database account when you save."}
           </p>
           <Grid container direction="column" sx={{ ml: 5, mt: 1 }}>
-            {/* Offered on both paths, each of which has a holder for the account:
-                the phone's own client on the direct path, the micro-server on the
-                webservice one. */}
-            <CustomizedCheckbox
-              recoilState={databaseInformationState}
-              field="require_ssl"
-              label="Require an encrypted (SSL/TLS) connection"
-            />
-            <p style={DB_HELPER_STYLE}>
+            {/* No longer a choice. Every account is created requiring TLS, and every
+                client this deployment ships already asked for it, so a switch here
+                could only ever describe a connection the database would refuse. */}
+            <Alert severity="success" sx={{ mb: 1 }}>
+              <AlertTitle>
+                The database connection is always encrypted
+              </AlertTitle>
               {direct
-                ? "Participant devices must connect to the database over an encrypted (TLS) connection, so sensor data is never sent in plaintext. Only enable this if the devices support TLS — otherwise their uploads are rejected."
-                : "The database refuses this account any connection that is not encrypted (TLS). On this path the account belongs to the server, which reaches the database over an encrypted connection either way, so this makes that a condition the database itself enforces."}
+                ? "Participant devices open the database over TLS, so sensor data and the account password are never sent in plaintext."
+                : "This server opens the database over TLS, so the study's data is never sent in plaintext."}{" "}
+              The database refuses any connection that is not encrypted.
+            </Alert>
+            <p style={DB_HELPER_STYLE}>
+              What encryption does not do on its own is prove <i>which</i>{" "}
+              server answered. A database this deployment runs signs its own
+              certificate, and setup publishes the authority it signed with, so
+              participant devices can check it. A database you name elsewhere
+              has an authority only you can supply.
             </p>
+            {externalDatabase && (
+              <Alert severity="info" sx={{ mt: 1 }}>
+                <AlertTitle>
+                  This database needs its certificate authority from you
+                </AlertTitle>
+                Your database presents a certificate when something connects to
+                it. Devices can only check that certificate against the
+                authority that signed it — and for a database you run, only you
+                can supply that. Setup cannot generate it: the authority lives
+                on your server, not on this one.
+                <br />
+                <br />
+                <b>Where to find it.</b> Whoever hosts the database publishes
+                it. A managed database has it in the control panel — Google
+                Cloud SQL under <i>Connections → Security</i>, DigitalOcean and
+                Aiven behind a <i>Download CA certificate</i> button, Amazon RDS
+                and Azure as a download in their documentation. A server your
+                institution runs has an administrator who can send it. A MySQL
+                server that generated its own keeps it as <code>ca.pem</code> in
+                the data directory. If none of those match, search your
+                provider&apos;s documentation for <i>CA certificate</i>.
+                <br />
+                <br />
+                <b>What to paste.</b> The whole file, beginning with{" "}
+                <code>-----BEGIN CERTIFICATE-----</code>. Some providers give a
+                bundle holding several certificates — paste all of it. Devices
+                build their trust store from what the study publishes and do not
+                fall back to the authorities already on the phone, so this is
+                needed even when the database uses a well-known certificate.
+                <br />
+                <br />
+                <b>If you leave it empty</b>, the connection is still encrypted,
+                so nobody on the network can read the study&apos;s data. What
+                stays open is impersonation: another server on that network
+                could answer in place of your database, and devices would have
+                no way to tell.
+              </Alert>
+            )}
+            {externalDatabase && (
+              <TextField
+                multiline
+                minRows={4}
+                fullWidth
+                sx={{ mt: 2 }}
+                label="Certificate authority (optional)"
+                placeholder={
+                  "-----BEGIN CERTIFICATE-----\n…\n-----END CERTIFICATE-----"
+                }
+                value={databaseInfo.ca_certificate || ""}
+                onChange={(event) =>
+                  setDatabaseInfo({
+                    ...databaseInfo,
+                    ca_certificate: event.target.value,
+                  })
+                }
+                helperText={
+                  "Paste the whole file, including the BEGIN and END lines. " +
+                  "A bundle holding several certificates can be pasted as it is. " +
+                  "Leave empty to connect encrypted without verifying the server."
+                }
+              />
+            )}
+            <Alert severity="warning" sx={{ mt: 1 }}>
+              <AlertTitle>
+                An unreadable certificate authority stops collection
+              </AlertTitle>
+              Devices treat an authority they cannot parse as a database they
+              cannot reach: they keep their data and stop uploading, rather than
+              falling back to an unverified connection. That is the safe
+              behaviour, and it means a truncated or mistyped certificate
+              silently halts the whole study until it is corrected. Setup
+              refuses to publish one it cannot read for the same reason — leave
+              it empty to run encrypted without verifying the server.
+            </Alert>
             {/* Only the direct path publishes a config carrying the password, so
                 this is the one control that has nothing to govern otherwise. */}
             {direct ? (

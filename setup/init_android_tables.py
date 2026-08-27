@@ -85,10 +85,18 @@ def load_database_accounts() -> list[dict]:
     which performs every write on the webservice dataflow --- so both are listed and
     each carries its own password.
 
-    ``require_ssl`` is applied to the account the study's dataflow puts on the ingest
-    path and left as None elsewhere, which keeps an account's existing requirement.
-    The requirement describes the connection ingest actually makes, so it lands on
-    the account making it rather than on one nothing is opening.
+Every account requires TLS, and none of them asks. Encryption is not a property of
+    one connection or one dataflow: whoever opens the database carries a whole study's
+    data over that socket, and MySQL 8 protecting only the password while the rows
+    travel in clear is the wrong half. The clients were all ready for it --- the
+    Android client has never opened MySQL without ``requireSSL=true``, the
+    micro-server supplies the mode from its own configuration, and the dashboard's
+    API encrypts in ``app/database.py``.
+
+    What this does not buy is protection from impersonation: a bundled MySQL presents
+    a certificate it generated itself, with no subject alternative name, so no client
+    can verify who it is talking to. That is stated wherever a researcher reads about
+    it rather than implied by the word "SSL".
 
     Each entry carries the platform whose schema it writes, so a caller provisioning
     one schema selects the accounts belonging to it.
@@ -101,9 +109,7 @@ def load_database_accounts() -> list[dict]:
     server = database.android_ingest_account(dataflow.WEBSERVICE)
 
     def requirement(entry: dict, username: str):
-        if username != on_path_name or "require_ssl" not in entry:
-            return None
-        return bool(entry["require_ssl"])
+        return True
 
     accounts = []
     for platform, name_key, password_key in (
@@ -224,8 +230,8 @@ def apply_account_passwords(
         user = f"{quote_sql_string(account['username'])}@'%'"
         password = quote_sql_string(account["password"])
         require = ""
-        if account["require_ssl"] is not None:
-            require = " REQUIRE SSL" if account["require_ssl"] else " REQUIRE NONE"
+        if account["require_ssl"]:
+            require = " REQUIRE SSL"
         statements.append(f"CREATE USER IF NOT EXISTS {user} IDENTIFIED BY {password};")
         statements.append(f"ALTER USER {user} IDENTIFIED BY {password}{require};")
     statements.append("FLUSH PRIVILEGES;")

@@ -18,6 +18,7 @@ if str(PROJECT) not in sys.path:
     sys.path.insert(0, str(PROJECT))
 
 from shared_config import database, dataflow, messaging, placement
+from shared_config.certificates import read_certificate, valid_certificate
 from shared_config.source_store import update_source
 from shared_config.runtime import (
     SECRET_MODE,
@@ -369,10 +370,18 @@ def apply_dataflow(env: dict[str, str], source: dict) -> str:
         )
 
     android = dataflow.declared(source, "android")
+    # Read from the combination rather than from the dataflow alone. The dataflow
+    # names who opens the database; where it runs names whether that crosses a
+    # network, and the same webservice study is a hop inside one machine on a
+    # bundled database and a hop across the internet on a named one.
+    #
     # Loopback rather than removing the mapping: the mapping is what the compose
     # file declares, and narrowing the address is the part that decides who can
-    # reach it.
-    bind = "0.0.0.0" if android == dataflow.DIRECT else "127.0.0.1"
+    # reach it. A study running no database of its own has nothing to bind, and the
+    # value is written anyway so the compose file always has an answer -- the
+    # service it belongs to is removed by the override in that case.
+    where = placement.declared(source)
+    bind = placement.connection(where, android)["bundled_bind"] or "127.0.0.1"
     set_env_value(ENV_PATH, "MYSQL_BIND_ADDRESS", bind)
     # Written back so `.env` mirrors the declaration rather than competing with it.
     # The setup wizard reads `.env` to fill its form, and a mirror is what lets it
@@ -897,11 +906,13 @@ def main() -> None:
     # After the dataflow, because the combination is what is refused: an external
     # database is offered with HTTP/S ingest and not with phones connecting directly.
     where = apply_placement(source)
+    authority = ensure_database_authority(source)
     broker_port = apply_broker(env)
     resolve_database_readers(env, source)
     print(f"dataflow: android={dataflow.declared(source, 'android')} "
           f"ios={dataflow.declared(source, 'ios')} mysql_bind={bind}")
-    print(f"database: {where} at {database.declared_host(source.get('database') or {})}")
+    print(f"database: {where} at {database.declared_host(source.get('database') or {})} "
+          f"(tls verified by: {authority})")
     print(f"broker: {messaging.PARTICIPANT_USER} on port {broker_port} "
           f"({'TLS' if messaging.uses_tls(env.get('PROTOCOL', 'http')) else 'plaintext'})")
 

@@ -8,6 +8,11 @@ from shared_config.database import android_server_credentials
 from shared_config.runtime import build_public_base_url
 from shared_config.source_store import read_source
 
+#: What the Android client calls the certificate authority in the database block it
+#: is served. Its own preference name, so the key it reads and the key written here
+#: cannot drift apart.
+DB_CA_KEY = "database_certificate_authority"
+
 DEFAULT_ANDROID_TEMPLATE_PATH = pathlib.Path(__file__).resolve().parent / "android_template.json"
 
 COMMON_SHARED_SENSOR_FIELDS: dict[str, tuple[str, ...]] = {
@@ -582,7 +587,20 @@ def serialize_android_config(
             "config_without_password": android_db.get(
                 "config_without_password", False
             ),
-            "require_ssl": android_db.get("require_ssl", False),
+            # Always true now: every account is created requiring TLS, and the
+            # client has never opened MySQL without asking for it.
+            "require_ssl": True,
+            # The authority that signed the database's certificate, when the study
+            # publishes one. Encryption alone leaves a phone unable to tell which
+            # server answered; this is what lets it check, and the client builds a
+            # trust store from it on the device.
+            #
+            # A study that publishes none is left with an encrypted but unverified
+            # connection, which is what a self-signed certificate can offer. A study
+            # that publishes an unreadable one stops uploading rather than falling
+            # back quietly -- the client treats it as a database it could not reach,
+            # so the batch waits for the next sync.
+            DB_CA_KEY: str(android_db.get("ca_certificate") or "").strip(),
         }
     else:
         # Absent rather than blanked. A block of empty strings still tells a
@@ -700,24 +718,20 @@ def build_android_micro_config(
 #: REQUIRE clause. Both encrypt: the clause decides whether a connection that
 #: arrives in plaintext is served or refused, and the mode follows it so a client
 #: asks for what the account grants.
-DATABASE_SSL_MODES = {True: "required", False: "preferred"}
-
-
 def database_ssl_mode(database: dict) -> str:
-    """The client TLS mode matching this account's REQUIRE clause.
+    """The client TLS mode. Always ``required``, and no longer a study's to choose.
 
-    ``require_ssl`` is applied to the database account, where it makes TLS the
-    condition of every connection. ``required`` matches that on the client side, so
-    a connection that fails to encrypt is reported as the TLS failure it is.
+    Every account is created requiring TLS, so a client asking for anything less
+    would be refused by the server it is asking. The two used to be a pair of
+    settings that could disagree; now there is one answer and it is here.
 
-    An account left without the clause takes ``preferred``, which encrypts against
-    a server offering TLS and connects to one serving plaintext. Encryption is then
-    what a connection has by default, and turning the clause on meets a client that
-    is already encrypting -- so the account and the server holding it stay in step
-    across the moment the setting changes, which lands on the account as it is saved
-    and in this config as the deployment is next generated.
+    ``required`` encrypts and does not verify. Verifying needs the authority that
+    signed the server's certificate, and a bundled MySQL signs its own with no
+    subject alternative name, so no client can check who answered. What this closes
+    is reading the traffic; what it leaves open is impersonating the server, and
+    saying so plainly is better than letting the word "SSL" imply both.
     """
-    return DATABASE_SSL_MODES[bool(database.get("require_ssl", False))]
+    return "required"
 
 
 def update_ios_server_config(
