@@ -178,6 +178,37 @@ If `.env` already exists, the script detects them and offers a choice:
 
 Both options re-apply `PARTICIPANT_DB_PASSWORD` and `ANDROID_SERVER_DB_PASSWORD` to their MySQL accounts, so the passwords in `.env` and the ones the study needs never drift apart. If you edited a password directly in `.env`, run `setup.sh` (or `python3 setup/init_android_tables.py`) rather than `docker compose up` on its own — starting the containers by hand leaves the existing database untouched, and the accounts keep their old passwords.
 
+### Checking the ingest path before anyone enrols
+
+Setup runs `setup/verify_ingest.py` once the containers report healthy, and both the
+terminal and the wizard page show what it found. It asks the deployment the question a
+participant's phone will ask, at the study's public address rather than over the
+compose network:
+
+| Check | What it answers |
+| --- | --- |
+| Endpoint reachable | The address the study hands out answers, with the configuration a joining phone reads |
+| Certificate | On HTTPS, the certificate that address presents verifies, and when it expires |
+| Test record lands | A row posted the way the client posts one is admitted and is in the study database afterwards |
+| Probe removed | Everything the check wrote has been taken back out |
+
+Both dataflows are covered. On `webservice` the row goes over HTTPS to the Android
+micro-server; on `direct` it is written by the participant account over MySQL's
+published port, which is what a phone opens on that path.
+
+The check writes as a synthetic device named `setup-self-test-…`, and removes its row,
+its enrolment window and its entries in `record_counts`, `coverage_hourly` and
+`refusals` — all of which are keyed by device, so the study's own figures are untouched.
+If a run is interrupted, its rows are still addressable by that prefix.
+
+A failure does not stop the deployment: the stack is up either way. It means phones
+enrolled now would collect data and never deliver it, so fix what it reports and run it
+again:
+
+```bash
+python3 setup/verify_ingest.py
+```
+
 ### Reclaiming sensor label space
 
 The ten physical sensor tables are created without a `label` column. The client
