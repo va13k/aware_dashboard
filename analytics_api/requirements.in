@@ -9,3 +9,4 @@ python-dotenv        # reads .env file
 jinja2               # HTML template rendering for login page
 python-multipart     # required for FastAPI Form() parsing
 openpyxl             # writes the .xlsx coverage workbook
+paho-mqtt           # publishes to the study broker, the one path that speaks to a phone

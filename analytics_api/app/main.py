@@ -13,6 +13,7 @@ from app.routers import (
     export,
     study,
     logs,
+    messages,
     counts,
     coverage,
     jobs,
@@ -66,6 +67,7 @@ app.include_router(backup.router)
 app.include_router(jobs.router)
 app.include_router(export.router)
 app.include_router(logs.router)
+app.include_router(messages.router)
 app.include_router(counts.router)
 app.include_router(coverage.router)
 app.include_router(live.router)
