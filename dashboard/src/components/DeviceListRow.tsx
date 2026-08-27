@@ -16,10 +16,20 @@ export default function DeviceListRow({
   device,
   selected,
   onSelect,
+  picking = false,
 }: {
   device: Device;
   selected: boolean;
   onSelect: () => void;
+  /**
+   * Whether a click adds this phone to a set rather than opening it.
+   *
+   * The two read as the same gesture and mean different things, so the row says
+   * which: a picked phone shows a tick and announces itself as pressed, where a
+   * navigated one announces itself as current. Without that a researcher choosing
+   * recipients has no way to tell a selection from a page they are about to leave.
+   */
+  picking?: boolean;
 }) {
   const study = device.platform === "android" ? device.study : null;
 
@@ -27,7 +37,8 @@ export default function DeviceListRow({
     <button
       type="button"
       onClick={onSelect}
-      aria-current={selected}
+      aria-current={picking ? undefined : selected}
+      aria-pressed={picking ? selected : undefined}
       className={`w-full min-w-0 cursor-pointer rounded-2xl border px-3.5 py-3 text-left transition-colors ${
         selected
           ? "border-teal bg-teal-soft"
@@ -35,6 +46,18 @@ export default function DeviceListRow({
       }`}
     >
       <div className="flex min-w-0 items-center gap-2">
+        {picking ? (
+          <span
+            aria-hidden="true"
+            className={`flex h-4 w-4 shrink-0 items-center justify-center rounded border text-[10px] font-bold ${
+              selected
+                ? "border-teal bg-teal text-white"
+                : "border-wire bg-card-strong text-transparent"
+            }`}
+          >
+            ✓
+          </span>
+        ) : null}
         <PlatformIcon platform={device.platform} className="h-4 w-4 shrink-0" />
         <span className="min-w-0 flex-1 truncate text-[14px] font-semibold leading-tight text-ink">
           {deviceLabel(device)}

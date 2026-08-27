@@ -1,4 +1,6 @@
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import DeviceList from "../components/DeviceList";
+import ComposeMessageDialog from "../components/ComposeMessageDialog";
 import {
   fetchDevices,
   fetchMessageHistory,
@@ -6,283 +8,247 @@ import {
   type MessageHistory,
   type SendMessageRequest,
 } from "../api/client";
+import type { Device, DevicesResponse } from "../types";
+import { deviceLabel } from "../utils/devices";
 
 /**
- * Reaching a participant, and what became of it.
+ * Reaching participants, and what became of it.
  *
- * Every other page here reads what a phone sent. This one sends, and the difference
- * shapes it: a prompt interrupts somebody, so what it will look like and who it goes
- * to are settled before the button, and what happened to it is shown afterwards
- * rather than assumed.
+ * Every other page here reads what a phone sent. This one sends, and that shapes
+ * two things.
  *
- * The three states are kept apart deliberately. *Sent* is ours. *Delivered* is the
- * phone's own record of receiving it, uploaded with the rest of its data — which is
- * evidence rather than an assumption, and which lags a sync. A prompt to a quiet
- * phone sits at "sent" until that phone next uploads, and that is a normal state,
- * not a failure, so it is drawn as waiting rather than as an error.
+ * Recipients are chosen from the same list the Devices tab shows, not from a
+ * dropdown of identifiers. A researcher deciding who to interrupt needs to see who
+ * they are and how they are doing — a phone that withdrew, or has not reported in a
+ * week, is one you would think twice about prompting, and a bare UUID hides that.
+ * The list carries its own filters, so "everyone still enrolled" is a filter and a
+ * tick rather than a group somebody has to maintain.
+ *
+ * What is sent is settled in a dialog rather than in a panel beside the list.
+ * Sending interrupts somebody, and the last question it asks — whether the words are
+ * kept with the study record — is a decision, not a setting. A checkbox on a form is
+ * read past; a dialog that has to be answered is not.
+ *
+ * The three states below are kept apart deliberately. *Sent* is ours. *Delivered* is
+ * the phone's own record of receiving it, uploaded with the rest of its data, which
+ * makes it evidence rather than an assumption — and which lags a sync. A prompt to a
+ * quiet phone sits at "sent" until it next uploads, and that is a normal state, not
+ * a failure.
  */
-
-type Kind = "sync" | "update" | "question" | "notice";
-
-// Addresses every phone the study log recorded joining.
-const ALL_DEVICES = "all";
-
-const KINDS: { value: Kind; label: string; hint: string }[] = [
-  {
-    value: "sync",
-    label: "Ask the phone to upload",
-    hint: "Costs the participant nothing and shows them nothing. Use it when a phone has gone quiet and you want to know whether it is holding data.",
-  },
-  {
-    value: "update",
-    label: "Ask the phone for a study update",
-    hint: "Makes the phone re-read the study configuration now instead of waiting on its own timer. Send this to everyone after changing questions, schedules or sensors — otherwise each phone picks the change up whenever it happens to look.",
-  },
-  {
-    value: "question",
-    label: "Ask a question",
-    hint: "Appears on the phone now. The answer lands in the study data alongside the scheduled questionnaires.",
-  },
-  {
-    value: "notice",
-    label: "Tell them something",
-    hint: "A message with one button to dismiss it. Nothing is being asked.",
-  },
-];
 
 function when(ms: number): string {
   return new Date(ms).toLocaleString();
 }
 
 export default function MessagesPage() {
-  const [devices, setDevices] = useState<string[]>([]);
-  const [device, setDevice] = useState("");
-  const [kind, setKind] = useState<Kind>("question");
-  const [title, setTitle] = useState("");
-  const [instructions, setInstructions] = useState("");
-  const [answers, setAnswers] = useState("Yes, No");
-  const [retain, setRetain] = useState(true);
+  const [devices, setDevices] = useState<DevicesResponse | null>(null);
+  const [picked, setPicked] = useState<Set<string>>(new Set());
+  const [composing, setComposing] = useState(false);
   const [history, setHistory] = useState<MessageHistory | null>(null);
-  const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<{ ok: boolean; text: string } | null>(
     null,
   );
 
-  const reload = useCallback(async (id: string) => {
+  useEffect(() => {
+    fetchDevices()
+      .then(setDevices)
+      .catch(() => setDevices({ android: [], ios: [] }));
+  }, []);
+
+  // Only Android phones subscribe: an iPhone keeps its study state locally and
+  // listens on nothing, so there is no topic to address one on.
+  const reachable = useMemo(() => devices?.android ?? [], [devices]);
+
+  const loadHistory = async () => {
     try {
-      setHistory(await fetchMessageHistory(id || undefined));
+      setHistory(await fetchMessageHistory());
     } catch {
       setHistory(null);
     }
-  }, []);
+  };
 
   useEffect(() => {
-    fetchDevices()
-      .then((d) => {
-        const ids = (d.android ?? []).map((x) => x.device_id);
-        setDevices(ids);
-        if (ids.length) setDevice(ids[0]);
-      })
-      .catch(() => setDevices([]));
-  }, []);
-
-  useEffect(() => {
-    // Guarded rather than fired and forgotten: switching device twice quickly would
-    // otherwise let the first answer land after the second and show the wrong
-    // phone's history.
     let current = true;
-    (async () => {
-      try {
-        const next = await fetchMessageHistory(device || undefined);
-        if (current) setHistory(next);
-      } catch {
-        if (current) setHistory(null);
-      }
-    })();
+    fetchMessageHistory()
+      .then((next) => current && setHistory(next))
+      .catch(() => current && setHistory(null));
     return () => {
       current = false;
     };
-  }, [device]);
+  }, []);
 
-  async function send() {
-    setBusy(true);
-    setResult(null);
-    const body: SendMessageRequest = { device_id: device, kind, retain };
-    if (kind !== "sync") {
-      body.title = title;
-      body.instructions = instructions;
-      body.answers = answers
-        .split(",")
-        .map((a) => a.trim())
-        .filter(Boolean);
-    }
+  function toggle(device: Device) {
+    setPicked((current) => {
+      const next = new Set(current);
+      if (next.has(device.device_id)) next.delete(device.device_id);
+      else next.add(device.device_id);
+      return next;
+    });
+  }
+
+  async function send(body: Omit<SendMessageRequest, "device_id">) {
+    const targets = [...picked];
+    // One request carrying every recipient. The server publishes per phone either
+    // way — the clients subscribe only to their own topics — but doing the fan-out
+    // there keeps the rate limit, the record and the answer in one transaction,
+    // where a request per phone leaves a half-sent state if one of them fails.
     try {
-      const answer = await sendMessage(body);
-      // A study-wide send rarely succeeds uniformly: a phone at its limit is held
-      // and the rest go, so the count is the answer rather than the word "sent".
-      const parts = [`Sent to ${answer.sent.length} phone(s).`];
+      const answer = await sendMessage({ ...body, device_ids: targets });
+      const parts = [`Sent to ${answer.sent.length} of ${targets.length}.`];
       if (answer.held.length) {
         parts.push(`${answer.held.length} held by the rate limit.`);
       }
       if (answer.failed.length) {
-        parts.push(`${answer.failed.length} could not be published.`);
+        parts.push(`${answer.failed.length} could not be sent.`);
       }
-      if (composing && answer.retained === false) {
-        parts.push("Its words were not kept.");
+      if (body.retain === false && answer.sent.length) {
+        parts.push("The words were not kept with the study record.");
       }
-      setResult({ ok: true, text: parts.join(" ") });
-      await reload(device);
+      setResult({ ok: answer.sent.length > 0, text: parts.join(" ") });
     } catch (error) {
-      // A refusal by the rate limit arrives here too, and it is the message worth
-      // reading: it says how many have gone and when the window lifts.
       setResult({ ok: false, text: (error as Error).message });
-    } finally {
-      setBusy(false);
     }
+    setComposing(false);
+    await loadHistory();
   }
 
-  const composing = kind !== "sync" && kind !== "update";
-  const ready = device && (!composing || title.trim());
+  const chosen = reachable.filter((device) => picked.has(device.device_id));
 
   return (
-    <div className="p-6 max-w-5xl mx-auto">
+    <div className="p-6">
       <h1 className="text-2xl font-semibold text-ink mb-1">Messages</h1>
-      <p className="text-sage text-sm mb-6">
-        The one thing this system does outward. Sending is an intervention
-        rather than an observation, so it is rate limited per device and every
-        send is recorded.
+      <p className="text-sage text-sm mb-6 max-w-3xl">
+        The one thing this system does outward. Choose who to reach, then what to
+        send. Sending is an intervention rather than an observation, so it is rate
+        limited per phone and every send is recorded.
       </p>
 
-      <div className="border border-mist rounded-xl p-5 mb-8">
-        <label className="block text-sm font-medium text-ink mb-1">To</label>
-        <select
-          value={device}
-          onChange={(e) => setDevice(e.target.value)}
-          className="w-full mb-4 px-3 py-2 border border-mist rounded-lg text-sm"
-        >
-          <option value={ALL_DEVICES}>
-            Every phone in the study ({devices.length})
-          </option>
-          {devices.map((d) => (
-            <option key={d} value={d}>
-              {d}
-            </option>
-          ))}
-        </select>
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_22rem]">
+        <DeviceList
+          devices={devices}
+          selected={null}
+          onSelect={toggle}
+          pickedIds={picked}
+          header={(visible) => {
+            const reachableVisible = visible.filter(
+              (device) => device.platform === "android",
+            );
+            const allPicked =
+              reachableVisible.length > 0 &&
+              reachableVisible.every((device) => picked.has(device.device_id));
+            return (
+              <div className="flex flex-wrap items-center gap-3 text-[13px]">
+                <button
+                  type="button"
+                  onClick={() =>
+                    setPicked((current) => {
+                      const next = new Set(current);
+                      reachableVisible.forEach((device) =>
+                        allPicked
+                          ? next.delete(device.device_id)
+                          : next.add(device.device_id),
+                      );
+                      return next;
+                    })
+                  }
+                  disabled={reachableVisible.length === 0}
+                  className="cursor-pointer rounded-lg border border-wire bg-card-strong px-3 py-1.5 font-medium text-ink transition-colors hover:bg-teal-soft/50 disabled:opacity-40"
+                >
+                  {allPicked
+                    ? `Clear these ${reachableVisible.length}`
+                    : `Choose these ${reachableVisible.length}`}
+                </button>
+                <span className="text-sage">
+                  {picked.size === 0
+                    ? "Nobody chosen yet"
+                    : `${picked.size} chosen`}
+                </span>
+                {visible.length !== reachableVisible.length ? (
+                  <span className="text-sage">
+                    iPhones cannot be messaged and are not counted
+                  </span>
+                ) : null}
+              </div>
+            );
+          }}
+        />
 
-        <label className="block text-sm font-medium text-ink mb-1">
-          What to send
-        </label>
-        <select
-          value={kind}
-          onChange={(e) => setKind(e.target.value as Kind)}
-          className="w-full px-3 py-2 border border-mist rounded-lg text-sm"
-        >
-          {KINDS.map((k) => (
-            <option key={k.value} value={k.value}>
-              {k.label}
-            </option>
-          ))}
-        </select>
-        <p className="text-[12px] text-sage mt-1 mb-4">
-          {KINDS.find((k) => k.value === kind)?.hint}
-        </p>
+        <aside className="min-w-0">
+          <div className="rounded-2xl border border-wire bg-card-strong p-4">
+            <h2 className="text-sm font-semibold text-ink">Recipients</h2>
+            {chosen.length === 0 ? (
+              <p className="mt-2 text-[13px] text-sage">
+                Pick phones on the left. The filters above the list are the quickest
+                way to reach a group — everyone still enrolled, or everyone gone
+                quiet.
+              </p>
+            ) : (
+              <ul className="mt-2 max-h-56 space-y-1 overflow-y-auto">
+                {chosen.map((device) => (
+                  <li
+                    key={device.device_id}
+                    className="truncate text-[13px] text-ink"
+                    title={device.device_id}
+                  >
+                    {deviceLabel(device)}
+                  </li>
+                ))}
+              </ul>
+            )}
+            <button
+              type="button"
+              onClick={() => setComposing(true)}
+              disabled={chosen.length === 0}
+              className="mt-4 w-full cursor-pointer rounded-lg border-none bg-teal px-4 py-2 text-sm font-medium text-white disabled:opacity-40"
+            >
+              Compose a message
+            </button>
+            {result ? (
+              <p
+                className={`mt-3 text-[13px] ${result.ok ? "text-teal" : "text-red-600"}`}
+              >
+                {result.text}
+              </p>
+            ) : null}
+          </div>
 
-        {composing && (
-          <>
-            <label className="block text-sm font-medium text-ink mb-1">
-              Title
-            </label>
-            <input
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              placeholder="How is your day going?"
-              className="w-full mb-3 px-3 py-2 border border-mist rounded-lg text-sm"
-            />
-            <label className="block text-sm font-medium text-ink mb-1">
-              Instructions
-            </label>
-            <input
-              value={instructions}
-              onChange={(e) => setInstructions(e.target.value)}
-              placeholder="One touch answer"
-              className="w-full mb-3 px-3 py-2 border border-mist rounded-lg text-sm"
-            />
-            <label className="block text-sm font-medium text-ink mb-1">
-              Answers, comma separated
-            </label>
-            <input
-              value={answers}
-              onChange={(e) => setAnswers(e.target.value)}
-              className="w-full mb-1 px-3 py-2 border border-mist rounded-lg text-sm"
-            />
-            <p className="text-[12px] text-sage mb-4">
-              Leave empty for a free-text answer.
-            </p>
-
-            <label className="flex items-start gap-2 mb-4 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={retain}
-                onChange={(e) => setRetain(e.target.checked)}
-                className="mt-1"
-              />
-              <span className="text-[13px] text-ink">
-                Keep this message in the database
-              </span>
-            </label>
-          </>
-        )}
-
-        <button
-          onClick={send}
-          disabled={busy || !ready}
-          className="px-4 py-2 rounded-lg text-sm font-medium bg-teal text-white disabled:opacity-40 border-none cursor-pointer"
-        >
-          {busy ? "Sending…" : "Send"}
-        </button>
-
-        {result && (
-          <p
-            className={`mt-3 text-[13px] ${
-              result.ok ? "text-teal" : "text-red-600"
-            }`}
-          >
-            {result.text}
-          </p>
-        )}
+          <Column
+            title="Sent"
+            note="What was asked of a phone"
+            rows={(history?.sent ?? []).map((m) => ({
+              key: `s${m._id}`,
+              head: m.kind === "sync" ? "Upload request" : m.title || "(not kept)",
+              sub: when(m.sent_at) + (m.retained ? "" : " · words not kept"),
+            }))}
+          />
+          <Column
+            title="Delivered"
+            note="What a phone recorded receiving. Reported on its next upload, so a quiet phone lags."
+            rows={(history?.delivered ?? []).map((m, i) => ({
+              key: `d${i}`,
+              head: m.topic.split("/").pop() ?? m.topic,
+              sub: when(m.timestamp),
+            }))}
+          />
+          <Column
+            title="Answered"
+            note="What came back"
+            rows={(history?.answered ?? []).map((m, i) => ({
+              key: `a${i}`,
+              head: m.esm_user_answer || "(no answer)",
+              sub: `${m.esm_title} · ${when(m.answered_at)}`,
+            }))}
+          />
+        </aside>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-        <Column
-          title="Sent"
-          note="What was asked of the phone"
-          rows={(history?.sent ?? []).map((m) => ({
-            key: `s${m._id}`,
-            head:
-              m.kind === "sync" ? "Upload request" : m.title || "(not kept)",
-            sub: when(m.sent_at) + (m.retained ? "" : " · words not kept"),
-          }))}
+      {composing ? (
+        <ComposeMessageDialog
+          recipients={chosen.map(deviceLabel)}
+          onCancel={() => setComposing(false)}
+          onSend={send}
         />
-        <Column
-          title="Delivered"
-          note="What the phone recorded receiving. Reported on its next upload, so a quiet phone lags."
-          rows={(history?.delivered ?? []).map((m, i) => ({
-            key: `d${i}`,
-            head: m.topic.split("/").pop() ?? m.topic,
-            sub: when(m.timestamp),
-          }))}
-        />
-        <Column
-          title="Answered"
-          note="What came back"
-          rows={(history?.answered ?? []).map((m, i) => ({
-            key: `a${i}`,
-            head: m.esm_user_answer || "(no answer)",
-            sub: `${m.esm_title} · ${when(m.answered_at)}`,
-          }))}
-        />
-      </div>
+      ) : null}
     </div>
   );
 }
@@ -297,15 +263,15 @@ function Column({
   rows: { key: string; head: string; sub: string }[];
 }) {
   return (
-    <div className="border border-mist rounded-xl p-4">
+    <div className="mt-4 rounded-2xl border border-wire bg-card-strong p-4">
       <h2 className="text-sm font-semibold text-ink">{title}</h2>
-      <p className="text-[11px] text-sage mb-3 leading-snug">{note}</p>
+      <p className="mb-2 text-[11px] leading-snug text-sage">{note}</p>
       {rows.length === 0 ? (
-        <p className="text-[12px] text-sage italic">Nothing yet</p>
+        <p className="text-[12px] italic text-sage">Nothing yet</p>
       ) : (
-        rows.map((r) => (
-          <div key={r.key} className="py-2 border-t border-mist/60">
-            <p className="text-[13px] text-ink leading-snug">{r.head}</p>
+        rows.slice(0, 6).map((r) => (
+          <div key={r.key} className="border-t border-wire/60 py-2">
+            <p className="text-[13px] leading-snug text-ink">{r.head}</p>
             <p className="text-[11px] text-sage">{r.sub}</p>
           </div>
         ))

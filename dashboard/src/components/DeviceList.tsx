@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import type { Device, DevicesResponse, StudyEnrollmentStatus } from "../types";
 import { deviceLabel } from "../utils/devices";
 import { normalizeTimestamp } from "../utils/time";
@@ -69,11 +69,29 @@ export default function DeviceList({
   devices,
   selected,
   onSelect,
+  pickedIds,
+  header,
 }: {
   devices: DevicesResponse | null;
   selected: Device | null;
   onSelect: (device: Device) => void;
+  /**
+   * The phones already chosen, when this list is picking a set rather than
+   * navigating to one. Its presence is what puts the list in that mode: the
+   * filtering, sorting and states are the same question either way, and keeping
+   * one list is what stops the two drifting into showing different things.
+   */
+  pickedIds?: Set<string>;
+  /**
+   * Rendered above the rows, given the phones the filters left showing.
+   *
+   * A function rather than a node, because a control that says "choose all of
+   * these" has to mean the ones on screen. Handed the whole list instead, it would
+   * quietly pick phones the researcher had filtered out of view.
+   */
+  header?: (visible: Device[]) => ReactNode;
 }) {
+  const picking = pickedIds !== undefined;
   const [platform, setPlatform] = useState<PlatformFilter>("all");
   const [status, setStatus] = useState<StatusFilter>("all");
   const [order, setOrder] = useState<SortOrder>("contact");
@@ -145,6 +163,8 @@ export default function DeviceList({
         </select>
       </div>
 
+      {header ? <div className="mb-3">{header(visible)}</div> : null}
+
       <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
         {!devices ? (
           <div className="h-24 rounded-xl shimmer sm:col-span-2" />
@@ -159,9 +179,12 @@ export default function DeviceList({
             <DeviceListRow
               key={`${device.platform}:${device.device_id}`}
               device={device}
+              picking={picking}
               selected={
-                device.device_id === selected?.device_id &&
-                device.platform === selected?.platform
+                picking
+                  ? pickedIds.has(device.device_id)
+                  : device.device_id === selected?.device_id &&
+                    device.platform === selected?.platform
               }
               onSelect={() => onSelect(device)}
             />
