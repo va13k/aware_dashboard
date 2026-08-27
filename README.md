@@ -202,6 +202,118 @@ of a compose file is still depended on, and Compose starts a dependency whether 
 not anyone asked for it. The file is generated from the choice and removed again when
 you switch back, so its presence is the placement.
 
+### The database connection is always encrypted
+
+Every account this deployment creates requires TLS, and there is no setting to turn
+that off. Without it MySQL 8 still protects the password, then carries every row of
+every participant's data over the same socket in clear — the password was never the
+part most worth protecting.
+
+Encryption alone does not prove *which* server answered. For a bundled database setup
+solves that for you: MySQL generates its own certificate authority on first start, and
+`deploy_config.py` reads it out of the container and publishes it in the study config,
+so a participant's phone verifies the certificate chain. Nothing to enter. It is re-read
+on every deploy, so a database that regenerates its certificate — a fresh volume, a
+restored backup — publishes the authority it is actually using.
+
+For a database you name elsewhere, only you can supply its authority. Put it in
+`database.android.ca_certificate` in the study model. Without one the connection is
+encrypted but unverified: the traffic cannot be read, and a server on the same network
+could impersonate the database.
+
+> **A certificate authority that cannot be read stops collection.** The Android client
+> treats an unparseable authority as a database it cannot reach — it keeps its data and
+> stops uploading rather than quietly falling back to an unverified connection. That is
+> the right behaviour, and it means a truncated or mistyped certificate halts the whole
+> study until corrected. Setup refuses to publish one it cannot read, and `deploy_config.py`
+> exits with an error rather than writing it. Leave it empty to run encrypted without
+> verification.
+
+### Getting a certificate authority for your own database
+
+You only need this if you told setup to use **a database somewhere else** — a managed
+one from a cloud provider, or a server you or your institution runs. If the deployment
+runs its own database, this is already done for you and you can skip this section.
+
+**What it is, in one paragraph.** Your database proves who it is by showing a
+certificate, the way a website does. A certificate is only worth anything if somebody
+vouched for it, and the one who vouches is called a *certificate authority*. Phones in
+your study need a copy of that authority, otherwise they can encrypt the connection but
+cannot tell your database apart from anything else answering at that address. What you
+need is one small text file, and whoever hosts the database publishes it.
+
+#### Step 1 — find the file
+
+It depends on where your database lives. In every case you are looking for the thing
+the provider calls the **server CA certificate** — not a key, not a client certificate.
+
+| Where the database runs | Where to find it |
+| --- | --- |
+| **Amazon RDS / Aurora** | Amazon publishes a certificate bundle for download; their docs call it the RDS certificate bundle. Search their documentation for *"SSL/TLS certificates for RDS"* and take the bundle for your region, or the global one. |
+| **Google Cloud SQL** | In the instance page, under **Connections → Security**, there is a server CA certificate you can download. |
+| **Azure Database for MySQL** | Microsoft publishes the root certificate their servers use, with a download link in their *"Connect with encryption"* documentation. |
+| **DigitalOcean, Aiven, Scaleway and similar** | The database's page in the control panel has a **Download CA certificate** button. |
+| **A server your institution runs** | Ask whoever administers it for the CA certificate used for TLS connections. |
+| **A server you run yourself** | If MySQL generated its own, it is `/var/lib/mysql/ca.pem` on that machine. |
+
+If none of these match, search your provider's documentation for **"CA certificate"**
+or **"SSL certificate download"**. Every provider that offers encrypted connections
+publishes one.
+
+#### Step 2 — check you got the right thing
+
+Open the file in any text editor. The right file:
+
+- begins with the line `-----BEGIN CERTIFICATE-----`
+- ends with the line `-----END CERTIFICATE-----`
+- has a block of random-looking letters and numbers in between
+- is small, a few dozen lines at most
+
+Some providers give a *bundle* holding several certificates one after another. That is
+fine — paste the whole thing.
+
+**If the file begins with `-----BEGIN PRIVATE KEY-----`, stop.** That is a secret key,
+not a certificate, and it should not be shared or pasted anywhere. Go back and look for
+the certificate instead.
+
+#### Step 3 — put it into the study
+
+Open the Configurator, go to **Study information → Database access**, and paste the
+**whole file** into the certificate authority field — including the `BEGIN` and `END`
+lines. Then save.
+
+Copy all of it. A certificate that is missing its first or last line, or has lost a
+line in the middle, cannot be read — and an unreadable one stops collection (see the
+warning below).
+
+#### Step 4 — check it worked
+
+```bash
+python3 setup/verify_database.py
+```
+
+The **Encrypted** line tells you which of the two you have:
+
+- *"Encrypted (…) and verified against the authority you named"* — done.
+- *"Encrypted (…). The certificate is not verified"* — the connection is protected from
+  being read, but the authority is missing or was not accepted. Go back to step 1.
+
+#### If you cannot find the file
+
+Leave the field empty. The study still works and the data is still encrypted — nobody
+watching the network can read it. What you give up is the phones' ability to confirm
+they are talking to *your* database rather than to something pretending to be it. That
+is a reasonable trade on a network you trust, and worth fixing when you can.
+
+#### One thing to be careful about
+
+Devices treat a certificate authority they cannot read as a database they cannot reach:
+they hold on to their data and **stop uploading**, rather than quietly connecting
+without checking. That is deliberate — a study that thinks it is protected should not
+silently be unprotected — but it means one mistyped or half-copied certificate can halt
+the whole study until it is corrected. Setup refuses to publish a certificate it cannot
+read, so a bad paste fails at deployment rather than on the phones.
+
 ### Checking the database before the study is committed to it
 
 `setup/verify_database.py` runs on both placements and asks four questions:
