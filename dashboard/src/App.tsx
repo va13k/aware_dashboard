@@ -13,6 +13,7 @@ import DevicesPage from "./pages/DevicesPage";
 import DeviceDetailPage from "./pages/DeviceDetailPage";
 import ManifestPage from "./pages/ManifestPage";
 import LogsPage from "./pages/LogsPage";
+import MessagesPage from "./pages/MessagesPage";
 import LiveStatus from "./components/LiveStatus";
 import { HeaderSlotContext, useHeaderSlot } from "./utils/headerSlot";
 
@@ -24,7 +25,7 @@ function Layout() {
   // for the platform landing page, which lives above our /dashboard basename
   // and so needs a real navigation rather than a router link.
   const onDeviceDetail = /^\/devices\/[^/]+/.test(pathname);
-  const onSubPage = /^\/(manifest|logs)(\/|$)/.test(pathname);
+  const onSubPage = /^\/(manifest|logs|messages)(\/|$)/.test(pathname);
   const backLink = onDeviceDetail
     ? { to: "/devices", label: "All devices", external: false }
     : onSubPage
@@ -77,6 +78,7 @@ function Layout() {
             {[
               { to: "/", label: "Overview", end: true },
               { to: "/devices", label: "Devices", end: false },
+              { to: "/messages", label: "Messages", end: false },
             ].map(({ to, label, end }) => (
               <NavLink
                 key={to}
@@ -106,6 +108,7 @@ function Layout() {
           <Route path="devices/:deviceId" element={<DeviceDetailPage />} />
           <Route path="manifest" element={<ManifestPage />} />
           <Route path="logs" element={<LogsPage />} />
+          <Route path="messages" element={<MessagesPage />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </main>

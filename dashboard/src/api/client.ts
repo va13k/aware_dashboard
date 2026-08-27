@@ -384,3 +384,50 @@ export const exportSensorHref = (
   if (opts.toTs != null) params.set("to_ts", String(Math.floor(opts.toTs)));
   return `${BASE}/${platform}/${encodeURIComponent(deviceId)}/export?${params.toString()}`;
 };
+
+// Reaching a participant. The only call in this file that sends something outward
+// rather than reading something back, which is why its result says what happened to
+// the message rather than returning a record.
+export interface SentMessage {
+  _id: number;
+  device_id: string;
+  kind: string;
+  title: string;
+  sent_at: number;
+  retained: number;
+}
+
+export interface MessageHistory {
+  sent: SentMessage[];
+  delivered: { device_id: string; topic: string; timestamp: number }[];
+  answered: {
+    device_id: string;
+    esm_title: string;
+    esm_user_answer: string;
+    answered_at: number;
+  }[];
+}
+
+export interface SendMessageRequest {
+  device_id: string;
+  kind: "sync" | "update" | "question" | "notice";
+  title?: string;
+  instructions?: string;
+  answers?: string[];
+  expires?: number;
+  retain?: boolean;
+}
+
+export const sendMessage = (
+  body: SendMessageRequest,
+): Promise<{
+  sent: string[];
+  held: { device_id: string; reason: string }[];
+  failed: { device_id: string; reason: string }[];
+  recorded: boolean;
+  retained?: boolean;
+}> =>
+  post("/messages/send", body);
+
+export const fetchMessageHistory = (deviceId?: string): Promise<MessageHistory> =>
+  get(`/messages/history${deviceId ? `?device_id=${encodeURIComponent(deviceId)}` : ""}`);
