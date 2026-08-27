@@ -127,6 +127,62 @@ def check_reachable(client: mysql_client.Client, user: str, password: str, host:
     )
 
 
+def check_tls(client: mysql_client.Client, user: str, password: str, ca_path: str = "") -> dict:
+    """Whether this database can carry the study's data encrypted, and how far it is trusted.
+
+    Asked because encryption is no longer optional: every account this deployment
+    creates requires it, so a server that cannot offer TLS is a server this study
+    cannot use at all --- and finding that out here is the difference between a
+    failed check and a deployment that authenticates and then refuses every write.
+
+    Verification is reported apart from encryption, because they fail for different
+    reasons and only one of them stops a study. A database this deployment runs
+    generates its own certificate with no subject alternative name, so nothing can
+    check who answered; that is a limit to state, not a fault to fix. A database the
+    researcher names may present a real one, and then naming its authority is what
+    closes impersonation.
+    """
+    offered = client.run(
+        user, password, "SHOW VARIABLES LIKE 'have_ssl';", batch=True
+    )
+    if offered.returncode == 0 and "YES" not in offered.stdout.upper():
+        return check(
+            "tls",
+            False,
+            "This server does not offer TLS. Every account this deployment creates "
+            "requires an encrypted connection, so nothing would be able to write to "
+            "it. Enable TLS on the server, or use a database that offers it.",
+        )
+
+    session = client.run(
+        user, password, "SHOW STATUS LIKE 'Ssl_cipher';", batch=True
+    )
+    cipher = ""
+    if session.returncode == 0 and session.stdout.strip():
+        parts = session.stdout.strip().split()
+        cipher = parts[-1] if len(parts) > 1 else ""
+    if not cipher:
+        return check(
+            "tls",
+            False,
+            "The connection to this server was not encrypted, and every account this "
+            "deployment creates requires that it is. Nothing would be able to write.",
+        )
+
+    verified = client.run(user, password, "SELECT 1;", batch=True) if ca_path else None
+    if ca_path and verified is not None and verified.returncode == 0:
+        return check("tls", True, f"Encrypted ({cipher}) and verified against the authority you named.")
+
+    return check(
+        "tls",
+        True,
+        f"Encrypted ({cipher}). The certificate is not verified: nothing here names "
+        "the authority that signed it, so the traffic cannot be read but a server on "
+        "the same network could impersonate this one. Naming a certificate authority "
+        "is what closes that.",
+    )
+
+
 def check_schema(client: mysql_client.Client, user: str, password: str, schema: str) -> dict:
     present = client.run(
         user,
@@ -315,10 +371,21 @@ def verify(
             check("write", False, "Not attempted: the database did not answer."),
         ]
 
+    tls_check = check_tls(client, admin_user, admin_password)
+    if not tls_check["ok"]:
+        return [
+            reachable,
+            tls_check,
+            check("schema", False, "Not attempted: this study cannot use an unencrypted server."),
+            check("accounts", False, "Not attempted: this study cannot use an unencrypted server."),
+            check("write", False, "Not attempted: this study cannot use an unencrypted server."),
+        ]
+
     schema_check = check_schema(client, admin_user, admin_password, schema)
     if not schema_check["ok"]:
         return [
             reachable,
+            tls_check,
             schema_check,
             check("accounts", False, "Not attempted: the schema is not there to grant on."),
             check("write", False, "Not attempted: the schema is not there to write into."),
@@ -335,12 +402,13 @@ def verify(
             "the study to the other dataflow, whose account may not be."
         )
 
-    return [reachable, schema_check, accounts_check, write_check]
+    return [reachable, tls_check, schema_check, accounts_check, write_check]
 
 
 def report(result: dict) -> None:
     labels = {
         "reachable": "Reachable",
+        "tls": "Encrypted",
         "schema": "Schema",
         "accounts": "Ingest accounts",
         "write": "A row can be written",
