@@ -401,3 +401,37 @@ h1 {
 .field input.invalid {
   border-color: var(--danger);
 }
+
+/* One line per question the ingest self-test asked, and what the deployment
+   answered. The mark carries the state on its own, so the result is readable
+   without relying on colour alone. */
+.check-row {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  padding: 5px 0;
+  font-size: 0.82rem;
+  line-height: 1.45;
+}
+
+.check-mark {
+  flex: 0 0 auto;
+  font-weight: 700;
+  min-width: 3.4em;
+}
+
+.check-row.ok .check-mark {
+  color: #2f855a;
+}
+
+.check-row.fail .check-mark {
+  color: #e24b4a;
+}
+
+.check-row.skip .check-mark {
+  color: #8a94a6;
+}
+
+.check-detail {
+  color: #4a5568;
+}

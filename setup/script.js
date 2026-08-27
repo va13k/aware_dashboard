@@ -412,7 +412,59 @@ function getReachabilityBaseUrl() {
   );
 }
 
-function finishDeployment() {
+var CHECK_LABELS = {
+  endpoint: "Endpoint reachable",
+  certificate: "Certificate",
+  record: "Test record lands",
+  cleanup: "Probe removed",
+};
+
+/**
+ * What the deployment answered when it was asked what a phone will ask.
+ *
+ * Drawn whether it passed or failed, because a failure here is the thing worth
+ * seeing: the stack is up and healthy either way, and a study whose ingest path
+ * does not work looks exactly like one that does until the data fails to arrive.
+ */
+function renderIngestResult(result) {
+  if (!result) return;
+  var box = document.getElementById("ingestBox");
+  var rows = document.getElementById("ingestChecks");
+  var checks = result.checks || [];
+
+  document.getElementById("ingestTitle").textContent =
+    "Ingest self-test — " + (result.dataflow || "") + " dataflow";
+
+  rows.innerHTML = "";
+  checks.forEach(function (entry) {
+    var state = entry.skipped ? "skip" : entry.ok ? "ok" : "fail";
+    var row = document.createElement("div");
+    row.className = "check-row " + state;
+
+    var mark = document.createElement("span");
+    mark.className = "check-mark";
+    mark.textContent = state === "skip" ? "skip" : state === "ok" ? "ok" : "FAIL";
+
+    var detail = document.createElement("span");
+    detail.className = "check-detail";
+    var label = document.createElement("strong");
+    label.textContent = (CHECK_LABELS[entry.name] || entry.name) + ": ";
+    detail.appendChild(label);
+    detail.appendChild(document.createTextNode(entry.detail || ""));
+
+    row.appendChild(mark);
+    row.appendChild(detail);
+    rows.appendChild(row);
+  });
+
+  document.getElementById("ingestHint").textContent = result.ok
+    ? "The ingest path works from outside the deployment. Enrolment can begin."
+    : "Phones enrolled now would collect data and never deliver it. Fix the " +
+      "failures above, then rerun: python3 setup/verify_ingest.py";
+  box.classList.remove("hidden");
+}
+
+function finishDeployment(ingestResult) {
   var baseUrl = getBaseUrl();
   var urls = deploymentUrls || {};
   var mainPageUrl = urls.app_url || baseUrl + "/";
@@ -439,6 +491,17 @@ function finishDeployment() {
     document.getElementById("statusDesc").textContent =
       "Services are ready. Redirecting to the main page.";
   }
+  renderIngestResult(ingestResult);
+
+  if (ingestResult && !ingestResult.ok) {
+    document.getElementById("statusDesc").textContent =
+      "Services are ready, and the ingest self-test did not pass. Read it below " +
+      "before enrolling anyone.";
+    document.getElementById("nav").classList.remove("hidden");
+    document.getElementById("editBtn").classList.remove("hidden");
+    return;
+  }
+
   redirectTimer = setTimeout(function () {
     window.location.href = mainPageUrl;
   }, 2500);
@@ -447,6 +510,12 @@ function finishDeployment() {
 function waitForServices() {
   var attempts = 0;
   var maxAttempts = 360;
+  // The self-test runs on the host once the containers report healthy, so the
+  // page is ready before its answer is. Waiting a bounded while for it keeps the
+  // result on screen instead of behind a redirect; giving up carries on, since a
+  // deploy that never reports one is still a deploy.
+  var ingestWaited = 0;
+  var maxIngestWaits = 40;
   var ALL_SERVICES = [
     "aware_mysql",
     "aware_mysql_backup",
@@ -469,7 +538,18 @@ function waitForServices() {
       .then(function (data) {
         attempts += 1;
         if (data.ready) {
-          finishDeployment();
+          if (data.ingest || ingestWaited >= maxIngestWaits) {
+            finishDeployment(data.ingest || null);
+            return;
+          }
+          ingestWaited += 1;
+          document.getElementById("statusTitle").textContent =
+            "Checking the ingest path…";
+          document.getElementById("statusDesc").textContent =
+            "Asking the deployment what a participant's phone will ask: the " +
+            "endpoint at its public address, its certificate, and whether a test " +
+            "record lands.";
+          window.setTimeout(pollStatus, 1500);
           return;
         }
         document.getElementById("statusTitle").textContent =
@@ -478,7 +558,7 @@ function waitForServices() {
           document.getElementById("statusDesc").textContent =
             "Docker socket not available. Services are starting—this may take a moment.";
           if (attempts >= 20) {
-            finishDeployment();
+            finishDeployment(data.ingest || null);
             return;
           }
         } else {

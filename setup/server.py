@@ -17,6 +17,25 @@ _HEALTH_CHECKED = frozenset({
 _RUNNING_ONLY = frozenset({"aware_mysql_backup", "aware_nginx"})
 _REQUIRED = _HEALTH_CHECKED | _RUNNING_ONLY
 
+# Written by setup/verify_ingest.py on the host once the stack is healthy. The
+# wizard reports it rather than running it: the check has to reach the deployment
+# at its public address and read the study database, and this container is on
+# neither path.
+_INGEST_RESULT = "/project/setup/.ingest-check.json"
+
+
+def _ingest_result():
+    """This run's ingest self-test, or None while it has not finished.
+
+    A half-written file reads as not finished, which is the same answer as no file
+    and leaves the page waiting rather than showing a partial result.
+    """
+    try:
+        with open(_INGEST_RESULT, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except (OSError, ValueError):
+        return None
+
 
 class _UnixHTTP(http.client.HTTPConnection):
     """HTTPConnection that talks over a Unix domain socket."""
@@ -138,6 +157,7 @@ class Handler(BaseHTTPRequestHandler):
                 and all(statuses.values())
             )
             payload = {"ready": ready, "services": {k: bool(v) for k, v in statuses.items()}}
+        payload["ingest"] = _ingest_result()
         body = json.dumps(payload).encode()
         self.send_response(200)
         self.send_header("Content-Type", "application/json")

@@ -319,6 +319,18 @@
               without the password
             </p>
           </div>
+          <!-- What the deployment answered when it was asked the question a
+               participant's phone will ask. Filled in once the self-test on the
+               host has finished; the same result the terminal prints. -->
+          <div
+            class="credentials-box hidden"
+            id="ingestBox"
+            style="margin-top: 1.25rem; text-align: left"
+          >
+            <p class="output-label" id="ingestTitle">Ingest self-test</p>
+            <div id="ingestChecks"></div>
+            <p class="hint" style="margin-top: 6px" id="ingestHint"></p>
+          </div>
           <div class="error-detail hidden" id="errorDetail"></div>
           <button
             class="btn btn-back hidden"
