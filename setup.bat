@@ -69,6 +69,7 @@ if "%HAS_ENV%"=="1" if "%HAS_MICRO_CONFIG%"=="1" (
             echo   Deployment failed. Check the output above.
             exit /b 1
         )
+        call :verify_ingest
         echo.
         echo   All services are starting.
         call :print_deployment_links
@@ -90,6 +91,7 @@ if "%HAS_ENV%"=="1" if "%HAS_MICRO_CONFIG%"=="0" (
 :: Remove markers from any previous run
 if exist .env.saved del /f /q .env.saved
 if exist setup\.wizard_url del /f /q setup\.wizard_url
+if exist setup\.ingest-check.json del /f /q setup\.ingest-check.json
 
 :: Detect public host
 set SUGGESTED_PUBLIC_HOST=localhost
@@ -164,7 +166,9 @@ if errorlevel 1 exit /b 1
 
 :: Keep the wizard alive until services are healthy (browser uses it to detect readiness)
 call :wait_for_service_redirect
+call :verify_ingest
 if not errorlevel 1 (
+    timeout /t 3 /nobreak >nul
     docker compose --profile setup stop setup-wizard 2>nul
     docker compose --profile setup rm -f setup-wizard 2>nul
 )
@@ -189,6 +193,14 @@ docker compose up --build -d
 if errorlevel 1 exit /b 1
 %PYTHON% setup\init_android_tables.py
 if errorlevel 1 exit /b 1
+exit /b 0
+
+
+:: The question a participant's phone will ask, asked before anyone enrols. A
+:: failure is reported rather than exited on: the stack is up either way, and the
+:: wizard shows the same result in the browser.
+:verify_ingest
+%PYTHON% setup\verify_ingest.py
 exit /b 0
 
 

@@ -6,6 +6,7 @@
 .htpasswd
 nginx/auth/.htpasswd
 setup/.wizard_url
+setup/.ingest-check.json
 deployment-urls.json
 source.json
 

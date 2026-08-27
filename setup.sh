@@ -47,6 +47,15 @@ deploy_stack() {
     python3 setup/init_android_tables.py --docker-prefix sudo
 }
 
+# The question a participant's phone will ask, asked before anyone enrols: the
+# ingest endpoint at its public address, the certificate it presents, and a row
+# posted the way the client posts one. A failure here is a study that looks
+# deployed and collects nothing, so it is reported rather than exited on --- the
+# stack is up either way, and the wizard shows the same result in the browser.
+verify_ingest() {
+    python3 setup/verify_ingest.py --docker-prefix sudo || true
+}
+
 print_deployment_links() {
     if [ ! -f deployment-urls.json ]; then
         return 0
@@ -136,6 +145,7 @@ if [ "$HAS_ENV" -eq 1 ] && [ "$HAS_MICRO_CONFIG" -eq 1 ]; then
         echo "  Regenerating config and starting services..."
         echo ""
         deploy_stack
+        verify_ingest
         echo ""
         echo "  All services are starting."
         print_deployment_links
@@ -151,7 +161,7 @@ elif [ "$HAS_ENV" -eq 1 ] && [ "$HAS_MICRO_CONFIG" -eq 0 ]; then
 fi
 
 # Remove markers from any previous run
-rm -f .env.saved setup/.wizard_url
+rm -f .env.saved setup/.wizard_url setup/.ingest-check.json
 
 SUGGESTED_PUBLIC_HOST=$(python3 setup/detect_public_host.py)
 printf "PUBLIC_HOST=%s\nPUBLIC_PORT=80\nPROTOCOL=http\n" "$SUGGESTED_PUBLIC_HOST" > .setup-defaults.env
@@ -213,9 +223,14 @@ echo ""
 start_stack_only
 
 if wait_for_service_redirect; then
-    # Stop the wizard after the browser has had time to observe readiness.
+    verify_ingest
+    # Stop the wizard after the browser has had time to observe readiness and to
+    # read the self-test result.
+    sleep 3
     sudo docker compose --profile setup stop setup-wizard 2>/dev/null
     sudo docker compose --profile setup rm -f setup-wizard 2>/dev/null
+else
+    verify_ingest
 fi
 
 echo ""
