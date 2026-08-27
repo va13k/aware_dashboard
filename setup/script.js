@@ -190,11 +190,13 @@ function go(dir) {
   if (dir > 0) {
     if (step === 0) {
       var mp = (document.getElementById("mysqlPass").value || "").trim();
-      var pp = (document.getElementById("participantPass").value || "").trim();
       if (!mp) {
         showFieldError("mysqlPass", "Please enter a MySQL root password.");
         return;
       }
+    }
+    if (step === 2 && androidDataflow() === "direct") {
+      var pp = (document.getElementById("participantPass").value || "").trim();
       if (pp && !PASSWORD_PATTERN.test(pp)) {
         showFieldError(
           "participantPass",
@@ -363,18 +365,30 @@ function updateDbPlacement() {
   if (!select || !external) return;
 
   var directPath = androidDataflow() === "direct";
-  var externalOption = select.querySelector('option[value="external"]');
-  if (externalOption) {
-    externalOption.disabled = directPath;
-    externalOption.textContent = directPath
-      ? "Somewhere I name — needs Android going through the server"
-      : "Somewhere I name (a database I own or my institution runs)";
-  }
-  if (directPath && select.value === "external") {
-    select.value = "bundled";
-  }
 
   external.classList.toggle("hidden", select.value !== "external");
+
+  // Both placements are offered on both paths. Naming a database while phones open
+  // it themselves asks something of the network that an institution will usually
+  // refuse — but a researcher running their own server may decide otherwise, and
+  // refusing would decide it for them. The cost is stated instead.
+  var caution = document.getElementById("dbExposureCaution");
+  if (caution) {
+    caution.classList.toggle(
+      "hidden",
+      !(directPath && select.value === "external"),
+    );
+  }
+
+  // A phone opens the database itself only on the direct path. On the webservice
+  // path it is given a study URL and no credential, so the field is not merely
+  // hidden -- the page says why there is nothing to ask for.
+  document
+    .getElementById("participantPassField")
+    .classList.toggle("hidden", !directPath);
+  document
+    .getElementById("participantPassAbsent")
+    .classList.toggle("hidden", directPath);
 }
 
 function getEnv() {
@@ -528,7 +542,7 @@ function finishDeployment(ingestResult) {
     '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#33B5E5" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>';
   document.getElementById("statusTitle").textContent = "Deployment complete";
 
-  if (participantPassword) {
+  if (participantPassword && androidDataflow() === "direct") {
     document.getElementById("participantBox").classList.remove("hidden");
     document.getElementById("participantText").textContent = participantPassword;
   }
@@ -798,9 +812,14 @@ function loadExisting() {
   };
   x.onerror = function () {
     updateHostInput();
+    updateDbPlacement();
   };
   x.send();
 }
 
 initPasswordToggles();
+// Run once before anything is loaded, so the form opens in a state that matches
+// its own default rather than showing neither the field nor the note explaining
+// its absence. loadExisting() runs it again once the deployment has answered.
+updateDbPlacement();
 loadExisting();

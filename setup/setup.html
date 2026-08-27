@@ -47,37 +47,6 @@
           <p class="field-error hidden" id="mysqlPassError"></p>
           <p class="hint">All services use this to connect to MySQL</p>
         </div>
-        <div class="field">
-          <label>Participant device password</label>
-          <div class="field-row">
-            <input
-              type="password"
-              id="participantPass"
-              placeholder=""
-              autocomplete="off"
-              oninput="clearFieldError('participantPass')"
-            />
-            <button
-              class="eye-btn"
-              type="button"
-              id="participantPassEye"
-              onclick="togglePasswordVisibility('participantPass')"
-            ></button>
-            <button
-              class="gen-btn"
-              type="button"
-              onclick="suggestPassword('participantPass')"
-            >
-              Generate
-            </button>
-          </div>
-          <p class="field-error hidden" id="participantPassError"></p>
-          <p class="hint" id="participantHint">
-            Devices use this account to send data. Participants type it when
-            joining if the study config is served without the password. A random
-            one is filled in for you — reveal it with the eye, or type your own.
-          </p>
-        </div>
       </div>
 
       <div class="card hidden" id="s2">
@@ -144,12 +113,16 @@
               placeholder="study.example.com"
             />
           </div>
-          <p class="hint">
+                    <p class="hint">Must be reachable by participant devices on the same network.</p>
+          <details class="hint">
+            <summary>How do I find my IP address?</summary>
+            <div style="margin-top: 8px">
             Must be reachable by participant devices on the same network.
             If the detected IP looks wrong, choose <b>Enter another host manually</b>.
             To find your IP: <b>Windows</b> — open Command Prompt, run <code>ipconfig</code>, look for "IPv4 Address" under your Wi-Fi or Ethernet adapter.
             <b>Mac</b> — System Settings → Network → your active adapter.
-          </p>
+          </div>
+          </details>
         </div>
         <div class="field">
           <label>How Android phones send their data</label>
@@ -161,7 +134,10 @@
               Through the server (phones post over HTTPS, no database credential)
             </option>
           </select>
-          <p class="hint">
+                    <p class="hint">Phones either open the database themselves, or post to this server.</p>
+          <details class="hint">
+            <summary>What is the difference?</summary>
+            <div style="margin-top: 8px">
             <b>Straight to the database</b> means every participant's phone must
             reach MySQL on port 3306 from whatever network they happen to be on,
             for the length of the study. Fewer moving parts, but a phone that
@@ -177,7 +153,8 @@
             <br /><br />
             iPhones always go through the server: an iPhone has no
             direct-database client, so it is not a choice this study makes.
-          </p>
+          </div>
+          </details>
           <p class="hint" style="border-left: 3px solid #b45309; padding-left: 10px">
             <b>Changing this later means every enrolled participant has to join
             again.</b> It is not a setting that can be pushed to a phone: the study
@@ -198,7 +175,10 @@
               Somewhere I name (a database I own or my institution runs)
             </option>
           </select>
-          <p class="hint">
+                    <p class="hint">Either way, setup checks the database answers and that this study can write to it.</p>
+          <details class="hint">
+            <summary>What is the difference?</summary>
+            <div style="margin-top: 8px">
             <b>On this machine</b> needs nothing to exist beforehand: the deployment
             brings up its own MySQL, creates the schema and manages the accounts.
             <br /><br />
@@ -213,8 +193,61 @@
             study can write a row to it before enrolment. If your account cannot
             create the schema or the accounts, the exact SQL is printed for whoever
             administers the server.
+          </div>
+          </details>
+        </div>
+        <p
+          class="hint hidden"
+          id="dbExposureCaution"
+          style="margin: 0 0 18px; border-left: 3px solid #b45309; padding-left: 10px"
+        >
+          <b>Every participant's phone will open this database directly.</b> The host
+          you name has to accept connections from any network, for the length of the
+          study. An institution will rarely open a database that way — if this is not
+          a server you run yourself, send the data through the server instead.
+        </p>
+        <p
+          class="hint hidden"
+          id="participantPassAbsent"
+          style="margin: 0 0 18px; border-left: 3px solid #0891b2; padding-left: 10px"
+        >
+          <b>No participant database password is needed on this path.</b> Phones post
+          to the server and are never given database credentials, so there is nothing
+          for a participant to type and nothing in the published config to read. The
+          server holds its own account, settled at deployment.
+        </p>
+        <div class="field hidden" id="participantPassField">
+          <label>Participant device password</label>
+          <div class="field-row">
+            <input
+              type="password"
+              id="participantPass"
+              placeholder=""
+              autocomplete="off"
+              oninput="clearFieldError('participantPass')"
+            />
+            <button
+              class="eye-btn"
+              type="button"
+              id="participantPassEye"
+              onclick="togglePasswordVisibility('participantPass')"
+            ></button>
+            <button
+              class="gen-btn"
+              type="button"
+              onclick="suggestPassword('participantPass')"
+            >
+              Generate
+            </button>
+          </div>
+          <p class="field-error hidden" id="participantPassError"></p>
+          <p class="hint" id="participantHint">
+            The account a phone opens the database with on this path. Participants
+            type it when joining if the study config is served without it. A random
+            one is filled in for you — reveal it with the eye, or type your own.
           </p>
         </div>
+
         <div class="field hidden" id="dbExternalFields">
           <label for="dbHost">Database host</label>
           <input type="text" id="dbHost" placeholder="db.example.edu" />
@@ -234,8 +267,33 @@
           <div>
             <p class="toggle-label">Enable HTTPS</p>
             <p class="toggle-hint">
-              Requires SSL certificates (e.g. from Let's Encrypt)
+              Encrypts everything between participants' phones and this server
             </p>
+            <details class="hint" style="margin-top: 6px">
+              <summary>I don't have certificate files yet</summary>
+              <div style="margin-top: 8px">
+                You need two files: a certificate and its private key. They are free
+                and take a few minutes.
+                <br /><br />
+                <b>If this machine has a public domain name</b>, install Certbot and
+                run
+                <code>sudo certbot certonly --standalone -d your-domain.example</code>.
+                It writes both files under
+                <code>/etc/letsencrypt/live/your-domain.example/</code> —
+                <code>fullchain.pem</code> is the certificate and
+                <code>privkey.pem</code> is the key. Paste those two paths below.
+                Certificates last 90 days and Certbot renews them on its own.
+                <br /><br />
+                <b>If this machine has no domain name</b> — only a local IP like the
+                one above — no authority can issue a certificate for it. Leave HTTPS
+                off. Participants' phones on your own network still reach the study,
+                and the data still goes into the database; what travels unencrypted
+                is the traffic between the phone and this machine.
+                <br /><br />
+                Full instructions, including the Docker-specific details, are in the
+                project README under <i>SSL certificate</i>.
+              </div>
+            </details>
           </div>
         </div>
         <div class="ssl-fields" id="sslFields">
