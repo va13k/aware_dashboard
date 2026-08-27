@@ -46,6 +46,33 @@ def _load_secret() -> bytes:
 
 _SECRET = _load_secret()
 _COOKIE = "aware_session"
+
+#: What the deployment was configured to serve, used when a request carries no
+#: answer of its own. Read once, because it describes the deployment rather than
+#: any particular request.
+_CONFIGURED_PROTOCOL = os.getenv("PROTOCOL", "http").strip().lower()
+
+
+def _secure_cookie(request: Request) -> bool:
+    """Whether this request's session cookie may only travel over TLS.
+
+    Decided per request rather than at startup. Nginx terminates TLS and forwards
+    the scheme it answered on, so this follows what the browser actually used --- a
+    deployment reachable on both gets the right answer for each, and one that
+    switches protocol does not keep handing out the old flag until its containers
+    are recreated.
+
+    Neither answer can be assumed. Without the flag an HTTPS deployment's cookie is
+    sent over plain HTTP as well, and whoever reads it is logged in without a
+    password. With it, an HTTP deployment never receives the cookie back at all, so
+    nobody can log in.
+
+    The configured protocol answers when nothing forwarded a scheme, which is the
+    case for a request that reached the API without passing the proxy.
+    """
+    forwarded = request.headers.get("x-forwarded-proto", "")
+    scheme = forwarded.split(",")[0].strip().lower() or _CONFIGURED_PROTOCOL
+    return scheme == "https"
 #: How long a session lasts. Enforced twice: the browser drops the cookie, and
 #: `_verify_token` rejects a token this much older than the time it carries.
 _MAX_AGE = 8 * 3600
@@ -134,7 +161,14 @@ async def login(
     if _check_credentials(username, password):
         token = _make_token(username)
         resp = RedirectResponse(url=next_url, status_code=302)
-        resp.set_cookie(_COOKIE, token, max_age=_MAX_AGE, httponly=True, samesite="lax")
+        resp.set_cookie(
+            _COOKIE,
+            token,
+            max_age=_MAX_AGE,
+            httponly=True,
+            samesite="lax",
+            secure=_secure_cookie(request),
+        )
         return resp
     return templates.TemplateResponse(
         request,
@@ -145,7 +179,11 @@ async def login(
 
 
 @router.get("/logout")
-async def logout():
+async def logout(request: Request):
     resp = RedirectResponse(url="/auth/login", status_code=302)
-    resp.delete_cookie(_COOKIE)
+    # Cleared with the attributes it was set with, or a browser keeps a cookie it
+    # was asked to drop.
+    resp.delete_cookie(
+        _COOKIE, httponly=True, samesite="lax", secure=_secure_cookie(request)
+    )
     return resp

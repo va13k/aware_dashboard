@@ -268,6 +268,10 @@ services:
       # Signs the researcher's session cookie. Written once at deployment, so a
       # restart keeps everyone logged in and more than one worker can serve.
       DASHBOARD_SESSION_SECRET: ${DASHBOARD_SESSION_SECRET:-}
+      # Read to decide whether the session cookie may only travel over TLS.
+      # It cannot be set outright: on an HTTP deployment a secure cookie is
+      # never sent back, so nobody could log in at all.
+      PROTOCOL: ${PROTOCOL:-http}
       # The broker, reached over the compose network on its plaintext listener:
       # the port participants use is a different question, settled by the study's
       # protocol, and does not concern a publisher already inside the deployment.
