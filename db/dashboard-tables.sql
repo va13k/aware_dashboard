@@ -57,6 +57,12 @@
 -- exclusion the dashboard hid would be indistinguishable from a participant who
 -- never took part. What it changes is the exports, which is where the analysis
 -- dataset actually leaves.
+--
+-- `device_contacts` is deliberately not a sensor table. The micro-server
+-- upserts one row after a batch is accepted, using its own clock, so the
+-- dashboard can distinguish a reachable phone from one whose newest research
+-- measurement is old. It has no `timestamp` column so coverage discovery does
+-- not mistake it for participant data.
 
 USE `aware_android`;
 
@@ -97,6 +103,18 @@ CREATE TABLE IF NOT EXISTS `coverage_hourly` (
 
 GRANT SELECT, INSERT, UPDATE, DELETE ON `aware_android`.`coverage_hourly` TO 'aware_analytics'@'%';
 
+CREATE TABLE IF NOT EXISTS `device_contacts` (
+  `device_id`    varchar(150)    NOT NULL,
+  `last_contact` bigint unsigned NOT NULL,
+  `last_table`   varchar(64)     NOT NULL DEFAULT '',
+  `updated_at`   timestamp       NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`device_id`),
+  KEY `last_contact_idx` (`last_contact`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+GRANT SELECT, INSERT, UPDATE ON `aware_android`.`device_contacts` TO 'aware_android_server'@'%';
+REVOKE IF EXISTS SELECT, INSERT, UPDATE ON `aware_android`.`device_contacts` FROM 'aware_android_participant'@'%';
+
 -- `join_source` records how the window's start was established: `study_event`
 -- from the phone's own `aware_studies` row, `first_data` inferred from when data
 -- first arrived, `manual` entered by a researcher. It is what separates a device
@@ -113,6 +131,56 @@ CREATE TABLE IF NOT EXISTS `device_enrolment` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 GRANT SELECT, INSERT, UPDATE, DELETE ON `aware_android`.`device_enrolment` TO 'aware_analytics'@'%';
+
+-- `messages_sent` is what a researcher asked of a phone: a sync request, a question
+-- or a notice. It is the third of the three states a prompt has, and the only one
+-- this side owns --- what arrived is the phone's own `mqtt_messages` row, and what
+-- came back is its `esms` row. Without it a dashboard could show what a participant
+-- answered and never what they were asked.
+--
+-- Deliberately no `timestamp` column: the coverage rollup walks every timestamped
+-- table it finds, and a table of researcher actions arriving on the coverage grid as
+-- a sensor nobody configured would be wrong in a way that is hard to see. `sent_at`
+-- carries the same value under a name the builder does not look for.
+--
+-- It also carries the rate limit. A limit needs to know what was already sent, and
+-- this is the record of exactly that, so counting rows in a window is the whole of it.
+CREATE TABLE IF NOT EXISTS `messages_sent` (
+  `_id`       bigint unsigned NOT NULL AUTO_INCREMENT,
+  `device_id` varchar(150)    NOT NULL,
+  `channel`   varchar(32)     NOT NULL,
+  `kind`      varchar(32)     NOT NULL,
+  `title`     varchar(255)    NOT NULL DEFAULT '',
+  `body`      text,
+  `sent_at`   bigint unsigned NOT NULL,
+  `sent_by`   varchar(64)     NOT NULL DEFAULT '',
+  -- Whether the message's own words were kept. A researcher sending operational
+  -- chatter -- charge your phone, we are away next week -- can ask for it not to
+  -- enter the study record, and then `title` and `body` are empty here.
+  --
+  -- The row itself is written either way, and that is deliberate: the rate limit
+  -- counts these, so a message that left no row would be a way past it, and a
+  -- channel to participants that leaves no trace at all is not one a study should
+  -- have. What is optional is the content, not the fact.
+  `retained`  tinyint(1)      NOT NULL DEFAULT 1,
+  PRIMARY KEY (`_id`),
+  -- Both readers ask the same shape: everything sent to one device, newest first.
+  -- The rate limit asks it over a window and the history asks it over a page.
+  KEY `device_time` (`device_id`, `sent_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+GRANT SELECT, INSERT, DELETE ON `aware_android`.`messages_sent` TO 'aware_analytics'@'%';
+
+SET @ddl := IF(
+  (SELECT COUNT(*) FROM information_schema.COLUMNS
+     WHERE TABLE_SCHEMA = 'aware_android' AND TABLE_NAME = 'messages_sent'
+       AND COLUMN_NAME = 'retained') = 0,
+  'ALTER TABLE `messages_sent` ADD COLUMN `retained` tinyint(1) NOT NULL DEFAULT 1',
+  'DO 0'
+);
+PREPARE _mig FROM @ddl;
+EXECUTE _mig;
+DEALLOCATE PREPARE _mig;
 
 -- The micro-server reads this table to decide whether a device may write, so the
 -- account it connects as needs to see it. Read-only: windows are derived by the
@@ -199,6 +267,17 @@ CREATE TABLE IF NOT EXISTS `coverage_hourly` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 GRANT SELECT, INSERT, UPDATE, DELETE ON `aware_ios`.`coverage_hourly` TO 'aware_analytics'@'%';
+
+CREATE TABLE IF NOT EXISTS `device_contacts` (
+  `device_id`    varchar(150)    NOT NULL,
+  `last_contact` bigint unsigned NOT NULL,
+  `last_table`   varchar(64)     NOT NULL DEFAULT '',
+  `updated_at`   timestamp       NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`device_id`),
+  KEY `last_contact_idx` (`last_contact`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+GRANT SELECT, INSERT, UPDATE ON `aware_ios`.`device_contacts` TO 'aware_ios_participant'@'%';
 
 -- `reason` is why the write was turned away: `no_enrolment` for a device with no
 -- window the study log put there, `no_device_id` for a request that named no

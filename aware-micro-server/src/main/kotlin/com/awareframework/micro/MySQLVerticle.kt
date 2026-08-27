@@ -99,7 +99,12 @@ class MySQLVerticle : AbstractVerticle() {
             table = postData.getString("table"),
             data = JsonArray(postData.getString("data"))
           )
-            .onSuccess { stored -> receivedMessage.reply(JsonObject().put("stored", stored)) }
+            .onSuccess { stored ->
+              if (stored) {
+                recordContact(postData.getString("device_id"), postData.getString("table"))
+              }
+              receivedMessage.reply(JsonObject().put("stored", stored))
+            }
             .onFailure { e -> receivedMessage.fail(500, e.message ?: "insert failed") }
         }
 
@@ -509,6 +514,31 @@ class MySQLVerticle : AbstractVerticle() {
       .execute()
       .onFailure { e ->
         logger.error(e) { "Failed to record a refused write from $device_id into $table." }
+      }
+  }
+
+  /**
+   * Record that the server accepted a batch from this device.
+   *
+   * This uses the server clock rather than a row timestamp supplied by the
+   * phone. One upserted row per device is a connectivity signal, not research
+   * data, and therefore remains separate from aware_device metadata and the
+   * sensor tables.
+   */
+  private fun recordContact(device_id: String, table: String) {
+    if (device_id.isBlank()) return
+
+    val contactedAt = System.currentTimeMillis()
+    sqlClient
+      .query(
+        "INSERT INTO `device_contacts` (`device_id`,`last_contact`,`last_table`) " +
+          "VALUES ('${sqlValue(device_id)}', $contactedAt, '${sqlValue(table)}') " +
+          "ON DUPLICATE KEY UPDATE `last_contact` = $contactedAt, " +
+          "`last_table` = '${sqlValue(table)}'"
+      )
+      .execute()
+      .onFailure { e ->
+        logger.error(e) { "Failed to record a successful contact from $device_id for $table." }
       }
   }
 
