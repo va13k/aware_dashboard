@@ -126,6 +126,33 @@ function describeDatabaseSecurity(databaseInfo) {
   };
 }
 
+/**
+ * What "encrypted" is worth, in the three states a study can be in.
+ *
+ * Kept together so the three read against each other: only one of them leaves the
+ * server unverified, and it is the one a researcher can act on.
+ */
+function verificationText(authority) {
+  if (authority === "none") {
+    return (
+      <>
+        <b>not verified</b> — nothing here names the authority that signed its
+        certificate, so devices cannot tell your database from another server
+        answering in its place.
+      </>
+    );
+  }
+  if (authority === "supplied") {
+    return <>verified against the certificate authority you supplied below.</>;
+  }
+  return (
+    <>
+      verified against the authority this deployment publishes for you. Nothing
+      to enter.
+    </>
+  );
+}
+
 export default function StudyInformation() {
   const [studyInformation] = useRecoilState(studyFormStudyInformationState);
   const [databaseInfo, setDatabaseInfo] = useRecoilState(
@@ -358,6 +385,41 @@ export default function StudyInformation() {
             {/* No longer a choice. Every account is created requiring TLS, and every
                 client this deployment ships already asked for it, so a switch here
                 could only ever describe a connection the database would refuse. */}
+            <Alert severity="info" sx={{ mb: 2 }}>
+              <AlertTitle>How this deployment stands right now</AlertTitle>
+              <ul style={{ margin: "6px 0 0", paddingLeft: "1.1rem" }}>
+                <li>
+                  Phones reach the study{" "}
+                  <b>
+                    {direct
+                      ? "by opening the database themselves"
+                      : "through this server"}
+                  </b>
+                  {facts?.protocol === "https"
+                    ? ", over HTTPS."
+                    : ", over plain HTTP — what they upload is readable on the network."}
+                </li>
+                <li>
+                  The database runs{" "}
+                  <b>
+                    {externalDatabase
+                      ? "on a server you named"
+                      : "on this machine"}
+                  </b>
+                  .
+                </li>
+                <li>
+                  The connection{" "}
+                  <b>
+                    {direct
+                      ? "from each participant's phone to the database"
+                      : "from this server to the database"}
+                  </b>{" "}
+                  is <b>encrypted</b>, and{" "}
+                  {verificationText(facts?.database_authority)}
+                </li>
+              </ul>
+            </Alert>
             <Alert severity="success" sx={{ mb: 1 }}>
               <AlertTitle>
                 The database connection is always encrypted
@@ -436,18 +498,21 @@ export default function StudyInformation() {
                 }
               />
             )}
-            <Alert severity="warning" sx={{ mt: 1 }}>
-              <AlertTitle>
-                An unreadable certificate authority stops collection
-              </AlertTitle>
-              Devices treat an authority they cannot parse as a database they
-              cannot reach: they keep their data and stop uploading, rather than
-              falling back to an unverified connection. That is the safe
-              behaviour, and it means a truncated or mistyped certificate
-              silently halts the whole study until it is corrected. Setup
-              refuses to publish one it cannot read for the same reason — leave
-              it empty to run encrypted without verifying the server.
-            </Alert>
+            {externalDatabase && (
+              <Alert severity="warning" sx={{ mt: 1 }}>
+                <AlertTitle>
+                  A certificate that cannot be read stops collection
+                </AlertTitle>
+                Devices treat an authority they cannot parse as a database they
+                cannot reach: they keep their data and stop uploading rather
+                than connecting without checking. So a truncated or half-copied
+                certificate halts the study until it is corrected. Saving
+                refuses a certificate it cannot read for that reason — nothing
+                broken reaches the phones. Leaving the field empty is a valid
+                answer: the connection stays encrypted and the server is not
+                verified.
+              </Alert>
+            )}
             {/* Only the direct path publishes a config carrying the password, so
                 this is the one control that has nothing to govern otherwise. */}
             {direct ? (

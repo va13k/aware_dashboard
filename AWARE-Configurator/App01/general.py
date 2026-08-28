@@ -110,6 +110,26 @@ def deployment_facts(request):
                 "android_ingest_account": android_credentials(
                     source.get("database", {}), dataflow.declared(source, "android")
                 )[0],
+                # What a phone verifies the database against, so the page can state
+                # the connection it actually has rather than warn about one it might.
+                # `generated` is the authority a bundled MySQL signs with, which the
+                # deploy reads out of the container and publishes; `supplied` is one
+                # the researcher pasted; `none` leaves the connection encrypted and
+                # unverified, which only an external database can end up in.
+                "database_authority": (
+                    "supplied"
+                    if str(
+                        (source.get("database", {}).get("android") or {}).get(
+                            "ca_certificate"
+                        )
+                        or ""
+                    ).strip()
+                    else (
+                        "generated"
+                        if placement.declared(source) == placement.BUNDLED
+                        else "none"
+                    )
+                ),
                 "protocol": str(env.get("PROTOCOL", "http")).strip().lower(),
                 # A published port narrowed to loopback is reachable only from the
                 # host itself, which is where the micro-server's own hop starts.
