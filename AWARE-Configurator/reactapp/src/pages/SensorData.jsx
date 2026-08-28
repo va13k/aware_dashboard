@@ -11,7 +11,16 @@ import {
   RadioGroup,
   TextField,
   ThemeProvider,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  InputAdornment,
+  Switch,
+  IconButton,
 } from "@mui/material";
+import SearchIcon from "@mui/icons-material/Search";
+import CloseIcon from "@mui/icons-material/Close";
 import FormControlLabel from "@mui/material/FormControlLabel";
 import {
   accelerometerState,
@@ -40,6 +49,8 @@ import {
   pluginSensorState,
 } from "../functions/atom";
 import SensorComponent from "../components/SensorComponent/SensorComponent";
+import SensorCard from "../components/SensorCard/SensorCard";
+import { SENSORS, GROUPS } from "../functions/sensorCatalogue";
 import FrequencyField from "../components/FrequencyField/FrequencyField";
 import ThresholdField from "../components/ThresholdField/ThresholdField";
 import customisedTheme from "../functions/theme";
@@ -608,6 +619,8 @@ function AndroidOnlyNote() {
 }
 
 export default function SensorData() {
+  const [sensorQuery, setSensorQuery] = React.useState("");
+  const [openSensor, setOpenSensor] = React.useState(null);
   const navigateTo = useNavigate();
   const [sensorData, setsensorData] = useRecoilState(sensorDataState);
 
@@ -1700,131 +1713,6 @@ export default function SensorData() {
   }
 
   // eslint-disable-next-line react/no-unstable-nested-components
-  function SensorMqttSubContent() {
-    return (
-      <Grid container rowSpacing={1} columnSpacing={{ xs: 1, sm: 2, md: 3 }}>
-        <Grid width="10%" />
-        <Grid width="70%">
-          <div className="sensor_vertical_layout">
-            <Grid>
-              <p className="field_name" mb={10}>
-                Broker address
-              </p>
-            </Grid>
-            <Grid marginTop={2}>
-              <TextField
-                id="mqtt_server"
-                placeholder="mqtt.example.com"
-                value={sensorData.mqtt_server || ""}
-                type="text"
-                style={{ width: "100%" }}
-                onChange={(event) => {
-                  updateSensorData("mqtt_server", event.target.value);
-                }}
-              />
-              <p className="explanation">
-                Hostname or IP address of the MQTT broker the client should
-                connect to.
-              </p>
-            </Grid>
-          </div>
-
-          <FrequencyField
-            id="mqtt_port"
-            title="Broker port"
-            inputLabel="MQTT broker port"
-            defaultNum={1883}
-            description="Port the MQTT broker listens on (default 1883, or 8883 for TLS)."
-            field="mqtt_port"
-            studyField={sensorData.mqtt_port}
-            modeState="sensor"
-          />
-
-          <div className="sensor_vertical_layout">
-            <Grid>
-              <p className="field_name" mb={10}>
-                Username
-              </p>
-            </Grid>
-            <Grid marginTop={2}>
-              <TextField
-                id="mqtt_username"
-                placeholder="Optional"
-                value={sensorData.mqtt_username || ""}
-                type="text"
-                style={{ width: "100%" }}
-                onChange={(event) => {
-                  updateSensorData("mqtt_username", event.target.value);
-                }}
-              />
-              <p className="explanation">
-                Username for authenticating with the broker, if required.
-              </p>
-            </Grid>
-          </div>
-
-          <PasswordField
-            fieldName="Password"
-            recoilState={sensorDataState}
-            field="mqtt_password"
-            inputLabel="Optional"
-            description="Password for authenticating with the broker, if required."
-          />
-
-          <FrequencyField
-            id="mqtt_keep_alive"
-            title="Keep alive"
-            inputLabel="Keep-alive interval (seconds)"
-            defaultNum={600}
-            description="How often the client pings the broker to keep the connection alive (seconds)."
-            field="mqtt_keep_alive"
-            studyField={sensorData.mqtt_keep_alive}
-            modeState="sensor"
-          />
-
-          <div>
-            <Grid>
-              <p className="field_name" mb={10}>
-                QoS level
-              </p>
-            </Grid>
-            <Grid marginTop={2}>
-              <RadioGroup
-                aria-labelledby="mqtt_qos"
-                name="mqtt_qos"
-                value={
-                  sensorData.mqtt_qos !== undefined ? sensorData.mqtt_qos : 2
-                }
-                row
-              >
-                <FormControlLabel
-                  value={0}
-                  control={<Radio />}
-                  label="0 - At most once"
-                  onClick={() => updateSensorData("mqtt_qos", 0)}
-                />
-                <FormControlLabel
-                  value={1}
-                  control={<Radio />}
-                  label="1 - At least once"
-                  onClick={() => updateSensorData("mqtt_qos", 1)}
-                />
-                <FormControlLabel
-                  value={2}
-                  control={<Radio />}
-                  label="2 - Exactly once"
-                  onClick={() => updateSensorData("mqtt_qos", 2)}
-                />
-              </RadioGroup>
-              <p className="schedule-description">
-                Quality of service level for published/subscribed MQTT messages.
-              </p>
-            </Grid>
-          </div>
-        </Grid>
-      </Grid>
-    );
-  }
 
   // eslint-disable-next-line react/no-unstable-nested-components
   function PluginOpenWeatherSubContent() {
@@ -2282,6 +2170,75 @@ export default function SensorData() {
     );
   }
 
+  function esmSchedulerSettings() {
+    return (
+      <Grid container spacing={2} sx={{ mt: 1, mb: 2 }}>
+        <Grid>
+          <Button
+            color="main"
+            variant="outlined"
+            onClick={() => navigateTo("/study/questions")}
+          >
+            EDIT ESM QUESTIONS
+          </Button>
+        </Grid>
+        <Grid>
+          <Button
+            color="main"
+            variant="outlined"
+            onClick={() => navigateTo("/study/schedule_configuration")}
+          >
+            EDIT ESM SCHEDULES
+          </Button>
+        </Grid>
+      </Grid>
+    );
+  }
+
+  const SENSOR_SETTINGS = {
+    "Communication (Calls)": SensorCommunicationSubContent,
+    Screen: SensorScreenSubContent,
+    Timezone: SensorTimezoneSubContent,
+    Accelerometer: SensorAccelerometerSubContent,
+    Barometer: SensorBarometerSubContent,
+    Bluetooth: SensorBluetoothSubContent,
+    Gyroscope: SensorGyroscopeSubContent,
+    "Linear accelerometer": SensorLinearAccelerometerSubContent,
+    Locations: SensorLocationsSubContent,
+    Magnetometer: SensorMagnetometerSubContent,
+    Network: SensorNetworkSubContent,
+    Processor: SensorProcessorSubContent,
+    Rotation: SensorRotationSubContent,
+    "Wi-Fi": SensorWifiSubContent,
+    Gravity: SensorGravitySubContent,
+    Light: SensorLightSubContent,
+    Proximity: SensorProximitySubContent,
+    Temperature: SensorTemperatureSubContent,
+    Applications: SensorApplicationSubContent,
+    Screenshot: SensorScreenshotSubContent,
+    "Activity Recognition": PluginActivityRecognitionSubContent,
+    Contacts: PluginContactsListSubContent,
+    Fitbit: PluginFitbitSubContent,
+    Conversation: PluginConversationsSubContent,
+    "Fused Location": PluginGoogleFusedLocationSubContent,
+    HealthKit: PluginHealthKitSubContent,
+    "Heart Rate (BLE)": PluginBLEHeartRateSubContent,
+    Pedometer: PluginIosPedometerSubContent,
+    "Push Notification": PluginPushNotificationSubContent,
+    "ESM Scheduler Plugin": esmSchedulerSettings,
+    "Ambient Noise Plugin": PluginAmbientNoiseSubContent,
+    "OpenWeather Plugin": PluginOpenWeatherSubContent,
+  };
+
+  const matchingSensors = SENSORS.filter((sensor) =>
+    `${sensor.name} ${sensor.description}`
+      .toLowerCase()
+      .includes(sensorQuery.trim().toLowerCase())
+  );
+  const enabledCount = SENSORS.filter(
+    (sensor) => sensorData[sensor.field]
+  ).length;
+
   return (
     <ThemeProvider theme={customisedTheme}>
       <div className="main_vertical_layout">
@@ -2481,508 +2438,125 @@ export default function SensorData() {
         </div>
 
         <div className="border">
-          <p className="title">Shared sensors</p>
-          <SensorComponent
-            sensorName="Battery"
-            sensorDescription="Battery information and power related events (phone shutting down, rebooting)."
-            stateField={sensorData.sensor_battery}
-            field="sensor_battery"
-            modeState="sensor"
-          />
-          <SensorComponent
-            sensorName="Communication (Calls)"
-            sensorDescription="Call events on iPhone and Android. Android-only communication events and text messages can be controlled below."
-            stateField={sensorData.sensor_communication}
-            field="sensor_communication"
-            modeState="sensor"
-          />
+          <p className="title">Sensors</p>
+          <p className="explanation">
+            Choose what each phone measures. A highlighted sensor is being
+            collected. The switch turns one on without leaving the grid; opening
+            a card shows what it records and whatever it lets you decide.
+          </p>
 
-          {sensorData.sensor_communication ? (
-            SensorCommunicationSubContent()
-          ) : (
-            <div />
-          )}
-
-          <SensorComponent
-            sensorName="Screen"
-            sensorDescription="Smartphone screen status; turning on, turning off, lock, and unlock."
-            stateField={sensorData.sensor_screen}
-            field="sensor_screen"
-            modeState="sensor"
-          />
-          {sensorData.sensor_screen ? SensorScreenSubContent() : <div />}
-
-          <SensorComponent
-            sensorName="Timezone"
-            sensorDescription="Logs user's current timezone."
-            stateField={sensorData.sensor_timezone}
-            field="sensor_timezone"
-            modeState="sensor"
-          />
-
-          {sensorData.sensor_timezone ? SensorTimezoneSubContent() : <div />}
-
-          <SensorComponent
-            sensorName="Accelerometer"
-            sensorDescription="Acceleration applied to the device, including the force of gravity."
-            stateField={sensorData.sensor_accelerometer}
-            field="sensor_accelerometer"
-            modeState="sensor"
-          />
-
-          {sensorData.sensor_accelerometer ? (
-            SensorAccelerometerSubContent()
-          ) : (
-            <div />
-          )}
-
-          <SensorComponent
-            sensorName="Barometer"
-            sensorDescription="Ambient air pressure."
-            stateField={sensorData.sensor_barometer}
-            field="sensor_barometer"
-            modeState="sensor"
-          />
-
-          {sensorData.sensor_barometer ? SensorBarometerSubContent() : <div />}
-
-          <SensorComponent
-            sensorName="Bluetooth"
-            sensorDescription="Smartphone's Bluetooth sensor and surrounding Bluetooth-enabled and visible devices. Includes respective RSSI dB values."
-            stateField={sensorData.sensor_bluetooth}
-            field="sensor_bluetooth"
-            modeState="sensor"
-          />
-
-          {sensorData.sensor_bluetooth ? SensorBluetoothSubContent() : <div />}
-
-          <SensorComponent
-            sensorName="Gyroscope"
-            sensorDescription="Rate or rotation in rad/s around a device’s x-, y-, and z-axis."
-            stateField={sensorData.sensor_gyroscope}
-            field="sensor_gyroscope"
-            modeState="sensor"
-          />
-          {sensorData.sensor_gyroscope ? SensorGyroscopeSubContent() : <div />}
-
-          <SensorComponent
-            sensorName="Linear accelerometer"
-            sensorDescription="Acceleration applied to the device, excluding the force of gravity."
-            stateField={sensorData.sensor_linear_accelerometer}
-            field="sensor_linear_accelerometer"
-            modeState="sensor"
-          />
-
-          {sensorData.sensor_linear_accelerometer ? (
-            SensorLinearAccelerometerSubContent()
-          ) : (
-            <div />
-          )}
-
-          <SensorComponent
-            sensorName="Locations"
-            sensorDescription="Best location estimate of the users’ current location, based on an algorithm that results in minimum battery impact."
-            stateField={sensorData.sensor_locations}
-            field="sensor_locations"
-            modeState="sensor"
-          />
-
-          {sensorData.sensor_locations ? SensorLocationsSubContent() : <div />}
-
-          <SensorComponent
-            sensorName="Magnetometer"
-            sensorDescription="Geomagnetic field strength around the device."
-            stateField={sensorData.sensor_magnetometer}
-            field="sensor_magnetometer"
-            modeState="sensor"
-          />
-
-          {sensorData.sensor_magnetometer ? (
-            SensorMagnetometerSubContent()
-          ) : (
-            <div />
-          )}
-
-          <SensorComponent
-            sensorName="Network"
-            sensorDescription="Information on the network sensors availability of the device. These include use of airplane mode, Wi-Fi, Bluetooth, GPS, mobile, and WIMAX status as well as internet availability."
-            stateField={sensorData.sensor_network}
-            field="sensor_network"
-            modeState="sensor"
-          />
-
-          {sensorData.sensor_network ? SensorNetworkSubContent() : <div />}
-
-          <SensorComponent
-            sensorName="Processor"
-            sensorDescription="Processor load."
-            stateField={sensorData.sensor_processor}
-            field="sensor_processor"
-            modeState="sensor"
-          />
-
-          {sensorData.sensor_processor ? SensorProcessorSubContent() : <div />}
-
-          <SensorComponent
-            sensorName="Rotation"
-            sensorDescription="Orientation of the device as a combination of an angle and an axis."
-            stateField={sensorData.sensor_rotation}
-            field="sensor_rotation"
-            modeState="sensor"
-          />
-
-          {sensorData.sensor_rotation ? SensorRotationSubContent() : <div />}
-
-          <SensorComponent
-            sensorName="Significant Motion"
-            sensorDescription="Motion co-processor signal for significant movement changes."
-            stateField={sensorData.ios_significant_motion}
-            field="ios_significant_motion"
-            modeState="sensor"
-          />
-
-          <SensorComponent
-            sensorName="Wi-Fi"
-            sensorDescription="The device’s Wi-Fi sensor, current AP, and surrounding Wi-Fi visible devices with respective RSSI dB values."
-            stateField={sensorData.sensor_wifi}
-            field="sensor_wifi"
-            modeState="sensor"
-          />
-
-          {sensorData.sensor_wifi ? SensorWifiSubContent() : <div />}
-        </div>
-
-        <div className="border">
-          <p className="title">Android-only sensors</p>
-          <SensorComponent
-            sensorName="Gravity"
-            sensorDescription="Force of gravity applied to the device, provides a three dimensional vector indicating the direction and magnitude of gravity."
-            stateField={sensorData.sensor_gravity}
-            field="sensor_gravity"
-            modeState="sensor"
-          />
-
-          {sensorData.sensor_gravity ? SensorGravitySubContent() : <div />}
-
-          <SensorComponent
-            sensorName="Light"
-            sensorDescription="Level of ambient light."
-            stateField={sensorData.sensor_light}
-            field="sensor_light"
-            modeState="sensor"
-          />
-
-          {sensorData.sensor_light ? SensorLightSubContent() : <div />}
-
-          <SensorComponent
-            sensorName="Proximity"
-            sensorDescription="Android-only proximity sensor (near/far)."
-            stateField={sensorData.sensor_proximity}
-            field="sensor_proximity"
-            modeState="sensor"
-          />
-
-          {sensorData.sensor_proximity ? SensorProximitySubContent() : <div />}
-
-          <SensorComponent
-            sensorName="Temperature"
-            sensorDescription="Ambient air temperature in Celsius (˚C). Not many devices have this sensor available."
-            stateField={sensorData.sensor_temperature}
-            field="sensor_temperature"
-            modeState="sensor"
-          />
-
-          {sensorData.sensor_temperature ? (
-            SensorTemperatureSubContent()
-          ) : (
-            <div />
-          )}
-
-          <SensorComponent
-            sensorName="Applications"
-            sensorDescription="Application usage and incoming notifications on the device."
-            stateField={sensorData.sensor_application}
-            field="sensor_application"
-            modeState="sensor"
-          />
-
-          {sensorData.sensor_application ? (
-            SensorApplicationSubContent()
-          ) : (
-            <div />
-          )}
-
-          <SensorComponent
-            sensorName="Installations"
-            sensorDescription="Application installations, removal, and updates."
-            stateField={sensorData.sensor_installation}
-            field="sensor_installation"
-            modeState="sensor"
-          />
-
-          <SensorComponent
-            sensorName="Telephony"
-            sensorDescription="Information on the mobile phone capabilities of the device, connected cell towers, and neighboring towers."
-            stateField={sensorData.sensor_telephony}
-            field="sensor_telephony"
-            modeState="sensor"
-          />
-
-          <SensorComponent
-            sensorName="MQTT"
-            sensorDescription="MQTT transport for realtime sensor updates."
-            stateField={sensorData.status_mqtt}
-            field="status_mqtt"
-            modeState="sensor"
-          />
-          {sensorData.status_mqtt ? SensorMqttSubContent() : <div />}
-
-          <SensorComponent
-            sensorName="Screenshot"
-            sensorDescription="Smartphone screenshot capture."
-            stateField={sensorData.sensor_screenshot}
-            field="sensor_screenshot"
-            modeState="sensor"
-          />
-          {sensorData.sensor_screenshot ? (
-            SensorScreenshotSubContent()
-          ) : (
-            <div />
-          )}
-
-          <SensorComponent
-            sensorName="Taking Note"
-            sensorDescription="Allow participants to take notes. Maximum length of each note is 10000 characters."
-            stateField={sensorData.sensor_notes}
-            field="sensor_notes"
-            modeState="sensor"
-          />
-        </div>
-
-        <div className="border">
-          <p className="title">iOS-only sensors</p>
-          <SensorComponent
-            sensorName="Activity Recognition"
-            sensorDescription="Detect physical activity (walking, running, driving, etc.) using Google's activity recognition API"
-            stateField={sensorData.status_plugin_google_activity_recognition}
-            field="status_plugin_google_activity_recognition"
-            modeState="sensor"
-          />
-          {sensorData.status_plugin_google_activity_recognition ? (
-            PluginActivityRecognitionSubContent()
-          ) : (
-            <div />
-          )}
-
-          <SensorComponent
-            sensorName="Contacts"
-            sensorDescription="Periodically sync the device contacts list (hashed for privacy)"
-            stateField={sensorData.status_plugin_contacts}
-            field="status_plugin_contacts"
-            modeState="sensor"
-          />
-          {sensorData.status_plugin_contacts ? (
-            PluginContactsListSubContent()
-          ) : (
-            <div />
-          )}
-
-          <SensorComponent
-            sensorName="Fitbit"
-            sensorDescription="Sync Fitbit wearable data (steps, heart rate, sleep) via the Fitbit API"
-            stateField={sensorData.status_plugin_fitbit}
-            field="status_plugin_fitbit"
-            modeState="sensor"
-          />
-          {sensorData.status_plugin_fitbit ? PluginFitbitSubContent() : <div />}
-
-          <SensorComponent
-            sensorName="Google Login"
-            sensorDescription="Authenticate participants with their Google account"
-            stateField={sensorData.status_plugin_google_login}
-            field="status_plugin_google_login"
-            modeState="sensor"
-          />
-
-          <SensorComponent
-            sensorName="Conversation"
-            sensorDescription="Detect conversational audio events without recording content"
-            stateField={sensorData.status_plugin_studentlife_audio}
-            field="status_plugin_studentlife_audio"
-            modeState="sensor"
-          />
-          {sensorData.status_plugin_studentlife_audio ? (
-            PluginConversationsSubContent()
-          ) : (
-            <div />
-          )}
-
-          <SensorComponent
-            sensorName="Fused Location"
-            sensorDescription="High-accuracy location using Google's fused location provider (GPS + network)"
-            stateField={sensorData.status_google_fused_location}
-            field="status_google_fused_location"
-            modeState="sensor"
-          />
-          {sensorData.status_google_fused_location ? (
-            PluginGoogleFusedLocationSubContent()
-          ) : (
-            <div />
-          )}
-
-          <SensorComponent
-            sensorName="Device Usage"
-            sensorDescription="Track app usage and screen-on/off events"
-            stateField={sensorData.status_plugin_device_usage}
-            field="status_plugin_device_usage"
-            modeState="sensor"
-          />
-
-          <SensorComponent
-            sensorName="Calendar"
-            sensorDescription="Log calendar events (title, location, dates)."
-            stateField={sensorData.status_plugin_calendar}
-            field="status_plugin_calendar"
-            modeState="sensor"
-          />
-
-          <SensorComponent
-            sensorName="Google Calendar ESM"
-            sensorDescription="Schedule ESM questionnaires using iOS calendar events (Google Calendar ESM scheduler)."
-            stateField={sensorData.status_ios_esm_scheduler}
-            field="status_ios_esm_scheduler"
-            modeState="sensor"
-          />
-
-          <SensorComponent
-            sensorName="Headphone Motion"
-            sensorDescription="Log motion sensor data from AirPods and compatible headphones."
-            stateField={sensorData.status_plugin_headphone_motion}
-            field="status_plugin_headphone_motion"
-            modeState="sensor"
-          />
-
-          <SensorComponent
-            sensorName="HealthKit"
-            sensorDescription="Sync HealthKit data (steps, sleep, heart rate, workouts, etc.)."
-            stateField={sensorData.status_health_kit}
-            field="status_health_kit"
-            modeState="sensor"
-          />
-          {sensorData.status_health_kit ? PluginHealthKitSubContent() : <div />}
-
-          <SensorComponent
-            sensorName="Heart Rate (BLE)"
-            sensorDescription="Measure heart rate via a Bluetooth Low Energy wearable sensor."
-            stateField={sensorData.status_plugin_ble_heartrate}
-            field="status_plugin_ble_heartrate"
-            modeState="sensor"
-          />
-          {sensorData.status_plugin_ble_heartrate ? (
-            PluginBLEHeartRateSubContent()
-          ) : (
-            <div />
-          )}
-
-          <SensorComponent
-            sensorName="NTP"
-            sensorDescription="Sync and log the device clock offset against NTP servers."
-            stateField={sensorData.status_plugin_ntptime}
-            field="status_plugin_ntptime"
-            modeState="sensor"
-          />
-
-          <SensorComponent
-            sensorName="Pedometer"
-            sensorDescription="Log step count, distance, floors climbed, and cadence via CoreMotion."
-            stateField={sensorData.status_plugin_ios_pedometer}
-            field="status_plugin_ios_pedometer"
-            modeState="sensor"
-          />
-          {sensorData.status_plugin_ios_pedometer ? (
-            PluginIosPedometerSubContent()
-          ) : (
-            <div />
-          )}
-
-          <SensorComponent
-            sensorName="Push Notification"
-            sensorDescription="Enable push notification delivery to study participants."
-            stateField={sensorData.status_push_notification}
-            field="status_push_notification"
-            modeState="sensor"
-          />
-          {sensorData.status_push_notification ? (
-            PluginPushNotificationSubContent()
-          ) : (
-            <div />
-          )}
-        </div>
-
-        <div className="border">
-          <p className="title">Shared plugins</p>
-          <SensorComponent
-            sensorName="ESM Scheduler Plugin"
-            sensorDescription="Schedule and deliver ESM questionnaires to participants"
-            stateField={sensorData.status_plugin_esm_scheduler}
-            field="status_plugin_esm_scheduler"
-            modeState="sensor"
-          />
-          {sensorData.status_plugin_esm_scheduler ? (
-            <Grid container spacing={2} sx={{ mt: 1, mb: 2, ml: "10%" }}>
-              <Grid>
-                <Button
-                  color="main"
-                  variant="outlined"
-                  onClick={() => {
-                    navigateTo("/study/questions");
-                  }}
-                >
-                  EDIT ESM QUESTIONS
-                </Button>
-              </Grid>
-              <Grid>
-                <Button
-                  color="main"
-                  variant="outlined"
-                  onClick={() => {
-                    navigateTo("/study/schedule_configuration");
-                  }}
-                >
-                  EDIT ESM SCHEDULES
-                </Button>
-              </Grid>
+          <Grid container spacing={2} alignItems="center" sx={{ mb: 1 }}>
+            <Grid xs={12} sm={7}>
+              <TextField
+                fullWidth
+                size="small"
+                placeholder="Search sensors"
+                value={sensorQuery}
+                onChange={(event) => setSensorQuery(event.target.value)}
+                InputProps={{
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <SearchIcon fontSize="small" />
+                    </InputAdornment>
+                  ),
+                }}
+              />
             </Grid>
-          ) : (
-            <div />
-          )}
+            <Grid xs={12} sm={5}>
+              <p className="explanation" style={{ margin: 0 }}>
+                {enabledCount} of {SENSORS.length} sensors on
+              </p>
+            </Grid>
+          </Grid>
 
-          <SensorComponent
-            sensorName="Ambient Noise Plugin"
-            sensorDescription="Ambient noise sampling plugin for smartphones"
-            stateField={sensorData.status_plugin_ambient_noise}
-            field="status_plugin_ambient_noise"
-            modeState="sensor"
-          />
-          {sensorData.status_plugin_ambient_noise ? (
-            PluginAmbientNoiseSubContent()
-          ) : (
-            <div />
-          )}
+          {GROUPS.map((group) => {
+            const shown = matchingSensors.filter((s) => s.group === group.key);
+            if (shown.length === 0) return null;
+            return (
+              <div key={group.key} style={{ marginTop: 18 }}>
+                <p className="field_name">{group.title}</p>
+                <div
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns:
+                      "repeat(auto-fill, minmax(148px, 1fr))",
+                    gap: 12,
+                    marginTop: 8,
+                  }}
+                >
+                  {shown.map((sensor) => (
+                    <SensorCard
+                      key={sensor.field}
+                      sensor={sensor}
+                      enabled={sensorData[sensor.field]}
+                      onOpen={setOpenSensor}
+                    />
+                  ))}
+                </div>
+              </div>
+            );
+          })}
 
-          <SensorComponent
-            sensorName="OpenWeather Plugin"
-            sensorDescription="Fetch local weather data using OpenWeather API"
-            stateField={sensorData.status_plugin_openweather}
-            field="status_plugin_openweather"
-            modeState="sensor"
-          />
-          {sensorData.status_plugin_openweather ? (
-            PluginOpenWeatherSubContent()
-          ) : (
-            <div />
-          )}
+          {matchingSensors.length === 0 ? (
+            <p className="explanation">Nothing matches this search.</p>
+          ) : null}
         </div>
+
+        <Dialog
+          open={Boolean(openSensor)}
+          onClose={() => setOpenSensor(null)}
+          maxWidth="md"
+          fullWidth
+        >
+          {openSensor ? (
+            <>
+              <DialogTitle
+                sx={{ display: "flex", alignItems: "center", gap: 1, pr: 6 }}
+              >
+                {openSensor.name}
+                <IconButton
+                  onClick={() => setOpenSensor(null)}
+                  sx={{ position: "absolute", right: 8, top: 8 }}
+                >
+                  <CloseIcon />
+                </IconButton>
+              </DialogTitle>
+              <DialogContent dividers>
+                <p className="explanation">{openSensor.description}</p>
+                <FormControlLabel
+                  control={
+                    <Switch
+                      color="main"
+                      checked={Boolean(sensorData[openSensor.field])}
+                      onChange={(event) =>
+                        updateSensorData(openSensor.field, event.target.checked)
+                      }
+                    />
+                  }
+                  label={
+                    sensorData[openSensor.field]
+                      ? "Being collected"
+                      : "Not collected"
+                  }
+                />
+                {sensorData[openSensor.field] &&
+                SENSOR_SETTINGS[openSensor.name]
+                  ? SENSOR_SETTINGS[openSensor.name]()
+                  : null}
+                {!SENSOR_SETTINGS[openSensor.name] ? (
+                  <p className="explanation">
+                    Nothing to configure — this sensor is either on or off.
+                  </p>
+                ) : null}
+              </DialogContent>
+              <DialogActions>
+                <Button color="main" onClick={() => setOpenSensor(null)}>
+                  DONE
+                </Button>
+              </DialogActions>
+            </>
+          ) : null}
+        </Dialog>
 
         <Box sx={{ width: "100%" }} mt={5} marginBottom={5}>
           <Grid
