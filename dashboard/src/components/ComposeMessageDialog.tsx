@@ -94,13 +94,17 @@ export default function ComposeMessageDialog({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/40 p-4"
+      className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/40 p-4 backdrop-blur-sm"
       role="dialog"
       aria-modal="true"
       aria-label="Compose a message"
       onClick={(event) => event.target === event.currentTarget && onCancel()}
     >
-      <div className="my-auto w-full max-w-lg rounded-2xl border border-wire bg-card p-5 shadow-xl">
+      {/* `card` carries an alpha of its own, which is right for a panel resting on
+          the page and wrong for one over a dimmed backdrop: the darkening shows
+          through and the dialog reads as half-erased. `card-strong` is the opaque
+          one, and the blur above is what the other dialogs put behind theirs. */}
+      <div className="my-auto w-full max-w-lg rounded-2xl border border-wire bg-card-strong p-5 shadow-xl">
         {asking ? (
           <>
             <h2 className="text-lg font-semibold text-ink">
