@@ -294,9 +294,13 @@ export default function Overview() {
           "config_without_password" in databaseInfo &&
           databaseInfo.config_without_password
         ),
-        require_ssl: !!(
-          "require_ssl" in databaseInfo && databaseInfo.require_ssl
-        ),
+        // Sent only when the form actually holds an answer. A missing key means
+        // this browser was never shown the control -- the served config carries it
+        // on one dataflow and not the other -- and sending `false` for it would
+        // turn a study's encryption off by opening a page.
+        ...("require_ssl" in databaseInfo
+          ? { require_ssl: !!databaseInfo.require_ssl }
+          : {}),
         rootUsername: "-",
         rootPassword: "-",
       },

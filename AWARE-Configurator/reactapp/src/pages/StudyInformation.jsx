@@ -92,10 +92,8 @@ function describeWebserviceSecurity(facts) {
 // Describes the security of the current SSL + password-in-config combination
 // and recommends the stronger option (encrypted connection, password kept out
 // of the study config) without dictating what the researcher must do.
-function describeDatabaseSecurity(databaseInfo) {
-  // Encryption is unconditional now, so the only thing left that varies is where
-  // the password lives.
-  const ssl = true;
+function describeDatabaseSecurity(databaseInfo, encrypted) {
+  const ssl = encrypted;
   const passwordInConfig = !databaseInfo.config_without_password;
 
   if (ssl && !passwordInConfig) {
@@ -116,13 +114,13 @@ function describeDatabaseSecurity(databaseInfo) {
     return {
       severity: "warning",
       title: "Connection is not encrypted",
-      body: "The password is not shipped in the config, but the database connection is unencrypted, so sensor data travels in plaintext. We recommend enabling the encrypted connection.",
+      body: "The password is not shipped in the config, but the database connection is unencrypted, so sensor data travels in plaintext across every participant's network. Turn encryption back on as soon as the server can offer it.",
     };
   }
   return {
     severity: "error",
     title: "Weakest option",
-    body: "The connection is unencrypted and the password is embedded in the downloaded config, so both the data and the password are exposed on the network. We recommend enabling the encrypted connection and keeping the password out of the config.",
+    body: "The connection is unencrypted and the password is embedded in the downloaded config, so both the data and the password are exposed on the network. Keep the password out of the config, and turn encryption back on as soon as the server can offer it.",
   };
 }
 
@@ -170,11 +168,21 @@ export default function StudyInformation() {
       // Kept in the shared state the rest of the form reads, so the study's own
       // dataflow is what any other page sees.
       setDataflow(loaded.android_dataflow);
+      // What the study asks of its database connection. The served config carries
+      // it only on the direct path -- the webservice one publishes no database
+      // block at all -- so it is seeded from the deployment rather than left to
+      // default. An unchecked box that saved as a decision nobody made is how a
+      // study would turn its own encryption off by being opened.
+      setDatabaseInfo((current) =>
+        "require_ssl" in current
+          ? current
+          : { ...current, require_ssl: loaded.database_require_tls !== false }
+      );
     });
     return () => {
       cancelled = true;
     };
-  }, [setDataflow]);
+  }, [setDataflow, setDatabaseInfo]);
 
   const dataflow = facts?.android_dataflow ?? null;
   const direct = dataflow === "direct";
@@ -183,8 +191,17 @@ export default function StudyInformation() {
   // administrator holds, and saying so is the difference between a researcher who
   // knows to go and ask for it and one who never learns the connection is unverified.
   const externalDatabase = facts?.database_placement === "external";
+  // What the study actually asks of its database connection. A database this
+  // deployment runs is always encrypted; one the researcher named answers to its
+  // owner, so the page reports the study's own answer rather than a promise it
+  // cannot keep for a server it does not administer. The form's own value leads
+  // once there is one, so everything below follows the control as it is used.
+  const encrypted =
+    "require_ssl" in databaseInfo
+      ? !!databaseInfo.require_ssl
+      : facts?.database_require_tls !== false;
   const dbSecurity = direct
-    ? describeDatabaseSecurity(databaseInfo)
+    ? describeDatabaseSecurity(databaseInfo, encrypted)
     : describeWebserviceSecurity(facts ?? {});
 
   const [blankFields, setBlankFields] = React.useState([]);
@@ -415,8 +432,19 @@ export default function StudyInformation() {
                       ? "from each participant's phone to the database"
                       : "from this server to the database"}
                   </b>{" "}
-                  is <b>encrypted</b>, and{" "}
-                  {verificationText(facts?.database_authority)}
+                  is{" "}
+                  {encrypted ? (
+                    <>
+                      <b>encrypted</b>, and{" "}
+                      {verificationText(facts?.database_authority)}
+                    </>
+                  ) : (
+                    <>
+                      <b>not encrypted</b> — this study declares a server that
+                      cannot offer TLS, so what travels over it is readable by
+                      anyone on the network in between.
+                    </>
+                  )}
                 </li>
               </ul>
             </Alert>
@@ -449,15 +477,57 @@ export default function StudyInformation() {
                 </>
               )}
             </Alert>
-            <Alert severity="success" sx={{ mb: 1 }}>
-              <AlertTitle>
-                The database connection is always encrypted
-              </AlertTitle>
-              {direct
-                ? "Participant devices open the database over TLS, so sensor data and the account password are never sent in plaintext."
-                : "This server opens the database over TLS, so the study's data is never sent in plaintext."}{" "}
-              The database refuses any connection that is not encrypted.
-            </Alert>
+            {!externalDatabase && (
+              <Alert severity="success" sx={{ mb: 1 }}>
+                <AlertTitle>
+                  The database connection is always encrypted
+                </AlertTitle>
+                {direct
+                  ? "Participant devices open the database over TLS, so sensor data and the account password are never sent in plaintext."
+                  : "This server opens the database over TLS, so the study's data is never sent in plaintext."}{" "}
+                This deployment runs the database itself and administers both
+                ends of the connection, so there is nothing to arrange and
+                nothing to choose — the accounts it creates refuse any
+                connection that is not encrypted.
+              </Alert>
+            )}
+            {externalDatabase && (
+              <Alert
+                severity={encrypted ? "success" : "warning"}
+                sx={{ mb: 1 }}
+              >
+                <AlertTitle>
+                  {encrypted
+                    ? "The database connection is encrypted"
+                    : "The database connection is not encrypted"}
+                </AlertTitle>
+                {encrypted ? (
+                  <>
+                    {direct
+                      ? "Participant devices open this database over TLS, so sensor data and the account password are never sent in plaintext."
+                      : "This server opens the database over TLS, so the study's data is never sent in plaintext."}{" "}
+                    The accounts this study writes with are granted on that
+                    condition, so a connection arriving without it is refused.
+                  </>
+                ) : (
+                  <>
+                    This study declares that its database cannot offer TLS, so
+                    everything written to it — and the account password used to
+                    write it — crosses the network in clear text. Turn
+                    encryption back on below once the server can offer it; setup
+                    checks the connection before the study is deployed and
+                    reports what actually happened.
+                  </>
+                )}
+                <br />
+                <br />
+                <CustomizedCheckbox
+                  recoilState={databaseInformationState}
+                  field="require_ssl"
+                  label="Connect to this database over TLS"
+                />
+              </Alert>
+            )}
             <p style={DB_HELPER_STYLE}>
               What encryption does not do on its own is prove <i>which</i>{" "}
               server answered. A database this deployment runs signs its own
@@ -465,7 +535,7 @@ export default function StudyInformation() {
               participant devices can check it. A database you name elsewhere
               has an authority only you can supply.
             </p>
-            {externalDatabase && (
+            {externalDatabase && encrypted && (
               <Alert severity="info" sx={{ mt: 1 }}>
                 <AlertTitle>
                   This database needs its certificate authority from you
@@ -503,7 +573,7 @@ export default function StudyInformation() {
                 no way to tell.
               </Alert>
             )}
-            {externalDatabase && (
+            {externalDatabase && encrypted && (
               <TextField
                 multiline
                 minRows={4}
@@ -527,7 +597,7 @@ export default function StudyInformation() {
                 }
               />
             )}
-            {externalDatabase && (
+            {externalDatabase && encrypted && (
               <Alert severity="warning" sx={{ mt: 1 }}>
                 <AlertTitle>
                   A certificate that cannot be read stops collection

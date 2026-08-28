@@ -26,23 +26,15 @@ SERVER = "aware_android_server"
     "android, expected",
     [
         (
-            {"password": "pw", "config_without_password": False, "require_ssl": False},
-            (PARTICIPANT, "pw", False),
+            {"password": "pw", "config_without_password": False},
+            (PARTICIPANT, "pw", True),
         ),
         # config_without_password never blanks the account password
         (
-            {"password": "pw", "config_without_password": True, "require_ssl": False},
-            (PARTICIPANT, "pw", False),
-        ),
-        (
-            {"password": "pw", "config_without_password": False, "require_ssl": True},
+            {"password": "pw", "config_without_password": True},
             (PARTICIPANT, "pw", True),
         ),
-        (
-            {"password": "pw", "config_without_password": True, "require_ssl": True},
-            (PARTICIPANT, "pw", True),
-        ),
-        ({}, (PARTICIPANT, "", False)),
+        ({}, (PARTICIPANT, "", True)),
     ],
 )
 def test_ingest_credentials_on_the_direct_path(android, expected):
@@ -51,8 +43,30 @@ def test_ingest_credentials_on_the_direct_path(android, expected):
     assert general._ingest_credentials(source) == expected
 
 
+@pytest.mark.parametrize(
+    "databases, encrypted",
+    [
+        # A database this deployment runs is administered at both ends, so its
+        # accounts are granted on the one condition it can always meet.
+        ({"host": "db.internal", "android": {"password": "pw"}}, True),
+        ({"host": "db.example.edu", "android": {"password": "pw"}}, True),
+        (
+            {
+                "host": "db.example.edu",
+                "tls": {"require": False},
+                "android": {"password": "pw"},
+            },
+            False,
+        ),
+    ],
+)
+def test_the_accounts_require_what_the_study_declares(databases, encrypted):
+    """The REQUIRE clause follows the study's one answer about its connection."""
+    assert general._ingest_credentials({"database": databases})[2] is encrypted
+
+
 def test_ingest_credentials_missing_database():
-    assert general._ingest_credentials({}) == (PARTICIPANT, "", False)
+    assert general._ingest_credentials({}) == (PARTICIPANT, "", True)
 
 
 def test_ingest_credentials_on_the_webservice_path():
@@ -64,11 +78,10 @@ def test_ingest_credentials_on_the_webservice_path():
                 "password": "phone-pw",
                 "server_username": SERVER,
                 "server_password": "server-pw",
-                "require_ssl": False,
             }
         },
     }
-    assert general._ingest_credentials(source) == (SERVER, "server-pw", False)
+    assert general._ingest_credentials(source) == (SERVER, "server-pw", True)
 
 
 def test_ingest_credentials_name_the_server_account_without_one_stored():
@@ -93,14 +106,15 @@ def test_the_env_variable_follows_the_account():
 # _merge_and_sync_credentials: only sync on an effective change
 # --------------------------------------------------------------------------
 
-def _source(password="old", passwordless=False, require_ssl=False):
+def _source(password="old", passwordless=False, require_ssl=True):
     return {
         "database": {
+            "host": "db.example.edu",
+            "tls": {"require": require_ssl},
             "android": {
                 "password": password,
                 "config_without_password": passwordless,
-                "require_ssl": require_ssl,
-            }
+            },
         }
     }
 
@@ -141,7 +155,7 @@ def test_sync_called_when_require_ssl_changes(monkeypatch):
     synced = []
 
     def fake_update(source, content):
-        source["database"]["android"]["require_ssl"] = True
+        source["database"]["tls"]["require"] = True
         return source
 
     monkeypatch.setattr(general, "update_source_from_android_config", fake_update)
@@ -308,20 +322,19 @@ def test_get_participant_password_rejects_writes(monkeypatch, method):
 # --------------------------------------------------------------------------
 
 
-def _saveable(android_dataflow="webservice", **android_db):
+def _saveable(android_dataflow="webservice", host="db.internal", **android_db):
     """A study model shaped enough for the save path to merge into."""
     database = {
         "port": 3306,
         "name": "aware_android",
         "username": "aware_android_participant",
         "password": "stored",
-        "require_ssl": False,
         "config_without_password": True,
     }
     database.update(android_db)
     return {
         "deployment": {"dataflow": {"android": android_dataflow, "ios": "webservice"}},
-        "database": {"host": "db.internal", "android": database, "ios": {}},
+        "database": {"host": host, "android": database, "ios": {}},
         "study": {"id": "s", "title": "t", "description": "d"},
         "researcher": {"first_name": "f", "last_name": "l", "contact": "c"},
         "android": {"settings": {}},
@@ -334,7 +347,10 @@ def _submit(source, **database):
     content = {
         "_id": "s",
         "study_info": {},
-        "database": {"database_host": "db.internal", **database},
+        # The host the study already declares unless the case is about changing it,
+        # because the placement is what decides whether the rest of this section is
+        # the researcher's to set.
+        "database": {"database_host": source["database"]["host"], **database},
     }
     if "dataflow" in database:
         content["dataflow"] = database.pop("dataflow")
@@ -382,38 +398,49 @@ class TestTheDataflowIsNotSubmittable:
 
 
 class TestWhichDatabaseSettingsEachPathDecides:
-    """`require_ssl` reaches the account on both paths; the published password on one.
+    """What a submitted config may decide about the connection, and on which placement.
 
-    The REQUIRE clause describes what the database grants the account, and each
-    dataflow has a holder for it: the phone's own client on the direct path, the
-    micro-server on the webservice one. Both reach the database over TLS, so the
-    clause is a condition either can meet.
+    Encryption is settled by where the database runs, not by the dataflow: a database
+    this deployment runs is administered at both ends and always encrypted, and one
+    the researcher named answers to its owner. So the setting is the researcher's on
+    the second placement and nobody's on the first --- and a browser keeps its own
+    copy of this section, so a value from the other placement arrives here either way.
 
     `config_without_password` governs the config a phone downloads, and the direct
-    path is the one that publishes a password in it. A browser keeps its own copy of
-    this section, so a value left in it from the other path arrives here either way.
+    path is the one that publishes a password in it.
     """
 
-    def test_require_ssl_reaches_the_account_on_the_webservice_path(self):
-        source = _saveable("webservice", require_ssl=False)
-
-        _submit(source, require_ssl=True)
-
-        assert source["database"]["android"]["require_ssl"] is True
-
-    def test_require_ssl_reaches_the_account_on_the_direct_path(self):
-        source = _saveable("direct", require_ssl=False)
-
-        _submit(source, require_ssl=True)
-
-        assert source["database"]["android"]["require_ssl"] is True
-
-    def test_require_ssl_is_cleared_from_the_account_too(self):
-        source = _saveable("webservice", require_ssl=True)
+    def test_a_named_database_can_be_told_it_cannot_encrypt(self):
+        source = _saveable("webservice", host="db.example.edu")
 
         _submit(source, require_ssl=False)
 
-        assert source["database"]["android"]["require_ssl"] is False
+        assert source["database"]["tls"]["require"] is False
+
+    def test_the_same_holds_on_the_direct_path(self):
+        source = _saveable("direct", host="db.example.edu")
+
+        _submit(source, require_ssl=False)
+
+        assert source["database"]["tls"]["require"] is False
+
+    def test_encryption_can_be_asked_for_again(self):
+        source = _saveable("webservice", host="db.example.edu")
+        source["database"]["tls"] = {"require": False}
+
+        _submit(source, require_ssl=True)
+
+        assert source["database"]["tls"]["require"] is True
+
+    def test_a_bundled_database_is_not_a_study_setting(self):
+        # Refusing the value rather than storing it: a stale browser copy would
+        # otherwise leave a study declaring plaintext against a server whose accounts
+        # this deployment creates requiring TLS, and nothing could write.
+        source = _saveable("webservice")
+
+        _submit(source, require_ssl=False)
+
+        assert "tls" not in source["database"]
 
     def test_config_without_password_is_held_on_the_webservice_path(self):
         source = _saveable("webservice", config_without_password=True)

@@ -12,6 +12,7 @@ from aware_light_config_Django import settings
 # repo root locally) and adds it to sys.path, so shared_config is importable.
 PROJECT_ROOT = settings.PROJECT_ROOT
 
+from shared_config import database as database_model
 from shared_config import dataflow, placement
 from shared_config.certificates import read_certificate
 from shared_config.database import android_credentials, android_ingest_account
@@ -118,17 +119,19 @@ def deployment_facts(request):
                 # unverified, which only an external database can end up in.
                 "database_authority": (
                     "supplied"
-                    if str(
-                        (source.get("database", {}).get("android") or {}).get(
-                            "ca_certificate"
-                        )
-                        or ""
-                    ).strip()
+                    if database_model.tls_authority(source.get("database", {}))
                     else (
                         "generated"
                         if placement.declared(source) == placement.BUNDLED
                         else "none"
                     )
+                ),
+                # Whether this study's database connection is encrypted at all. A
+                # database this deployment runs always is; one the researcher named
+                # answers to its owner, so the page states the study's own answer
+                # rather than a promise it cannot keep for a server it does not run.
+                "database_require_tls": database_model.tls_required(
+                    source.get("database", {})
                 ),
                 # Where the broker this deployment runs actually is. The dashboard
                 # publishes there, so a study pointing phones elsewhere would listen
@@ -288,22 +291,30 @@ def _ingest_credentials(source):
     whether the served study config embeds the password or omits it so the
     participant enters it when joining. The account always keeps its password.
     """
-    android_db = source.get("database", {}).get("android", {})
     username, password = android_credentials(
         source.get("database", {}), dataflow.declared(source, "android")
     )
-    return (username, password, bool(android_db.get("require_ssl")))
+    return (username, password, database_model.tls_required(source.get("database", {})))
 
 
-def _mysql_admin_settings():
+def _mysql_admin_settings(source=None):
+    """Where the account changes are applied, resolved the way every service does.
+
+    The study's own declaration is the fallback rather than the compose name, so a
+    study whose database is a host the researcher named has its accounts altered on
+    that host. Naming the bundled service unconditionally would send the change to a
+    container that is not running on that placement, and the save would fail on a
+    study whose database is perfectly reachable.
+    """
     env = load_env(ENV_PATH)
 
     def pick(key, default=""):
         return os.environ.get(key) or str(env.get(key, "")).strip() or default
 
+    databases = (source or {}).get("database") or {}
     return {
-        "host": pick("MYSQL_HOST", "mysql"),
-        "port": int(pick("MYSQL_PORT", "3306")),
+        "host": pick("MYSQL_HOST", database_model.service_host(databases)),
+        "port": int(pick("MYSQL_PORT", str(database_model.platform_port(databases, "android")))),
         "root_password": pick("MYSQL_ROOT_PASSWORD"),
     }
 
@@ -316,7 +327,7 @@ def _sync_ingest_credentials(source):
     path. Each keeps its own password, so changing one leaves the other as it was.
     """
     username, password, require_ssl = _ingest_credentials(source)
-    admin = _mysql_admin_settings()
+    admin = _mysql_admin_settings(source)
     apply_account_credentials(
         host=admin["host"],
         port=admin["port"],
@@ -427,33 +438,35 @@ def update_source_from_android_config(source, content):
         incoming_password = database.get("database_password")
         if incoming_password and incoming_password != "-":
             android_db[_ingest_account(source)["password_key"]] = incoming_password
-        # The account's REQUIRE clause, which both dataflows have a holder for: the
-        # phone on the direct path, the micro-server on the webservice one. Each
-        # reaches the database over TLS wherever the server offers it, so the clause
-        # describes what that database grants the account rather than deciding
-        # whether the holder can connect.
-        android_db["require_ssl"] = database.get(
-            "require_ssl", android_db.get("require_ssl", False)
-        )
-        # The authority a phone verifies the database against. Kept only when it is
-        # a certificate that can actually be read: devices treat an unreadable one
-        # as a database they cannot reach and stop uploading, so storing a bad paste
-        # would halt the study rather than merely fail to protect it. A blank field
-        # clears it, which is how a researcher goes back to encrypted-but-unverified.
-        if "ca_certificate" in database:
-            supplied = str(database.get("ca_certificate") or "").strip()
-            if not supplied:
-                android_db["ca_certificate"] = ""
-            else:
-                cleaned = read_certificate(supplied)
-                if not cleaned:
-                    raise ValueError(
-                        "That is not a certificate this deployment can read. Paste the "
-                        "whole file, from -----BEGIN CERTIFICATE----- to "
-                        "-----END CERTIFICATE-----, or leave the field empty to run "
-                        "encrypted without verifying the server."
-                    )
-                android_db["ca_certificate"] = cleaned
+        # What this study asks of the connection, held beside the host it describes.
+        # Only a database the researcher named carries an answer: one this deployment
+        # runs is administered at both ends and always encrypted, so a value arriving
+        # for it is a browser's copy of a control the page never showed.
+        if placement.declared(source) == placement.EXTERNAL:
+            if "require_ssl" in database:
+                database_model.declare_tls(
+                    source["database"], require=bool(database.get("require_ssl"))
+                )
+            # The authority a phone verifies the database against. Kept only when it
+            # is a certificate that can actually be read: devices treat an unreadable
+            # one as a database they cannot reach and stop uploading, so storing a bad
+            # paste would halt the study rather than merely fail to protect it. A
+            # blank field clears it, which is how a researcher goes back to
+            # encrypted-but-unverified.
+            if "ca_certificate" in database:
+                supplied = str(database.get("ca_certificate") or "").strip()
+                if supplied:
+                    cleaned = read_certificate(supplied)
+                    if not cleaned:
+                        raise ValueError(
+                            "That is not a certificate this deployment can read. Paste "
+                            "the whole file, from -----BEGIN CERTIFICATE----- to "
+                            "-----END CERTIFICATE-----, or leave the field empty to run "
+                            "encrypted without verifying the server."
+                        )
+                else:
+                    cleaned = ""
+                database_model.declare_tls(source["database"], ca_certificate=cleaned)
         # Whether the published config carries the password. The direct path is the
         # one that publishes it, so it is the path that governs the setting; a
         # browser keeps its own copy of this section, and a value left in it from
