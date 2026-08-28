@@ -235,14 +235,47 @@ def study_settings(server: str, protocol: str, username: str, password: str) -> 
     # Both halves or neither: an address with no credential is a connection the
     # broker refuses, retried for the life of the study.
     reachable = bool(server) and bool(username) and bool(password)
-    return {
-        "status_mqtt": reachable,
-        "mqtt_server": server,
-        "mqtt_port": port_for(protocol),
-        "mqtt_username": username,
-        "mqtt_password": password,
-        "mqtt_keep_alive": 600,
-        # At-least-once. The phone records what it received, so a duplicate is
-        # visible where a silently dropped prompt would not be.
-        "mqtt_qos": 1,
-    }
+    settings = dict(STUDY_OWNED_DEFAULTS)
+    settings.update(
+        {
+            "status_mqtt": reachable,
+            "mqtt_server": server,
+            "mqtt_port": port_for(protocol),
+            "mqtt_username": username,
+            "mqtt_password": password,
+        }
+    )
+    return settings
+
+
+#: Where the broker is and who connects to it. Derived from what this deployment
+#: actually runs, and rewritten on every deploy: the dashboard publishes to the
+#: broker it brought up, so a study naming a different one would have its phones
+#: listening somewhere nothing is sent.
+DEPLOYMENT_OWNED = ("mqtt_server", "mqtt_port", "mqtt_username", "mqtt_password")
+
+#: How the client behaves once connected. Nothing here decides where a message
+#: goes, so a researcher may set them and a deploy leaves them alone.
+#:
+#: ``mqtt_qos`` is at-least-once: the phone records what it received, so a duplicate
+#: is visible where a silently dropped prompt would not be.
+STUDY_OWNED_DEFAULTS = {"status_mqtt": False, "mqtt_keep_alive": 600, "mqtt_qos": 1}
+
+
+def apply_deployment_settings(existing: dict, generated: dict) -> dict:
+    """The deployment's half rewritten, the study's half left as the researcher set it.
+
+    Called on every deploy. Without the split a saved change to how often the client
+    pings, or to whether messaging is on at all, would survive until the next deploy
+    and then vanish without anybody touching it.
+    """
+    merged = dict(existing or {})
+    for key in DEPLOYMENT_OWNED:
+        merged[key] = generated[key]
+    for key, fallback in STUDY_OWNED_DEFAULTS.items():
+        if key not in merged:
+            merged[key] = generated.get(key, fallback)
+    # A study with no broker to reach cannot be messaging, whatever it last said.
+    if not generated.get("status_mqtt"):
+        merged["status_mqtt"] = False
+    return merged

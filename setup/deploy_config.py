@@ -312,15 +312,18 @@ def seed_source_secrets(env: dict[str, str]) -> dict:
         # participant's phone resolves it from wherever the participant is.
         android_settings = source.setdefault("android", {}).setdefault("settings", {})
         android_settings.update(
-            messaging.study_settings(
-                # A study with no public host has no address to hand a phone, and a
-                # block naming a broker that is not there is worse than one that is
-                # off: the client would retry a connection it can never make. Absent
-                # either half, the sensor stays off and says so.
-                server=str(env.get("PUBLIC_HOST", "")).strip(),
-                protocol=env.get("PROTOCOL", "http"),
-                username=messaging.PARTICIPANT_USER,
-                password=str(env.get("MQTT_PARTICIPANT_PASSWORD", "")).strip(),
+            messaging.apply_deployment_settings(
+                android_settings,
+                messaging.study_settings(
+                    # A study with no public host has no address to hand a phone, and
+                    # a block naming a broker that is not there is worse than one that
+                    # is off: the client would retry a connection it can never make.
+                    # Absent either half, the sensor stays off and says so.
+                    server=str(env.get("PUBLIC_HOST", "")).strip(),
+                    protocol=env.get("PROTOCOL", "http"),
+                    username=messaging.PARTICIPANT_USER,
+                    password=str(env.get("MQTT_PARTICIPANT_PASSWORD", "")).strip(),
+                ),
             )
         )
 

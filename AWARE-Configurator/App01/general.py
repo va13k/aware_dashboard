@@ -130,6 +130,16 @@ def deployment_facts(request):
                         else "none"
                     )
                 ),
+                # Where the broker this deployment runs actually is. The dashboard
+                # publishes there, so a study pointing phones elsewhere would listen
+                # where nothing is sent -- the address is stated, not offered.
+                "mqtt_server": str(
+                    (source.get("android", {}).get("settings") or {}).get("mqtt_server")
+                    or ""
+                ),
+                "mqtt_port": (source.get("android", {}).get("settings") or {}).get(
+                    "mqtt_port"
+                ),
                 "protocol": str(env.get("PROTOCOL", "http")).strip().lower(),
                 # A published port narrowed to loopback is reachable only from the
                 # host itself, which is where the micro-server's own hop starts.

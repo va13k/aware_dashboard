@@ -420,6 +420,35 @@ export default function StudyInformation() {
                 </li>
               </ul>
             </Alert>
+
+            <Alert severity="info" sx={{ mb: 2 }}>
+              <AlertTitle>Reaching participants</AlertTitle>
+              {facts?.mqtt_server ? (
+                <>
+                  Phones connect to the broker at{" "}
+                  <b>
+                    {facts.mqtt_server}:{facts.mqtt_port}
+                  </b>
+                  {facts.mqtt_port === 8883
+                    ? ", over TLS."
+                    : ", unencrypted — a prompt and its answer are readable on the network."}{" "}
+                  That is how the dashboard&apos;s <b>Messages</b> tab asks a
+                  phone to upload, puts a question on it, or tells it to re-read
+                  this study.
+                  <br />
+                  <br />
+                  The address and its credentials belong to the deployment and
+                  are rewritten every time it is brought up — the dashboard
+                  publishes to the broker it runs, so a study pointing phones
+                  anywhere else would have them listening where nothing is sent.
+                </>
+              ) : (
+                <>
+                  No broker is configured, so nothing can be sent to a phone.
+                  Deploy the study with <code>./setup.sh</code> to bring one up.
+                </>
+              )}
+            </Alert>
             <Alert severity="success" sx={{ mb: 1 }}>
               <AlertTitle>
                 The database connection is always encrypted
