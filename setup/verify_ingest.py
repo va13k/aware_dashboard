@@ -471,9 +471,10 @@ def verify_direct(
             check(
                 "certificate",
                 True,
-                "This study's participant account does not require TLS, so phones open "
-                "the database in clear text. Requiring it is a setting on the account "
-                "and on the study's database block.",
+                "This study declares an unencrypted connection to its database, so "
+                "phones open it in clear text. The declaration is `database.tls` in "
+                "the study model, and only a database the researcher names may carry "
+                "it.",
                 skipped=True,
             )
         )
@@ -638,7 +639,6 @@ def main() -> int:
             )
     else:
         username, password = database.android_credentials(databases, android)
-        entry = databases.get("android") or {}
         result["checks"] = verify_direct(
             docker_base,
             sql,
@@ -647,7 +647,7 @@ def main() -> int:
             schema,
             username,
             password,
-            bool(entry.get("require_ssl")),
+            database.tls_required(databases),
         )
 
     result["ok"] = all(entry["ok"] for entry in result["checks"])

@@ -78,32 +78,29 @@ class TestWhatTheCombinationDecides:
             assert placement.connection(placement.EXTERNAL, flow)["bundled_bind"] is None
 
 
-class TestWhenEncryptionIsTheDefault:
-    """placement.requires_tls: derived from whether the connection leaves the host."""
+class TestWhenEncryptionIsNotAQuestion:
+    """placement.requires_tls: settled by the placement, or the researcher's to answer."""
 
-    @pytest.mark.parametrize(
-        "where,flow",
-        [
-            (placement.BUNDLED, dataflow.DIRECT),
-            (placement.EXTERNAL, dataflow.DIRECT),
-            (placement.EXTERNAL, dataflow.WEBSERVICE),
-        ],
-    )
-    def test_a_connection_that_leaves_the_machine_is_encrypted(self, where, flow):
-        assert placement.requires_tls(where, flow)
-        # And the interface has a sentence for what turning it off would cost.
-        assert placement.unencrypted_warning(where, flow)
+    @pytest.mark.parametrize("flow", [dataflow.DIRECT, dataflow.WEBSERVICE])
+    def test_a_database_this_deployment_runs_is_always_encrypted(self, flow):
+        # Both ends are ours: this deployment generates the certificate, publishes
+        # the authority and grants the accounts. There is nothing to arrange and so
+        # nothing to ask.
+        assert placement.requires_tls(placement.BUNDLED)
+        assert placement.unencrypted_warning(placement.BUNDLED, flow) is None
 
-    def test_a_hop_inside_one_machine_is_not_forced(self):
-        # A bridge on one host and the internet are the same statement in a config
-        # and not the same risk, so only one of them is made non-negotiable.
-        assert not placement.requires_tls(placement.BUNDLED, dataflow.WEBSERVICE)
-        assert placement.unencrypted_warning(placement.BUNDLED, dataflow.WEBSERVICE) is None
+    @pytest.mark.parametrize("flow", [dataflow.DIRECT, dataflow.WEBSERVICE])
+    def test_a_named_database_answers_to_its_owner(self, flow):
+        # TLS on somebody else's server is something they offer or do not, so the
+        # study declares what it needs and the interface says what going without it
+        # costs.
+        assert not placement.requires_tls(placement.EXTERNAL)
+        assert placement.unencrypted_warning(placement.EXTERNAL, flow)
 
     def test_the_two_unsafe_cases_read_differently(self):
         # One exposes every participant's own network, the other the link between
         # two servers. A single generic caution would understate both.
-        phones = placement.unencrypted_warning(placement.BUNDLED, dataflow.DIRECT)
+        phones = placement.unencrypted_warning(placement.EXTERNAL, dataflow.DIRECT)
         server = placement.unencrypted_warning(placement.EXTERNAL, dataflow.WEBSERVICE)
         assert "participant" in phones and phones != server
 

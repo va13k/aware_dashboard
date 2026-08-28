@@ -15,6 +15,8 @@ is up --- the client falls back to this machine's own resolution, and
 :meth:`Client.on_network` says which of the two answered.
 """
 
+import base64
+import shlex
 import subprocess
 
 from shared_config import database, placement
@@ -33,6 +35,12 @@ COMPOSE_NETWORK = "aware_dashboard_aware_network"
 #: unreachable one is reported rather than waited on.
 CONNECT_TIMEOUT_SECONDS = 10
 
+#: Where an authority is planted for the client that has to check a certificate
+#: against it. Inside the container that runs the query and gone with it, because
+#: the study already holds the certificate and a copy on a disk somewhere is one
+#: more thing that can go stale.
+CA_PATH = "/tmp/aware-db-ca.pem"
+
 
 class Client:
     """A MySQL client addressed at this study's database.
@@ -47,21 +55,48 @@ class Client:
         host: str,
         port: int = 3306,
         network: str = COMPOSE_NETWORK,
+        ssl_mode: str = "",
+        ca_pem: str = "",
     ):
         self._base = docker_base
         self._host = host
         self._port = int(port)
         self._network = network
         self._bundled = database.is_internal(host)
+        self._ssl_mode = str(ssl_mode or "").strip()
+        self._ca_pem = str(ca_pem or "").strip()
 
     @classmethod
     def for_study(cls, docker_base: list[str], source: dict, platform: str = "android"):
-        """The client this study's declared database is reached with."""
+        """The client this study's declared database is reached with.
+
+        Left on the client's own default rather than asking for a mode, because this
+        is the administrative connection: it creates the accounts that decide what
+        every other connection may ask for, and a study being repaired is one whose
+        declaration and whose server may not agree yet. ``PREFERRED`` encrypts
+        wherever the server offers it and still reaches one that cannot.
+        """
         databases = source.get("database") or {}
         return cls(
             docker_base,
             database.service_host(databases),
             database.platform_port(databases, platform),
+        )
+
+    def asking_for(self, ssl_mode: str, ca_pem: str = ""):
+        """The same address, opened with a TLS mode this connection must get.
+
+        A separate client rather than a setting on this one: the checks ask the same
+        database several questions with different demands, and one that quietly
+        changed what an earlier answer meant would be worse than no check at all.
+        """
+        return Client(
+            self._base,
+            self._host,
+            self._port,
+            self._network,
+            ssl_mode=ssl_mode,
+            ca_pem=ca_pem,
         )
 
     @property
@@ -77,7 +112,7 @@ class Client:
         """Whether a query is asked from the deployment's network or from this machine."""
         return self._bundled or self._network_available()
 
-    def _command(self, user: str, password: str, schema: str, batch: bool) -> list[str]:
+    def _client_argv(self, user: str, password: str, schema: str, batch: bool) -> list[str]:
         client = [
             "mysql",
             "--protocol=TCP",
@@ -87,10 +122,36 @@ class Client:
             f"-p{password}",
             f"--connect-timeout={CONNECT_TIMEOUT_SECONDS}",
         ]
+        if self._ssl_mode:
+            client.append(f"--ssl-mode={self._ssl_mode}")
+        if self._ca_pem:
+            client.append(f"--ssl-ca={CA_PATH}")
         if batch:
             client += ["-B", "-N"]
         if schema:
             client.append(schema)
+        return client
+
+    def _with_authority(self, client: list[str]) -> list[str]:
+        """The client run behind a line that plants the authority it has to check.
+
+        The certificate travels base64-encoded and quoted, so a PEM's newlines and a
+        bundle holding several certificates survive being handed to a shell. ``exec``
+        rather than a second command, so the client still owns the standard input the
+        SQL arrives on.
+        """
+        if not self._ca_pem:
+            return client
+        encoded = base64.b64encode(self._ca_pem.encode("utf-8")).decode("ascii")
+        program = " ".join(shlex.quote(argument) for argument in client)
+        return [
+            "sh",
+            "-c",
+            f"printf %s {shlex.quote(encoded)} | base64 -d > {CA_PATH} && exec {program}",
+        ]
+
+    def _command(self, user: str, password: str, schema: str, batch: bool) -> list[str]:
+        client = self._with_authority(self._client_argv(user, password, schema, batch))
 
         if self._bundled:
             return self._base + ["exec", "-i", BUNDLED_CONTAINER] + client

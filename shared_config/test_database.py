@@ -171,3 +171,68 @@ class TestWhoWrites:
         assert database.android_ingest_account("nonsense") == (
             database.android_ingest_account(dataflow.DIRECT)
         )
+
+
+class TestWhatIsAskedOfTheConnection:
+    """database.tls_required / tls_authority: one answer, and who gets to give it.
+
+    Encryption is settled on a database this deployment runs and declared on one the
+    researcher names, because the second is somebody else's server: a MySQL built
+    without TLS, or a MariaDB that generated no certificate, is a database this
+    software could otherwise never be pointed at.
+    """
+
+    def test_a_bundled_database_is_encrypted_whatever_is_declared(self):
+        # Both ends are ours, so an answer arriving for it is a form field that was
+        # never asked rather than a decision to apply.
+        for stated in (True, False):
+            assert database.tls_required({**BUNDLED, "tls": {"require": stated}})
+
+    def test_a_named_database_declaring_nothing_is_encrypted(self):
+        # Silence has meant TLS since every account was created requiring it, so the
+        # arrival of the setting cannot turn a running study's encryption off.
+        assert database.tls_required(EXTERNAL)
+
+    def test_a_named_database_can_say_it_cannot_encrypt(self):
+        assert not database.tls_required({**EXTERNAL, "tls": {"require": False}})
+
+    def test_the_authority_is_read_from_the_connection_block(self):
+        declared = {**EXTERNAL, "tls": {"ca_certificate": "PEM"}}
+        assert database.tls_authority(declared) == "PEM"
+
+    def test_a_study_written_before_the_block_keeps_its_authority(self):
+        # The same certificate, in the only place a study used to be able to keep
+        # it. Losing it on an upgrade would leave devices unable to verify a server
+        # they were verifying yesterday.
+        legacy = {**EXTERNAL, "android": {**EXTERNAL["android"], "ca_certificate": "PEM"}}
+        assert database.tls_authority(legacy) == "PEM"
+
+    def test_the_connection_block_wins_over_the_older_place(self):
+        both = {
+            **EXTERNAL,
+            "tls": {"ca_certificate": "NEW"},
+            "android": {**EXTERNAL["android"], "ca_certificate": "OLD"},
+        }
+        assert database.tls_authority(both) == "NEW"
+
+    def test_an_unencrypted_study_has_nothing_to_verify(self):
+        # Publishing an authority for a connection no client will check is a promise
+        # every interface would then have to un-make.
+        declared = {**EXTERNAL, "tls": {"require": False, "ca_certificate": "PEM"}}
+        assert database.tls_authority(declared) == ""
+
+    def test_the_deployments_own_readers_are_told(self):
+        # The API reads `.env` and not the study model, so the answer travels as a
+        # variable or it does not travel at all.
+        assert database.resolved_env(EXTERNAL, "pw")["DB_REQUIRE_TLS"] == "1"
+        assert (
+            database.resolved_env({**EXTERNAL, "tls": {"require": False}}, "pw")[
+                "DB_REQUIRE_TLS"
+            ]
+            == "0"
+        )
+
+    def test_declaring_one_part_leaves_the_other_alone(self):
+        databases = {**EXTERNAL, "tls": {"require": True, "ca_certificate": "PEM"}}
+        database.declare_tls(databases, require=False)
+        assert databases["tls"] == {"require": False, "ca_certificate": "PEM"}

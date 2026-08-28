@@ -202,12 +202,28 @@ of a compose file is still depended on, and Compose starts a dependency whether 
 not anyone asked for it. The file is generated from the choice and removed again when
 you switch back, so its presence is the placement.
 
-### The database connection is always encrypted
+### Encryption to the database, and who decides it
 
-Every account this deployment creates requires TLS, and there is no setting to turn
-that off. Without it MySQL 8 still protects the password, then carries every row of
-every participant's data over the same socket in clear — the password was never the
-part most worth protecting.
+Without TLS, MySQL 8 still protects the password and then carries every row of every
+participant's data over the same socket in clear — the password was never the part
+most worth protecting. So the connection is encrypted, and where the database runs
+decides whether that is a question at all.
+
+**On this machine, it is settled.** The deployment administers both ends: MySQL
+generates its own certificate on first start, every account setup creates is granted
+`REQUIRE SSL`, and there is no setting to turn it off. Offering one would be a way to
+make a working study less safe in exchange for nothing.
+
+**On a database you name, you answer it.** That server is not one this deployment
+administers, and TLS there is something its owner offers or does not — an institutional
+MySQL built without it, or a MariaDB older than 11.4 that generated no certificate.
+Refusing those outright would refuse the study, so setup asks. The toggle is on by
+default: nearly every server can encrypt, and setup opens the connection and reports
+what actually happened before the study is deployed, so a server that cannot is found
+there rather than weeks later as a study that enrolled and collected nothing. Turning
+it off is recorded in the study model as `database.tls.require`, applied to every
+account as `REQUIRE NONE`, and stated wherever the connection is described — the
+wizard, the database check, and the Configurator's study page.
 
 Encryption alone does not prove *which* server answered. For a bundled database setup
 solves that for you: MySQL generates its own certificate authority on first start, and
@@ -216,10 +232,11 @@ so a participant's phone verifies the certificate chain. Nothing to enter. It is
 on every deploy, so a database that regenerates its certificate — a fresh volume, a
 restored backup — publishes the authority it is actually using.
 
-For a database you name elsewhere, only you can supply its authority. Put it in
-`database.android.ca_certificate` in the study model. Without one the connection is
-encrypted but unverified: the traffic cannot be read, and a server on the same network
-could impersonate the database.
+For a database you name elsewhere, only you can supply its authority. Paste it into the
+setup wizard beside the host, or into the Configurator later; it is kept in the study
+model as `database.tls.ca_certificate`. Setup verifies the server against it before the
+study deploys. Without one the connection is encrypted but unverified: the traffic
+cannot be read, and a server on the same network could impersonate the database.
 
 > **A certificate authority that cannot be read stops collection.** The Android client
 > treats an unparseable authority as a database it cannot reach — it keeps its data and
@@ -278,9 +295,10 @@ the certificate instead.
 
 #### Step 3 — put it into the study
 
-Open the Configurator, go to **Study information → Database access**, and paste the
-**whole file** into the certificate authority field — including the `BEGIN` and `END`
-lines. Then save.
+In the setup wizard, paste the **whole file** into the certificate authority field
+under the database host — including the `BEGIN` and `END` lines. On a study that is
+already deployed, the same field is in the Configurator under **Study information →
+Database access**; paste it there and save.
 
 Copy all of it. A certificate that is missing its first or last line, or has lost a
 line in the middle, cannot be read — and an unreadable one stops collection (see the
@@ -292,11 +310,16 @@ warning below).
 python3 setup/verify_database.py
 ```
 
-The **Encrypted** line tells you which of the two you have:
+The **Encrypted** line says which of these you have:
 
-- *"Encrypted (…) and verified against the authority you named"* — done.
+- *"Encrypted (…) and verified against the certificate authority this study supplies"* —
+  done.
 - *"Encrypted (…). The certificate is not verified"* — the connection is protected from
-  being read, but the authority is missing or was not accepted. Go back to step 1.
+  being read, but no authority is supplied. Go back to step 1.
+- *"This server's certificate does not check out against the authority this study
+  supplies"* — the file is a certificate but not the one that signed this server's.
+  This fails the check rather than warning, because the phones would refuse the
+  database too. Go back to step 1.
 
 #### If you cannot find the file
 
@@ -316,11 +339,12 @@ read, so a bad paste fails at deployment rather than on the phones.
 
 ### Checking the database before the study is committed to it
 
-`setup/verify_database.py` runs on both placements and asks four questions:
+`setup/verify_database.py` runs on both placements and asks five questions:
 
 | Check | What it answers |
 | --- | --- |
 | Reachable | The address answers on its port and the credential authenticates |
+| Encrypted | The connection is what the study asked of it, and — where an authority is supplied — the server's certificate checks out against it |
 | Schema | The study's schema is there, or this account can create it |
 | Ingest accounts | The account each dataflow writes with exists with the grants its work needs |
 | A row can be written | The account that carries the study's rows can insert one, and it reads back |

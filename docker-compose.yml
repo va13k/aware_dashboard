@@ -262,6 +262,11 @@ services:
       # for a deployment that has not run setup since this became a variable.
       ANDROID_DATABASE_URL: ${ANDROID_DATABASE_URL:-mysql+aiomysql://aware_analytics:analyticspass@mysql:3306/aware_android}
       IOS_DATABASE_URL: ${IOS_DATABASE_URL:-mysql+aiomysql://aware_analytics:analyticspass@mysql:3306/aware_ios}
+      # Whether these connections are encrypted, from the same declaration the
+      # phones and the micro-server read. A database this deployment runs is always
+      # encrypted, so the default is on: a deployment that has not run setup since
+      # this became a variable is running one.
+      DB_REQUIRE_TLS: ${DB_REQUIRE_TLS:-1}
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-CHANGE_ME}
       RESEARCHER_USERNAME: ${RESEARCHER_USERNAME:-}
       RESEARCHER_PASSWORD: ${RESEARCHER_PASSWORD:-}
@@ -325,6 +330,11 @@ services:
     environment:
       ANDROID_DATABASE_URL: ${ANDROID_DATABASE_URL:-mysql+aiomysql://aware_analytics:analyticspass@mysql:3306/aware_android}
       IOS_DATABASE_URL: ${IOS_DATABASE_URL:-mysql+aiomysql://aware_analytics:analyticspass@mysql:3306/aware_ios}
+      # Whether these connections are encrypted, from the same declaration the
+      # phones and the micro-server read. A database this deployment runs is always
+      # encrypted, so the default is on: a deployment that has not run setup since
+      # this became a variable is running one.
+      DB_REQUIRE_TLS: ${DB_REQUIRE_TLS:-1}
       # How often a pass runs, and the file each completed pass stamps. The
       # healthcheck below reads both.
       COUNTS_REFRESH_INTERVAL_SECONDS: ${COUNTS_REFRESH_INTERVAL_SECONDS:-60}

@@ -1,5 +1,9 @@
 var step = 0,
   ssl = false,
+  // Encryption to a database this deployment does not run. On by default because
+  // almost every server offers it, and the question is only asked for the one
+  // placement whose server this deployment does not administer.
+  dbTls = true,
   redirectTimer = null,
   suggestedPublicHost = "",
   customPublicHost = "",
@@ -195,6 +199,22 @@ function go(dir) {
         return;
       }
     }
+    // Caught before the request so a half-copied paste is a corrected field
+    // rather than a refused deployment. The server checks it again, because a
+    // form is not a boundary.
+    if (step === 2 && dbPlacement() === "external" && dbTls) {
+      var ca = dbCaCertificate();
+      if (
+        ca &&
+        !/-----BEGIN CERTIFICATE-----[\s\S]*-----END CERTIFICATE-----/.test(ca)
+      ) {
+        showFieldError(
+          "dbCaCertificate",
+          "Paste the whole file, from -----BEGIN CERTIFICATE----- to -----END CERTIFICATE-----.",
+        );
+        return;
+      }
+    }
     if (step === 2 && androidDataflow() === "direct") {
       var pp = (document.getElementById("participantPass").value || "").trim();
       if (pp && !PASSWORD_PATTERN.test(pp)) {
@@ -290,6 +310,26 @@ function toggleSSL() {
   document.getElementById("sslFields").classList.toggle("show", ssl);
 }
 
+/**
+ * Whether this study opens the database it names over TLS.
+ *
+ * The authority field goes with it: there is nothing to verify on a connection
+ * nobody encrypts, and leaving the box on screen would invite a researcher to
+ * paste a certificate that changes nothing.
+ */
+function toggleDbTls() {
+  dbTls = !dbTls;
+  document.getElementById("dbTlsToggle").classList.toggle("on", dbTls);
+  document.getElementById("dbCaField").classList.toggle("hidden", !dbTls);
+  document.getElementById("dbPlaintextCaution").classList.toggle("hidden", dbTls);
+  if (!dbTls) clearFieldError("dbCaCertificate");
+}
+
+function dbCaCertificate() {
+  var el = document.getElementById("dbCaCertificate");
+  return el && el.value ? el.value.trim() : "";
+}
+
 function getPayload() {
   var mp = (document.getElementById("mysqlPass").value || "CHANGE_ME").trim();
   var ru = (document.getElementById("researcherUser").value || "").trim();
@@ -313,6 +353,12 @@ function getPayload() {
     db_placement: dbPlacement(),
     db_host: dbHost(),
     db_port: dbPort(),
+    // Sent only for the placement that has a say. A bundled database settles both
+    // of these itself, and an answer arriving for it would be a form field nobody
+    // was shown rather than a decision the researcher made.
+    db_require_tls: dbPlacement() === "external" && !dbTls ? "0" : "1",
+    db_ca_certificate:
+      dbPlacement() === "external" && dbTls ? dbCaCertificate() : "",
     mysql_backup_host_dir:
       (document.getElementById("backupHostDir").value || "").trim() ||
       "./backups/mysql",
@@ -420,6 +466,9 @@ function getEnv() {
     "\n" +
     "DB_PORT=" +
     payload.db_port +
+    "\n" +
+    "DB_REQUIRE_TLS=" +
+    payload.db_require_tls +
     "\n" +
     "MYSQL_BACKUP_HOST_DIR=" +
     payload.mysql_backup_host_dir +
@@ -734,6 +783,11 @@ function loadExisting() {
       }
       if ((d.DB_PORT || "").trim()) {
         document.getElementById("dbPort").value = d.DB_PORT;
+      }
+      // A study that turned encryption off did so for a server that cannot offer
+      // it, and that server does not change because the wizard was reopened.
+      if (["0", "false", "no", "off"].indexOf((d.DB_REQUIRE_TLS || "").trim()) !== -1) {
+        toggleDbTls();
       }
       updateDbPlacement();
 

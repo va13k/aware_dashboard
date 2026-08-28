@@ -1,3 +1,4 @@
+import base64
 import json
 import pathlib
 import re
@@ -29,6 +30,7 @@ def project_root(candidates=PROJECT_CANDIDATES) -> pathlib.Path:
 # refuses.
 sys.path.insert(0, str(project_root()))
 from shared_config import dataflow, placement  # noqa: E402
+from shared_config.certificates import read_certificate  # noqa: E402
 
 # Characters that survive .env, the wizard's JSON responses and MySQL quoting
 # unambiguously, and that a participant can retype from a printed sheet. Kept
@@ -131,6 +133,44 @@ def clean_placement(value: object, dataflow_choice: str, host: object) -> tuple[
     return chosen, named
 
 
+def clean_tls(
+    placement_choice: str, require: object, ca_certificate: object
+) -> tuple[bool, str]:
+    """What this run asks of the connection, refused here when it cannot be honoured.
+
+    Only a database the researcher names carries an answer. A bundled one is
+    administered at both ends by this deployment, which generates the certificate and
+    publishes the authority it signed with, so an answer arriving for it is a form
+    field that was never asked rather than a decision to apply.
+
+    A certificate that cannot be read is refused at the boundary rather than stored.
+    Devices build their trust store from what a study publishes and treat an
+    unreadable authority as a database they cannot reach, so a half-copied paste
+    would stop every upload --- and finding that out here costs a corrected paste
+    instead of a study that enrols and collects nothing.
+    """
+    if placement_choice != placement.EXTERNAL:
+        return True, ""
+
+    text = str(require if require is not None else "1").strip().lower()
+    encrypted = text not in {"0", "false", "no", "off"}
+    if not encrypted:
+        return False, ""
+
+    supplied = str(ca_certificate or "").strip()
+    if not supplied:
+        return True, ""
+    cleaned = read_certificate(supplied)
+    if not cleaned:
+        raise SystemExit(
+            "The database certificate authority is not a certificate this deployment "
+            "can read. Paste the whole file, from -----BEGIN CERTIFICATE----- to "
+            "-----END CERTIFICATE-----, or leave it empty to connect encrypted "
+            "without verifying the server."
+        )
+    return True, cleaned
+
+
 def main() -> None:
     if len(sys.argv) != 2:
         raise SystemExit("usage: write_request_env.py <output-path>")
@@ -167,6 +207,11 @@ def main() -> None:
         payload.get("db_host", env_fallback.get("DB_HOST", "")),
     )
     db_port = positive_int(payload.get("db_port"), env_fallback.get("DB_PORT", "3306"))
+    db_require_tls, db_ca_certificate = clean_tls(
+        db_placement,
+        payload.get("db_require_tls", env_fallback.get("DB_REQUIRE_TLS", "")) or None,
+        payload.get("db_ca_certificate"),
+    )
     ssl_cert = str(
         payload.get(
             "ssl_certificate_path",
@@ -229,11 +274,22 @@ def main() -> None:
         f"DB_PLACEMENT={db_placement}",
         f"DB_HOST={db_host}",
         f"DB_PORT={db_port}",
+        f"DB_REQUIRE_TLS={'1' if db_require_tls else '0'}",
         f"MYSQL_BACKUP_HOST_DIR={backup_host_dir}",
         f"MYSQL_BACKUP_INTERVAL_SECONDS={backup_interval_seconds}",
         f"MYSQL_BACKUP_RETENTION_DAYS={backup_retention_days}",
         f"MYSQL_MAX_USER_CONNECTIONS_PER_ACCOUNT={mysql_max_user_connections}",
     ]
+
+    # Encoded because every line here is one setting and a PEM is several. Left out
+    # entirely when there is none, so an empty field clears nothing a previous run
+    # settled -- the study model is where an authority is cleared, and it is cleared
+    # there by saving an empty one.
+    if db_ca_certificate:
+        lines.append(
+            "DB_CA_CERTIFICATE_B64="
+            + base64.b64encode(db_ca_certificate.encode("utf-8")).decode("ascii")
+        )
 
     if researcher_username:
         lines.append(f"RESEARCHER_USERNAME={researcher_username}")

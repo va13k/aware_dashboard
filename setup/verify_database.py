@@ -11,6 +11,12 @@ firewall:
 ``reachable``
     The address answers on its port and the credential authenticates.
 
+``tls``
+    The connection is what the study asked of it. A database this deployment runs is
+    always encrypted; one the researcher names answers to its owner, so the study
+    declares what it needs and this is where the server is held to it --- including
+    the certificate authority, checked here rather than first on a phone.
+
 ``schema``
     The study's schema is there, or this account can create it.
 
@@ -127,60 +133,111 @@ def check_reachable(client: mysql_client.Client, user: str, password: str, host:
     )
 
 
-def check_tls(client: mysql_client.Client, user: str, password: str, ca_path: str = "") -> dict:
-    """Whether this database can carry the study's data encrypted, and how far it is trusted.
+def session_cipher(client: mysql_client.Client, user: str, password: str) -> str:
+    """The cipher this connection negotiated, or "" when it arrived in clear text.
 
-    Asked because encryption is no longer optional: every account this deployment
-    creates requires it, so a server that cannot offer TLS is a server this study
-    cannot use at all --- and finding that out here is the difference between a
-    failed check and a deployment that authenticates and then refuses every write.
+    The session is asked rather than the server's configuration. ``have_ssl`` was the
+    variable that answered the question directly and MySQL 8.4 removed it, so reading
+    it would report every recent server as unable to encrypt --- while what a study
+    actually depends on is whether a connection came up encrypted, which this is.
+    """
+    result = client.run(user, password, "SHOW STATUS LIKE 'Ssl_cipher';", batch=True)
+    if result.returncode != 0:
+        return ""
+    parts = result.stdout.strip().split()
+    return parts[-1] if len(parts) > 1 else ""
+
+
+def check_tls(
+    client: mysql_client.Client,
+    user: str,
+    password: str,
+    required: bool,
+    authority: str = "",
+    exposure: str = "",
+) -> dict:
+    """Whether the connection is what this study asked of it, and how far it is trusted.
+
+    Asked because the answer decides whether anything can write at all: the accounts
+    are created requiring an encrypted session wherever the study asked for one, so a
+    server that cannot offer TLS to a study that demands it authenticates and then
+    refuses every insert. Finding that out here is the difference between a failed
+    check and a deployment that comes up healthy and collects nothing.
+
+    A study that asked for plaintext is reported rather than failed. That is the
+    answer a researcher gave about a server they own, and this check's job is to say
+    what it costs --- including whether the server would have encrypted anyway, since
+    a study running in clear text against a database that could have done better is
+    worth going back for.
 
     Verification is reported apart from encryption, because they fail for different
-    reasons and only one of them stops a study. A database this deployment runs
-    generates its own certificate with no subject alternative name, so nothing can
-    check who answered; that is a limit to state, not a fault to fix. A database the
-    researcher names may present a real one, and then naming its authority is what
-    closes impersonation.
+    reasons. A database this deployment runs signs its own certificate with no
+    subject alternative name, so nothing can check who answered; that is a limit to
+    state. A database the researcher names may present a real one, and an authority
+    supplied for it is checked here rather than first on a participant's phone --- a
+    certificate that does not chain to it is a study whose devices keep their data and
+    stop uploading.
     """
-    offered = client.run(
-        user, password, "SHOW VARIABLES LIKE 'have_ssl';", batch=True
-    )
-    if offered.returncode == 0 and "YES" not in offered.stdout.upper():
+    if not required:
+        cipher = session_cipher(client, user, password)
+        offered = (
+            " The server does offer encryption --- the connection this check made came "
+            "up encrypted --- so this study is in clear text by its own setting rather "
+            "than by the server's limits."
+            if cipher
+            else " The server did not offer encryption either."
+        )
         return check(
             "tls",
             False,
-            "This server does not offer TLS. Every account this deployment creates "
-            "requires an encrypted connection, so nothing would be able to write to "
-            "it. Enable TLS on the server, or use a database that offers it.",
+            "This study asked for an unencrypted connection to its database."
+            + (f" {exposure}" if exposure else "")
+            + offered,
+            warning=True,
         )
 
-    session = client.run(
-        user, password, "SHOW STATUS LIKE 'Ssl_cipher';", batch=True
-    )
-    cipher = ""
-    if session.returncode == 0 and session.stdout.strip():
-        parts = session.stdout.strip().split()
-        cipher = parts[-1] if len(parts) > 1 else ""
+    cipher = session_cipher(client.asking_for("REQUIRED"), user, password)
     if not cipher:
         return check(
             "tls",
             False,
-            "The connection to this server was not encrypted, and every account this "
-            "deployment creates requires that it is. Nothing would be able to write.",
+            "This server would not open an encrypted connection, and this study "
+            "requires one --- every account it creates is granted on that condition, so "
+            "nothing would be able to write. Enable TLS on the server, use a database "
+            "that offers it, or say in setup that this study connects without "
+            "encryption.",
         )
 
-    verified = client.run(user, password, "SELECT 1;", batch=True) if ca_path else None
-    if ca_path and verified is not None and verified.returncode == 0:
-        return check("tls", True, f"Encrypted ({cipher}) and verified against the authority you named.")
+    if not authority:
+        return check(
+            "tls",
+            True,
+            f"Encrypted ({cipher}). The certificate is not verified: nothing here names "
+            "the authority that signed it, so the traffic cannot be read but a server "
+            "on the same network could impersonate this one. Supplying a certificate "
+            "authority is what closes that.",
+        )
 
+    verified = client.asking_for("VERIFY_CA", authority).run(
+        user, password, "SELECT 1;", batch=True
+    )
+    if verified.returncode == 0:
+        return check(
+            "tls",
+            True,
+            f"Encrypted ({cipher}) and verified against the certificate authority this "
+            "study supplies.",
+        )
     return check(
         "tls",
-        True,
-        f"Encrypted ({cipher}). The certificate is not verified: nothing here names "
-        "the authority that signed it, so the traffic cannot be read but a server on "
-        "the same network could impersonate this one. Naming a certificate authority "
-        "is what closes that.",
+        False,
+        "This server's certificate does not check out against the authority this study "
+        f"supplies: {mysql_client.error_of(verified)} Devices are given that authority "
+        "and verify against it, so they would treat this database as one they cannot "
+        "reach and stop uploading. Supply the authority that signed this server's "
+        "certificate, or clear it to connect encrypted without verifying.",
     )
+
 
 
 def check_schema(client: mysql_client.Client, user: str, password: str, schema: str) -> dict:
@@ -358,6 +415,9 @@ def verify(
     schema: str,
     accounts: list[dict],
     writer: dict,
+    tls_required: bool = True,
+    authority: str = "",
+    exposure: str = "",
 ) -> list[dict]:
     """The four questions, in the order a later one depends on an earlier."""
     client = mysql_client.Client(docker_base, host, port)
@@ -371,8 +431,14 @@ def verify(
             check("write", False, "Not attempted: the database did not answer."),
         ]
 
-    tls_check = check_tls(client, admin_user, admin_password)
-    if not tls_check["ok"]:
+    tls_check = check_tls(
+        client, admin_user, admin_password, tls_required, authority, exposure
+    )
+    # A study that asked for plaintext leaves this failed and warning, which is a
+    # connection to carry on checking over. Only a demand the server could not meet
+    # stops the rest: the accounts would be created on a condition it cannot honour,
+    # so what they could write says nothing about what the study would.
+    if not tls_check["ok"] and not tls_check["warning"]:
         return [
             reachable,
             tls_check,
@@ -473,6 +539,9 @@ def main() -> int:
         "host": host,
         "port": port,
         "schema": schema,
+        # What was asked of the connection, so a reader of the file knows which
+        # question the encryption line answers.
+        "tls_required": database.tls_required(databases),
         "checked_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
         "checks": [],
         "ok": False,
@@ -487,7 +556,17 @@ def main() -> int:
         ]
     else:
         result["checks"] = verify(
-            docker_base, host, port, admin_user, admin_password, schema, accounts, writer
+            docker_base,
+            host,
+            port,
+            admin_user,
+            admin_password,
+            schema,
+            accounts,
+            writer,
+            database.tls_required(databases),
+            database.tls_authority(databases),
+            placement.unencrypted_warning(chosen, dataflow.declared(source, "android")) or "",
         )
 
     result["ok"] = all(entry["ok"] or entry.get("warning") for entry in result["checks"])

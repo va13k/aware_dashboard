@@ -27,6 +27,10 @@ published port may be bound to loopback on the webservice dataflow.
 
 So one declaration, two resolutions, and the distinction is which side of the
 deployment boundary the reader sits on.
+
+What is asked of that connection is declared once here too, in ``database.tls``,
+and resolved the same way: the placement decides whether it is a question at all.
+See :func:`tls_required`.
 """
 
 from shared_config import dataflow
@@ -37,6 +41,13 @@ INTERNAL_HOSTS = frozenset({"", "db.internal", "mysql", "localhost", "127.0.0.1"
 
 #: What the bundled database is called on the compose network.
 COMPOSE_HOST = "mysql"
+
+#: Where a study says what it wants of the connection to its database: whether that
+#: connection has to be encrypted, and the authority the server's certificate is
+#: checked against. Beside ``host`` rather than inside a platform's block, because
+#: both platforms and every service open the same server --- two answers could
+#: disagree about one connection.
+TLS_KEY = "tls"
 
 #: The account the dashboard reads with. Read-only on the study tables, with write
 #: granted on its own cache tables only (see db/dashboard-tables.sql).
@@ -133,6 +144,72 @@ def service_host(database: dict) -> str:
     return COMPOSE_HOST if is_internal(host) else host
 
 
+def tls_declaration(database: dict) -> dict:
+    """What this study declares about the connection, or {} when it declares nothing."""
+    block = (database or {}).get(TLS_KEY)
+    return block if isinstance(block, dict) else {}
+
+
+def tls_required(database: dict) -> bool:
+    """Whether the connection to this study's database has to be encrypted.
+
+    Not a preference on the bundled placement. Both ends belong to this deployment,
+    the server generates its own certificate on first start and the deploy publishes
+    the authority it signed with, so there is nothing for a researcher to arrange and
+    nothing to gain by leaving it off --- the setting would only ever be a way to
+    make a working study less safe.
+
+    A database the researcher names is a server this deployment does not administer,
+    and not every one of them can offer TLS: a MySQL built without it, a MariaDB
+    older than 11.4 that generated no certificate, an institutional host whose
+    administrator will not enable it. Refusing those outright refuses the study, so
+    there the answer is declared rather than assumed.
+
+    A study that declares nothing is encrypted. Silence has meant TLS ever since
+    every account was created requiring it, and a study running that way today would
+    otherwise be turned unencrypted by the arrival of this setting.
+    """
+    if is_internal(declared_host(database)):
+        return True
+    declared = tls_declaration(database).get("require")
+    return True if declared is None else bool(declared)
+
+
+def tls_authority(database: dict) -> str:
+    """The authority the database's certificate is checked against, or "" for none.
+
+    Read from the connection block, falling back to where a study written before it
+    kept the same PEM so nothing a researcher pasted is lost. Empty leaves the
+    connection encrypted and unverified: the traffic cannot be read, and a server on
+    the same network could still answer in this database's place.
+
+    Nothing to verify without encryption, so a study that turned TLS off reports
+    none whatever it holds.
+    """
+    if not tls_required(database):
+        return ""
+    declared = tls_declaration(database).get("ca_certificate")
+    if declared is None:
+        declared = ((database or {}).get("android") or {}).get("ca_certificate")
+    return str(declared or "").strip()
+
+
+def declare_tls(
+    database: dict, require: bool | None = None, ca_certificate: str | None = None
+) -> dict:
+    """Record what a study wants of its connection, in the one place it is read from.
+
+    Each part is written only when an answer was given, so a caller settling one of
+    them leaves the other as the study declared it.
+    """
+    block = database.setdefault(TLS_KEY, {})
+    if require is not None:
+        block["require"] = bool(require)
+    if ca_certificate is not None:
+        block["ca_certificate"] = str(ca_certificate or "").strip()
+    return block
+
+
 def platform_port(database: dict, platform: str) -> int:
     """The port for a platform, defaulting to MySQL's rather than guessing."""
     entry = (database or {}).get(platform) or {}
@@ -173,6 +250,11 @@ def resolved_env(database: dict, analytics_password: str) -> dict[str, str]:
     """
     return {
         "DB_SERVICE_HOST": service_host(database),
+        # The dashboard's API opens the same server as everything else, so it takes
+        # the same answer. Passed as an environment variable because the API reads
+        # `.env` and not the study model: a service that encrypted while the server
+        # does not offer it would fail every query rather than read the study.
+        "DB_REQUIRE_TLS": "1" if tls_required(database) else "0",
         "ANDROID_DATABASE_URL": analytics_url(database, "android", analytics_password),
         "IOS_DATABASE_URL": analytics_url(database, "ios", analytics_password),
     }

@@ -27,8 +27,13 @@ dataflow puts every participant's phone on the database itself, from whatever
 network the participant is on, so an external host has to be reachable from the
 internet for the length of the study. An institution does not open its database
 that way; a researcher running their own server legitimately might. Refusing it
-would decide for them, so it is offered with the exposure stated plainly and TLS
-turned on --- which is the part that is not a preference.
+would decide for them, so it is offered with the exposure stated plainly.
+
+Encryption follows the placement in the same way. On ``bundled`` it is settled and
+not asked about: this deployment administers both ends. On ``external`` it is a
+property of somebody else's server, so it is asked for, checked before the study
+deploys, and refusable --- an institutional MySQL built without TLS would otherwise
+be a database this software simply cannot be pointed at.
 
 Switching placement is a redeploy rather than a live change, for the same reason
 the dataflow is: it decides which containers exist. What it does not do is carry
@@ -99,25 +104,30 @@ def connection(placement_choice: str, android_dataflow: str) -> dict:
     }
 
 
-def requires_tls(placement_choice: str, android_dataflow: str) -> bool:
-    """Whether this connection should be encrypted unless a researcher says otherwise.
+def requires_tls(placement_choice: str) -> bool:
+    """Whether encryption is settled by the placement rather than asked about.
 
-    Derived rather than configured, because the honest answer is a property of the
-    topology and not a preference. A researcher may still turn it off --- a closed
-    lab network, or an external certificate that will not verify --- and the
-    interfaces say plainly what that costs.
+    A database this deployment runs is one it administers at both ends: it generates
+    the certificate, the deploy publishes the authority it signed with, and every
+    account it creates requires an encrypted session. Nothing has to be arranged, so
+    there is nothing to ask and no answer worth accepting except yes.
+
+    A database the researcher names is a server this deployment does not administer,
+    and TLS there is something its owner either offers or does not. That is the one
+    placement where the question is real, and :func:`shared_config.database.tls_required`
+    is where the study's answer to it is read.
     """
-    return connection(placement_choice, android_dataflow)["crosses_network"]
+    return placement_choice != EXTERNAL
 
 
 def unencrypted_warning(placement_choice: str, android_dataflow: str) -> str | None:
-    """What running this combination without TLS exposes, or None when it exposes little.
+    """What running this combination without TLS exposes, or None when it cannot be run so.
 
     Returned as the sentence an interface shows in red, because the two unsafe cases
     are unsafe for different reasons and a single generic caution would understate
     both.
     """
-    if not requires_tls(placement_choice, android_dataflow):
+    if requires_tls(placement_choice):
         return None
     if connection(placement_choice, android_dataflow)["opener"] == "participants":
         return (

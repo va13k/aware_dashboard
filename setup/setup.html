@@ -259,6 +259,73 @@
             asks from the deployment's network rather than from this machine, so a
             host that only resolves here is reported rather than accepted.
           </p>
+          <div class="toggle-row" style="margin-top: 16px">
+            <div class="toggle on" id="dbTlsToggle" onclick="toggleDbTls()">
+              <div class="toggle-knob"></div>
+            </div>
+            <div>
+              <p class="toggle-label">Connect to this database over TLS</p>
+              <p class="toggle-hint">
+                Encrypts everything between this study and the database it names
+              </p>
+              <details class="hint" style="margin-top: 6px">
+                <summary>When would I turn this off?</summary>
+                <div style="margin-top: 8px">
+                  Only when the server cannot offer it. Most databases can:
+                  MySQL 5.7 and later generate a certificate the first time they
+                  start, and managed databases require encryption outright. The
+                  ones that cannot are a MySQL built without TLS support, a
+                  MariaDB older than 11.4 that was never given a certificate, or
+                  a host whose administrator has switched it off.
+                  <br /><br />
+                  Leave it on if you are not sure. Setup opens the connection and
+                  tells you what happened before the study is deployed, so a
+                  server that cannot encrypt is reported here rather than found
+                  later as a study that enrols and collects nothing.
+                  <br /><br />
+                  A database this deployment runs itself is always encrypted and
+                  never asks — this question exists because a server you name is
+                  one this deployment does not administer.
+                </div>
+              </details>
+            </div>
+          </div>
+          <p
+            class="hint hidden"
+            id="dbPlaintextCaution"
+            style="margin: 10px 0 0; border-left: 3px solid #b45309; padding-left: 10px"
+          >
+            <b>The study's data will cross the network in clear text.</b> Everything
+            written to this database, and the account password used to write it,
+            can be read by anyone positioned on the network in between. Choose this
+            only for a server that genuinely cannot encrypt.
+          </p>
+          <div class="field" id="dbCaField" style="margin-top: 16px">
+            <label for="dbCaCertificate">Certificate authority (optional)</label>
+            <textarea
+              id="dbCaCertificate"
+              rows="5"
+              spellcheck="false"
+              placeholder="-----BEGIN CERTIFICATE-----&#10;…&#10;-----END CERTIFICATE-----"
+            ></textarea>
+            <p class="field-error hidden" id="dbCaCertificateError"></p>
+            <p class="hint">
+              Encryption keeps the traffic unreadable; it cannot say <i>which</i>
+              server answered. This is what closes that — paste the authority that
+              signed your database's certificate and setup verifies the server
+              against it before deploying. Managed databases publish it (Google
+              Cloud SQL under <i>Connections → Security</i>, DigitalOcean and Aiven
+              behind a <i>Download CA certificate</i> button, RDS and Azure as a
+              documentation download); a server your institution runs has an
+              administrator who can send it; a MySQL that generated its own keeps
+              it as <code>ca.pem</code> in its data directory.
+              <br /><br />
+              Paste the whole file including the BEGIN and END lines — a bundle
+              holding several certificates can be pasted as it is. Leave it empty
+              to connect encrypted without verifying the server, which you can
+              supply later in the Configurator.
+            </p>
+          </div>
         </div>
         <div class="toggle-row">
           <div class="toggle" id="sslToggle" onclick="toggleSSL()">

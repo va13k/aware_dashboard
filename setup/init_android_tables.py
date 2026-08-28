@@ -85,31 +85,30 @@ def load_database_accounts() -> list[dict]:
     which performs every write on the webservice dataflow --- so both are listed and
     each carries its own password.
 
-Every account requires TLS, and none of them asks. Encryption is not a property of
-    one connection or one dataflow: whoever opens the database carries a whole study's
-    data over that socket, and MySQL 8 protecting only the password while the rows
-    travel in clear is the wrong half. The clients were all ready for it --- the
-    Android client has never opened MySQL without ``requireSSL=true``, the
-    micro-server supplies the mode from its own configuration, and the dashboard's
-    API encrypts in ``app/database.py``.
+    Every account carries the same REQUIRE clause, because encryption is not a
+    property of one connection or one dataflow: whoever opens the database carries a
+    whole study's data over that socket, and MySQL 8 protecting only the password
+    while the rows travel in clear is the wrong half. So the study's one answer is
+    read here and applied to all of them, and the clients ask for what it grants ---
+    the Android client from the served config, the micro-server from its own, and the
+    dashboard's API in ``app/database.py``.
 
-    What this does not buy is protection from impersonation: a bundled MySQL presents
-    a certificate it generated itself, with no subject alternative name, so no client
-    can verify who it is talking to. That is stated wherever a researcher reads about
-    it rather than implied by the word "SSL".
+    That answer is settled rather than asked on a database this deployment runs, and
+    declared by the study on one the researcher names, where TLS is a property of
+    somebody else's server. See :func:`shared_config.database.tls_required`.
+
+    What encryption does not buy is protection from impersonation: a bundled MySQL
+    presents a certificate it generated itself, with no subject alternative name, so
+    no client can verify who it is talking to. That is stated wherever a researcher
+    reads about it rather than implied by the word "SSL".
 
     Each entry carries the platform whose schema it writes, so a caller provisioning
     one schema selects the accounts belonging to it.
     """
     source = read_source()
     databases = source["database"]
-    on_path_name, _ = database.android_credentials(
-        databases, dataflow.declared(source, "android")
-    )
     server = database.android_ingest_account(dataflow.WEBSERVICE)
-
-    def requirement(entry: dict, username: str):
-        return True
+    require_ssl = database.tls_required(databases)
 
     accounts = []
     for platform, name_key, password_key in (
@@ -128,7 +127,7 @@ Every account requires TLS, and none of them asks. Encryption is not a property 
                 "platform": platform,
                 "username": username,
                 "password": str(entry.get(password_key, "")).strip(),
-                "require_ssl": requirement(entry, username),
+                "require_ssl": require_ssl,
             }
         )
     return accounts
@@ -229,9 +228,11 @@ def apply_account_passwords(
     for account in accounts:
         user = f"{quote_sql_string(account['username'])}@'%'"
         password = quote_sql_string(account["password"])
-        require = ""
-        if account["require_ssl"]:
-            require = " REQUIRE SSL"
+        # Stated in both directions rather than only when TLS is wanted. An ALTER
+        # USER with no REQUIRE leaves the clause the account already carries, so a
+        # study moved onto a server that cannot encrypt would keep accounts refusing
+        # every connection it can make, and the deployment would look configured.
+        require = " REQUIRE SSL" if account["require_ssl"] else " REQUIRE NONE"
         statements.append(f"CREATE USER IF NOT EXISTS {user} IDENTIFIED BY {password};")
         statements.append(f"ALTER USER {user} IDENTIFIED BY {password}{require};")
     statements.append("FLUSH PRIVILEGES;")

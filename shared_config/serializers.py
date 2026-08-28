@@ -3,7 +3,7 @@ import pathlib
 import secrets
 from datetime import datetime, timezone
 
-from shared_config import dataflow
+from shared_config import database, dataflow
 from shared_config.database import android_server_credentials
 from shared_config.runtime import build_public_base_url
 from shared_config.source_store import read_source
@@ -587,9 +587,11 @@ def serialize_android_config(
             "config_without_password": android_db.get(
                 "config_without_password", False
             ),
-            # Always true now: every account is created requiring TLS, and the
-            # client has never opened MySQL without asking for it.
-            "require_ssl": True,
+            # What the account this phone opens the database with was created
+            # requiring, so the client asks for the session the server will grant.
+            # Settled by the placement on a database this deployment runs, declared
+            # by the study on one the researcher names.
+            "require_ssl": database.tls_required(source["database"]),
             # The authority that signed the database's certificate, when the study
             # publishes one. Encryption alone leaves a phone unable to tell which
             # server answered; this is what lets it check, and the client builds a
@@ -600,7 +602,7 @@ def serialize_android_config(
             # that publishes an unreadable one stops uploading rather than falling
             # back quietly -- the client treats it as a database it could not reach,
             # so the batch waits for the next sync.
-            DB_CA_KEY: str(android_db.get("ca_certificate") or "").strip(),
+            DB_CA_KEY: database.tls_authority(source["database"]),
         }
     else:
         # Absent rather than blanked. A block of empty strings still tells a
@@ -685,7 +687,7 @@ def build_android_micro_config(
             "database_user": server_user,
             "database_pwd": server_password,
             "database_port": android_db["port"],
-            "database_ssl_mode": database_ssl_mode(android_db),
+            "database_ssl_mode": database_ssl_mode(source["database"]),
             "server_host": "0.0.0.0",
             "server_port": settings.get("android_micro_server_port", 8082),
             "websocket_port": settings.get("android_micro_websocket_port", 8083),
@@ -714,24 +716,25 @@ def build_android_micro_config(
     }
 
 
-#: The client TLS mode written into a micro-server config, keyed by the account's
-#: REQUIRE clause. Both encrypt: the clause decides whether a connection that
-#: arrives in plaintext is served or refused, and the mode follows it so a client
-#: asks for what the account grants.
-def database_ssl_mode(database: dict) -> str:
-    """The client TLS mode. Always ``required``, and no longer a study's to choose.
+def database_ssl_mode(database_block: dict) -> str:
+    """The client TLS mode a micro-server opens the study database with.
 
-    Every account is created requiring TLS, so a client asking for anything less
-    would be refused by the server it is asking. The two used to be a pair of
-    settings that could disagree; now there is one answer and it is here.
+    Follows the account's REQUIRE clause, because the two are one answer read from
+    two ends: a client asking for less than the account was granted is refused by
+    the server, and a client asking for more than the server offers cannot connect
+    at all. Both are settled by :func:`shared_config.database.tls_required`.
 
     ``required`` encrypts and does not verify. Verifying needs the authority that
     signed the server's certificate, and a bundled MySQL signs its own with no
     subject alternative name, so no client can check who answered. What this closes
     is reading the traffic; what it leaves open is impersonating the server, and
     saying so plainly is better than letting the word "SSL" imply both.
+
+    ``disabled`` is what a study running against a server that cannot offer TLS
+    gets. It is the researcher's declared answer rather than a default, and what it
+    costs is stated wherever it can be chosen.
     """
-    return "required"
+    return "required" if database.tls_required(database_block) else "disabled"
 
 
 def update_ios_server_config(
@@ -750,9 +753,7 @@ def update_ios_server_config(
     server["database_user"] = settings["ios_database_user"]
     server["database_pwd"] = settings["ios_database_password"]
     server["database_port"] = settings["ios_database_port"]
-    server["database_ssl_mode"] = database_ssl_mode(
-        (source_database or {}).get("ios", {})
-    )
+    server["database_ssl_mode"] = database_ssl_mode(source_database or {})
     server["server_host"] = settings["ios_server_host"]
     server["server_port"] = settings["ios_server_port"]
     server["websocket_port"] = settings["ios_websocket_port"]

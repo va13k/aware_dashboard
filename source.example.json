@@ -23,16 +23,18 @@
   },
   "database": {
     "host": "db.internal",
+    "tls": {
+      "require": true,
+      "ca_certificate": ""
+    },
     "android": {
       "port": 3306,
       "name": "aware_android",
       "username": "aware_android_participant",
       "password": "CHANGE_ME",
-      "require_ssl": false,
       "config_without_password": false,
       "server_username": "aware_android_server",
-      "server_password": "CHANGE_ME",
-      "ca_certificate": ""
+      "server_password": "CHANGE_ME"
     },
     "ios": {
       "port": 3306,

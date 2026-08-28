@@ -20,7 +20,7 @@ import sys
 
 import pytest
 
-from shared_config import database, dataflow
+from shared_config import database, dataflow, placement
 
 SETUP = pathlib.Path(__file__).resolve().parent.parent / "setup"
 sys.path.insert(0, str(SETUP))
@@ -677,31 +677,34 @@ class TestTheDeployIsChecked:
 
 
 class TestTheServersOwnTlsSetting:
-    """serializers.database_ssl_mode: one answer, no longer a study's to choose.
+    """serializers.database_ssl_mode: the client asks for what the account was granted.
 
-    Every account is created requiring TLS, so a client asking for less is refused by
-    the server it is asking. The mode used to mirror a per-study clause and the two
-    could disagree; keeping one answer is what stops a config from describing a
-    connection the account will not accept.
+    One answer read from two ends. A client asking for less than the account requires
+    is refused by the server; a client asking for more than the server offers cannot
+    connect at all. Both come from the study's one declaration, and the placement
+    decides whether that declaration is the researcher's to make.
     """
 
     #: The values MySQLVerticle.setDatabaseSslMode maps to an encrypting client.
     ENCRYPTING = {"prefer", "preferred", "require", "required"}
 
-    def _android(self, require_ssl=None):
-        entry = {
-            "name": "aware_android",
-            "username": "aware_android_participant",
-            "password": "secret",
-            "port": 3306,
+    def _databases(self, host="db.internal", require=None):
+        databases = {
+            "host": host,
+            "android": {
+                "name": "aware_android",
+                "username": "aware_android_participant",
+                "password": "secret",
+                "port": 3306,
+            },
         }
-        if require_ssl is not None:
-            entry["require_ssl"] = require_ssl
-        return entry
+        if require is not None:
+            databases["tls"] = {"require": require}
+        return databases
 
-    def _micro(self, require_ssl=None):
+    def _micro(self, host="db.internal", require=None):
         source = {
-            "database": {"android": self._android(require_ssl)},
+            "database": self._databases(host, require),
             "study": {
                 "title": "Study",
                 "description": "",
@@ -728,21 +731,38 @@ class TestTheServersOwnTlsSetting:
             join_url="http://h/2/k",
         )
 
-    def test_the_connection_is_always_required_to_encrypt(self):
+    def test_a_database_this_deployment_runs_always_encrypts(self):
         assert serializers.database_ssl_mode({}) == "required"
 
     @pytest.mark.parametrize("stated", [True, False, None])
-    def test_a_study_saying_otherwise_no_longer_changes_it(self, stated):
-        # The clause on the account is unconditional now, so a leftover field in an
-        # old study model must not talk a client into a mode the server refuses.
-        assert serializers.database_ssl_mode(self._android(stated)) == "required"
+    def test_a_bundled_study_cannot_declare_its_way_out_of_it(self, stated):
+        # Both ends are this deployment's and every account it creates requires an
+        # encrypted session, so a client talked into asking for less would simply be
+        # refused by the server beside it.
+        assert serializers.database_ssl_mode(self._databases(require=stated)) == "required"
 
-    @pytest.mark.parametrize("stated", [True, False, None])
+    def test_a_named_database_encrypts_unless_the_study_says_otherwise(self):
+        # Silence has meant TLS since every account was created requiring it, so a
+        # study written before the setting arrived keeps the connection it has.
+        assert serializers.database_ssl_mode(self._databases("db.example.edu")) == "required"
+
+    def test_a_named_database_that_cannot_encrypt_is_told_so(self):
+        # Asking for TLS from a server that does not offer it is a client that never
+        # connects, which collects exactly as much as no configuration at all.
+        assert (
+            serializers.database_ssl_mode(self._databases("db.example.edu", False))
+            == "disabled"
+        )
+
+    @pytest.mark.parametrize("stated", [True, None])
     def test_the_micro_server_is_configured_to_encrypt(self, stated):
-        mode = self._micro(stated)["server"]["database_ssl_mode"]
+        mode = self._micro("db.example.edu", stated)["server"]["database_ssl_mode"]
         assert mode in self.ENCRYPTING
         assert mode == "required"
 
+    def test_the_micro_server_follows_a_study_that_declared_plaintext(self):
+        mode = self._micro("db.example.edu", False)["server"]["database_ssl_mode"]
+        assert mode not in self.ENCRYPTING
 
 
 class TestTheDatabaseCertificateAuthority:
@@ -755,7 +775,7 @@ class TestTheDatabaseCertificateAuthority:
     simply never published one.
     """
 
-    def _config(self, ca=None):
+    def _config(self, ca=None, tls=None):
         entry = {
             "name": "aware_android",
             "username": "aware_android_participant",
@@ -763,10 +783,13 @@ class TestTheDatabaseCertificateAuthority:
             "port": 3306,
             "host": "db.example.edu",
         }
+        databases = {"host": "db.example.edu", "android": entry}
         if ca is not None:
-            entry["ca_certificate"] = ca
+            databases["tls"] = {"ca_certificate": ca}
+        if tls is not None:
+            databases.setdefault("tls", {})["require"] = tls
         source = {
-            "database": {"android": entry},
+            "database": databases,
             "deployment": {"dataflow": {"android": dataflow.DIRECT}},
             "study": {"title": "S", "description": "", "active": True, "start_timestamp": 0},
             "researcher": {"first_name": "F", "last_name": "L", "contact": "r@example.com"},
@@ -813,8 +836,17 @@ class TestTheDatabaseCertificateAuthority:
         block = self._database_block(self._config())
         assert block[serializers.DB_CA_KEY] == ""
 
-    def test_encryption_is_no_longer_something_the_config_can_switch_off(self):
+    def test_a_phone_is_told_to_encrypt_unless_the_study_declared_otherwise(self):
         assert self._database_block(self._config())["require_ssl"] is True
+
+    def test_a_phone_opening_a_server_that_cannot_encrypt_is_told_that_too(self):
+        # A client asking for TLS from a database that does not offer it never
+        # connects, so it would keep every batch and deliver none.
+        block = self._database_block(self._config(tls=False))
+        assert block["require_ssl"] is False
+        # And there is nothing to verify on a connection nobody encrypts, so no
+        # authority is published for one.
+        assert block[serializers.DB_CA_KEY] == ""
 
 
 class TestPublishingTheDatabaseAuthority:
@@ -871,3 +903,170 @@ class TestPublishingTheDatabaseAuthority:
         # to read and inventing one would verify nothing.
         source = {"database": {"host": "db.example.edu", "android": {}}}
         assert deploy_config.ensure_database_authority(source) == "none"
+
+
+class TestWhatTheWizardMayAskOfTheConnection:
+    """write_request_env.clean_tls: the researcher's answer, and where it is allowed.
+
+    Encryption is a question only for a database this deployment does not
+    administer. Asking it about the bundled one would offer a way to make a working
+    study less safe for nothing in return, so an answer arriving for that placement
+    is a form field nobody was shown rather than a decision to apply.
+    """
+
+    REAL = (
+        "-----BEGIN CERTIFICATE-----\n"
+        "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA\n"
+        "-----END CERTIFICATE-----\n"
+    )
+
+    def test_a_bundled_database_is_encrypted_whatever_arrives(self):
+        assert write_request_env.clean_tls(placement.BUNDLED, "0", self.REAL) == (
+            True,
+            "",
+        )
+
+    def test_a_named_database_defaults_to_encrypted(self):
+        assert write_request_env.clean_tls(placement.EXTERNAL, None, "") == (True, "")
+
+    @pytest.mark.parametrize("answer", ["0", "false", "no", "off"])
+    def test_a_named_database_can_say_it_cannot_encrypt(self, answer):
+        assert write_request_env.clean_tls(placement.EXTERNAL, answer, "") == (
+            False,
+            "",
+        )
+
+    def test_an_authority_is_kept_only_for_a_connection_that_verifies(self):
+        # Nothing checks a certificate on a connection nobody encrypts, and storing
+        # one would be a promise every interface then has to un-make.
+        assert write_request_env.clean_tls(placement.EXTERNAL, "0", self.REAL) == (
+            False,
+            "",
+        )
+
+    def test_an_authority_survives_what_it_arrived_wrapped_in(self):
+        required, authority = write_request_env.clean_tls(
+            placement.EXTERNAL, "1", f"  {self.REAL}  trailing text"
+        )
+        assert required
+        assert authority.startswith("-----BEGIN CERTIFICATE-----")
+        assert "trailing text" not in authority
+
+    def test_a_certificate_that_cannot_be_read_is_refused_here(self):
+        # Refused where the researcher pasted it: devices treat an unreadable
+        # authority as a database they cannot reach, so the alternative is a study
+        # that enrols and then stops uploading.
+        with pytest.raises(SystemExit):
+            write_request_env.clean_tls(placement.EXTERNAL, "1", "not a certificate")
+
+
+class TestCarryingTheAnswerToTheStudyModel:
+    """deploy_config: what this wizard run declares about the connection.
+
+    The request env is the boundary between a form and a study, and a `.env` file
+    holds one setting per line while a PEM holds several. Encoding is what lets a
+    researcher's paste cross it as the bytes they pasted.
+    """
+
+    REAL = TestWhatTheWizardMayAskOfTheConnection.REAL
+
+    def _request(self, monkeypatch, values, tmp_path):
+        path = tmp_path / "request.env"
+        path.write_text(
+            "\n".join(f"{k}={v}" for k, v in values.items()) + "\n", encoding="utf-8"
+        )
+        monkeypatch.setattr(deploy_config, "RUNNING_IN_WIZARD", True)
+        monkeypatch.setattr(deploy_config, "REQUEST_ENV_PATH", path)
+
+    def test_a_named_database_carries_its_answer(self, monkeypatch, tmp_path):
+        self._request(
+            monkeypatch,
+            {
+                "DB_PLACEMENT": "external",
+                "DB_HOST": "db.example.edu",
+                "DB_PORT": "3306",
+                "DB_REQUIRE_TLS": "0",
+            },
+            tmp_path,
+        )
+        assert deploy_config.requested_placement()["require_tls"] is False
+
+    def test_an_authority_arrives_as_the_bytes_that_were_pasted(
+        self, monkeypatch, tmp_path
+    ):
+        import base64
+
+        self._request(
+            monkeypatch,
+            {
+                "DB_PLACEMENT": "external",
+                "DB_HOST": "db.example.edu",
+                "DB_REQUIRE_TLS": "1",
+                "DB_CA_CERTIFICATE_B64": base64.b64encode(
+                    self.REAL.encode("utf-8")
+                ).decode("ascii"),
+            },
+            tmp_path,
+        )
+        assert deploy_config.requested_placement()["ca_certificate"].startswith(
+            "-----BEGIN CERTIFICATE-----"
+        )
+
+    def test_a_run_that_pasted_nothing_leaves_the_study_alone(
+        self, monkeypatch, tmp_path
+    ):
+        # The wizard cannot tell an empty field from one nobody typed in, so it does
+        # not get to clear an authority a study is publishing. That is done where
+        # the current one can be seen, which is the Configurator.
+        self._request(
+            monkeypatch,
+            {
+                "DB_PLACEMENT": "external",
+                "DB_HOST": "db.example.edu",
+                "DB_REQUIRE_TLS": "1",
+            },
+            tmp_path,
+        )
+        assert "ca_certificate" not in deploy_config.requested_placement()
+
+    def test_the_bundled_placement_carries_no_answer(self, monkeypatch, tmp_path):
+        self._request(
+            monkeypatch, {"DB_PLACEMENT": "bundled", "DB_REQUIRE_TLS": "0"}, tmp_path
+        )
+        assert deploy_config.requested_placement() == {"host": placement.DEFAULT_HOST}
+
+    def test_an_unencrypted_study_publishes_no_authority(self):
+        # ensure_database_authority reads a bundled MySQL's own certificate out of
+        # the container; there is nothing to read for a connection that carries
+        # nothing to verify.
+        source = {
+            "database": {
+                "host": "db.example.edu",
+                "tls": {"require": False},
+                "android": {},
+            }
+        }
+        assert deploy_config.ensure_database_authority(source) == "unencrypted"
+
+
+class TestWhatIsWrittenBackToEnv:
+    """persist_env: a wizard run's answers, minus the ones that were only in transit.
+
+    The request env is merged over `.env` so a run's answers reach the code that
+    applies them, and everything unrecognised is carried through --- which is what
+    keeps a deployment's own settings from being dropped by a wizard that never
+    asked about them. A pasted certificate is the exception: the study model holds
+    it, and a second copy in `.env` is one more thing that can go stale.
+    """
+
+    def test_a_pasted_authority_is_not_a_deployment_setting(
+        self, monkeypatch, tmp_path
+    ):
+        written = tmp_path / ".env"
+        monkeypatch.setattr(deploy_config, "ENV_PATH", written)
+        deploy_config.persist_env(
+            {"PUBLIC_HOST": "h", "DB_CA_CERTIFICATE_B64": "QUJD", "DB_PORT": "3306"}
+        )
+        body = written.read_text(encoding="utf-8")
+        assert "DB_CA_CERTIFICATE_B64" not in body
+        assert "DB_PORT=3306" in body

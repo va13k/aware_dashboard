@@ -18,7 +18,11 @@ if str(PROJECT) not in sys.path:
     sys.path.insert(0, str(PROJECT))
 
 from shared_config import database, dataflow, messaging, placement
-from shared_config.certificates import read_certificate, valid_certificate
+from shared_config.certificates import (
+    decode_certificate,
+    read_certificate,
+    valid_certificate,
+)
 from shared_config.source_store import update_source
 from shared_config.runtime import (
     SECRET_MODE,
@@ -115,12 +119,16 @@ def requested_dataflow() -> str:
     return str(load_env(REQUEST_ENV_PATH).get("ANDROID_DATAFLOW", "")).strip().lower()
 
 
-def requested_placement() -> dict[str, str]:
+def requested_placement() -> dict[str, object]:
     """The database the researcher named in this wizard run, or {} for none.
 
     Read from the request env for the same reason the dataflow is: `.env` keeps the
     last value written, so a deploy nobody answered the question in leaves the
     study's own declaration standing rather than reapplying an old answer.
+
+    What the connection to it has to be carries the same way, and only for a database
+    the researcher named: on the bundled placement encryption is settled and the
+    authority is read out of the container, so there is no answer to carry.
     """
     if not RUNNING_IN_WIZARD:
         return {}
@@ -130,10 +138,22 @@ def requested_placement() -> dict[str, str]:
         return {}
     if chosen == placement.BUNDLED:
         return {"host": placement.DEFAULT_HOST}
-    return {
+    named = {
         "host": str(request.get("DB_HOST", "")).strip(),
         "port": str(request.get("DB_PORT", "")).strip(),
     }
+    declared = str(request.get("DB_REQUIRE_TLS", "")).strip()
+    if declared:
+        named["require_tls"] = declared not in {"0", "false", "no", "off"}
+    # Carried encoded because a PEM is several lines and the request is a `.env` file,
+    # whose every line is one setting. Absent rather than empty when none was pasted,
+    # so a run nobody typed a certificate in leaves the one this study already
+    # publishes standing --- clearing an authority is done where the current one can
+    # be seen, which is the Configurator and not this form.
+    pasted = read_certificate(decode_certificate(request.get("DB_CA_CERTIFICATE_B64", "")))
+    if pasted:
+        named["ca_certificate"] = pasted
+    return named
 
 
 def apply_placement(source: dict) -> str:
@@ -303,6 +323,15 @@ def seed_source_secrets(env: dict[str, str]) -> dict:
                     entry = db.get(platform)
                     if entry is not None:
                         entry["port"] = int(named["port"])
+            # Beside the host, because it describes the same server and only the
+            # researcher naming one has an answer to give. A run that named the
+            # bundled database clears nothing: switching back settles encryption by
+            # placement, and the authority pasted for the old server is re-read from
+            # the container it now runs in.
+            if "require_tls" in named or "ca_certificate" in named:
+                database.declare_tls(
+                    db, named.get("require_tls"), named.get("ca_certificate")
+                )
         source.setdefault("database", {}).setdefault("host", placement.DEFAULT_HOST)
 
         # The one path that reaches a phone, filled in rather than built: every one of
@@ -500,13 +529,20 @@ def ensure_database_authority(source: dict, docker_prefix: list[str] | None = No
     model. It is re-read on every deploy instead, so a database that regenerates its
     certificate --- a fresh volume, a restored backup --- publishes the authority it
     is actually using rather than one this study remembered from before.
+
+    A study that declared an unencrypted connection has nothing to verify, and
+    publishing an authority for a connection no client will check is a promise the
+    interfaces would then have to un-make.
     """
     databases = source.get("database") or {}
     android = databases.get("android")
     if android is None:
         return "supplied"
 
-    existing = str(android.get("ca_certificate") or "").strip()
+    if not database.tls_required(databases):
+        return "unencrypted"
+
+    existing = database.tls_authority(databases)
     if existing:
         if not valid_certificate(existing):
             raise SystemExit(
@@ -534,7 +570,7 @@ def ensure_database_authority(source: dict, docker_prefix: list[str] | None = No
         # next deploy, once the server has generated what it signs with.
         return "none"
 
-    android["ca_certificate"] = pem
+    database.declare_tls(databases, ca_certificate=pem)
     return "generated"
 
 
@@ -585,6 +621,13 @@ def generate_htpasswd(username: str, password: str) -> None:
     atomic_write_text(HTPASSWD_PATH, f"{username}:{hashed}\n", SECRET_MODE)
 
 
+#: Answers that belong to one wizard run rather than to the deployment. The request
+#: env is merged over `.env` so a run's answers reach the code that applies them, and
+#: this is what keeps the ones that were only ever in transit --- a certificate the
+#: study model now holds --- from being written back as deployment settings.
+REQUEST_ONLY_KEYS = frozenset({"DB_CA_CERTIFICATE_B64"})
+
+
 def persist_env(env: dict[str, str]) -> None:
     ordered_keys = [
         "MYSQL_ROOT_PASSWORD",
@@ -614,7 +657,7 @@ def persist_env(env: dict[str, str]) -> None:
             env_lines.append(f"{key}={value}")
 
     for key, value in env.items():
-        if key not in ordered_keys and value:
+        if key not in ordered_keys and key not in REQUEST_ONLY_KEYS and value:
             env_lines.append(f"{key}={value}")
 
     atomic_write_text(ENV_PATH, "\n".join(env_lines) + "\n", SECRET_MODE)
@@ -914,8 +957,15 @@ def main() -> None:
     resolve_database_readers(env, source)
     print(f"dataflow: android={dataflow.declared(source, 'android')} "
           f"ios={dataflow.declared(source, 'ios')} mysql_bind={bind}")
-    print(f"database: {where} at {database.declared_host(source.get('database') or {})} "
-          f"(tls verified by: {authority})")
+    databases = source.get("database") or {}
+    print(
+        f"database: {where} at {database.declared_host(databases)} "
+        + (
+            f"(encrypted, verified by: {authority})"
+            if database.tls_required(databases)
+            else "(unencrypted, as this study declares)"
+        )
+    )
     print(f"broker: {messaging.PARTICIPANT_USER} on port {broker_port} "
           f"({'TLS' if messaging.uses_tls(env.get('PROTOCOL', 'http')) else 'plaintext'})")
 

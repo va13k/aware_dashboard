@@ -44,3 +44,24 @@ def read_certificate(pem: str) -> str:
 def valid_certificate(pem: str) -> bool:
     """Whether this holds a certificate a client could load."""
     return bool(read_certificate(pem))
+
+
+def decode_certificate(encoded: str) -> str:
+    """A certificate carried base64-encoded, back as the text that was encoded.
+
+    The setup wizard hands its answers to the deploy as a ``.env`` file, where every
+    line is one setting and a PEM is several. Encoding it is what lets a researcher's
+    paste cross that boundary as the bytes they pasted rather than as something
+    reassembled from fragments afterwards.
+
+    Anything that is not base64 reads as nothing, which is the same answer an empty
+    field gives: a study left connecting encrypted and unverified rather than one
+    publishing an authority no device can load.
+    """
+    text = str(encoded or "").strip()
+    if not text:
+        return ""
+    try:
+        return base64.b64decode(text, validate=True).decode("utf-8", "replace")
+    except (binascii.Error, ValueError):
+        return ""
