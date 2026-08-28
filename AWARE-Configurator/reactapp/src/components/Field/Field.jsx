@@ -95,17 +95,17 @@ export default function Field(inputs) {
       columnSpacing={{ xs: 1, sm: 2, md: 3 }}
       sx={{ mt: 2 }}
     >
-      <Grid xs={12} md={3}>
+      <Grid xs={12} md={4}>
         <p className="field_name">{fieldName + (required ? " *" : "")}</p>
       </Grid>
-      <Grid xs={12} md={9}>
+      <Grid xs={12} md={8}>
         <TextField
           error={isError}
           required={required === undefined ? false : required}
           id="outlined-basic"
           label={inputLabel}
           variant="outlined"
-          style={{ width: "100%" }}
+          style={{ width: "100%", maxWidth: type === "number" ? 220 : 560 }}
           value={getValue() || (defaultNum && defaultNum.toString())}
           type={type || "text"}
           onChange={(event) => {
@@ -129,11 +129,11 @@ export default function Field(inputs) {
             }
           }}
         />
-        {description === undefined ? "" : <Grid xs={12} md={3} />}
+        {description === undefined ? "" : <Grid xs={12} md={4} />}
         {description === undefined ? (
           ""
         ) : (
-          <Grid xs={12} md={9}>
+          <Grid xs={12} md={8}>
             <p className="description" style={{ width: "100%" }}>
               {description}
             </p>

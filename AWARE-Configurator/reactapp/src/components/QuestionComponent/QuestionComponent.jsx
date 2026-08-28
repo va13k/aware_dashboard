@@ -11,6 +11,8 @@ import {
 import Box from "@mui/material/Box";
 import "./QuestionComponent.css";
 import DeleteIcon from "@mui/icons-material/Delete";
+import CloseIcon from "@mui/icons-material/Close";
+import IconButton from "@mui/material/IconButton";
 import { useRecoilState } from "recoil";
 import Field from "../Field/Field";
 import { studyFormQuestionsState } from "../../functions/atom";
@@ -147,7 +149,7 @@ export default function QuestionComponent(input) {
         rowSpacing={1}
         columnSpacing={{ xs: 1, sm: 2, md: 3 }}
       >
-        <Grid xs={10}>
+        <Grid xs={11}>
           <Field
             fieldName={`Option ${index + 1}`}
             recoilState={studyFormQuestionsState}
@@ -156,15 +158,24 @@ export default function QuestionComponent(input) {
             field={groupFieldName}
           />
         </Grid>
-        <Grid xs={1}>
-          <Button
-            variant="contained"
+        <Grid xs={1} sx={{ display: "flex", alignItems: "center" }}>
+          <IconButton
+            aria-label={`Remove option ${index + 1}`}
+            title="Remove this option"
+            size="small"
             onClick={() => {
               updateOptions(questionIndex, groupFieldName, index, false);
             }}
+            sx={{
+              color: "var(--cfg-muted, #64748b)",
+              "&:hover": {
+                color: "#dc2626",
+                background: "rgba(220,38,38,0.08)",
+              },
+            }}
           >
-            X
-          </Button>
+            <CloseIcon fontSize="small" />
+          </IconButton>
         </Grid>
       </Grid>
     );

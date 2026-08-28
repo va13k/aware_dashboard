@@ -23,6 +23,9 @@
 
 .survey-layout__content {
   min-width: 0;
+  max-width: 82rem;
+  margin-inline: auto;
+  width: 100%;
 }
 
 @media (max-width: 1024px) {
