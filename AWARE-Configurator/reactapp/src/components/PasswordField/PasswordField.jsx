@@ -71,12 +71,16 @@ export default function PasswordField(inputs) {
   }, [information[field]]);
 
   return (
-    <Grid container rowSpacing={1} columnSpacing={{ xs: 1, sm: 2, md: 3 }}>
-      <Grid xs={12} md={3}>
-        {/* <p className="field_name">{fieldName}</p> */}
+    <Grid
+      container
+      rowSpacing={1}
+      columnSpacing={{ xs: 1, sm: 2, md: 3 }}
+      sx={{ mt: 2 }}
+    >
+      <Grid xs={12} md={4}>
         <p className="field_name">{fieldName}</p>
       </Grid>
-      <Grid xs={12} md={9}>
+      <Grid xs={12} md={8}>
         <TextField
           error={isError}
           type={showPassword ? "text" : "password"}
@@ -84,7 +88,7 @@ export default function PasswordField(inputs) {
           id="outlined-basic"
           label={inputLabel}
           variant="outlined"
-          style={{ width: "100%" }}
+          style={{ width: "100%", maxWidth: 560 }}
           value={information[field] || ""}
           onChange={(event) => {
             updateFormByField(field.toString(), event.target.value);
@@ -104,11 +108,11 @@ export default function PasswordField(inputs) {
             ),
           }}
         />
-        {description === undefined ? "" : <Grid xs={12} md={3} />}
+        {description === undefined ? "" : <Grid xs={12} md={4} />}
         {description === undefined ? (
           ""
         ) : (
-          <Grid xs={12} md={9}>
+          <Grid xs={12} md={8}>
             <p className="description" style={{ width: "100%" }}>
               {description}
             </p>

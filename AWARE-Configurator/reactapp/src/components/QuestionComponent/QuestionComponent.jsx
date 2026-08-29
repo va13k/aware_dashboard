@@ -410,12 +410,13 @@ export default function QuestionComponent(input) {
             container
             rowSpacing={1}
             columnSpacing={{ xs: 1, sm: 2, md: 3 }}
+            sx={{ mt: 2 }}
           >
-            <Grid xs={12} md={3}>
+            <Grid xs={12} md={4}>
               <p className="question_field_name">Question type*</p>
             </Grid>
-            <Grid xs={12} md={9}>
-              <FormControl fullWidth>
+            <Grid xs={12} md={8}>
+              <FormControl fullWidth sx={{ maxWidth: 560 }}>
                 <InputLabel id="question-type-select">Select One *</InputLabel>
                 <Select
                   required

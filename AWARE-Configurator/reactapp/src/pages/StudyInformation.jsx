@@ -398,7 +398,11 @@ export default function StudyInformation() {
               ? "Controls how participant devices reach the study database. Recommended: require an encrypted connection and keep the password out of the study config. Password and SSL changes are applied to the participant database account when you save."
               : "Controls how this server reaches the study database. Participant phones never open it on this path — they post to the server, which performs the write. Password and SSL changes are applied to the database account when you save."}
           </p>
-          <Grid container direction="column" sx={{ ml: 5, mt: 1 }}>
+          <Grid
+            container
+            direction="column"
+            sx={{ ml: 5, mt: 1, maxWidth: "680px" }}
+          >
             {/* No longer a choice. Every account is created requiring TLS, and every
                 client this deployment ships already asked for it, so a switch here
                 could only ever describe a connection the database would refuse. */}
