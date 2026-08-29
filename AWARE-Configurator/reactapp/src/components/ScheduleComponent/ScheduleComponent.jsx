@@ -408,6 +408,7 @@ export default function ScheduleComponent(input) {
             index={scheduleIndex}
             recoilState={studyFormScheduleConfigurationState}
             field="notification_body"
+            description="iPhone only — the line under the notification's title, which is this schedule's name. It is the whole of what a participant reads before opening the questions. Android carries no such field and ignores this. Left empty, iPhones show “Tap to answer”."
           />
         </Box>
       </div>
