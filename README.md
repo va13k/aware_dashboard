@@ -176,7 +176,7 @@ If `.env` already exists, the script detects them and offers a choice:
 - **Option 1** — skips the wizard and redeploys immediately with the saved config.
 - **Option 2** — opens the wizard again so you can change any settings before deploying.
 
-Both options re-apply `PARTICIPANT_DB_PASSWORD` and `ANDROID_SERVER_DB_PASSWORD` to their MySQL accounts, so the passwords in `.env` and the ones the study needs never drift apart. If you edited a password directly in `.env`, run `setup.sh` (or `python3 setup/init_android_tables.py`) rather than `docker compose up` on its own — starting the containers by hand leaves the existing database untouched, and the accounts keep their old passwords.
+Both options re-apply `PARTICIPANT_DB_PASSWORD` and `ANDROID_SERVER_DB_PASSWORD` to their MySQL accounts, so the passwords in `.env` and the ones the study needs never drift apart. If you edited a password directly in `.env`, run `setup.sh` (or `python3 setup/init_study_tables.py`) rather than `docker compose up` on its own — starting the containers by hand leaves the existing database untouched, and the accounts keep their old passwords.
 
 ### Where the study database runs
 
@@ -201,6 +201,107 @@ writes `docker-compose.external-db.yml`, which removes the `mysql` service *and*
 of a compose file is still depended on, and Compose starts a dependency whether or
 not anyone asked for it. The file is generated from the choice and removed again when
 you switch back, so its presence is the placement.
+
+### Bringing your own managed database
+
+**It has to be MySQL.** MySQL 8.0 or later, or a service that speaks its protocol
+— MariaDB, Aurora MySQL, Percona. The whole stack reaches the database through the
+MySQL client and `aiomysql`, and the schema is written in MySQL's dialect, so a
+PostgreSQL-compatible service **cannot be used at all**, however the connection is
+spelled. That rules out CockroachDB, Neon, Supabase, Render Postgres and anything
+else whose selling point is Postgres compatibility — there is no setting that
+bridges the two.
+
+Where people usually get one:
+
+| Service | Notes |
+| --- | --- |
+| **Google Cloud SQL for MySQL** | Paid. New accounts get trial credit; publishes its CA under *Connections → Security*. |
+| **Amazon RDS for MySQL** | Paid, with a 12-month free tier for new accounts on the smallest instance. Aurora MySQL is the same protocol at a higher price. |
+| **Azure Database for MySQL** | Paid, with a limited free tier for the first year. |
+| **DigitalOcean Managed MySQL** | Paid, flat monthly price. *Download CA certificate* button in the console. |
+| **Aiven for MySQL** | Paid after a trial; CA certificate downloadable per service. |
+| **PlanetScale** | Paid, MySQL-compatible. |
+| **A VPS you run** (Hetzner, DigitalOcean droplet, your institution's VM) | Cheapest per gigabyte, and the schema, backups and TLS are then yours to manage. |
+| **db4free.net, freemysqlhosting.net** | Free, tiny and rate-limited. Fine for trying the stack out, not for a study — no guarantee, and a database that disappears takes the collection with it. |
+
+Prices and free tiers change; check the current terms rather than trusting this
+table. What does not change is the protocol: if the service does not say **MySQL**,
+it will not work here.
+
+A study collects in bursts when participants sync, not continuously, so the
+smallest tier a provider offers is usually where to start. Storage is what grows —
+high-frequency sensors like the accelerometer are the bulk of it.
+
+**1. Create the instance.** MySQL 8.0 or later. The smallest tier a provider offers
+is usually enough to start: a study writes in batches when participants sync, not
+continuously.
+
+**2. Let it be reached.** The database is opened from inside this deployment, so
+allow the address of the machine running it. Providers call this different things —
+*Authorized networks* (Cloud SQL), *Trusted sources* (DigitalOcean), *Allowed IP
+addresses* (Aiven), a security group (RDS). Nothing else has to be public: on the
+webservice dataflow, no participant's phone ever contacts the database.
+
+**3. Take an administrator account.** The one the provider created with the instance
+is what setup uses to create the schema and the study's own accounts. Setup never
+stores it; it is used for the deployment and then forgotten.
+
+**4. Find the certificate authority, if the provider verifies one.** Managed
+databases require TLS, and most publish a CA certificate to check them against:
+Cloud SQL under *Connections → Security*, DigitalOcean and Aiven behind a *Download
+CA certificate* button, RDS and Azure as downloads in their documentation. Paste the
+whole file — the `-----BEGIN CERTIFICATE-----` line included — into the wizard.
+Leaving it empty still encrypts the connection; what it leaves unchecked is whether
+the server answering is the one you meant.
+
+**5. Paste what the provider gave you.** Managed services hand out a single line
+like `mysql://user:password@db-123.example.cloud:25060/defaultdb?ssl-mode=REQUIRED`.
+Paste it into **Database host** and the wizard takes it apart — host, port,
+administrator account, and the password if you have not typed one. The parts land
+in their own fields, so you can see what was understood and correct it.
+
+Typing the host by hand works too, and the administrator account is then taken
+from it — `avnadmin` for Aiven, `doadmin` for DigitalOcean, `root` for a server
+you run. Change it if your provider named it something else. The port is yours to
+copy: 3306 is MySQL's default and managed services rarely use it.
+
+The database name is not asked for: the deployment creates its own schemas and
+names them itself.
+
+**The port is the usual trip-up.** 3306 is MySQL's default and most managed
+services do not use it — Aiven and DigitalOcean give each database a port of its
+own, often five digits. A wrong port looks exactly like a firewall: the name
+resolves, nothing answers, and the check reports `Can't connect to MySQL server`.
+If the port is right and it still times out, the provider is refusing this machine
+— add its address under *Allowed IP addresses* (Aiven), *Trusted sources*
+(DigitalOcean) or *Authorized networks* (Cloud SQL).
+
+Pasting the whole string into the host field is caught by the wizard now, but the
+reason it is worth knowing is that the string carries a password — one that ends up
+in the deployment log if it reaches the check. Treat a connection string as a
+credential, and rotate it if it has been pasted somewhere it should not have been.
+
+### Testing the database before deploying, and who creates it
+
+The database step has two controls that answer the questions people hit first.
+
+**Test this database** asks what the deployment asks — reachable, schema present,
+the study's accounts there, a row can be written — and shows each answer in the
+wizard. It runs the same script the deployment does, so an answer here is the
+answer there, and a database that cannot be reached becomes a field to correct
+rather than a deployment that stops half way.
+
+**Who creates the schema and the accounts** decides who does the work:
+
+| Choice | What happens |
+| --- | --- |
+| **Setup does it** | The deployment creates the schema and this study's accounts with the administrator account named above. Needs an account that may do that — managed databases usually give you one. |
+| **I run the SQL myself** | Setup creates nothing. **Download setup.sql** gives you the statements; run them, or hand them to whoever administers the server, then test again. The account setup uses then only has to write. |
+
+The second is the usual answer at an institution, where the account you are given
+may insert and nothing else. The file carries this study's account passwords, so
+send it the way you would send a credential.
 
 ### Encryption to the database, and who decides it
 
@@ -345,15 +446,28 @@ read, so a bad paste fails at deployment rather than on the phones.
 | --- | --- |
 | Reachable | The address answers on its port and the credential authenticates |
 | Encrypted | The connection is what the study asked of it, and — where an authority is supplied — the server's certificate checks out against it |
-| Schema | The study's schema is there, or this account can create it |
-| Ingest accounts | The account each dataflow writes with exists with the grants its work needs |
-| A row can be written | The account that carries the study's rows can insert one, and it reads back |
+| Schemas | Both schemas this study's data lands in are there |
+| Study accounts | Every account this deployment opens the database with — the one each Android dataflow puts on the ingest path, the iOS micro-server's, and the dashboard's own — connects with the password this study holds |
+| Tables | The tables a phone's rows land in are there |
 
-Reachability alone is not the question — a host that answers and refuses every insert
-collects exactly as much as one that does not answer — so the write is what the result
-turns on. The client runs on the deployment's own network, so the question asked is
-the one the micro-server and the API will ask; a host that resolves on your machine
-and not inside a container is reported rather than accepted.
+**The check creates nothing.** It opens the database as each account and reports what
+is there; `setup/init_study_tables.py` is what makes it so, and it runs as part of
+deploying. That split is what makes the answer worth having — a check that created
+what it was asked about could only ever report success, and would report it against a
+database you had not agreed to have changed yet.
+
+So what is missing before the first deploy is not a failure. It is a line saying which
+side is going to create it: setup, when it deploys, or whoever administers a database
+setup may not touch.
+
+Both schemas are asked about, and the tables as well as the accounts. An account
+holding every grant its work needs on an empty schema collects nothing, and says so
+only on the device — the client inserts into `accelerometer` and is told there is no
+such table.
+
+The client runs on the deployment's own network, so the question asked is the one the
+micro-server and the API will ask; a host that resolves on your machine and not inside
+a container is reported rather than accepted.
 
 **An external database is checked before anything is generated.** If it fails, no
 config a phone or a service reads is written and the deployment keeps running whatever
@@ -361,18 +475,15 @@ it ran before. The bundled one is checked once it is up, since it does not exist
 asked before that.
 
 **Missing privileges are reported, not assumed.** If your account cannot create the
-schema or the accounts — the usual case with an institutional database — the exact SQL
-is printed for whoever administers the server. Those statements carry this study's
-account passwords, so send them the way you would send a credential. Once they have
-run, check again:
+schemas, the accounts or the tables — the usual case with an institutional database —
+setup writes the whole thing out as one file for whoever administers the server: the
+schemas, this study's accounts, and every table its data lands in. That file carries
+this study's account passwords, so send it the way you would send a credential. Once
+it has run, check again:
 
 ```bash
 python3 setup/verify_database.py
 ```
-
-If the accounts already exist and work, a failure to re-apply the grants is reported
-as a warning rather than a failure: a database somebody else provisioned correctly
-collects exactly as well as one provisioned here.
 
 ### Switching between them
 

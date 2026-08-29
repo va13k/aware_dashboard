@@ -72,7 +72,7 @@ deploy_stack() {
     mkdir -p studies aware-micro-server/cache aware-micro-server/esm
     python3 setup/deploy_config.py
     compose up --build -d
-    python3 setup/init_android_tables.py --docker-prefix sudo
+    python3 setup/init_study_tables.py --docker-prefix sudo
     verify_database
 }
 
@@ -117,7 +117,7 @@ PY
 
 start_stack_only() {
     compose up --build -d
-    python3 setup/init_android_tables.py --docker-prefix sudo
+    python3 setup/init_study_tables.py --docker-prefix sudo
     verify_database
 }
 
