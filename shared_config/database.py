@@ -64,6 +64,17 @@ ANDROID_PARTICIPANT_USER = "aware_android_participant"
 #: write, the refusal counters it keeps, and the device-metadata row it fills in.
 ANDROID_SERVER_USER = "aware_android_server"
 
+#: The account the iOS micro-server writes with. iOS runs the webservice dataflow
+#: alone --- an iPhone has no direct-database client --- so this is a server's
+#: credential even though its name reads like a participant's.
+IOS_PARTICIPANT_USER = "aware_ios_participant"
+
+#: Where the dashboard's own database password is kept. It belongs to the deployment
+#: rather than to the study, so it lives in ``.env`` and not in the study model, and
+#: the seed below is the one ``db/00-bootstrap.sql`` creates the account with.
+ANALYTICS_PASSWORD_ENV = "ANALYTICS_DB_PASSWORD"
+ANALYTICS_SEED_PASSWORD = "analyticspass"
+
 #: Which account each Android dataflow puts on the ingest path: the study-model keys
 #: holding its name and password, and the ``.env`` variable the deployment keeps that
 #: password in.
@@ -120,6 +131,118 @@ def android_server_credentials(database: dict) -> tuple[str, str]:
     path it is the same account with no traffic to write.
     """
     return android_credentials(database, dataflow.WEBSERVICE)
+
+
+def ios_credentials(database: dict) -> tuple[str, str]:
+    """The name and password the iOS micro-server writes the iOS schema with."""
+    entry = (database or {}).get("ios") or {}
+    return (
+        str(entry.get("username") or IOS_PARTICIPANT_USER).strip(),
+        str(entry.get("password") or ""),
+    )
+
+
+def analytics_password(env: dict) -> str:
+    """The password the dashboard's account holds, as this deployment settled it."""
+    return str((env or {}).get(ANALYTICS_PASSWORD_ENV) or ANALYTICS_SEED_PASSWORD).strip()
+
+
+def profiles(database: dict, analytics_secret: str = "") -> list[dict]:
+    """Every account this deployment opens the study's database with.
+
+    One list because the deployment has one answer: the same accounts are created at
+    deploy, connected with by the services, and asked about by the check. Deriving
+    them separately is how a database ends up holding the accounts one path knows
+    about and missing the ones another needs --- which reads as a study that
+    collects and a dashboard that shows nothing.
+
+    ``schemas`` are the schemas the account works in --- one for an account that
+    carries a platform's rows, both for the one that reads them --- and ``writes``
+    says which of those two it does. They are different failures: an ingest account
+    that cannot connect is data that never arrives, and the analytics one is a
+    dashboard with nothing to draw.
+
+    Both Android accounts are listed whichever dataflow the study runs, so a study
+    switching paths finds its new account already holding the password its generated
+    configuration names.
+    """
+    entries = []
+    for choice in (dataflow.DIRECT, dataflow.WEBSERVICE):
+        username, password = android_credentials(database, choice)
+        if username:
+            entries.append(
+                {
+                    "username": username,
+                    "password": password,
+                    "platform": "android",
+                    "schemas": [platform_schema(database, "android")],
+                    "dataflow": choice,
+                    "writes": True,
+                }
+            )
+    username, password = ios_credentials(database)
+    if username:
+        entries.append(
+            {
+                "username": username,
+                "password": password,
+                "platform": "ios",
+                "schemas": [platform_schema(database, "ios")],
+                "dataflow": dataflow.WEBSERVICE,
+                "writes": True,
+            }
+        )
+    entries.append(
+        {
+            "username": ANALYTICS_USER,
+            "password": str(analytics_secret or ANALYTICS_SEED_PASSWORD),
+            "platform": "",
+            "schemas": [
+                platform_schema(database, "android"),
+                platform_schema(database, "ios"),
+            ],
+            "dataflow": "",
+            "writes": False,
+        }
+    )
+    return entries
+
+
+#: MySQL's own administrator, and the one a database this deployment brings up is
+#: created with.
+DEFAULT_ADMIN_USER = "root"
+
+#: What each managed service calls the account it hands out with a new database.
+#: Matched on the host because that is the one thing a researcher always has, and
+#: none of these is `root`: authenticating as root there fails in a way that reads
+#: exactly like a wrong password, which is the wrong thing to go looking for.
+ADMIN_BY_HOST_SUFFIX = (
+    (".aivencloud.com", "avnadmin"),
+    (".ondigitalocean.com", "doadmin"),
+)
+
+
+def admin_for_host(host: object) -> str:
+    """The administrator this provider hands out, or "" when the host says nothing."""
+    name = str(host or "").strip().lower()
+    for suffix, account in ADMIN_BY_HOST_SUFFIX:
+        if name.endswith(suffix):
+            return account
+    return ""
+
+
+def admin_user(host: object, declared: object = "") -> str:
+    """Which account creates this study's schema and accounts.
+
+    What the study said, then what the host says about its provider, then MySQL's
+    own default. Settled in one place so the wizard, the deploy and the checks
+    cannot each decide it differently --- an account that exists for one of them
+    and not the others is a deployment that half works.
+    """
+    named = str(declared or "").strip()
+    if named:
+        return named
+    return admin_for_host(host) or DEFAULT_ADMIN_USER
 
 
 def declared_host(database: dict) -> str:

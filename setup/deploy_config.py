@@ -23,7 +23,7 @@ from shared_config.certificates import (
     read_certificate,
     valid_certificate,
 )
-from shared_config.source_store import update_source
+from shared_config.source_store import read_source, update_source
 from shared_config.runtime import (
     SECRET_MODE,
     SHARED_MODE,
@@ -199,8 +199,25 @@ def require_reachable_database(source: dict) -> None:
     here points at that rather than repeating it.
     """
     checker = SCRIPT_DIR / "verify_database.py"
+    # The account that creates the schema is the study's answer, not root by
+    # assumption: a managed database calls its administrator something of its own,
+    # and authenticating as a name that does not exist reads exactly like a wrong
+    # password.
+    request = load_env(REQUEST_ENV_PATH)
+    admin_user = str(request.get("DB_ADMIN_USER", "")).strip() or "root"
+    # Where the study said its schema is created by hand, the deployment checks and
+    # creates nothing: the account it was given may only write.
+    verify_only = str(request.get("DB_INIT", "")).strip().lower() == "manual"
     result = subprocess.run(
-        [sys.executable, str(checker), "--placement", placement.EXTERNAL],
+        [
+            sys.executable,
+            str(checker),
+            "--placement",
+            placement.EXTERNAL,
+            "--admin-user",
+            admin_user,
+        ]
+        + (["--verify-only"] if verify_only else []),
         capture_output=True,
         text=True,
         check=False,
@@ -375,8 +392,9 @@ def resolve_database_readers(env: dict[str, str], source: dict) -> dict[str, str
     bootstrap SQL creates, which is what keeps an existing deployment working
     without being re-provisioned.
     """
-    analytics_password = env.get("ANALYTICS_DB_PASSWORD", "analyticspass")
-    resolved = database.resolved_env(source.get("database") or {}, analytics_password)
+    resolved = database.resolved_env(
+        source.get("database") or {}, database.analytics_password(env)
+    )
     for key, value in resolved.items():
         set_env_value(ENV_PATH, key, value)
     return resolved
@@ -628,8 +646,26 @@ def generate_htpasswd(username: str, password: str) -> None:
 REQUEST_ONLY_KEYS = frozenset({"DB_CA_CERTIFICATE_B64"})
 
 
+def declared_database_host() -> str:
+    """The host the study model names, for settling what the request left out."""
+    try:
+        return database.declared_host((read_source().get("database") or {}))
+    except Exception:
+        return ""
+
+
 def persist_env(env: dict[str, str]) -> None:
+    # Written whether or not the request carried it: a deployment upgraded in place
+    # has an .env from before the question existed, and every script that opens the
+    # database reads this file rather than asking again.
+    env = dict(env)
+    if not str(env.get("DB_ADMIN_USER", "")).strip():
+        env["DB_ADMIN_USER"] = database.admin_user(
+            str(env.get("DB_HOST", "")).strip() or declared_database_host(), ""
+        )
+
     ordered_keys = [
+        "DB_ADMIN_USER",
         "MYSQL_ROOT_PASSWORD",
         "DJANGO_SECRET_KEY",
         "DASHBOARD_SESSION_SECRET",

@@ -236,3 +236,44 @@ class TestWhatIsAskedOfTheConnection:
         databases = {**EXTERNAL, "tls": {"require": True, "ca_certificate": "PEM"}}
         database.declare_tls(databases, require=False)
         assert databases["tls"] == {"require": False, "ca_certificate": "PEM"}
+
+
+class TestEveryAccountTheDeploymentOpensItWith:
+    """profiles: one list, so no path provisions the accounts another path needs.
+
+    The accounts were derived separately by the deploy, by the check and by the
+    services that connect, and a database ended up holding the ones the Android path
+    knew about and missing the iOS micro-server's and the dashboard's. That failure
+    is invisible from the ingest side --- the study collects --- and total from the
+    reading side, which is the shape these guard.
+    """
+
+    def test_both_platforms_and_the_dashboard_are_named(self):
+        assert [entry["username"] for entry in database.profiles(EXTERNAL)] == [
+            "aware_android_participant",
+            "aware_android_server",
+            "aware_ios_participant",
+            "aware_analytics",
+        ]
+
+    def test_each_account_carries_the_schema_it_works_in(self):
+        schemas = {entry["username"]: entry["schemas"] for entry in database.profiles(EXTERNAL)}
+        assert schemas["aware_android_server"] == ["study_android"]
+        assert schemas["aware_ios_participant"] == ["study_ios"]
+
+    def test_the_dashboard_reads_both_of_them(self):
+        """It is handed a URL into each schema, so an account granted on one is a
+        dashboard that shows half a study and reports the other half as empty."""
+        schemas = {entry["username"]: entry["schemas"] for entry in database.profiles(EXTERNAL)}
+        assert schemas["aware_analytics"] == ["study_android", "study_ios"]
+
+    def test_who_writes_is_stated_rather_than_read_from_the_name(self):
+        """`aware_ios_participant` is the iOS micro-server's account and carries
+        rows; `aware_analytics` reads them. Their names say the opposite."""
+        writes = {entry["username"]: entry["writes"] for entry in database.profiles(EXTERNAL)}
+        assert writes["aware_ios_participant"] is True
+        assert writes["aware_analytics"] is False
+
+    def test_the_dashboard_password_comes_from_the_deployment(self):
+        assert database.profiles(EXTERNAL, "chosen")[-1]["password"] == "chosen"
+        assert database.profiles(EXTERNAL)[-1]["password"] == database.ANALYTICS_SEED_PASSWORD
