@@ -645,12 +645,12 @@ The main page links to all four sections of the platform:
 
 | Page                    | URL              | Access                     |
 | ----------------------- | ---------------- | -------------------------- |
-| **Studies**             | `/studies/`      | Public — no login required |
+| **Join the study**      | `/studies/`      | Public — no login required |
 | **Configurator**        | `/configurator/` | Researcher login required  |
 | **Analytics Dashboard** | `/dashboard/`    | Researcher login required  |
 | **Backup & Restore**    | `/backup/`       | Researcher login required  |
 
-**Studies** is intentionally public so that study participants can reach it without credentials. It shows the available study configurations and QR codes that participants use to join a study with the AWARE app.
+**Join the study** is intentionally public so that participants can reach it without credentials. It asks which phone they have and then shows only that platform's steps: where to get the app, the join URL to copy, and the QR code to scan. The page guesses the platform from the browser and lets them switch.
 
 All other pages are protected. When you navigate to any of them without being logged in, you are redirected to the researcher login page. Enter the username and password you set in step 2 of the wizard to gain access. The session lasts 8 hours; after that you will be asked to log in again.
 

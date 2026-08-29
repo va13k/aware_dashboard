@@ -1,4 +1,4 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
@@ -113,15 +113,19 @@
               placeholder="study.example.com"
             />
           </div>
-                    <p class="hint">Must be reachable by participant devices on the same network.</p>
+          <p class="hint">
+            Must be reachable by participant devices on the same network.
+          </p>
           <details class="hint">
             <summary>How do I find my IP address?</summary>
             <div style="margin-top: 8px">
-            Must be reachable by participant devices on the same network.
-            If the detected IP looks wrong, choose <b>Enter another host manually</b>.
-            To find your IP: <b>Windows</b> — open Command Prompt, run <code>ipconfig</code>, look for "IPv4 Address" under your Wi-Fi or Ethernet adapter.
-            <b>Mac</b> — System Settings → Network → your active adapter.
-          </div>
+              Must be reachable by participant devices on the same network. If
+              the detected IP looks wrong, choose
+              <b>Enter another host manually</b>. To find your IP:
+              <b>Windows</b> — open Command Prompt, run <code>ipconfig</code>,
+              look for "IPv4 Address" under your Wi-Fi or Ethernet adapter.
+              <b>Mac</b> — System Settings → Network → your active adapter.
+            </div>
           </details>
         </div>
         <div class="field">
@@ -131,38 +135,47 @@
               Straight to the database (phones open MySQL themselves)
             </option>
             <option value="webservice">
-              Through the server (phones post over HTTPS, no database credential)
+              Through the server (phones post over HTTPS, no database
+              credential)
             </option>
           </select>
-                    <p class="hint">Phones either open the database themselves, or post to this server.</p>
+          <p class="hint">
+            Phones either open the database themselves, or post to this server.
+          </p>
           <details class="hint">
             <summary>What is the difference?</summary>
             <div style="margin-top: 8px">
-            <b>Straight to the database</b> means every participant's phone must
-            reach MySQL on port 3306 from whatever network they happen to be on,
-            for the length of the study. Fewer moving parts, but a phone that
-            cannot open 3306 does not fail loudly — it collects data it never
-            delivers, and the gap shows up in the coverage grid weeks later. The
-            database has to sit somewhere you can deliberately expose.
-            <br /><br />
-            <b>Through the server</b> means phones post over HTTPS, which nearly
-            every network allows, and carry no database credential at all — so the
-            database can stay private, remote, or managed by someone else. Android
-            gets its own micro-server instance, and a write from a device the study
-            log never recorded joining is refused there and reported.
-            <br /><br />
-            iPhones always go through the server: an iPhone has no
-            direct-database client, so it is not a choice this study makes.
-          </div>
+              <b>Straight to the database</b> means every participant's phone
+              must reach MySQL on port 3306 from whatever network they happen to
+              be on, for the length of the study. Fewer moving parts, but a
+              phone that cannot open 3306 does not fail loudly — it collects
+              data it never delivers, and the gap shows up in the coverage grid
+              weeks later. The database has to sit somewhere you can
+              deliberately expose. <br /><br />
+              <b>Through the server</b> means phones post over HTTPS, which
+              nearly every network allows, and carry no database credential at
+              all — so the database can stay private, remote, or managed by
+              someone else. Android gets its own micro-server instance, and a
+              write from a device the study log never recorded joining is
+              refused there and reported. <br /><br />
+              iPhones always go through the server: an iPhone has no
+              direct-database client, so it is not a choice this study makes.
+            </div>
           </details>
-          <p class="hint" style="border-left: 3px solid #b45309; padding-left: 10px">
-            <b>Changing this later means every enrolled participant has to join
-            again.</b> It is not a setting that can be pushed to a phone: the study
-            address a device joined with is how it identifies the study it belongs
-            to, so it cannot be moved underneath them. Their phones keep collecting
-            but stop delivering until each one re-joins from a new link or QR code.
-            Choose now if you can; changing it mid-study is a decision about
-            contacting every participant.
+          <p
+            class="hint"
+            style="border-left: 3px solid #b45309; padding-left: 10px"
+          >
+            <b
+              >Changing this later means every enrolled participant has to join
+              again.</b
+            >
+            It is not a setting that can be pushed to a phone: the study address
+            a device joined with is how it identifies the study it belongs to,
+            so it cannot be moved underneath them. Their phones keep collecting
+            but stop delivering until each one re-joins from a new link or QR
+            code. Choose now if you can; changing it mid-study is a decision
+            about contacting every participant.
           </p>
         </div>
         <div class="field">
@@ -175,46 +188,59 @@
               Somewhere I name (a database I own or my institution runs)
             </option>
           </select>
-                    <p class="hint">Either way, setup checks the database answers and that this study can write to it.</p>
+          <p class="hint">
+            Either way, setup checks the database answers and that this study
+            can write to it.
+          </p>
           <details class="hint">
             <summary>What is the difference?</summary>
             <div style="margin-top: 8px">
-            <b>On this machine</b> needs nothing to exist beforehand: the deployment
-            brings up its own MySQL, creates the schema and manages the accounts.
-            <br /><br />
-            <b>Somewhere I name</b> starts no database of its own — no container, no
-            published port, and none of the services waiting on it. It is offered
-            only when Android phones go <b>through the server</b> above: on the
-            direct path every participant's phone would have to reach that host on
-            its database port from whatever network they are on, which is not
-            something an institution opens up.
-            <br /><br />
-            Either way, setup checks that the database answers <i>and</i> that this
-            study can write a row to it before enrolment. If your account cannot
-            create the schema or the accounts, the exact SQL is printed for whoever
-            administers the server.
-          </div>
+              <b>On this machine</b> needs nothing to exist beforehand: the
+              deployment brings up its own MySQL, creates the schema and manages
+              the accounts. <br /><br />
+              <b>Somewhere I name</b> starts no database of its own — no
+              container, no published port, and none of the services waiting on
+              it. It is offered only when Android phones go
+              <b>through the server</b> above: on the direct path every
+              participant's phone would have to reach that host on its database
+              port from whatever network they are on, which is not something an
+              institution opens up. <br /><br />
+              Either way, setup checks that the database answers <i>and</i> that
+              this study can write a row to it before enrolment. If your account
+              cannot create the schema or the accounts, the exact SQL is printed
+              for whoever administers the server.
+            </div>
           </details>
         </div>
         <p
           class="hint hidden"
           id="dbExposureCaution"
-          style="margin: 0 0 18px; border-left: 3px solid #b45309; padding-left: 10px"
+          style="
+            margin: 0 0 18px;
+            border-left: 3px solid #b45309;
+            padding-left: 10px;
+          "
         >
-          <b>Every participant's phone will open this database directly.</b> The host
-          you name has to accept connections from any network, for the length of the
-          study. An institution will rarely open a database that way — if this is not
-          a server you run yourself, send the data through the server instead.
+          <b>Every participant's phone will open this database directly.</b> The
+          host you name has to accept connections from any network, for the
+          length of the study. An institution will rarely open a database that
+          way — if this is not a server you run yourself, send the data through
+          the server instead.
         </p>
         <p
           class="hint hidden"
           id="participantPassAbsent"
-          style="margin: 0 0 18px; border-left: 3px solid #0891b2; padding-left: 10px"
+          style="
+            margin: 0 0 18px;
+            border-left: 3px solid #0891b2;
+            padding-left: 10px;
+          "
         >
-          <b>No participant database password is needed on this path.</b> Phones post
-          to the server and are never given database credentials, so there is nothing
-          for a participant to type and nothing in the published config to read. The
-          server holds its own account, settled at deployment.
+          <b>No participant database password is needed on this path.</b> Phones
+          post to the server and are never given database credentials, so there
+          is nothing for a participant to type and nothing in the published
+          config to read. The server holds its own account, settled at
+          deployment.
         </p>
         <div class="field hidden" id="participantPassField">
           <label>Participant device password</label>
@@ -242,9 +268,10 @@
           </div>
           <p class="field-error hidden" id="participantPassError"></p>
           <p class="hint" id="participantHint">
-            The account a phone opens the database with on this path. Participants
-            type it when joining if the study config is served without it. A random
-            one is filled in for you — reveal it with the eye, or type your own.
+            The account a phone opens the database with on this path.
+            Participants type it when joining if the study config is served
+            without it. A random one is filled in for you — reveal it with the
+            eye, or type your own.
           </p>
         </div>
 
@@ -254,11 +281,6 @@
           <p class="field-error hidden" id="dbHostError"></p>
           <label for="dbPort" style="margin-top: 10px">Port</label>
           <input type="text" id="dbPort" value="3306" />
-          <p class="hint">
-            The address as this deployment's own containers will resolve it. Setup
-            asks from the deployment's network rather than from this machine, so a
-            host that only resolves here is reported rather than accepted.
-          </p>
           <div class="toggle-row" style="margin-top: 16px">
             <div class="toggle on" id="dbTlsToggle" onclick="toggleDbTls()">
               <div class="toggle-knob"></div>
@@ -278,8 +300,8 @@
                   MariaDB older than 11.4 that was never given a certificate, or
                   a host whose administrator has switched it off.
                   <br /><br />
-                  Leave it on if you are not sure. Setup opens the connection and
-                  tells you what happened before the study is deployed, so a
+                  Leave it on if you are not sure. Setup opens the connection
+                  and tells you what happened before the study is deployed, so a
                   server that cannot encrypt is reported here rather than found
                   later as a study that enrols and collects nothing.
                   <br /><br />
@@ -293,15 +315,22 @@
           <p
             class="hint hidden"
             id="dbPlaintextCaution"
-            style="margin: 10px 0 0; border-left: 3px solid #b45309; padding-left: 10px"
+            style="
+              margin: 10px 0 0;
+              border-left: 3px solid #b45309;
+              padding-left: 10px;
+            "
           >
-            <b>The study's data will cross the network in clear text.</b> Everything
-            written to this database, and the account password used to write it,
-            can be read by anyone positioned on the network in between. Choose this
-            only for a server that genuinely cannot encrypt.
+            <b>The study's data will cross the network in clear text.</b>
+            Everything written to this database, and the account password used
+            to write it, can be read by anyone positioned on the network in
+            between. Choose this only for a server that genuinely cannot
+            encrypt.
           </p>
           <div class="field" id="dbCaField" style="margin-top: 16px">
-            <label for="dbCaCertificate">Certificate authority (optional)</label>
+            <label for="dbCaCertificate"
+              >Certificate authority (optional)</label
+            >
             <textarea
               id="dbCaCertificate"
               rows="5"
@@ -310,20 +339,21 @@
             ></textarea>
             <p class="field-error hidden" id="dbCaCertificateError"></p>
             <p class="hint">
-              Encryption keeps the traffic unreadable; it cannot say <i>which</i>
-              server answered. This is what closes that — paste the authority that
-              signed your database's certificate and setup verifies the server
-              against it before deploying. Managed databases publish it (Google
-              Cloud SQL under <i>Connections → Security</i>, DigitalOcean and Aiven
-              behind a <i>Download CA certificate</i> button, RDS and Azure as a
+              Encryption keeps the traffic unreadable; it cannot say
+              <i>which</i> server answered. This is what closes that — paste the
+              authority that signed your database's certificate and setup
+              verifies the server against it before deploying. Managed databases
+              publish it (Google Cloud SQL under <i>Connections → Security</i>,
+              DigitalOcean and Aiven behind a
+              <i>Download CA certificate</i> button, RDS and Azure as a
               documentation download); a server your institution runs has an
-              administrator who can send it; a MySQL that generated its own keeps
-              it as <code>ca.pem</code> in its data directory.
+              administrator who can send it; a MySQL that generated its own
+              keeps it as <code>ca.pem</code> in its data directory.
               <br /><br />
               Paste the whole file including the BEGIN and END lines — a bundle
-              holding several certificates can be pasted as it is. Leave it empty
-              to connect encrypted without verifying the server, which you can
-              supply later in the Configurator.
+              holding several certificates can be pasted as it is. Leave it
+              empty to connect encrypted without verifying the server, which you
+              can supply later in the Configurator.
             </p>
           </div>
         </div>
@@ -339,26 +369,28 @@
             <details class="hint" style="margin-top: 6px">
               <summary>I don't have certificate files yet</summary>
               <div style="margin-top: 8px">
-                You need two files: a certificate and its private key. They are free
-                and take a few minutes.
+                You need two files: a certificate and its private key. They are
+                free and take a few minutes.
                 <br /><br />
-                <b>If this machine has a public domain name</b>, install Certbot and
-                run
-                <code>sudo certbot certonly --standalone -d your-domain.example</code>.
-                It writes both files under
+                <b>If this machine has a public domain name</b>, install Certbot
+                and run
+                <code
+                  >sudo certbot certonly --standalone -d
+                  your-domain.example</code
+                >. It writes both files under
                 <code>/etc/letsencrypt/live/your-domain.example/</code> —
                 <code>fullchain.pem</code> is the certificate and
-                <code>privkey.pem</code> is the key. Paste those two paths below.
-                Certificates last 90 days and Certbot renews them on its own.
-                <br /><br />
-                <b>If this machine has no domain name</b> — only a local IP like the
-                one above — no authority can issue a certificate for it. Leave HTTPS
-                off. Participants' phones on your own network still reach the study,
-                and the data still goes into the database; what travels unencrypted
-                is the traffic between the phone and this machine.
-                <br /><br />
-                Full instructions, including the Docker-specific details, are in the
-                project README under <i>SSL certificate</i>.
+                <code>privkey.pem</code> is the key. Paste those two paths
+                below. Certificates last 90 days and Certbot renews them on its
+                own. <br /><br />
+                <b>If this machine has no domain name</b> — only a local IP like
+                the one above — no authority can issue a certificate for it.
+                Leave HTTPS off. Participants' phones on your own network still
+                reach the study, and the data still goes into the database; what
+                travels unencrypted is the traffic between the phone and this
+                machine. <br /><br />
+                Full instructions, including the Docker-specific details, are in
+                the project README under <i>SSL certificate</i>.
               </div>
             </details>
           </div>
