@@ -19,37 +19,10 @@
       <p class="subtitle">Configure your deployment in a few steps</p>
 
       <div class="steps" id="steps">
-        <span class="active"></span><span></span><span></span><span></span
-        ><span></span>
+        <span class="active"></span><span></span><span></span><span></span>
       </div>
 
       <div class="card" id="s1">
-        <p class="step-title">Database</p>
-        <p class="step-desc">
-          MySQL stores all study data from Android and iOS devices
-        </p>
-        <div class="field">
-          <label>MySQL root password</label>
-          <div class="field-row">
-            <input
-              type="password"
-              id="mysqlPass"
-              placeholder="Enter a strong password"
-              oninput="clearFieldError('mysqlPass')"
-            />
-            <button
-              class="eye-btn"
-              type="button"
-              id="mysqlPassEye"
-              onclick="togglePasswordVisibility('mysqlPass')"
-            ></button>
-          </div>
-          <p class="field-error hidden" id="mysqlPassError"></p>
-          <p class="hint">All services use this to connect to MySQL</p>
-        </div>
-      </div>
-
-      <div class="card hidden" id="s2">
         <p class="step-title">Researcher access</p>
         <p class="step-desc">
           Blocks participants from reaching the configurator and dashboard
@@ -92,13 +65,13 @@
         </div>
       </div>
 
-      <div class="card hidden" id="s3">
-        <p class="step-title">Network</p>
+      <div class="card hidden" id="s2">
+        <p class="step-title">Network and database</p>
         <p class="step-desc">
-          Nginx routes all traffic through a single entry point
+          Where participants reach this deployment, and where its data is kept
         </p>
         <div class="field">
-          <label>Public host or IP</label>
+          <label>Where will people reach this from?</label>
           <div class="host-picker">
             <select id="publicHostMode" onchange="updateHostInput()">
               <option value="detected">Use detected local IP</option>
@@ -110,24 +83,31 @@
               id="publicHost"
               value=""
               oninput="rememberCustomHost()"
-              placeholder="study.example.com"
+              placeholder="study.example.edu"
             />
           </div>
+          <p class="field-error hidden" id="publicHostError"></p>
           <p class="hint">
-            Must be reachable by participant devices on the same network.
+            The detected IP works inside your own network only — participants on
+            mobile data or at home will not reach it. For a study that runs
+            outside the building, this has to be a hostname that resolves on the
+            internet, which means hosting with a domain of your own.
           </p>
-          <details class="hint">
-            <summary>How do I find my IP address?</summary>
-            <div style="margin-top: 8px">
-              Must be reachable by participant devices on the same network. If
-              the detected IP looks wrong, choose
-              <b>Enter another host manually</b>. To find your IP:
-              <b>Windows</b> — open Command Prompt, run <code>ipconfig</code>,
-              look for "IPv4 Address" under your Wi-Fi or Ethernet adapter.
-              <b>Mac</b> — System Settings → Network → your active adapter.
-            </div>
-          </details>
+          <p
+            class="hint"
+            style="
+              margin: 10px 0 0;
+              border-left: 3px solid #b45309;
+              padding-left: 10px;
+            "
+          >
+            <b
+              >Changing this later means every enrolled participant has to join
+              again.</b
+            >
+          </p>
         </div>
+
         <div class="field">
           <label>How Android phones send their data</label>
           <select id="androidDataflow" onchange="updateDbPlacement()">
@@ -170,47 +150,45 @@
               >Changing this later means every enrolled participant has to join
               again.</b
             >
-            It is not a setting that can be pushed to a phone: the study address
-            a device joined with is how it identifies the study it belongs to,
-            so it cannot be moved underneath them. Their phones keep collecting
-            but stop delivering until each one re-joins from a new link or QR
-            code. Choose now if you can; changing it mid-study is a decision
-            about contacting every participant.
           </p>
         </div>
+        <div class="field">
+          <label for="dbAdminUser">Database administrator</label>
+          <input type="text" id="dbAdminUser" placeholder="root" />
+          <p class="field-error hidden" id="dbAdminUserError"></p>
+          <label for="mysqlPass" style="margin-top: 10px"
+            >Database administrator password</label
+          >
+          <div class="field-row">
+            <input
+              type="password"
+              id="mysqlPass"
+              placeholder="Enter a strong password"
+              oninput="clearFieldError('mysqlPass')"
+            />
+            <button
+              class="eye-btn"
+              type="button"
+              id="mysqlPassEye"
+              onclick="togglePasswordVisibility('mysqlPass')"
+            ></button>
+          </div>
+          <p class="field-error hidden" id="mysqlPassError"></p>
+          <p class="hint">
+            The services inside this deployment connect to MySQL with this.
+          </p>
+        </div>
+
         <div class="field">
           <label>Where the study database runs</label>
           <select id="dbPlacement" onchange="updateDbPlacement()">
             <option value="bundled" selected>
-              On this machine (a database container this deployment runs)
+              On this machine, deployed alongside everything else
             </option>
             <option value="external">
-              Somewhere I name (a database I own or my institution runs)
+              On a separate server you name
             </option>
           </select>
-          <p class="hint">
-            Either way, setup checks the database answers and that this study
-            can write to it.
-          </p>
-          <details class="hint">
-            <summary>What is the difference?</summary>
-            <div style="margin-top: 8px">
-              <b>On this machine</b> needs nothing to exist beforehand: the
-              deployment brings up its own MySQL, creates the schema and manages
-              the accounts. <br /><br />
-              <b>Somewhere I name</b> starts no database of its own — no
-              container, no published port, and none of the services waiting on
-              it. It is offered only when Android phones go
-              <b>through the server</b> above: on the direct path every
-              participant's phone would have to reach that host on its database
-              port from whatever network they are on, which is not something an
-              institution opens up. <br /><br />
-              Either way, setup checks that the database answers <i>and</i> that
-              this study can write a row to it before enrolment. If your account
-              cannot create the schema or the accounts, the exact SQL is printed
-              for whoever administers the server.
-            </div>
-          </details>
         </div>
         <p
           class="hint hidden"
@@ -276,8 +254,41 @@
         </div>
 
         <div class="field hidden" id="dbExternalFields">
+          <p
+            class="hint"
+            style="
+              margin: 0 0 14px;
+              border-left: 3px solid #0891b2;
+              padding-left: 10px;
+            "
+          >
+            <b>It has to be MySQL 8.0 or later</b> — or something speaking its
+            protocol, such as MariaDB or Aurora MySQL.
+          </p>
+          <details class="hint" style="margin: 0 0 16px">
+            <summary>Where do I get one?</summary>
+            <div style="margin-top: 8px">
+              <b>Managed, paid</b> — Google Cloud SQL for MySQL, Amazon RDS for
+              MySQL, Azure Database for MySQL, DigitalOcean Managed MySQL, Aiven,
+              PlanetScale. Several give new accounts trial credit or a first-year
+              free tier; check the current terms.
+              <br /><br />
+              <b>Your own server</b> — a VPS with MySQL installed, or a machine
+              your institution runs.
+            </div>
+          </details>
           <label for="dbHost">Database host</label>
-          <input type="text" id="dbHost" placeholder="db.example.edu" />
+          <input
+            type="text"
+            id="dbHost"
+            placeholder="db.example.edu — or paste the whole connection string"
+            onblur="spreadConnectionString(this.value) || fillAdminFromHost()"
+          />
+          <p class="hint" style="margin: 6px 0 0">
+            Paste what your provider gives you. A connection string like
+            <code>mysql://user:pass@host:12345/db</code> is taken apart into the
+            fields below; a bare host name is used as it is.
+          </p>
           <p class="field-error hidden" id="dbHostError"></p>
           <label for="dbPort" style="margin-top: 10px">Port</label>
           <input type="text" id="dbPort" value="3306" />
@@ -338,25 +349,55 @@
               placeholder="-----BEGIN CERTIFICATE-----&#10;…&#10;-----END CERTIFICATE-----"
             ></textarea>
             <p class="field-error hidden" id="dbCaCertificateError"></p>
-            <p class="hint">
-              Encryption keeps the traffic unreadable; it cannot say
-              <i>which</i> server answered. This is what closes that — paste the
-              authority that signed your database's certificate and setup
-              verifies the server against it before deploying. Managed databases
-              publish it (Google Cloud SQL under <i>Connections → Security</i>,
-              DigitalOcean and Aiven behind a
-              <i>Download CA certificate</i> button, RDS and Azure as a
-              documentation download); a server your institution runs has an
-              administrator who can send it; a MySQL that generated its own
-              keeps it as <code>ca.pem</code> in its data directory.
-              <br /><br />
-              Paste the whole file including the BEGIN and END lines — a bundle
-              holding several certificates can be pasted as it is. Leave it
-              empty to connect encrypted without verifying the server, which you
-              can supply later in the Configurator.
+          </div>
+
+          <div class="field" style="margin-top: 18px">
+            <label for="dbInit">Who creates the schemas, the accounts and the tables</label>
+            <select id="dbInit" onchange="updateDbInit()">
+              <option value="auto" selected>
+                Setup does it, with the account above
+              </option>
+              <option value="manual">
+                I run the SQL myself (or my administrator does)
+              </option>
+            </select>
+            <p class="hint" id="dbInitHint">
+              Setup creates the schemas, this study's accounts and the tables when
+              it deploys. It needs an account that may do that — most managed
+              databases give you one; an institutional server often does not.
             </p>
           </div>
+
+          <div class="field" style="margin-top: 18px">
+            <button
+              type="button"
+              class="btn btn-back"
+              id="dbCheckBtn"
+              onclick="checkDatabase()"
+            >
+              Test this database
+            </button>
+            <button
+              type="button"
+              class="btn btn-back"
+              id="dbSqlBtn"
+              onclick="downloadSetupSql()"
+              style="margin-left: 8px"
+            >
+              Download setup.sql
+            </button>
+            <p class="hint" style="margin: 8px 0 0">
+              The test opens the database with each account this deployment uses
+              and reports what is there. It changes nothing, so before the first
+              deploy it names what is still to be created rather than failing on
+              it. The file is that work written out for an administrator — it
+              carries this study's passwords, so send it the way you would send a
+              credential.
+            </p>
+            <div id="dbCheckResult" class="hint hidden" style="margin-top: 10px"></div>
+          </div>
         </div>
+
         <div class="toggle-row">
           <div class="toggle" id="sslToggle" onclick="toggleSSL()">
             <div class="toggle-knob"></div>
@@ -407,7 +448,7 @@
         </div>
       </div>
 
-      <div class="card hidden" id="s4">
+      <div class="card hidden" id="s3">
         <p class="step-title">Backups</p>
         <p class="step-desc">
           MySQL backups are saved on the host machine, outside Docker volumes
@@ -461,7 +502,7 @@
         </div>
       </div>
 
-      <div class="card hidden" id="s5">
+      <div class="card hidden" id="s4">
         <p class="step-title">Review</p>
         <p class="step-desc">
           This will be saved as .env and Docker will start automatically
@@ -472,7 +513,7 @@
         </div>
       </div>
 
-      <div class="card hidden" id="s6">
+      <div class="card hidden" id="s5">
         <div class="status">
           <div class="status-icon loading" id="statusIcon">
             <svg

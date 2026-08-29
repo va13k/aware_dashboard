@@ -189,20 +189,65 @@ function suggestPassword(id) {
 
 function go(dir) {
   var next = step + dir;
-  if (next < 0 || next > 5) return;
+  if (next < 0 || next > 4) return;
 
   if (dir > 0) {
-    if (step === 0) {
+
+    // A connection string pasted whole is the common mistake here: providers
+    // hand out one line with the scheme, the credentials and the database in
+    // it, and this field wants the host alone. Left to the deployment, it comes
+    // back as a DNS failure naming the whole string -- password included.
+    if (step === 1) {
       var mp = (document.getElementById("mysqlPass").value || "").trim();
       if (!mp) {
-        showFieldError("mysqlPass", "Please enter a MySQL root password.");
+        showFieldError("mysqlPass", "Please enter the database password.");
         return;
       }
+    }
+    if (step === 1 && dbPlacement() === "external") {
+      var host = dbHost();
+      if (!host) {
+        showFieldError("dbHost", "Please enter the database host.");
+        return;
+      }
+      // A connection string is what the provider gives out, so it is taken
+      // apart rather than sent back: the parts land in their own fields, where
+      // they can be seen and corrected.
+      if (host.indexOf("://") !== -1 && spreadConnectionString(host)) {
+        host = dbHost();
+      }
+      if (/^[a-z][a-z0-9+.-]*:\/\//i.test(host) || host.indexOf("@") !== -1) {
+        showFieldError(
+          "dbHost",
+          "This does not read as a host or a connection string. Enter the host on its own, such as db.example.edu, and the port in the field below.",
+        );
+        return;
+      }
+      if (host.indexOf("/") !== -1 || host.indexOf("?") !== -1) {
+        showFieldError(
+          "dbHost",
+          "Enter the host on its own, without a path or query — the database name and options are settled by this deployment.",
+        );
+        return;
+      }
+      if (host.indexOf(":") !== -1) {
+        showFieldError(
+          "dbHost",
+          "Leave the port out of this field; there is a separate one for it below.",
+        );
+        return;
+      }
+      if (/\s/.test(host)) {
+        showFieldError("dbHost", "A host name has no spaces in it.");
+        return;
+      }
+      clearFieldError("dbHost");
+      fillAdminFromHost();
     }
     // Caught before the request so a half-copied paste is a corrected field
     // rather than a refused deployment. The server checks it again, because a
     // form is not a boundary.
-    if (step === 2 && dbPlacement() === "external" && dbTls) {
+    if (step === 1 && dbPlacement() === "external" && dbTls) {
       var ca = dbCaCertificate();
       if (
         ca &&
@@ -215,7 +260,7 @@ function go(dir) {
         return;
       }
     }
-    if (step === 2 && androidDataflow() === "direct") {
+    if (step === 1 && androidDataflow() === "direct") {
       var pp = (document.getElementById("participantPass").value || "").trim();
       if (pp && !PASSWORD_PATTERN.test(pp)) {
         showFieldError(
@@ -225,7 +270,7 @@ function go(dir) {
         return;
       }
     }
-    if (step === 1) {
+    if (step === 0) {
       var ru = (document.getElementById("researcherUser").value || "").trim();
       var rp = (document.getElementById("researcherPass").value || "").trim();
       var valid = true;
@@ -239,13 +284,13 @@ function go(dir) {
       }
       if (!valid) return;
     }
-    if (step === 3 && !validateBackups()) {
+    if (step === 2 && !validateBackups()) {
       return;
     }
   }
 
-  if (next === 4) buildPreview();
-  if (next === 5) deploy();
+  if (next === 3) buildPreview();
+  if (next === 4) deploy();
 
   document.getElementById("s" + (step + 1)).classList.add("hidden");
   document.getElementById("s" + (next + 1)).classList.remove("hidden");
@@ -264,9 +309,9 @@ function go(dir) {
   back.classList.toggle("hidden", step === 0);
   nb.classList.remove("hidden");
 
-  if (step === 4) {
+  if (step === 3) {
     nb.textContent = "Deploy";
-  } else if (step === 5) {
+  } else if (step === 4) {
     nav.classList.add("hidden");
   } else {
     nb.textContent = "Next";
@@ -278,7 +323,7 @@ function restart() {
     clearTimeout(redirectTimer);
     redirectTimer = null;
   }
-  document.getElementById("s6").classList.add("hidden");
+  document.getElementById("s5").classList.add("hidden");
   document.getElementById("s1").classList.remove("hidden");
   document.getElementById("statusIcon").className = "status-icon loading";
   document.getElementById("statusIcon").innerHTML =
@@ -352,6 +397,8 @@ function getPayload() {
     android_dataflow: androidDataflow(),
     db_placement: dbPlacement(),
     db_host: dbHost(),
+    db_admin_user: dbAdminUser(),
+    db_init: dbInit(),
     db_port: dbPort(),
     // Sent only for the placement that has a say. A bundled database settles both
     // of these itself, and an answer arriving for it would be a form field nobody
@@ -392,6 +439,196 @@ function dbHost() {
   return el && el.value ? el.value.trim() : "";
 }
 
+// What each managed service calls the account it hands out. None of them is
+// root, and somebody deploying for the first time has no reason to know that, so
+// the host answers it instead of a question.
+var ADMIN_BY_HOST = [
+  [".aivencloud.com", "avnadmin"],
+  [".ondigitalocean.com", "doadmin"],
+];
+
+function adminForHost(host) {
+  var name = String(host || "")
+    .trim()
+    .toLowerCase();
+  for (var i = 0; i < ADMIN_BY_HOST.length; i += 1) {
+    if (name.slice(-ADMIN_BY_HOST[i][0].length) === ADMIN_BY_HOST[i][0]) {
+      return ADMIN_BY_HOST[i][1];
+    }
+  }
+  return "";
+}
+
+// Providers hand out one line holding the host, the port, the account and the
+// password. Taking it apart here means the wizard can be pasted into: whatever
+// field it lands in, the parts go where they belong and the researcher sees what
+// was understood.
+function spreadConnectionString(text) {
+  var raw = String(text || "").trim();
+  if (raw.indexOf("://") === -1) return false;
+
+  var parsed;
+  try {
+    parsed = new URL(raw);
+  } catch (e) {
+    return false;
+  }
+  if (!parsed.hostname) return false;
+
+  document.getElementById("dbHost").value = parsed.hostname;
+  if (parsed.port) document.getElementById("dbPort").value = parsed.port;
+  if (parsed.username) {
+    document.getElementById("dbAdminUser").value = decodeURIComponent(
+      parsed.username,
+    );
+  }
+  var passField = document.getElementById("mysqlPass");
+  if (parsed.password && passField && !passField.value.trim()) {
+    passField.value = decodeURIComponent(parsed.password);
+  }
+  clearFieldError("dbHost");
+  return true;
+}
+
+function fillAdminFromHost() {
+  var field = document.getElementById("dbAdminUser");
+  if (!field || field.value.trim()) return;
+  var guessed = adminForHost(dbHost());
+  if (guessed) field.value = guessed;
+}
+
+// Asking before deploying, with the fields as they stand. The test creates nothing:
+// it opens the database with each account this deployment uses and reports what is
+// there, so a database that cannot be reached becomes a field to fix rather than a
+// deploy that stops --- and what is missing before the first deploy is reported as
+// the deploy's to create rather than as a failure.
+function dbInit() {
+  var el = document.getElementById("dbInit");
+  return el && el.value === "manual" ? "manual" : "auto";
+}
+
+// Two ways for a database to become ready, and the difference is who holds the
+// account that may create things. Setup can do it where the account allows;
+// where it does not --- an institutional server, most often --- the file is run
+// by whoever administers it and setup only checks the result.
+function updateDbInit() {
+  var manual = dbInit() === "manual";
+  var hint = document.getElementById("dbInitHint");
+  if (hint) {
+    hint.textContent = manual
+      ? "Download the file below and run it against the database first — it creates the schemas, this study's accounts and the tables its data lands in. The account you give setup only has to read what is there."
+      : "Setup creates the schemas, this study's accounts and the tables when it deploys. It needs an account that may do that — most managed databases give you one; an institutional server often does not.";
+  }
+  // Offered only where it is the way the database gets made: with setup doing it,
+  // the file is a thing to wonder about rather than a thing to run.
+  var sqlButton = document.getElementById("dbSqlBtn");
+  if (sqlButton) {
+    sqlButton.className = manual ? "btn btn-next" : "btn btn-next hidden";
+  }
+}
+
+function checkDatabase() {
+  var button = document.getElementById("dbCheckBtn");
+  var box = document.getElementById("dbCheckResult");
+  if (!button || !box) return;
+
+  spreadConnectionString(document.getElementById("dbHost").value);
+  fillAdminFromHost();
+
+  button.disabled = true;
+  button.textContent = "Testing…";
+  box.classList.remove("hidden");
+  box.textContent = "Asking the database…";
+
+  fetch("check-database", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      placement: dbPlacement(),
+      host: dbHost(),
+      port: dbPort(),
+      admin_user: dbAdminUser(),
+      init: dbInit(),
+      admin_password: (document.getElementById("mysqlPass").value || "").trim(),
+    }),
+  })
+    .then(function (response) {
+      return response.json();
+    })
+    .then(function (report) {
+      box.innerHTML = renderCheck(report);
+    })
+    .catch(function (error) {
+      box.textContent = "The test could not run: " + error.message;
+    })
+    .finally(function () {
+      button.disabled = false;
+      button.textContent = "Test this database";
+    });
+}
+
+function renderCheck(report) {
+  var labels = {
+    reachable: "Reachable",
+    tls: "Encrypted",
+    schema: "Schemas",
+    accounts: "Study accounts",
+    tables: "Tables",
+  };
+  var rows = (report.checks || []).map(function (entry) {
+    var state = entry.skipped
+      ? "skipped"
+      : entry.ok
+        ? "ok"
+        : entry.warning
+          ? "warning"
+          : "failed";
+    return (
+      '<div class="check-row check-' +
+      state +
+      '"><div class="check-head">' +
+      escapeHtml(labels[entry.name] || entry.name) +
+      '<span class="check-state">' +
+      state +
+      "</span></div><div class=\"check-detail\">" +
+      escapeHtml(entry.detail || "") +
+      "</div></div>"
+    );
+  });
+  var pending = (report.checks || []).some(function (entry) {
+    return (
+      entry.warning && ["schema", "accounts", "tables"].indexOf(entry.name) !== -1
+    );
+  });
+  var head = !report.ok
+    ? '<p class="check-verdict check-verdict-bad">Not ready yet — fix what is marked below, or run the setup file against the database.</p>'
+    : pending
+      ? '<p class="check-verdict check-verdict-ok">This database can take this study. What is missing is created when it deploys.</p>'
+      : '<p class="check-verdict check-verdict-ok">The database is ready for this study.</p>';
+  return head + rows.join("");
+}
+
+function escapeHtml(value) {
+  return String(value)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+}
+
+// The statements an administrator runs when this account may not create schemas
+// or accounts, which is the usual answer at an institution.
+function downloadSetupSql() {
+  window.location.href = "database.sql";
+}
+
+function dbAdminUser() {
+  var el = document.getElementById("dbAdminUser");
+  var value = el && el.value ? el.value.trim() : "";
+  // root is MySQL's own administrator and the bundled database's, so it is the
+  // fallback rather than a guess.
+  return value || "root";
+}
+
 function dbPort() {
   var el = document.getElementById("dbPort");
   return el && el.value ? el.value.trim() : "3306";
@@ -413,6 +650,7 @@ function updateDbPlacement() {
   var directPath = androidDataflow() === "direct";
 
   external.classList.toggle("hidden", select.value !== "external");
+  updateDbInit();
 
   // Both placements are offered on both paths. Naming a database while phones open
   // it themselves asks something of the network that an institution will usually
@@ -463,6 +701,12 @@ function getEnv() {
     "\n" +
     "DB_HOST=" +
     payload.db_host +
+    "\n" +
+    "DB_ADMIN_USER=" +
+    payload.db_admin_user +
+    "\n" +
+    "DB_INIT=" +
+    payload.db_init +
     "\n" +
     "DB_PORT=" +
     payload.db_port +
