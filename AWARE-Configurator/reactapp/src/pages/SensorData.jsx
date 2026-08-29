@@ -2256,6 +2256,12 @@ export default function SensorData() {
 
         <div className="border">
           <p className="title">Configuration settings</p>
+
+          <p className="field_name">Reaching the server</p>
+          <p className="explanation">
+            What each phone sends to the study, and the conditions it waits for
+            before sending. A phone that never meets them keeps its data.
+          </p>
           <SensorComponent
             sensorName="Sync to server"
             sensorDescription="Upload collected data to the study webservice. Disable to keep data on-device only."
@@ -2281,7 +2287,6 @@ export default function SensorData() {
             field="charging_only"
             modeState="sensor"
           />
-
           <FrequencyField
             id="offload_frequency"
             title="Offload frequency"
@@ -2292,7 +2297,46 @@ export default function SensorData() {
             studyField={sensorData.offload_frequency}
             modeState="sensor"
           />
+          <FrequencyField
+            id="fallback_network"
+            title="Fallback network"
+            inputLabel="maximum number of trying over wifi"
+            defaultNum={30}
+            description="Fallback to 3G syncing after specified number of hours trying over WiFi."
+            studyField={sensorData.fallback_network}
+            field="fallback_network"
+            modeState="sensor"
+          />
+          <SensorComponent
+            sensorName="Simple webservice payloads"
+            sensorDescription="Upload data using the simplified webservice payload format."
+            stateField={sensorData.webservice_simple}
+            field="webservice_simple"
+            modeState="sensor"
+          />
+          <SensorComponent
+            sensorName="Remove data after upload"
+            sensorDescription="Delete local sensor data once it has been successfully uploaded to the webservice."
+            stateField={sensorData.webservice_remove_data}
+            field="webservice_remove_data"
+            modeState="sensor"
+          />
+          <FrequencyField
+            id="config_update_freq"
+            title="Config update frequency"
+            inputLabel="minutes waiting for checking updates"
+            defaultNum={60}
+            description="How frequently to check for new study config (min)?"
+            field="config_update_freq"
+            studyField={sensorData.config_update_freq}
+            modeState="sensor"
+          />
 
+          <p className="field_name">On the participant's phone</p>
+          <p className="explanation">
+            What the participant notices, and what the app does with the data
+            while it is still on the phone.
+          </p>
           <div>
             <Grid>
               <p className="field_name" mb={10}>
@@ -2354,7 +2398,6 @@ export default function SensorData() {
               </p>
             </Grid>
           </div>
-
           <SensorComponent
             sensorName="Silent"
             sensorDescription="Don't show sync notifications."
@@ -2362,18 +2405,6 @@ export default function SensorData() {
             field="no_sync_notify"
             modeState="sensor"
           />
-
-          <FrequencyField
-            id="fallback_network"
-            title="Fallback network"
-            inputLabel="maximum number of trying over wifi"
-            defaultNum={30}
-            description="Fallback to 3G syncing after specified number of hours trying over WiFi."
-            studyField={sensorData.fallback_network}
-            field="fallback_network"
-            modeState="sensor"
-          />
-
           <SensorComponent
             sensorName="Remind to charge"
             sensorDescription="Remind to charge when 15% battery is left."
@@ -2389,6 +2420,13 @@ export default function SensorData() {
             modeState="sensor"
           />
           <SensorComponent
+            sensorName="Enable settings update"
+            sensorDescription="Allow participants to modify the study config from the mobile."
+            stateField={sensorData.setting_update}
+            field="setting_update"
+            modeState="sensor"
+          />
+          <SensorComponent
             sensorName="Debug flag"
             sensorDescription="Show debug messages in logcat."
             stateField={sensorData.debug_flag}
@@ -2400,39 +2438,6 @@ export default function SensorData() {
             sensorDescription="Log a warning when a local database operation takes too long."
             stateField={sensorData.debug_db_slow}
             field="debug_db_slow"
-            modeState="sensor"
-          />
-          <SensorComponent
-            sensorName="Simple webservice payloads"
-            sensorDescription="Upload data using the simplified webservice payload format."
-            stateField={sensorData.webservice_simple}
-            field="webservice_simple"
-            modeState="sensor"
-          />
-          <SensorComponent
-            sensorName="Remove data after upload"
-            sensorDescription="Delete local sensor data once it has been successfully uploaded to the webservice."
-            stateField={sensorData.webservice_remove_data}
-            field="webservice_remove_data"
-            modeState="sensor"
-          />
-
-          <FrequencyField
-            id="config_update_freq"
-            title="Config update frequency"
-            inputLabel="minutes waiting for checking updates"
-            defaultNum={60}
-            description="How frequently to check for new study config (min)?"
-            field="config_update_freq"
-            studyField={sensorData.config_update_freq}
-            modeState="sensor"
-          />
-
-          <SensorComponent
-            sensorName="Enable settings update"
-            sensorDescription="Allow participants to modify the study config from the mobile."
-            stateField={sensorData.setting_update}
-            field="setting_update"
             modeState="sensor"
           />
         </div>
