@@ -255,6 +255,10 @@ services:
       - ./nginx/configurator-loading.html:/usr/share/nginx/html/configurator-loading.html:ro
       - ./nginx/setup-loading.html:/usr/share/nginx/html/setup-loading.html:ro
       - ./nginx/${PROTOCOL:-http}.conf:/etc/nginx/conf.d/default.conf:ro
+      # The study's key, written by setup rather than checked in. Loaded ahead
+      # of the configuration above, which compares a request against it before
+      # serving a participant's configuration.
+      - ./nginx/study-key.conf:/etc/nginx/conf.d/00-study-key.conf:ro
       - ./studies:/usr/share/nginx/html/studies:ro
       - ./aware-micro-server/esm:/usr/share/nginx/html/esm:ro
       - configurator_static:/usr/share/nginx/html/configurator_static:ro

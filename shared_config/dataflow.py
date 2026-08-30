@@ -146,10 +146,15 @@ def android_study_url(
     and reads this URL for configuration updates, so it addresses the published
     Android config.
 
+    The key is in both addresses because it is what the deployment answers to. A
+    phone on the direct path holds no session and the config it reads carries the
+    database account it opens, so the key is what stands between that file and
+    anyone who asks for it by name.
+
     One function, so setup and the Configurator hand a phone the same address.
     """
     return webservice_server(
         choice,
         study_url=f"{base_url}/{ANDROID_STUDY_NUMBER}/{study_key}",
-        config_url=f"{base_url}/studies/files/{config_file_name}",
+        config_url=f"{base_url}/studies/files/{study_key}/{config_file_name}",
     )

@@ -182,7 +182,14 @@ class TestAndroidJoinUrl:
     def test_the_direct_path_addresses_the_published_config(self):
         """The client opens the database itself and reads this URL for config
         updates, which the deployment serves as a file."""
-        assert self._url("direct") == "http://host/studies/files/studyConfig.json"
+        assert self._url("direct") == "http://host/studies/files/KEY/studyConfig.json"
+
+    def test_both_paths_carry_the_key_the_deployment_answers_to(self):
+        """The config a direct phone downloads carries the account it opens the
+        database with, so the address it is given holds the study's key just as the
+        webservice one does."""
+        for android in ("direct", "webservice"):
+            assert "/KEY" in self._url(android)
 
     def test_the_url_and_the_android_instance_name_one_study(self):
         """A phone is routed to the instance by study number, and the instance
