@@ -54,6 +54,10 @@ mosquitto/mosquitto.conf
 mosquitto/acl
 mosquitto/passwords
 
+# The study's key as nginx reads it, written by setup. It is the credential the
+# config-serving paths compare a request against.
+nginx/study-key.conf
+
 # Generated from the database placement: present when the study names its own
 # database, absent when this deployment runs one.
 docker-compose.external-db.yml

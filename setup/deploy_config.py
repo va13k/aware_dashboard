@@ -66,6 +66,10 @@ COPY_SCRIPT_PATH = PROJECT / "copy-study-data.sh"
 MOSQUITTO_DIR = PROJECT / "mosquitto"
 STUDIES_INDEX_PATH = PROJECT / "studies" / "index.html"
 STUDIES_TEMPLATE_PATH = SCRIPT_DIR / "studies_index_template.html"
+#: The study key as nginx reads it. Generated rather than checked in, because it is
+#: this deployment's credential and the two protocol configurations beside it are
+#: the same file for every study.
+NGINX_STUDY_KEY_PATH = PROJECT / "nginx" / "study-key.conf"
 
 def load_merged_env() -> dict[str, str]:
     env = load_env(ENV_PATH)
@@ -75,6 +79,21 @@ def load_merged_env() -> dict[str, str]:
 
 
 PLACEHOLDER_SECRETS = {"", "CHANGE_ME"}
+
+#: The variable a deploy is asked through to mint a credential again.
+ROTATE_ENV = "ROTATE"
+
+#: What can be asked for, and the values each one replaces.
+#:
+#: Both are credentials every participant's phone holds a copy of, which is why a
+#: new one is asked for rather than produced by a redeploy: the study key is the
+#: address a phone uploads to, and the broker password is what every phone in the
+#: study connects with. A phone carrying the old one is a phone that has stopped
+#: reporting until it reads its configuration again.
+ROTATABLE = {
+    "study-key": ("STUDY_KEY",),
+    "broker": ("MQTT_PARTICIPANT_PASSWORD", "MQTT_PUBLISHER_PASSWORD"),
+}
 
 
 def ensure_participant_password(env: dict[str, str]) -> None:
@@ -933,6 +952,54 @@ def ensure_researcher_credentials(env: dict[str, str]) -> None:
         env["RESEARCHER_PASSWORD"] = secrets.token_urlsafe(16)
 
 
+def apply_rotation_request(env: dict[str, str]) -> list[str]:
+    """Empty the credentials this deploy was asked to mint again.
+
+    Emptied rather than replaced here, so each value still has exactly one
+    generator: every ``ensure_`` below reads a blank as a deployment that has none
+    yet, which is the path a first deploy already takes.
+
+    The request itself is cleared, so a rotation happens on the deploy that asked
+    for it. Left in place it would mint a new key on every subsequent run, and a
+    study whose address moves each time it is redeployed collects nothing.
+
+    A name nothing recognises stops the run. Ignored, it would report a rotation
+    that did not happen, and the value it was meant to replace is the one somebody
+    has already been told is gone.
+    """
+    asked = str(env.get(ROTATE_ENV, "")).replace(",", " ").split()
+    names = [name.strip().lower() for name in asked]
+    unknown = sorted({name for name in names if name not in ROTATABLE})
+    if unknown:
+        raise SystemExit(
+            f"{ROTATE_ENV}: this deployment does not mint {', '.join(unknown)}. "
+            f"Choose from {', '.join(sorted(ROTATABLE))}."
+        )
+
+    env[ROTATE_ENV] = ""
+    for name in names:
+        for key in ROTATABLE[name]:
+            env[key] = ""
+    return sorted(set(names))
+
+
+def report_rotation(rotated: list[str]) -> None:
+    """What a rotation costs the study, said where the researcher is standing.
+
+    Both credentials live on phones that are out in the field, so the deploy that
+    replaces one leaves participants to act before their data resumes.
+    """
+    if not rotated:
+        return
+    print(f"minted again: {', '.join(rotated)}")
+    if "study-key" in rotated:
+        print("  every phone holds the old address: a participant rejoins by "
+              "scanning the study's QR code again")
+    if "broker" in rotated:
+        print("  every phone holds the old broker password: prompts reach one "
+              "again once it has read its configuration")
+
+
 def generate_htpasswd(username: str, password: str) -> None:
     result = subprocess.run(
         ["openssl", "passwd", "-apr1", password],
@@ -1056,6 +1123,28 @@ def render_android_study_link() -> str:
     ).format(
         path=html.escape(public_path),
         name="android-study",
+    )
+
+
+def write_nginx_study_key(study_key: str) -> None:
+    """The key nginx compares a request against before serving a study config.
+
+    A phone's configuration carries the broker credential it connects with, and on
+    the direct dataflow the database account it opens as well, so the paths that
+    serve it ask for the key first. Written as a map in its own file so the key
+    reaches nginx without being written into a configuration that is checked in.
+
+    Absent, nginx refuses to start on the unknown variable, which is what a
+    deployment wants from a missing credential.
+    """
+    atomic_write_text(
+        NGINX_STUDY_KEY_PATH,
+        "# Generated from the study by setup/deploy_config.py. Edit the study, not this file.\n"
+        "#\n"
+        "# The key a phone presents to read its configuration, compared in\n"
+        "# nginx/http.conf and nginx/https.conf before either serves the file.\n"
+        f'map $host $study_key {{\n    default "{study_key}";\n}}\n',
+        SHARED_MODE,
     )
 
 
@@ -1253,6 +1342,7 @@ def _stored_join_url() -> str:
 
 def main() -> None:
     env = load_merged_env()
+    rotated = apply_rotation_request(env)
     ensure_django_secret_key(env)
     ensure_session_secret(env)
     ensure_study_key(env)
@@ -1335,6 +1425,7 @@ def main() -> None:
         print(f"rows already collected: run ./{COPY_SCRIPT_PATH.name} to carry them across")
     print(f"broker: {messaging.PARTICIPANT_USER} on port {broker_port} "
           f"({'TLS' if messaging.uses_tls(env.get('PROTOCOL', 'http')) else 'plaintext'})")
+    report_rotation(rotated)
 
     android_study_url = dataflow.android_study_url(
         dataflow.declared(source, "android"),
@@ -1367,6 +1458,7 @@ def main() -> None:
     study_join_url = f"{base_url}{study_join_path}"
     write_studies_index(base_url, study_join_path, study_join_url, android_study_url)
     write_deployment_urls(build_deployment_urls(base_url, study_join_url, android_study_url))
+    write_nginx_study_key(env["STUDY_KEY"])
 
     # Read back after everything is written: the check is worth only as much as
     # the files it inspects, and those are the files a phone will be served.
