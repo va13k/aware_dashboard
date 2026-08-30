@@ -1100,6 +1100,16 @@ def write_micro_config(config: dict) -> None:
     atomic_write_text(CONFIG_PATH, json.dumps(config, indent=2) + "\n", SHARED_MODE)
 
 
+def write_android_micro_config(config: dict) -> None:
+    # Bind-mounted into micro-server-android, which runs as appuser. The mode is
+    # fixed here rather than left to the caller: a raw atomic_write_text at the
+    # call site had it passing SECRET_MODE (0600, deploying user only), which left
+    # appuser unable to read its own configuration and the container unhealthy —
+    # this file is exactly as sensitive as CONFIG_PATH above, so it gets the same
+    # helper shape.
+    atomic_write_text(ANDROID_CONFIG_PATH, json.dumps(config, indent=2) + "\n", SHARED_MODE)
+
+
 def write_ios_esm_config(config: list[dict]) -> None:
     # Served to iOS devices by nginx at /esm/.
     atomic_write_text(ESM_CONFIG_PATH, json.dumps(config, indent=2) + "\n", SHARED_MODE)
@@ -1260,6 +1270,7 @@ def chown_generated_paths(env: dict[str, str]) -> None:
         CONFIG_PATH,
         CONFIG_PATH.parent,
         CONFIG_PATH.parent / "cache",
+        ANDROID_CONFIG_PATH,
         ESM_CONFIG_PATH,
         ESM_CONFIG_PATH.parent,
         STUDY_CONFIG_PATH,
@@ -1273,6 +1284,40 @@ def chown_generated_paths(env: dict[str, str]) -> None:
                 os.chown(path, uid, gid)
         except OSError as exc:
             print(f"deploy_config: could not chown {path}: {exc}", file=sys.stderr)
+
+
+#: Files a container reads under a uid that never matches the host user's — nginx's
+#: worker user for the two served over an alias, appuser inside each micro-server
+#: for its own config. `chown_generated_paths` still runs first (it fixes ownership
+#: for the host tools that touch the same paths, e.g. the Configurator), but a
+#: container-readable file must work even when that chown is skipped (Windows,
+#: `os.chown` missing) or when ownership and mode disagree, so what is checked here
+#: is the "other" bit specifically rather than who owns the file.
+CONTAINER_READABLE_PATHS = (CONFIG_PATH, ANDROID_CONFIG_PATH, ESM_CONFIG_PATH, STUDY_CONFIG_PATH)
+
+
+def check_config_permissions() -> None:
+    """Catch a config a container cannot read at deploy time, not weeks later.
+
+    `aware-config.android.json` once reached production as SECRET_MODE (0600):
+    every write into this file its own micro-server bind-mounts still went out
+    with the right mode, so it never showed up in review, and it only surfaced
+    as a 502 on the Android QR code once the container tried to boot from it.
+    Checked after chown_generated_paths, and by the "other" bit rather than the
+    owner, so the failure mode is a loud SystemExit here rather than a container
+    stuck unhealthy in the field.
+    """
+    unreadable = [
+        path for path in CONTAINER_READABLE_PATHS
+        if path.exists() and not (path.stat().st_mode & 0o004)
+    ]
+    if unreadable:
+        named = ", ".join(str(path) for path in unreadable)
+        raise SystemExit(
+            f"Not world-readable, so the container that bind-mounts it cannot "
+            f"open it: {named}. Whatever wrote it must use SHARED_MODE, not "
+            f"SECRET_MODE."
+        )
 
 
 def check_placement_applied(source: dict) -> None:
@@ -1468,9 +1513,7 @@ def main() -> None:
         dataflow.ANDROID_STUDY_NUMBER,
         join_url=android_study_url,
     )
-    atomic_write_text(
-        ANDROID_CONFIG_PATH, json.dumps(android_micro, indent=2) + "\n", SHARED_MODE
-    )
+    write_android_micro_config(android_micro)
 
     config, study = serialize_ios_config(source, settings, EXAMPLE_PATH, CONFIG_PATH, env["STUDY_KEY"])
     write_micro_config(config)
@@ -1487,6 +1530,7 @@ def main() -> None:
     check_placement_applied(source)
 
     chown_generated_paths(env)
+    check_config_permissions()
 
 
 if __name__ == "__main__":
