@@ -42,13 +42,13 @@ def admin():
         conn.close()
     except Exception as exc:  # server down / wrong creds -> not an integration env
         pytest.skip(f"MySQL not reachable on {HOST}:{PORT} ({exc})")
-    return {"host": HOST, "port": PORT, "root_password": password}
+    return {"host": HOST, "port": PORT, "admin_password": password}
 
 
 def _root_conn(admin):
     return pymysql.connect(
         host=admin["host"], port=admin["port"], user="root",
-        password=admin["root_password"], autocommit=True,
+        password=admin["admin_password"], autocommit=True,
     )
 
 
@@ -69,7 +69,7 @@ def test_user(admin):
 
 def _apply(admin, username, password, require_ssl):
     apply_account_credentials(
-        host=admin["host"], port=admin["port"], root_password=admin["root_password"],
+        host=admin["host"], port=admin["port"], admin_user="root", admin_password=admin["admin_password"],
         username=username, password=password, require_ssl=require_ssl,
     )
 

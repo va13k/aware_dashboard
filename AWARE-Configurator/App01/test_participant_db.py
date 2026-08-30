@@ -14,7 +14,7 @@ from App01.participant_db import ParticipantDbError, apply_account_credentials
 VALID = dict(
     host="mysql",
     port=3306,
-    root_password="rootpw",
+    admin_user="root", admin_password="rootpw",
     username="aware_android_participant",
 )
 
@@ -37,17 +37,17 @@ def test_missing_username_raises_without_connecting():
     with mock.patch.object(participant_db.pymysql, "connect") as connect:
         with pytest.raises(ParticipantDbError):
             apply_account_credentials(
-                host="mysql", port=3306, root_password="rootpw",
+                host="mysql", port=3306, admin_user="root", admin_password="rootpw",
                 username="", password="x", require_ssl=False,
             )
     connect.assert_not_called()
 
 
-def test_missing_root_password_raises_without_connecting():
+def test_missing_admin_password_raises_without_connecting():
     with mock.patch.object(participant_db.pymysql, "connect") as connect:
         with pytest.raises(ParticipantDbError):
             apply_account_credentials(
-                host="mysql", port=3306, root_password="",
+                host="mysql", port=3306, admin_user="root", admin_password="",
                 username="aware_android_participant", password="x", require_ssl=False,
             )
     connect.assert_not_called()

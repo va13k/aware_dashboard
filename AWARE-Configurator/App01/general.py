@@ -315,7 +315,14 @@ def _mysql_admin_settings(source=None):
     return {
         "host": pick("MYSQL_HOST", database_model.service_host(databases)),
         "port": int(pick("MYSQL_PORT", str(database_model.platform_port(databases, "android")))),
-        "root_password": pick("MYSQL_ROOT_PASSWORD"),
+        # The account that administers this study's database, whichever server that
+        # is. Not root: only the bundled container has one, and a study pointed at a
+        # managed server authenticates there as an account that does not exist.
+        "admin_user": database_model.admin_user(
+            database_model.declared_host(databases), pick("DB_ADMIN_USER")
+        ),
+        "admin_password": pick(database_model.ADMIN_PASSWORD_ENV)
+        or pick("MYSQL_ROOT_PASSWORD"),
     }
 
 
@@ -331,7 +338,8 @@ def _sync_ingest_credentials(source):
     apply_account_credentials(
         host=admin["host"],
         port=admin["port"],
-        root_password=admin["root_password"],
+        admin_user=admin["admin_user"],
+        admin_password=admin["admin_password"],
         username=username,
         password=password,
         require_ssl=require_ssl,

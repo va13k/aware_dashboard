@@ -29,7 +29,8 @@ def apply_account_credentials(
     *,
     host: str,
     port: int,
-    root_password: str,
+    admin_user: str,
+    admin_password: str,
     username: str,
     password: str,
     require_ssl: bool,
@@ -42,17 +43,18 @@ def apply_account_credentials(
     """
     if not username:
         raise ParticipantDbError("The database account to change is not configured.")
-    if not root_password:
+    if not admin_password:
         raise ParticipantDbError(
-            "MySQL root password is unavailable; cannot update the database account."
+            f"No password for {admin_user or 'the database administrator'}; cannot "
+            "update the database account."
         )
 
     try:
         connection = pymysql.connect(
             host=host,
             port=int(port),
-            user="root",
-            password=root_password,
+            user=admin_user or "root",
+            password=admin_password,
             charset="utf8mb4",
             autocommit=True,
             connect_timeout=10,

@@ -201,39 +201,67 @@ def test_admin_settings_from_env_file(monkeypatch):
     monkeypatch.setattr(
         general,
         "load_env",
-        lambda path: {"MYSQL_HOST": "dbhost", "MYSQL_PORT": "3307", "MYSQL_ROOT_PASSWORD": "rp"},
+        lambda path: {
+            "MYSQL_HOST": "dbhost",
+            "MYSQL_PORT": "3307",
+            "DB_ADMIN_USER": "aware_admin",
+            "DB_ADMIN_PASSWORD": "rp",
+        },
     )
-    for key in ("MYSQL_HOST", "MYSQL_PORT", "MYSQL_ROOT_PASSWORD"):
+    for key in ("MYSQL_HOST", "MYSQL_PORT", "DB_ADMIN_USER", "DB_ADMIN_PASSWORD",
+                "MYSQL_ROOT_PASSWORD"):
         monkeypatch.delenv(key, raising=False)
 
     assert general._mysql_admin_settings() == {
         "host": "dbhost",
         "port": 3307,
-        "root_password": "rp",
+        "admin_user": "aware_admin",
+        "admin_password": "rp",
     }
+
+
+def test_admin_settings_fall_back_to_the_older_key(monkeypatch):
+    """A deployment upgraded in place has an .env written before the split.
+
+    One field carried both the bundled server's root password and the administrator
+    of whichever database the study named. Reading only the new key would leave the
+    Configurator unable to change an account on a deployment that works.
+    """
+    monkeypatch.setattr(
+        general, "load_env", lambda path: {"MYSQL_ROOT_PASSWORD": "older"}
+    )
+    for key in ("DB_ADMIN_PASSWORD", "MYSQL_ROOT_PASSWORD", "DB_ADMIN_USER"):
+        monkeypatch.delenv(key, raising=False)
+
+    assert general._mysql_admin_settings()["admin_password"] == "older"
 
 
 def test_admin_settings_process_env_overrides_file(monkeypatch):
     monkeypatch.setattr(general, "load_env", lambda path: {"MYSQL_HOST": "filehost"})
     monkeypatch.setenv("MYSQL_HOST", "envhost")
     monkeypatch.delenv("MYSQL_PORT", raising=False)
-    monkeypatch.delenv("MYSQL_ROOT_PASSWORD", raising=False)
+    for key in ("MYSQL_ROOT_PASSWORD", "DB_ADMIN_PASSWORD", "DB_ADMIN_USER"):
+        monkeypatch.delenv(key, raising=False)
 
     settings = general._mysql_admin_settings()
     assert settings["host"] == "envhost"
     assert settings["port"] == 3306  # default
-    assert settings["root_password"] == ""  # default
+    assert settings["admin_password"] == ""  # default
 
 
 def test_admin_settings_defaults(monkeypatch):
     monkeypatch.setattr(general, "load_env", lambda path: {})
-    for key in ("MYSQL_HOST", "MYSQL_PORT", "MYSQL_ROOT_PASSWORD"):
+    for key in ("MYSQL_HOST", "MYSQL_PORT", "MYSQL_ROOT_PASSWORD",
+                "DB_ADMIN_USER", "DB_ADMIN_PASSWORD"):
         monkeypatch.delenv(key, raising=False)
 
+    # root is the bundled database's own administrator and the fallback nothing
+    # else names, which is what a study with no declaration is running.
     assert general._mysql_admin_settings() == {
         "host": "mysql",
         "port": 3306,
-        "root_password": "",
+        "admin_user": "root",
+        "admin_password": "",
     }
 
 
