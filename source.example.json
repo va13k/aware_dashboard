@@ -249,7 +249,7 @@
         {
           "title": "Schedule 1",
           "type": "interval",
-          "esm_keep": false,
+          "esm_keep": true,
           "questions": [
             1
           ],

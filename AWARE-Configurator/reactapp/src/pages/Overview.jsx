@@ -324,7 +324,11 @@ export default function Overview() {
         const common = {
           title: schedule.title,
           type,
-          esm_keep: schedule.esm_keep ? schedule.esm_keep : false,
+          // Carried over unless the study says otherwise. Without it the client
+          // clears its queue on every firing: a prompt nobody answered within the
+          // interval is marked replaced rather than left waiting, and a schedule
+          // that fires faster than participants answer collects nothing at all.
+          esm_keep: schedule.esm_keep ?? true,
           questions: normalizeScheduleQuestionIds(schedule),
           expiration:
             schedule.expiration !== undefined ? schedule.expiration : 60,
