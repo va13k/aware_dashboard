@@ -221,6 +221,8 @@ if [ ! -s setup/.wizard_url ]; then
 fi
 
 TOKEN_PATH=$(cat setup/.wizard_url)
+# The address this machine answers on, so a researcher deploying a server they are
+# not sitting at can open the wizard from their own computer.
 WIZARD_URL="http://${SUGGESTED_PUBLIC_HOST}:9999${TOKEN_PATH}"
 echo ""
 echo "  ┌──────────────────────────────────────────────────────────────┐"
@@ -230,6 +232,13 @@ printf "  │  %-60s  │\n" "$WIZARD_URL"
 echo "  │                                                              │"
 echo "  │  This token is valid for this session only.                 │"
 echo "  └──────────────────────────────────────────────────────────────┘"
+echo ""
+# Said rather than assumed: the page behind that token carries this deployment's
+# database password and the researcher's own, and it is served over plain HTTP.
+echo "  Keep this URL to yourself — the page behind it holds this deployment's"
+echo "  passwords. Port 9999 closes when setup finishes. On an untrusted network:"
+echo "  put SETUP_BIND=127.0.0.1 in .env, then tunnel with"
+echo "      ssh -N -L 9999:localhost:9999 ${SUDO_USER:-${USER:-user}}@${SUGGESTED_PUBLIC_HOST}"
 echo ""
 
 # Try to open browser
@@ -262,6 +271,9 @@ if wait_for_service_redirect; then
     sleep 3
     compose --profile setup stop setup-wizard 2>/dev/null
     compose --profile setup rm -f setup-wizard 2>/dev/null
+    # The token goes with the server that honoured it, rather than staying
+    # readable in the project folder for the life of the deployment.
+    rm -f setup/.wizard_url
 else
     verify_ingest
 fi

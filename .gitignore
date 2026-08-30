@@ -57,3 +57,7 @@ mosquitto/passwords
 # Generated from the database placement: present when the study names its own
 # database, absent when this deployment runs one.
 docker-compose.external-db.yml
+
+# Written for the one deployment that asked to carry its collected rows to the
+# database it named, and addressed to that server.
+copy-study-data.sh

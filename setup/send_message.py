@@ -264,7 +264,7 @@ def main() -> int:
     env = load_env(ENV_PATH)
     source = read_source()
     schema = database.platform_schema(source.get("database") or {}, "android")
-    root_password = str(env.get("MYSQL_ROOT_PASSWORD", "")).strip()
+    root_password = database.admin_password(env)
     sql = client(args.docker_prefix)
 
     if args.command == "devices":

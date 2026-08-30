@@ -5,6 +5,11 @@ MYSQL_HOST="${MYSQL_HOST:-mysql}"
 MYSQL_PORT="${MYSQL_PORT:-3306}"
 MYSQL_USER="${MYSQL_USER:-root}"
 MYSQL_PASSWORD="${MYSQL_PASSWORD:-}"
+# What the connection asks of the server. Empty for the database this deployment
+# runs, which is reached over the compose network and nowhere else; REQUIRED when
+# the study kept this job while moving to a server it named, where the dump crosses
+# a network anybody can sit on.
+MYSQL_SSL_MODE="${MYSQL_SSL_MODE:-}"
 BACKUP_DATABASES="${BACKUP_DATABASES:-aware_android aware_ios}"
 BACKUP_DIR="${BACKUP_DIR:-/backups}"
 # The dashboard's own tables, kept out of every archive. Each one summarises the
@@ -49,13 +54,27 @@ run_backup() {
     done
   done
 
+  ssl_flags=""
+  if [ -n "$MYSQL_SSL_MODE" ]; then
+    ssl_flags="--ssl-mode=$MYSQL_SSL_MODE"
+  fi
+
   # Intentional word splitting: BACKUP_DATABASES is a space-separated database
-  # list, and ignore_flags one option per skipped table.
+  # list, ignore_flags one option per skipped table, and ssl_flags empty where the
+  # connection does not leave the deployment.
+  #
+  # --no-tablespaces and --set-gtid-purged=OFF are what let an account that may only
+  # read take a dump: the first asks the server for tablespace metadata no study
+  # needs and PROCESS to see, the second reads the replication position, which a
+  # managed server has and hands out to nobody. Neither changes what is archived.
   if ! MYSQL_PWD="$MYSQL_PASSWORD" mysqldump \
     --host="$MYSQL_HOST" \
     --port="$MYSQL_PORT" \
     --user="$MYSQL_USER" \
+    $ssl_flags \
     --single-transaction \
+    --no-tablespaces \
+    --set-gtid-purged=OFF \
     --routines \
     --triggers \
     $ignore_flags \

@@ -85,6 +85,8 @@ Verify with: `git --version`.
 
 If you are deploying on a remote server, open ports `80` and `443` in your firewall before running setup. Port `9999` only needs to be reachable from your own machine during the setup step and can be closed afterwards.
 
+Treat the wizard URL as a credential while it is up. The page behind that token holds this deployment's database password and the researcher's own, and it is served over plain HTTP, so the token is what stands between them and anyone who can reach port `9999`. `setup.sh` removes the wizard container when setup finishes. On a network you do not trust, set `SETUP_BIND=127.0.0.1` in `.env` before running setup and reach the wizard through an SSH tunnel instead — see [Remote server deployment](#remote-server-deployment).
+
 ### SSL certificate (optional, recommended for remote servers)
 
 If you want HTTPS, obtain a certificate for your domain before running setup — for example with [Let's Encrypt / Certbot](https://certbot.eff.org/). The setup wizard will ask for the paths to the certificate and private key files.
@@ -155,7 +157,9 @@ The script checks that Docker and Python 3 are available, then does the followin
    ```
    http://192.168.1.42:9999/KL0XF9tXQVC4LRY-gCTRDWEQhO6II3IOLxU4/
    ```
-   The path contains a one-time random token that is valid for this session only.
+   The path contains a one-time random token that is valid for this session only, and it is the
+   only thing guarding a page that holds this deployment's passwords — so do not paste it into
+   a chat or an issue.
 4. **Tries to open the URL in your browser** automatically (macOS and Linux with a desktop). On a headless server, this step does nothing — see [Remote server deployment](#remote-server-deployment) below.
 
 Once the setup page opens in your browser — either automatically or after you copied the URL from the terminal — you are ready to continue. **Proceed to [Step 3 — Complete the setup wizard](#3-complete-the-setup-wizard).**
@@ -491,16 +495,31 @@ Changing the placement is a redeploy, not a live change, for the same reason cha
 the dataflow is: it decides which containers exist. Re-run `setup.sh` and choose the
 other option.
 
-**Backups are not carried across either.** The backup job dumps as the bundled
-database's own administrator, so a study that names its own database is deployed
-without it. Keeping copies of that server is the researcher's arrangement — the
-provider's snapshots, or an export from the dashboard's backup page.
+The change settles where the next row is written, and nothing else. Under **Keep from
+the current setup** the wizard asks about the two things that would otherwise be
+decided for you. Both are off unless switched on.
 
-**The data does not move.** Rows already collected stay on the server holding them.
-Export them from the dashboard's backup page before switching, then merge-import them
-into the new server — the backup page's import folds rows in above the watermark
-rather than replacing what is there, which is what makes that a move rather than an
-overwrite.
+**Keep the data collected so far.** On, the deploy writes `copy-study-data.sh` and the
+wizard shows the command:
+
+```bash
+sudo ./copy-study-data.sh
+```
+
+It dumps the old database from the container still holding it and loads it into the
+new one, reading both passwords where they already live rather than carrying either.
+Run it whenever suits — the study collects into the new database meanwhile — and run
+it again if it stops, since every row goes in under the id the old server gave it. A
+database that has already begun collecting is refused: inserting by id there would
+drop the new rows as duplicates, and that case is a merge-import from the dashboard's
+backup page instead. The dashboard's own counts are not copied; the first refresh on
+the new server rebuilds them.
+
+**Keep making backups.** On, the backup job stays, dumping the new database into the
+same folder as `aware_analytics`, the account that may only read. Off, it is removed
+along with the database it was written for, and copies are yours to arrange — your
+provider's snapshots, or an export from the dashboard's backup page. The answer lives
+in `.env` as `DB_KEEP_BACKUPS`, so a redeploy that skips the wizard keeps it.
 
 ### Checking the ingest path before anyone enrols
 
@@ -552,19 +571,28 @@ matching the schema is left alone. `bluetooth`, `locations` and `wifi` keep thei
 
 On a Linux server without a graphical desktop, the browser cannot open automatically. The URL is still printed in the terminal — copy it and open it from your own computer.
 
-For the wizard to be reachable from your computer, the server's port `9999` must be accessible. Two ways to do this:
+For the wizard to be reachable from your computer, the server's port `9999` must be
+accessible. Two ways to do this:
 
-**Option A — SSH tunnel (recommended, no firewall changes needed)**
+**Option A — Temporarily open port 9999**
+
+Open port `9999` in your firewall, copy the full URL the script printed, open it in your
+browser, complete setup, then close the port again. This is the shortest path and the one the
+script assumes.
+
+**Option B — SSH tunnel (nothing is exposed at any point)**
+
+Put `SETUP_BIND=127.0.0.1` in `.env` before running setup, so the wizard listens on the server
+itself and nowhere else. Then, on your own computer:
 
 ```bash
-ssh -L 9999:localhost:9999 your-user@your-server-ip
+ssh -N -L 9999:localhost:9999 your-user@your-server-ip
 ```
 
-Then open `http://localhost:9999/<token>/` on your local machine.
-
-**Option B — Temporarily open port 9999**
-
-Open port `9999` in your firewall, copy the full URL the script printed, open it in your browser, complete setup, then close the port again.
+Open the URL the script printed with `localhost` in place of the server's address. Worth the
+extra step on a shared or untrusted network: the wizard serves this deployment's database
+password and the researcher's own over plain HTTP, and the token guarding them travels in the
+URL in clear text.
 
 ### 3. Complete the setup wizard
 
@@ -574,7 +602,7 @@ The wizard has five steps. A progress bar at the top tracks where you are. You c
 
 **Step 1 — Database**
 
-Set the **MySQL root password**. All services (Configurator, Micro Server, Analytics API) use this password internally to connect to the database. Choose a strong password and keep it somewhere safe — you will need it if you ever need to access MySQL directly.
+Set the **database administrator** and its password. This is the account that creates the schemas, this study's own accounts and its tables. On a database you name it is the one your provider handed you — `avnadmin` on Aiven, `doadmin` on DigitalOcean. On the bundled database setup creates an account with the name you give and grants it what running the study needs; MySQL's own `root` keeps a password setup generates and nobody types, so moving a study between the two never overwrites either.
 
 Set the **participant device password** as well. This is the password of the MySQL account that participant devices use to insert their data, and it is the password participants type on their phone when the study configuration is served without an embedded password (the **Configure without password** option in the Configurator).
 

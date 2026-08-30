@@ -145,6 +145,23 @@ def clean_db_init(value: object, fallback: str) -> str:
     return chosen
 
 
+def clean_flag(value: object, fallback: object = "") -> str:
+    """A yes-or-no answer as `.env` carries one, defaulting to no.
+
+    Both answers this reads are about a database somebody else runs, and the wizard
+    only shows them once the study says it names one. Anything it does not recognise
+    falls to what the deployment already settled and then to no, because these decide
+    what is copied to and dumped from a server this deployment does not administer.
+    """
+    for candidate in (value, fallback):
+        text = str(candidate if candidate is not None else "").strip().lower()
+        if text in {"1", "true", "yes", "on"}:
+            return "1"
+        if text in {"0", "false", "no", "off"}:
+            return "0"
+    return "0"
+
+
 def clean_admin_user(value: object, fallback: str) -> str:
     """The account that creates the schema, as MySQL will accept it.
 
@@ -260,11 +277,19 @@ def main() -> None:
         ).strip():
             payload["mysql_root_password"] = pasted["admin_password"]
 
-    mysql_root_password = (
+    # The account that administers the database this study names, whichever server
+    # that is. Kept apart from the bundled container's own root password: that one is
+    # baked into its data directory at first start and cannot be retyped, so a field
+    # serving both overwrote the value the bundled server still needed the moment a
+    # researcher named somebody else's.
+    db_admin_password = (
         str(
             payload.get(
                 "mysql_root_password",
-                env_fallback.get("MYSQL_ROOT_PASSWORD", "CHANGE_ME"),
+                env_fallback.get(
+                    database.ADMIN_PASSWORD_ENV,
+                    env_fallback.get("MYSQL_ROOT_PASSWORD", "CHANGE_ME"),
+                ),
             )
         ).strip()
         or "CHANGE_ME"
@@ -287,7 +312,18 @@ def main() -> None:
         android_dataflow,
         payload.get("db_host", env_fallback.get("DB_HOST", "")),
     )
-    db_port = positive_int(payload.get("db_port"), env_fallback.get("DB_PORT", "3306"))
+    # Settled by the placement where the placement owns it. A study moving back onto
+    # the bundled database takes that database's port along with its host; keeping the
+    # one still in the form points every service, and the micro-server's config, at a
+    # port on this deployment that nothing listens on.
+    db_port = (
+        placement.DEFAULT_PORT
+        if db_placement == placement.BUNDLED
+        else positive_int(
+            payload.get("db_port"),
+            env_fallback.get("DB_PORT", str(placement.DEFAULT_PORT)),
+        )
+    )
     # Named by the study, then by what the host says about its provider, and only
     # then by MySQL's own default. A managed database is not root, and a
     # researcher deploying for the first time has no reason to know that.
@@ -296,6 +332,16 @@ def main() -> None:
         database.admin_user(db_host, env_fallback.get("DB_ADMIN_USER", "")),
     )
     db_init = clean_db_init(payload.get("db_init"), env_fallback.get("DB_INIT", "auto"))
+    # What travels with the study, each asked rather than assumed. A move changes
+    # which database is written to next; the rows already written and the job that
+    # copies them are two separate decisions about somebody else's server, and both
+    # are no until the researcher says otherwise.
+    db_keep_backups = clean_flag(
+        payload.get("db_keep_backups"), env_fallback.get("DB_KEEP_BACKUPS", "")
+    )
+    # Asked for one run rather than remembered: a copy is done once, and a deployment
+    # that kept the answer would offer to repeat it on every redeploy.
+    db_carry_data = clean_flag(payload.get("db_carry_data"))
     db_require_tls, db_ca_certificate = clean_tls(
         db_placement,
         payload.get("db_require_tls", env_fallback.get("DB_REQUIRE_TLS", "")) or None,
@@ -355,7 +401,7 @@ def main() -> None:
         raise SystemExit("PUBLIC_HOST is required")
 
     lines = [
-        f"MYSQL_ROOT_PASSWORD={mysql_root_password}",
+        f"{database.ADMIN_PASSWORD_ENV}={db_admin_password}",
         f"PUBLIC_HOST={public_host}",
         f"PUBLIC_PORT={public_port}",
         f"PROTOCOL={protocol}",
@@ -364,6 +410,8 @@ def main() -> None:
         f"DB_HOST={db_host}",
         f"DB_ADMIN_USER={db_admin_user}",
         f"DB_INIT={db_init}",
+        f"DB_KEEP_BACKUPS={db_keep_backups}",
+        f"DB_CARRY_DATA={db_carry_data}",
         f"DB_PORT={db_port}",
         f"DB_REQUIRE_TLS={'1' if db_require_tls else '0'}",
         f"MYSQL_BACKUP_HOST_DIR={backup_host_dir}",

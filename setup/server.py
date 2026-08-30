@@ -11,12 +11,33 @@ from http.server import HTTPServer, BaseHTTPRequestHandler
 
 # Containers that must pass their Docker healthcheck before the stack is ready.
 _HEALTH_CHECKED = frozenset({
-    "aware_mysql", "aware_micro", "aware_configurator",
-    "aware_dashboard_api", "aware_dashboard",
+    "aware_micro", "aware_configurator", "aware_dashboard_api", "aware_dashboard",
 })
 # Containers without a healthcheck — just need to be running.
-_RUNNING_ONLY = frozenset({"aware_mysql_backup", "aware_nginx"})
-_REQUIRED = _HEALTH_CHECKED | _RUNNING_ONLY
+_RUNNING_ONLY = frozenset({"aware_nginx"})
+
+# The two a deployment has only because it runs the database itself. A study that
+# names its own server has neither, so waiting for them is waiting forever --- the
+# browser sits on "Starting services" while the deployment behind it is finished.
+# deploy_config.py writes the compose override for that placement and removes it
+# again, so its presence is the placement, which is the same thing setup.sh reads.
+_BUNDLED_HEALTH_CHECKED = frozenset({"aware_mysql"})
+_BUNDLED_RUNNING_ONLY = frozenset({"aware_mysql_backup"})
+_COMPOSE_OVERRIDE = "/project/docker-compose.external-db.yml"
+
+
+def _runs_its_own_database():
+    return not os.path.exists(_COMPOSE_OVERRIDE)
+
+
+def _expected_services():
+    """The containers this deployment has, and how each says it is ready."""
+    health_checked = set(_HEALTH_CHECKED)
+    running_only = set(_RUNNING_ONLY)
+    if _runs_its_own_database():
+        health_checked |= _BUNDLED_HEALTH_CHECKED
+        running_only |= _BUNDLED_RUNNING_ONLY
+    return health_checked, running_only
 
 # Written by setup/verify_ingest.py on the host once the stack is healthy. The
 # wizard reports it rather than running it: the check has to reach the deployment
@@ -64,12 +85,14 @@ def _service_statuses():
     containers, socket_ok = _docker_containers()
     if not socket_ok:
         return None  # socket unavailable
-    statuses = {}
+    health_checked, running_only = _expected_services()
+    required = health_checked | running_only
+    statuses = {name: False for name in required}
     for c in containers:
         name = (c.get("Names") or [""])[0].lstrip("/")
-        if name in _REQUIRED:
+        if name in required:
             status_str = c.get("Status", "")
-            if name in _HEALTH_CHECKED:
+            if name in health_checked:
                 statuses[name] = "(healthy)" in status_str
             else:
                 statuses[name] = status_str.startswith("Up")
@@ -260,10 +283,10 @@ class Handler(BaseHTTPRequestHandler):
         if statuses is None:
             payload = {"ready": False, "services": {}, "socket_unavailable": True}
         else:
-            ready = (
-                all(n in statuses for n in _REQUIRED)
-                and all(statuses.values())
-            )
+            # Every expected service is in the mapping whether or not its container
+            # exists, so one that has not been created yet reads as not ready rather
+            # than as nothing to wait for.
+            ready = bool(statuses) and all(statuses.values())
             payload = {"ready": ready, "services": {k: bool(v) for k, v in statuses.items()}}
         payload["ingest"] = _ingest_result()
         body = json.dumps(payload).encode()

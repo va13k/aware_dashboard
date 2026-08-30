@@ -72,6 +72,13 @@ IOS_PARTICIPANT_USER = "aware_ios_participant"
 #: Where the dashboard's own database password is kept. It belongs to the deployment
 #: rather than to the study, so it lives in ``.env`` and not in the study model, and
 #: the seed below is the one ``db/00-bootstrap.sql`` creates the account with.
+#: Where the password of the account that administers the study's database is kept.
+#: Separate from the bundled container's own root password, which belongs to that
+#: container and is baked into its data directory at first start: one field serving
+#: both meant that naming an external server overwrote the value the bundled one
+#: still needed, and moving back authenticated to it with the other server's.
+ADMIN_PASSWORD_ENV = "DB_ADMIN_PASSWORD"
+
 ANALYTICS_PASSWORD_ENV = "ANALYTICS_DB_PASSWORD"
 ANALYTICS_SEED_PASSWORD = "analyticspass"
 
@@ -140,6 +147,17 @@ def ios_credentials(database: dict) -> tuple[str, str]:
         str(entry.get("username") or IOS_PARTICIPANT_USER).strip(),
         str(entry.get("password") or ""),
     )
+
+
+def admin_password(env: dict) -> str:
+    """The password the account that administers this study's database holds.
+
+    Falls back to the bundled container's root password for a deployment written
+    before the two were told apart, so an upgrade in place keeps opening the database
+    it already opens.
+    """
+    named = str((env or {}).get(ADMIN_PASSWORD_ENV) or "").strip()
+    return named or str((env or {}).get("MYSQL_ROOT_PASSWORD") or "").strip()
 
 
 def analytics_password(env: dict) -> str:

@@ -205,6 +205,41 @@
           way — if this is not a server you run yourself, send the data through
           the server instead.
         </p>
+        <div class="field hidden" id="dbMoveFields">
+          <label>Keep from the current setup</label>
+          <div class="toggle-row">
+            <div
+              class="toggle"
+              id="dbCarryDataToggle"
+              onclick="toggleDbCarryData()"
+            >
+              <div class="toggle-knob"></div>
+            </div>
+            <div>
+              <p class="toggle-label">Keep the data collected so far</p>
+              <p class="toggle-hint">
+                Copies it into the new database. Nothing is deleted either way —
+                leave this off and the old data simply stays where it is.
+              </p>
+            </div>
+          </div>
+          <div class="toggle-row" style="margin-top: 16px">
+            <div
+              class="toggle"
+              id="dbKeepBackupsToggle"
+              onclick="toggleDbKeepBackups()"
+            >
+              <div class="toggle-knob"></div>
+            </div>
+            <div>
+              <p class="toggle-label">Keep making backups</p>
+              <p class="toggle-hint">
+                Daily copies of the new database, saved on this machine as
+                before.
+              </p>
+            </div>
+          </div>
+        </div>
         <p
           class="hint hidden"
           id="dbBackupAbsent"
@@ -214,11 +249,8 @@
             padding-left: 10px;
           "
         >
-          <b>This deployment will not back up a database it does not run.</b> The
-          backup job dumps as the bundled database's own administrator and is left
-          out here, so keeping copies is yours to arrange — your provider's
-          snapshots, or an export from the dashboard's backup page. Export before
-          you switch, too: rows already collected stay on the server holding them.
+          <b>Nothing is kept.</b> The study starts with an empty database and no
+          backups. Your current data stays on the old server.
         </p>
         <p
           class="hint hidden"
@@ -569,6 +601,23 @@
             <p class="hint" style="margin-top: 6px">
               Participants type this when joining if the study config is served
               without the password
+            </p>
+          </div>
+          <!-- Shown only where the study asked for the copy, and it holds the page
+               open: the command is the whole point of having asked, and a redirect
+               would take it away before it was read. -->
+          <div
+            class="credentials-box hidden"
+            id="dataCopyBox"
+            style="margin-top: 1.25rem; text-align: left"
+          >
+            <p class="output-label">Copy your data</p>
+            <div class="output-block" id="dataCopyText">
+              sudo ./copy-study-data.sh
+            </div>
+            <p class="hint" style="margin-top: 6px">
+              Run this in the project folder when you are ready — it can take a
+              while. If it stops, run it again and it picks up where it left off.
             </p>
           </div>
           <!-- What the deployment answered when it was asked the question a

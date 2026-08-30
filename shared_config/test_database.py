@@ -277,3 +277,30 @@ class TestEveryAccountTheDeploymentOpensItWith:
     def test_the_dashboard_password_comes_from_the_deployment(self):
         assert database.profiles(EXTERNAL, "chosen")[-1]["password"] == "chosen"
         assert database.profiles(EXTERNAL)[-1]["password"] == database.ANALYTICS_SEED_PASSWORD
+
+
+class TestWhoAdministersTheStudysDatabase:
+    """database.admin_password: the administrator's, not the container's.
+
+    One field used to carry both the bundled server's `root` password and the
+    administrator of whichever database the study named. MySQL bakes root's into the
+    data directory at first start and ignores the variable after, so naming a managed
+    server overwrote the value the bundled one still needed --- and moving back
+    authenticated to it with somebody else's password.
+    """
+
+    def test_the_administrator_has_a_key_of_its_own(self):
+        env = {
+            database.ADMIN_PASSWORD_ENV: "the administrator's",
+            "MYSQL_ROOT_PASSWORD": "the container's",
+        }
+        assert database.admin_password(env) == "the administrator's"
+
+    def test_a_deployment_written_before_the_split_still_opens_its_database(self):
+        # Upgraded in place: .env holds only the older key, and it is the password
+        # that deployment's database actually takes.
+        assert database.admin_password({"MYSQL_ROOT_PASSWORD": "older"}) == "older"
+
+    def test_nothing_named_reads_as_nothing(self):
+        assert database.admin_password({}) == ""
+        assert database.admin_password({database.ADMIN_PASSWORD_ENV: "  "}) == ""

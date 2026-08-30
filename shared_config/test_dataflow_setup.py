@@ -889,13 +889,18 @@ class TestPublishingTheDatabaseAuthority:
         # Refused at deploy rather than published: the alternative is every phone in
         # the study stopping at once, with nothing on the server saying why.
         source = {
-            "database": {"host": "db.internal", "android": {"ca_certificate": "broken"}}
+            "database": {"host": "db.example.edu", "android": {"ca_certificate": "broken"}}
         }
         with pytest.raises(SystemExit):
             deploy_config.ensure_database_authority(source)
 
     def test_a_researchers_own_authority_is_left_alone(self):
-        source = {"database": {"host": "db.internal", "android": {"ca_certificate": self.REAL}}}
+        # On the placement it was given for. The wizard asks for one only about a
+        # database this deployment does not administer, so that is the only
+        # placement where a supplied authority describes the server in front of it.
+        source = {
+            "database": {"host": "db.example.edu", "android": {"ca_certificate": self.REAL}}
+        }
         assert deploy_config.ensure_database_authority(source) == "supplied"
 
     def test_a_named_database_gets_none_of_ours(self):
@@ -1070,3 +1075,51 @@ class TestWhatIsWrittenBackToEnv:
         body = written.read_text(encoding="utf-8")
         assert "DB_CA_CERTIFICATE_B64" not in body
         assert "DB_PORT=3306" in body
+
+
+class TestTheDeployIsCheckedAgainstThePlacementToo:
+    """check_dataflow_applied: the bundled bind address only when there is one.
+
+    The dataflow does not decide that address on its own. A study on the direct path
+    with a database of its own has to publish MySQL to every network a participant
+    might be on; the same study pointed at a server it names publishes nothing,
+    because the phones open that server instead and the bundled service is removed
+    from the deployment altogether. Read as though the dataflow decided it, the
+    placeholder written for the compose file reads as a deployment that disagrees
+    with itself, and the combination the wizard offers cannot be deployed at all.
+    """
+
+    def _external_direct(self):
+        return {
+            "deployment": {"dataflow": {"android": "direct", "ios": "webservice"}},
+            "database": {"host": "db.example.edu", "android": {"port": 3306}},
+        }
+
+    def _publish(self, monkeypatch, tmp_path, config, join_url):
+        study = tmp_path / "studyConfig.json"
+        study.write_text(json.dumps(config), encoding="utf-8")
+        monkeypatch.setattr(deploy_config, "STUDY_CONFIG_PATH", study)
+        urls = tmp_path / "deployment-urls.json"
+        urls.write_text(json.dumps({"android_join_url": join_url}), encoding="utf-8")
+        monkeypatch.setattr(deploy_config, "PROJECT", tmp_path)
+
+    def test_a_named_database_leaves_the_bind_address_undecided(self, tmp_path, monkeypatch):
+        direct_url = "http://host/studies/files/studyConfig.json"
+        self._publish(monkeypatch, tmp_path, {"database": {"database_host": "db"}}, direct_url)
+
+        # The value apply_dataflow writes for this combination, which is a placeholder
+        # rather than a claim about anything a phone reaches.
+        deploy_config.check_dataflow_applied(self._external_direct(), "127.0.0.1", direct_url)
+
+    def test_the_bundled_database_is_still_held_to_the_dataflow(self, tmp_path, monkeypatch):
+        direct_url = "http://host/studies/files/studyConfig.json"
+        self._publish(monkeypatch, tmp_path, {"database": {"database_host": "db"}}, direct_url)
+        bundled = {
+            "deployment": {"dataflow": {"android": "direct", "ios": "webservice"}},
+            "database": {"host": "mysql", "android": {"port": 3306}},
+        }
+
+        with pytest.raises(SystemExit) as refused:
+            deploy_config.check_dataflow_applied(bundled, "127.0.0.1", direct_url)
+
+        assert "0.0.0.0" in str(refused.value)

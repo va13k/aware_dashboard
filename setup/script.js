@@ -4,6 +4,12 @@ var step = 0,
   // almost every server offers it, and the question is only asked for the one
   // placement whose server this deployment does not administer.
   dbTls = true,
+  // What follows the study to a database this deployment does not run. Both off:
+  // moving decides where the next row is written, and copying gigabytes onto
+  // somebody else's server, or pulling them back every night, is a separate answer
+  // from a researcher who knows what that server is for.
+  dbCarryData = false,
+  dbKeepBackups = false,
   redirectTimer = null,
   suggestedPublicHost = "",
   customPublicHost = "",
@@ -370,6 +376,36 @@ function toggleDbTls() {
   if (!dbTls) clearFieldError("dbCaCertificate");
 }
 
+// The copy is offered rather than done here: a study's data is measured in
+// gigabytes, and the deploy answers a browser waiting on it.
+function toggleDbCarryData() {
+  dbCarryData = !dbCarryData;
+  document.getElementById("dbCarryDataToggle").classList.toggle("on", dbCarryData);
+  updateDbMoveNotice();
+}
+
+// The backup job follows the database only if asked. It dumps the whole study
+// every interval, which over a network to a server somebody else runs is a
+// different arrangement from the same job inside the deployment.
+function toggleDbKeepBackups() {
+  dbKeepBackups = !dbKeepBackups;
+  document
+    .getElementById("dbKeepBackupsToggle")
+    .classList.toggle("on", dbKeepBackups);
+  updateDbMoveNotice();
+}
+
+// The warning states what a move leaves behind, so it belongs where nothing was
+// asked for rather than next to the answers that were.
+function updateDbMoveNotice() {
+  var notice = document.getElementById("dbBackupAbsent");
+  if (!notice) return;
+  notice.classList.toggle(
+    "hidden",
+    dbPlacement() !== "external" || dbCarryData || dbKeepBackups,
+  );
+}
+
 function dbCaCertificate() {
   var el = document.getElementById("dbCaCertificate");
   return el && el.value ? el.value.trim() : "";
@@ -406,6 +442,11 @@ function getPayload() {
     db_require_tls: dbPlacement() === "external" && !dbTls ? "0" : "1",
     db_ca_certificate:
       dbPlacement() === "external" && dbTls ? dbCaCertificate() : "",
+    // Both are answers about a server this deployment does not run, so a study on
+    // the bundled database sends neither: its backup job is not going anywhere and
+    // there is nowhere to copy from.
+    db_carry_data: dbPlacement() === "external" && dbCarryData ? "1" : "0",
+    db_keep_backups: dbPlacement() === "external" && dbKeepBackups ? "1" : "0",
     mysql_backup_host_dir:
       (document.getElementById("backupHostDir").value || "").trim() ||
       "./backups/mysql",
@@ -664,13 +705,14 @@ function updateDbPlacement() {
     );
   }
 
-  // Said where the placement is chosen rather than left to be discovered: a
-  // deployment that keeps no copies of a database it does not administer is a
-  // reasonable arrangement and a bad surprise.
-  var backups = document.getElementById("dbBackupAbsent");
-  if (backups) {
-    backups.classList.toggle("hidden", select.value !== "external");
+  // Asked where the placement is chosen rather than left to be discovered: what a
+  // move carries over is a decision, and a deployment that made it silently would
+  // either copy gigabytes nobody asked for or drop copies nobody knew were gone.
+  var moving = document.getElementById("dbMoveFields");
+  if (moving) {
+    moving.classList.toggle("hidden", select.value !== "external");
   }
+  updateDbMoveNotice();
 
   // A phone opens the database itself only on the direct path. On the webservice
   // path it is given a study URL and no credential, so the field is not merely
@@ -686,7 +728,7 @@ function updateDbPlacement() {
 function getEnv() {
   var payload = getPayload();
   var e =
-    "MYSQL_ROOT_PASSWORD=" +
+    "DB_ADMIN_PASSWORD=" +
     payload.mysql_root_password +
     "\n" +
     (payload.participant_db_password
@@ -721,6 +763,9 @@ function getEnv() {
     "\n" +
     "DB_REQUIRE_TLS=" +
     payload.db_require_tls +
+    "\n" +
+    "DB_KEEP_BACKUPS=" +
+    payload.db_keep_backups +
     "\n" +
     "MYSQL_BACKUP_HOST_DIR=" +
     payload.mysql_backup_host_dir +
@@ -863,10 +908,28 @@ function finishDeployment(ingestResult) {
   }
   renderIngestResult(ingestResult);
 
+  // The copy is the researcher's to run, so the command is put on the page rather
+  // than only in the terminal the deploy printed to.
+  var carrying = dbCarryData && dbPlacement() === "external";
+  if (carrying) {
+    document.getElementById("dataCopyBox").classList.remove("hidden");
+  }
+
   if (ingestResult && !ingestResult.ok) {
     document.getElementById("statusDesc").textContent =
       "Services are ready, and the ingest self-test did not pass. Read it below " +
       "before enrolling anyone.";
+    document.getElementById("nav").classList.remove("hidden");
+    document.getElementById("editBtn").classList.remove("hidden");
+    return;
+  }
+
+  // Held here rather than redirected past: what the page is showing is a command
+  // nobody has run yet.
+  if (carrying) {
+    document.getElementById("statusDesc").textContent =
+      "Everything is running and the study is collecting into the new database. " +
+      "Your earlier data has not been copied yet — the command below does that.";
     document.getElementById("nav").classList.remove("hidden");
     document.getElementById("editBtn").classList.remove("hidden");
     return;
@@ -1041,12 +1104,24 @@ function loadExisting() {
       if (["0", "false", "no", "off"].indexOf((d.DB_REQUIRE_TLS || "").trim()) !== -1) {
         toggleDbTls();
       }
+      // A deployment already taking copies of the server it named goes on taking
+      // them: a redeploy that silently stopped would leave a study without backups
+      // because a form opened on its default. The copy has no counterpart here --
+      // it is done once, so reopening the wizard offers it rather than repeating it.
+      if (["1", "true", "yes", "on"].indexOf((d.DB_KEEP_BACKUPS || "").trim()) !== -1) {
+        toggleDbKeepBackups();
+      }
       updateDbPlacement();
 
       suggestedPublicHost = (d.SUGGESTED_PUBLIC_HOST || "").trim();
       updateHostPlaceholder();
-      if (d.MYSQL_ROOT_PASSWORD)
-        document.getElementById("mysqlPass").value = d.MYSQL_ROOT_PASSWORD;
+      // The administrator of the database this study names, whichever server that
+      // is. The bundled container's own root password is never shown: it is not a
+      // question anyone answers, and writing the form back would overwrite it.
+      if (d.DB_ADMIN_PASSWORD)
+        document.getElementById("mysqlPass").value = d.DB_ADMIN_PASSWORD;
+      if ((d.DB_ADMIN_USER || "").trim())
+        document.getElementById("dbAdminUser").value = d.DB_ADMIN_USER;
       if (d.PARTICIPANT_DB_PASSWORD) {
         document.getElementById("participantPass").value =
           d.PARTICIPANT_DB_PASSWORD;

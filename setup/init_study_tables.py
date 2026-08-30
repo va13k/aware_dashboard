@@ -94,13 +94,64 @@ def load_admin(databases: dict) -> tuple[str, str]:
     authenticate as an account its managed database has never had.
     """
     env = load_env(ENV_PATH)
-    password = str(env.get("MYSQL_ROOT_PASSWORD", "")).strip()
+    password = database.admin_password(env)
     if not password:
-        raise RuntimeError("MYSQL_ROOT_PASSWORD is missing from .env")
+        raise RuntimeError(
+            f"{database.ADMIN_PASSWORD_ENV} is missing from .env"
+        )
     admin_user = database.admin_user(
         database.declared_host(databases), env.get("DB_ADMIN_USER", "")
     )
     return admin_user, password
+
+
+def ensure_bundled_admin(
+    client: mysql_client.Client, admin_user: str, admin_password: str, env: dict
+) -> bool:
+    """Give the bundled database the administrator this study names.
+
+    MySQL creates one account of its own, `root`, and bakes its password into the
+    data directory the first time the server starts. That account is the bootstrap
+    and nothing else: what administers the study is the name the researcher gave,
+    created here with the privileges to do it and settled on every run so a changed
+    password reaches the server.
+
+    Done as root, once, and only for the bundled database --- a server somebody else
+    runs hands out its administrator ready-made, and this deployment has no account
+    there to create one with. Returns whether anything was created.
+    """
+    if admin_user == database.DEFAULT_ADMIN_USER:
+        return False
+
+    root_password = str(env.get("MYSQL_ROOT_PASSWORD", "")).strip()
+    if not root_password:
+        raise RuntimeError(
+            "MYSQL_ROOT_PASSWORD is missing from .env, so the bundled database's "
+            f"own account cannot create {admin_user!r}."
+        )
+
+    user = f"{mysql_client.quote_sql_string(admin_user)}@'%'"
+    quoted = mysql_client.quote_sql_string(admin_password)
+    result = client.run(
+        database.DEFAULT_ADMIN_USER,
+        root_password,
+        "\n".join(
+            [
+                f"CREATE USER IF NOT EXISTS {user} IDENTIFIED BY {quoted};",
+                f"ALTER USER {user} IDENTIFIED BY {quoted};",
+                f"GRANT ALL PRIVILEGES ON *.* TO {user} WITH GRANT OPTION;",
+                "FLUSH PRIVILEGES;",
+            ]
+        ),
+    )
+    if result.returncode != 0:
+        raise RuntimeError(
+            f"The bundled database would not create {admin_user!r}: "
+            + (mysql_client.error_of(result) or "the statement failed")
+            + " Its own root password is what creates this account, and .env holds "
+            "one the server does not have if the volume outlived it."
+        )
+    return True
 
 
 def study_schemas(databases: dict) -> dict[str, str]:
@@ -255,6 +306,19 @@ def main() -> int:
     profiles = database.profiles(databases, database.analytics_password(load_env(ENV_PATH)))
     client = mysql_client.Client.for_study(docker_base, source)
     print(f"database: {placement.declared(source)} — {client.describe()}")
+
+    # Before the wait, because the wait authenticates as this account and on the
+    # bundled placement it is this deployment that has to create it first.
+    if placement.declared(source) == placement.BUNDLED:
+        wait_for_mysql(
+            database.DEFAULT_ADMIN_USER,
+            client,
+            docker_base,
+            str(load_env(ENV_PATH).get("MYSQL_ROOT_PASSWORD", "")).strip(),
+            args.timeout_seconds,
+        )
+        if ensure_bundled_admin(client, admin_user, admin_password, load_env(ENV_PATH)):
+            print(f"Administrator on the bundled database: {admin_user}.")
 
     wait_for_mysql(admin_user, client, docker_base, admin_password, args.timeout_seconds)
     ensure_schemas(admin_user, client, admin_password, list(schemas.values()))

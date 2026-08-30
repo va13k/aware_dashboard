@@ -56,6 +56,10 @@ STUDY_CONFIG_PATH = PROJECT / "studies" / "studyConfig.json"
 #: Merged over the compose file when the study names a database of its own. Written
 #: rather than checked in, because it exists only for the placement that needs it.
 COMPOSE_OVERRIDE_PATH = PROJECT / "docker-compose.external-db.yml"
+#: The one-time copy from the database this deployment used to run into the one the
+#: study now names. Written only where the study asked for it, so a move that leaves
+#: the rows behind leaves nothing to run either.
+COPY_SCRIPT_PATH = PROJECT / "copy-study-data.sh"
 #: The broker's own files. Generated rather than checked in, because who may
 #: publish and who may only receive is derived from the study, and its passwords
 #: are this deployment's.
@@ -104,6 +108,25 @@ def ensure_server_password(env: dict[str, str]) -> None:
     env["ANDROID_SERVER_DB_PASSWORD"] = (
         secrets.token_urlsafe(16) if password in PLACEHOLDER_SECRETS else password
     )
+
+
+def ensure_bundled_root_password(env: dict[str, str]) -> None:
+    """Settle the password the bundled database's own `root` is created with.
+
+    Generated here and then left alone. MySQL bakes it into the data directory the
+    first time the container starts and ignores the variable ever after, so a value
+    that changes is a value that stops matching the server --- which is what happened
+    while this key also carried the administrator of whichever database the study
+    named: pointing a study at a managed server overwrote it, and moving back
+    authenticated to the bundled server with somebody else's password.
+
+    Nobody types this one. The account a researcher names lives in
+    database.ADMIN_PASSWORD_ENV, and on the bundled placement
+    setup/init_study_tables.py creates it with the privileges to administer the study.
+    """
+    password = str(env.get("MYSQL_ROOT_PASSWORD", "")).strip()
+    if not password or password in PLACEHOLDER_SECRETS:
+        env["MYSQL_ROOT_PASSWORD"] = secrets.token_urlsafe(16)
 
 
 def ensure_analytics_password(env: dict[str, str]) -> None:
@@ -202,7 +225,11 @@ def apply_placement(source: dict) -> str:
         # grid that stays empty. The bundled database is checked after it is up
         # instead, since it does not exist to be asked yet.
         require_reachable_database(source)
-        atomic_write_text(COMPOSE_OVERRIDE_PATH, build_compose_override(), SHARED_MODE)
+        atomic_write_text(
+            COMPOSE_OVERRIDE_PATH,
+            build_compose_override(backup_connection(source) if keeps_backups() else None),
+            SHARED_MODE,
+        )
     set_env_value(ENV_PATH, "DB_PLACEMENT", chosen)
     return chosen
 
@@ -257,13 +284,16 @@ def require_reachable_database(source: dict) -> None:
     )
 
 
-#: The services a deployment only has because it runs the database itself. The
-#: backup job is one of them: it authenticates as root on 3306 and dumps without
-#: asking for encryption, none of which describes a database somebody else runs, so
-#: it is taken out rather than left failing against a server it cannot reach.
-#: Backing up a database the researcher named is that researcher's own arrangement
-#: --- their provider's snapshots, or an export from the dashboard's backup page.
-BUNDLED_ONLY_SERVICES = ("mysql", "mysql-backup")
+#: The service a deployment has only because it runs the database itself. Nothing
+#: replaces it when the study names its own: the address in `.env` is what every
+#: other service opens.
+BUNDLED_DATABASE_SERVICE = "mysql"
+
+#: The scheduled dump. It goes wherever the database goes only if the study asked
+#: for it: the job was written for the database this deployment runs, and a server
+#: somebody else administers usually keeps its own snapshots. Left behind, it is
+#: removed rather than kept failing against a host it cannot reach.
+BACKUP_SERVICE = "mysql-backup"
 
 #: The services that wait on the bundled database's health check. A service kept out
 #: of a deployment is still depended on, and compose starts a dependency whether or
@@ -277,25 +307,243 @@ WAITS_ON_BUNDLED_MYSQL = (
 )
 
 
-def build_compose_override() -> str:
-    """The compose file that takes the bundled database, and its backup job, out.
+def build_compose_override(backup: dict[str, str] | None = None) -> str:
+    """The compose file that takes the bundled database out of the deployment.
 
     `!reset` clears a value the base file sets rather than merging with it, which is
     what removing a service and its dependents' waits requires: an override can add
     to `depends_on` but cannot otherwise take anything out of it.
+
+    `backup` is the connection the dump job is kept on when the study asked to go on
+    taking copies of the server it named, and None when it did not --- then the job
+    is removed like the database it was written for. The password is left as a
+    reference for compose to resolve from `.env`, so a generated file carries none.
     """
     lines = [
         "# Generated by setup/deploy_config.py for a study that names its own database.",
         "# Merged over docker-compose.yml, and absent whenever the study runs the",
         "# bundled one. Edit the placement in setup rather than this file.",
         "services:",
+        f"  {BUNDLED_DATABASE_SERVICE}: !reset null",
     ]
-    for service in BUNDLED_ONLY_SERVICES:
-        lines.append(f"  {service}: !reset null")
-    for service in WAITS_ON_BUNDLED_MYSQL:
+    waiting = list(WAITS_ON_BUNDLED_MYSQL)
+    if backup is None:
+        lines.append(f"  {BACKUP_SERVICE}: !reset null")
+    else:
+        waiting.append(BACKUP_SERVICE)
+    for service in waiting:
         lines.append(f"  {service}:")
         lines.append("    depends_on: !reset null")
+        if service == BACKUP_SERVICE:
+            lines.append("    environment:")
+            for key, value in backup.items():
+                lines.append(f"      {key}: {value}")
     return "\n".join(lines) + "\n"
+
+
+def keeps_backups(env: dict[str, str] | None = None) -> bool:
+    """Whether the deployment goes on dumping a database it does not run.
+
+    Off unless the study said otherwise, because carrying the job across is a
+    decision about somebody else's server rather than a detail of the move. Read from
+    this wizard run first and from the deployment on record after it, so a redeploy
+    that never opens the wizard keeps the answer already given.
+    """
+    answer = str(load_env(REQUEST_ENV_PATH).get("DB_KEEP_BACKUPS", "")).strip()
+    if not answer:
+        source = env if env is not None else load_env(ENV_PATH)
+        answer = str(source.get("DB_KEEP_BACKUPS", "")).strip()
+    return answer == "1"
+
+
+def backup_connection(source: dict) -> dict[str, str]:
+    """How the dump job opens a database this deployment does not run.
+
+    As `aware_analytics` rather than as the administrator: the job runs for the whole
+    study, and reading every row is all a dump needs. `--no-tablespaces` in the job
+    itself is what lets an account without PROCESS take one, and the schemas hold no
+    routines, triggers or views for the rest of the dump to need more.
+    """
+    databases = source.get("database") or {}
+    return {
+        "MYSQL_PORT": str(database.platform_port(databases, "android")),
+        "MYSQL_USER": database.ANALYTICS_USER,
+        "MYSQL_PASSWORD": "${ANALYTICS_DB_PASSWORD}",
+        "MYSQL_SSL_MODE": "REQUIRED" if database.tls_required(databases) else "PREFERRED",
+    }
+
+
+#: The copy script is run by the researcher rather than read by a service.
+EXECUTABLE_MODE = 0o755
+
+#: The container the bundled database keeps running in after a study has moved off
+#: it. Compose is not asked to remove orphans, so it is still there to be dumped.
+BUNDLED_CONTAINER = "aware_mysql"
+
+#: Tables the copy leaves behind. Both are the dashboard's own arithmetic over the
+#: rows that arrive, and the API rebuilds them on the server it lands on; carrying
+#: them would describe the deployment that counted rather than the study. The
+#: decisions --- enrolment, refusals, exclusions --- do travel, because a copy into
+#: an empty server has no second deployment's answers to reconcile with.
+COPY_SKIP_TABLES = ("record_counts", "coverage_hourly")
+
+
+def carries_collected_rows() -> bool:
+    """Whether this run was asked to carry the rows already collected across.
+
+    Off unless the study said otherwise. A move switches which database the study
+    writes to; what was written before stays where it was written, and copying
+    gigabytes into a server somebody else pays for is a decision rather than a step.
+    """
+    return str(load_env(REQUEST_ENV_PATH).get("DB_CARRY_DATA", "")).strip() == "1"
+
+
+def build_copy_script(source: dict) -> str:
+    """The commands that carry the collected rows into the database the study names.
+
+    Written out rather than run here: the deploy answers a browser that is waiting on
+    it, and 4 GB of sensor data is not something to move behind a request with no
+    progress and no second attempt. As a file it can be read before it is trusted,
+    watched while it runs, and run again --- every insert is an INSERT IGNORE, so a
+    connection that drops halfway costs the time and nothing else.
+
+    No password is written into it. The bundled server's own is read from the
+    container that still holds it, and the named server's from `.env`, which by then
+    describes the database this study writes to.
+    """
+    databases = source.get("database") or {}
+    host = database.declared_host(databases)
+    port = database.platform_port(databases, "android")
+    admin_user = database.admin_user(host, str(load_env(ENV_PATH).get("DB_ADMIN_USER", "")).strip())
+    ssl_mode = "REQUIRED" if database.tls_required(databases) else "PREFERRED"
+    android_schema = database.platform_schema(databases, "android")
+    schemas = " ".join(
+        database.platform_schema(databases, platform) for platform in ("android", "ios")
+    )
+    skipped = " ".join(COPY_SKIP_TABLES)
+    admin_password_env = database.ADMIN_PASSWORD_ENV
+    return f"""#!/bin/sh
+# Generated by setup/deploy_config.py for a study that moved to a database it names.
+#
+# Carries the rows collected before the move from the database this deployment used
+# to run into {host}. Run it from the project folder, once, after
+# the deploy that switched the study over:
+#
+#   sudo ./copy-study-data.sh
+#
+# It reads both passwords where they already live --- the old server's from the
+# container still holding it, this study's from .env --- so nothing here is a
+# credential. Set DOCKER=docker if your user may talk to the daemon without sudo.
+set -eu
+
+DOCKER="${{DOCKER:-sudo docker}}"
+SOURCE_CONTAINER='{BUNDLED_CONTAINER}'
+TARGET_HOST='{host}'
+TARGET_PORT='{port}'
+TARGET_USER='{admin_user}'
+TARGET_SSL_MODE='{ssl_mode}'
+SCHEMAS='{schemas}'
+SKIP_TABLES='{skipped}'
+
+cd "$(dirname "$0")"
+
+if [ ! -f .env ]; then
+    echo "No .env here. Run this from the project folder." >&2
+    exit 1
+fi
+
+TARGET_PASSWORD="$(sed -n 's/^{admin_password_env}=//p' .env | head -n 1)"
+if [ -z "$TARGET_PASSWORD" ]; then
+    echo "{admin_password_env} is not in .env, so there is no account to write with." >&2
+    exit 1
+fi
+
+if [ "$($DOCKER inspect -f '{{{{.State.Running}}}}' "$SOURCE_CONTAINER" 2>/dev/null)" != "true" ]; then
+    echo "$SOURCE_CONTAINER is not running, so the rows it holds cannot be read." >&2
+    echo "Start it with: $DOCKER start $SOURCE_CONTAINER" >&2
+    exit 1
+fi
+
+# Refused rather than merged. Every insert here is an INSERT IGNORE keyed on the
+# `_id` the old server assigned, so rows a phone has already written to the new one
+# would collide by number and be dropped without a word. A server that has begun
+# collecting is merged through the dashboard's backup page, which reconciles by
+# watermark instead.
+echo "Checking that the new database is still empty..."
+COLLECTED="$($DOCKER exec -i \\
+    -e MYSQL_PWD="$TARGET_PASSWORD" "$SOURCE_CONTAINER" \\
+    mysql --host="$TARGET_HOST" --port="$TARGET_PORT" --user="$TARGET_USER" \\
+    --ssl-mode="$TARGET_SSL_MODE" -B -N \\
+    -e 'SELECT COUNT(*) FROM aware_device' {android_schema} 2>/dev/null || echo 0)"
+if [ "${{COLLECTED:-0}}" != "0" ]; then
+    echo "The database this study now writes to already holds $COLLECTED devices." >&2
+    echo "Import through the dashboard's backup page instead: it folds rows in above" >&2
+    echo "the watermark, where this copy would drop them as duplicate ids." >&2
+    exit 1
+fi
+
+IGNORE=""
+for schema in $SCHEMAS; do
+    for table in $SKIP_TABLES; do
+        IGNORE="$IGNORE --ignore-table=$schema.$table"
+    done
+done
+
+echo "Copying $SCHEMAS to $TARGET_HOST. This runs as long as the data is large."
+
+# Intentional word splitting: SCHEMAS is a space-separated list and IGNORE one
+# option per table left behind.
+#
+# --no-create-info because the deploy has already created every table on the far
+# side, --insert-ignore so a second run adds only what the first did not, and
+# --set-gtid-purged=OFF because a managed server has GTIDs on and reading their
+# position needs a privilege a study's account has no reason to hold.
+$DOCKER exec -i \\
+    -e TARGET_PASSWORD="$TARGET_PASSWORD" \\
+    -e TARGET_HOST="$TARGET_HOST" \\
+    -e TARGET_PORT="$TARGET_PORT" \\
+    -e TARGET_USER="$TARGET_USER" \\
+    -e TARGET_SSL_MODE="$TARGET_SSL_MODE" \\
+    -e SCHEMAS="$SCHEMAS" \\
+    -e IGNORE="$IGNORE" \\
+    "$SOURCE_CONTAINER" sh -c '
+set -eu
+MYSQL_PWD="$MYSQL_ROOT_PASSWORD" mysqldump \\
+    --single-transaction --no-tablespaces --set-gtid-purged=OFF \\
+    --no-create-info --insert-ignore --complete-insert \\
+    $IGNORE --databases $SCHEMAS \\
+| MYSQL_PWD="$TARGET_PASSWORD" mysql \\
+    --host="$TARGET_HOST" --port="$TARGET_PORT" --user="$TARGET_USER" \\
+    --ssl-mode="$TARGET_SSL_MODE"
+'
+
+BEFORE="$($DOCKER exec -i "$SOURCE_CONTAINER" sh -c \\
+    'MYSQL_PWD="$MYSQL_ROOT_PASSWORD" mysql -B -N -e "SELECT COUNT(*) FROM aware_device" {android_schema}')"
+AFTER="$($DOCKER exec -i -e MYSQL_PWD="$TARGET_PASSWORD" "$SOURCE_CONTAINER" \\
+    mysql --host="$TARGET_HOST" --port="$TARGET_PORT" --user="$TARGET_USER" \\
+    --ssl-mode="$TARGET_SSL_MODE" -B -N \\
+    -e 'SELECT COUNT(*) FROM aware_device' {android_schema})"
+
+echo
+echo "Devices on the old server: $BEFORE"
+echo "Devices on {host}: $AFTER"
+echo
+echo "The dashboard's counts are its own arithmetic over these rows, and the first"
+echo "refresh after this rebuilds them."
+"""
+
+
+def apply_data_copy(source: dict) -> bool:
+    """Write, or take away, the script that carries the collected rows across.
+
+    Present only where a study asked for the copy, so the file's existence is the
+    answer --- the same way the compose override's existence is the placement.
+    """
+    if placement.runs_bundled_mysql(placement.declared(source)) or not carries_collected_rows():
+        COPY_SCRIPT_PATH.unlink(missing_ok=True)
+        return False
+    atomic_write_text(COPY_SCRIPT_PATH, build_copy_script(source), EXECUTABLE_MODE)
+    return True
 
 
 def seed_source_secrets(env: dict[str, str]) -> dict:
@@ -564,6 +812,12 @@ def write_broker_passwords(env: dict[str, str], docker_prefix: list[str]) -> Non
 BUNDLED_CA_PATH = "/var/lib/mysql/ca.pem"
 
 
+def clear_database_authority(model: dict) -> dict:
+    """Take the certificate authority out of the study model."""
+    database.declare_tls(model.setdefault("database", {}), ca_certificate="")
+    return model
+
+
 def ensure_database_authority(source: dict, docker_prefix: list[str] | None = None) -> str:
     """Publish the authority a phone can verify the study database against.
 
@@ -574,8 +828,10 @@ def ensure_database_authority(source: dict, docker_prefix: list[str] | None = No
     only they can provide, and its absence leaves the connection encrypted and
     unverified, which is stated where the choice is made.
 
-    An answer already in the study model wins: a researcher who pasted an authority
-    meant it, and it may well be the right one for a certificate that was replaced.
+    An answer already in the study model wins for the placement it was given for: a
+    researcher who pasted an authority meant it, and it may well be the right one for
+    a certificate that was replaced. It does not survive a move onto the bundled
+    database, whose certificate it did not sign.
 
     What is read from the container is deliberately not written back to the study
     model. It is re-read on every deploy instead, so a database that regenerates its
@@ -594,8 +850,9 @@ def ensure_database_authority(source: dict, docker_prefix: list[str] | None = No
     if not database.tls_required(databases):
         return "unencrypted"
 
+    bundled = placement.declared(source) == placement.BUNDLED
     existing = database.tls_authority(databases)
-    if existing:
+    if existing and not bundled:
         if not valid_certificate(existing):
             raise SystemExit(
                 "The database certificate authority in this study is not a "
@@ -606,8 +863,22 @@ def ensure_database_authority(source: dict, docker_prefix: list[str] | None = No
             )
         return "supplied"
 
-    if placement.declared(source) != placement.BUNDLED:
+    if not bundled:
         return "none"
+
+    # An authority belongs to the server that presented the certificate it signed,
+    # not to the study, so one supplied for a database this study has moved off is
+    # cleared rather than carried. Kept, it is published to every phone and checked
+    # against a certificate it never signed, which reads as a database they cannot
+    # reach --- and the deployment's own check refuses before that reaches anyone.
+    #
+    # Written through to the study model, unlike the authority read below: every
+    # other reader opens source.json rather than this run's copy, and one left
+    # holding the old server's certificate reports a database it cannot verify long
+    # after the deploy that moved off it.
+    if existing:
+        update_source(clear_database_authority)
+        database.declare_tls(databases, ca_certificate="")
 
     read = subprocess.run(
         (docker_prefix or []) + ["docker", "exec", "aware_mysql", "cat", BUNDLED_CA_PATH],
@@ -677,7 +948,10 @@ def generate_htpasswd(username: str, password: str) -> None:
 #: env is merged over `.env` so a run's answers reach the code that applies them, and
 #: this is what keeps the ones that were only ever in transit --- a certificate the
 #: study model now holds --- from being written back as deployment settings.
-REQUEST_ONLY_KEYS = frozenset({"DB_CA_CERTIFICATE_B64"})
+#: `DB_CARRY_DATA` is one of them: copying what was already collected is something a
+#: researcher does once, and a deployment that remembered it would offer to do it
+#: again on every redeploy.
+REQUEST_ONLY_KEYS = frozenset({"DB_CA_CERTIFICATE_B64", "DB_CARRY_DATA"})
 
 
 def declared_database_host() -> str:
@@ -700,6 +974,7 @@ def persist_env(env: dict[str, str]) -> None:
 
     ordered_keys = [
         "DB_ADMIN_USER",
+        database.ADMIN_PASSWORD_ENV,
         "MYSQL_ROOT_PASSWORD",
         "DJANGO_SECRET_KEY",
         "DASHBOARD_SESSION_SECRET",
@@ -924,7 +1199,12 @@ def check_dataflow_applied(source: dict, bind: str, android_study_url: str) -> N
     Raises SystemExit naming every disagreement, so one run reports all of them.
     """
     android = dataflow.declared(source, "android")
-    expected_bind = "0.0.0.0" if android == dataflow.DIRECT else "127.0.0.1"
+    # Asked of the same function that decided it, because the dataflow does not decide
+    # it alone. A study that names its own database runs no bundled one, so there is no
+    # address of this deployment's for a phone to be pointed at and none to disagree
+    # with --- and the value written for the compose file is a placeholder for a
+    # service the override removes.
+    expected_bind = placement.connection(placement.declared(source), android)["bundled_bind"]
     carries = dataflow.carries_database_credentials("android", android)
 
     published = {}
@@ -935,7 +1215,7 @@ def check_dataflow_applied(source: dict, bind: str, android_study_url: str) -> N
             published = {}
 
     problems = []
-    if bind != expected_bind:
+    if expected_bind is not None and bind != expected_bind:
         problems.append(
             f"MySQL is bound to {bind}, but {android!r} implies {expected_bind}."
         )
@@ -980,6 +1260,7 @@ def main() -> None:
     ensure_researcher_credentials(env)
     ensure_participant_password(env)
     ensure_server_password(env)
+    ensure_bundled_root_password(env)
     ensure_analytics_password(env)
     ensure_broker_passwords(env)
     env = normalize_public_env(env)
@@ -1024,6 +1305,9 @@ def main() -> None:
     # After the dataflow, because the combination is what is refused: an external
     # database is offered with HTTP/S ingest and not with phones connecting directly.
     where = apply_placement(source)
+    # After the placement, because it is the placement that decides there is anywhere
+    # to copy from: a study staying on the bundled database has one server, not two.
+    copying = apply_data_copy(source)
     authority = ensure_database_authority(source)
     broker_port = apply_broker(env)
     resolve_database_readers(env, source)
@@ -1038,6 +1322,17 @@ def main() -> None:
             else "(unencrypted, as this study declares)"
         )
     )
+    if where != placement.BUNDLED:
+        print(
+            "backups: "
+            + (
+                f"kept, dumped as {database.ANALYTICS_USER}"
+                if keeps_backups(env)
+                else "left with the database this deployment used to run"
+            )
+        )
+    if copying:
+        print(f"rows already collected: run ./{COPY_SCRIPT_PATH.name} to carry them across")
     print(f"broker: {messaging.PARTICIPANT_USER} on port {broker_port} "
           f"({'TLS' if messaging.uses_tls(env.get('PROTOCOL', 'http')) else 'plaintext'})")
 

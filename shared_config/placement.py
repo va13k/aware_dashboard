@@ -36,9 +36,12 @@ deploys, and refusable --- an institutional MySQL built without TLS would otherw
 be a database this software simply cannot be pointed at.
 
 Switching placement is a redeploy rather than a live change, for the same reason
-the dataflow is: it decides which containers exist. What it does not do is carry
-the data across --- the history stays on the server that holds it, and moving it is
-an export from one and a merge-import into the other.
+the dataflow is: it decides which containers exist. What it decides on its own is
+only where the next row is written. Two things a researcher may want to follow the
+study are asked for instead of assumed, and both are no unless answered: carrying
+the rows already collected, which the deploy writes out as a script to run rather
+than doing behind a browser, and keeping the scheduled backup job, which is
+otherwise removed along with the database it was written for.
 """
 
 from shared_config import dataflow
@@ -52,6 +55,12 @@ CHOICES = (BUNDLED, EXTERNAL)
 
 #: What a study declares when it names no host of its own.
 DEFAULT_HOST = "db.internal"
+
+#: The port that host answers on. MySQL's own, because this deployment runs the
+#: server and publishes it unchanged --- so it belongs to the placement the same way
+#: the host does, and a study moving back onto it takes both rather than keeping the
+#: port of a server it no longer names.
+DEFAULT_PORT = 3306
 
 
 def declared(source: dict) -> str:
