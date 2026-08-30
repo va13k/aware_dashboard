@@ -491,6 +491,11 @@ Changing the placement is a redeploy, not a live change, for the same reason cha
 the dataflow is: it decides which containers exist. Re-run `setup.sh` and choose the
 other option.
 
+**Backups are not carried across either.** The backup job dumps as the bundled
+database's own administrator, so a study that names its own database is deployed
+without it. Keeping copies of that server is the researcher's arrangement — the
+provider's snapshots, or an export from the dashboard's backup page.
+
 **The data does not move.** Rows already collected stay on the server holding them.
 Export them from the dashboard's backup page before switching, then merge-import them
 into the new server — the backup page's import folds rows in above the watermark

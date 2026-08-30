@@ -207,6 +207,21 @@
         </p>
         <p
           class="hint hidden"
+          id="dbBackupAbsent"
+          style="
+            margin: 0 0 18px;
+            border-left: 3px solid #b45309;
+            padding-left: 10px;
+          "
+        >
+          <b>This deployment will not back up a database it does not run.</b> The
+          backup job dumps as the bundled database's own administrator and is left
+          out here, so keeping copies is yours to arrange — your provider's
+          snapshots, or an export from the dashboard's backup page. Export before
+          you switch, too: rows already collected stay on the server holding them.
+        </p>
+        <p
+          class="hint hidden"
           id="participantPassAbsent"
           style="
             margin: 0 0 18px;

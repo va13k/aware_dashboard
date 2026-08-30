@@ -664,6 +664,14 @@ function updateDbPlacement() {
     );
   }
 
+  // Said where the placement is chosen rather than left to be discovered: a
+  // deployment that keeps no copies of a database it does not administer is a
+  // reasonable arrangement and a bad surprise.
+  var backups = document.getElementById("dbBackupAbsent");
+  if (backups) {
+    backups.classList.toggle("hidden", select.value !== "external");
+  }
+
   // A phone opens the database itself only on the direct path. On the webservice
   // path it is given a study URL and no credential, so the field is not merely
   // hidden -- the page says why there is nothing to ask for.

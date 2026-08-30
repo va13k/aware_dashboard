@@ -16,6 +16,7 @@ is up --- the client falls back to this machine's own resolution, and
 """
 
 import base64
+import re
 import shlex
 import subprocess
 
@@ -112,7 +113,9 @@ class Client:
         """Whether a query is asked from the deployment's network or from this machine."""
         return self._bundled or self._network_available()
 
-    def _client_argv(self, user: str, password: str, schema: str, batch: bool) -> list[str]:
+    def _client_argv(
+        self, user: str, password: str, schema: str, batch: bool, keep_going: bool = False
+    ) -> list[str]:
         client = [
             "mysql",
             "--protocol=TCP",
@@ -128,6 +131,11 @@ class Client:
             client.append(f"--ssl-ca={CA_PATH}")
         if batch:
             client += ["-B", "-N"]
+        # Applying a file written for a deployment that owns its database: the
+        # grants in it name accounts a database somebody else runs has never heard
+        # of, and stopping at the first would leave the tables after it uncreated.
+        if keep_going:
+            client.append("--force")
         if schema:
             client.append(schema)
         return client
@@ -150,8 +158,12 @@ class Client:
             f"printf %s {shlex.quote(encoded)} | base64 -d > {CA_PATH} && exec {program}",
         ]
 
-    def _command(self, user: str, password: str, schema: str, batch: bool) -> list[str]:
-        client = self._with_authority(self._client_argv(user, password, schema, batch))
+    def _command(
+        self, user: str, password: str, schema: str, batch: bool, keep_going: bool = False
+    ) -> list[str]:
+        client = self._with_authority(
+            self._client_argv(user, password, schema, batch, keep_going)
+        )
 
         if self._bundled:
             return self._base + ["exec", "-i", BUNDLED_CONTAINER] + client
@@ -166,10 +178,11 @@ class Client:
         schema: str = "",
         batch: bool = False,
         stdin=None,
+        keep_going: bool = False,
     ) -> subprocess.CompletedProcess:
         """Issue SQL, from stdin or from a file handle, and return what happened."""
         return subprocess.run(
-            self._command(user, password, schema, batch),
+            self._command(user, password, schema, batch, keep_going),
             input=None if stdin is not None else sql,
             stdin=stdin,
             capture_output=True,
