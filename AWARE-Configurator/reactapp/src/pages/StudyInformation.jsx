@@ -395,8 +395,8 @@ export default function StudyInformation() {
             }}
           >
             {direct
-              ? "Controls how participant devices reach the study database. Recommended: require an encrypted connection and keep the password out of the study config. Password and SSL changes are applied to the participant database account when you save."
-              : "Controls how this server reaches the study database. Participant phones never open it on this path — they post to the server, which performs the write. Password and SSL changes are applied to the database account when you save."}
+              ? "Controls how participant devices reach the study database — a MySQL 8 or later, named when this deployment was set up rather than here. Recommended: require an encrypted connection and keep the password out of the study config. Password and SSL changes are applied to the participant database account when you save."
+              : "Controls how this server reaches the study database — a MySQL 8 or later, named when this deployment was set up rather than here. Participant phones never open it on this path: they post to the server, which performs the write. Password and SSL changes are applied to the database account when you save."}
           </p>
           <Grid
             container
