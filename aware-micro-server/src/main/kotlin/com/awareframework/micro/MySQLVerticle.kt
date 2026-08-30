@@ -126,6 +126,8 @@ class MySQLVerticle : AbstractVerticle() {
             table = postData.getString("table"),
             data = JsonArray(postData.getString("data"))
           )
+            .onSuccess { applied -> receivedMessage.reply(JsonObject().put("applied", applied)) }
+            .onFailure { e -> receivedMessage.fail(500, e.message ?: "update failed") }
         }
 
         eventBus.consumer<JsonObject>("deleteData") { receivedMessage ->
@@ -135,6 +137,8 @@ class MySQLVerticle : AbstractVerticle() {
             table = postData.getString("table"),
             data = JsonArray(postData.getString("data"))
           )
+            .onSuccess { removed -> receivedMessage.reply(JsonObject().put("removed", removed)) }
+            .onFailure { e -> receivedMessage.fail(500, e.message ?: "delete failed") }
         }
 
         eventBus.consumer<JsonObject>("getData") { receivedMessage ->
@@ -206,61 +210,119 @@ class MySQLVerticle : AbstractVerticle() {
     return dataPromise.future()
   }
 
-  fun updateData(device_id: String, table: String, data: JsonArray) {
-    sqlClient.getConnection { connectionResult ->
-      if (connectionResult.succeeded()) {
-        val connection = connectionResult.result()
-        for (i in 0 until data.size()) {
-          val entry = data.getJsonObject(i)
-          val updateItem =
-            "UPDATE '$table' SET data = $entry WHERE device_id = '$device_id' AND timestamp = ${entry.getDouble("timestamp")}"
+  /**
+   * Rows a device asks to have rewritten, matched by the timestamps it names.
+   *
+   * Answered rather than assumed. The caller reads the result as "is what I sent
+   * what the server now holds", so a batch the database did not take has to arrive
+   * as a failure --- a client told the write happened stops offering it.
+   *
+   * Only a table storing a row whole has something to rewrite: the iOS schema keeps
+   * a row's fields in a `data` column, and the Android schema gives each field a
+   * column of its own with no `data` to put a row into. Asked of the schema, so the
+   * two are told apart by what the table has rather than by which platform sent it.
+   */
+  fun updateData(device_id: String, table: String, data: JsonArray): Future<Boolean> {
+    val quoted = TableName.quoted(table)
+      ?: return Future.failedFuture(IllegalArgumentException("not a table name: $table"))
+    if (data.isEmpty()) {
+      logger.warn { "$device_id ignored empty update for $table" }
+      return Future.succeededFuture(true)
+    }
 
-          // https://access.redhat.com/documentation/ja-jp/red_hat_build_of_eclipse_vert.x/4.0/html/eclipse_vert.x_4.0_migration_guide/changes-in-vertx-jdbc-client_changes-in-client-components#running_queries_on_managed_connections
-          connection.query(updateItem)
-            .execute()
-            .onFailure { e ->
-              logger.error(e) { "Failed to process update." }
-              connection.close()
-            }
-            .onSuccess { _ ->
-              logger.info { "$device_id updated $table: ${entry.encode()}" }
-              connection.close()
-            }
+    val applied: Promise<Boolean> = Promise.promise()
+    columnsOf(table).onFailure { e -> applied.fail(e) }.onSuccess { columns ->
+      if (!columns.contains("data")) {
+        logger.warn {
+          "refused an update of $table from $device_id: the table stores each field " +
+            "in a column of its own and holds no row to rewrite"
         }
+        applied.complete(false)
       } else {
-        logger.error(connectionResult.cause()) { "Failed to establish connection." }
+        val rows = (0 until data.size()).map { i ->
+          val entry = data.getJsonObject(i)
+          Tuple.of(entry.encode(), device_id, timestampFrom(entry))
+        }
+        sqlClient.getConnection { connectionResult ->
+          if (connectionResult.succeeded()) {
+            val connection = connectionResult.result()
+            connection
+              .preparedQuery(
+                "UPDATE $quoted SET data = ? WHERE device_id = ? AND timestamp = ?"
+              )
+              .executeBatch(rows)
+              .onFailure { e ->
+                logger.error(e) { "Failed to process update." }
+                connection.close()
+                applied.fail(e)
+              }
+              .onSuccess { _ ->
+                logger.info { "$device_id updated $table: ${rows.size} rows" }
+                connection.close()
+                applied.complete(true)
+              }
+          } else {
+            logger.error(connectionResult.cause()) { "Failed to establish connection." }
+            applied.fail(connectionResult.cause())
+          }
+        }
       }
     }
+    return applied.future()
   }
 
-  fun deleteData(device_id: String, table: String, data: JsonArray) {
-    sqlClient.getConnection { connectionResult ->
-      if (connectionResult.succeeded()) {
-        val connection = connectionResult.result()
-        val timestamps = mutableListOf<Double>()
-        for (i in 0 until data.size()) {
-          val entry = data.getJsonObject(i)
-          timestamps.add(entry.getDouble("timestamp"))
-        }
+  /**
+   * Rows a device asks to have removed, by the timestamps it names.
+   *
+   * The one operation whose answer a study has to be able to trust: a participant
+   * exercising the right to have their data taken out is told it happened by the
+   * client, and the client is told by this. So the removal is answered when the
+   * database has said what became of it, and a batch it could not take arrives at
+   * the caller as a failure rather than as silence.
+   */
+  fun deleteData(device_id: String, table: String, data: JsonArray): Future<Boolean> {
+    val quoted = TableName.quoted(table)
+      ?: return Future.failedFuture(IllegalArgumentException("not a table name: $table"))
 
-        val deleteBatch =
-          "DELETE from '$table' WHERE device_id = '$device_id' AND timestamp in (${timestamps.stream().map(Any::toString).collect(
-            Collectors.joining(",")
-          )})"
-        connection.query(deleteBatch)
-          .execute()
-          .onFailure { e ->
-            logger.error(e) { "Failed to process delete batch." }
-            connection.close()
-          }
-          .onSuccess { _ ->
-            logger.info { "$device_id deleted from $table: ${data.size()} records" }
-            connection.close()
-          }
-      } else {
-        logger.error(connectionResult.cause()) { "Failed to establish connection." }
+    val timestamps = (0 until data.size()).map { timestampFrom(data.getJsonObject(it)) }
+    if (timestamps.isEmpty()) {
+      logger.warn { "$device_id ignored empty delete for $table" }
+      return Future.succeededFuture(true)
+    }
+
+    val removed: Promise<Boolean> = Promise.promise()
+    columnsOf(table).onFailure { e -> removed.fail(e) }.onSuccess {
+      val parameters = Tuple.of(device_id)
+      timestamps.forEach { parameters.addDouble(it) }
+      val placeholders = timestamps.joinToString(", ") { "?" }
+      sqlClient.getConnection { connectionResult ->
+        if (connectionResult.succeeded()) {
+          val connection = connectionResult.result()
+          connection
+            .preparedQuery(
+              "DELETE FROM $quoted WHERE device_id = ? AND timestamp IN ($placeholders)"
+            )
+            .execute(parameters)
+            .onFailure { e ->
+              logger.error(e) { "Failed to process delete batch." }
+              connection.close()
+              removed.fail(e)
+            }
+            .onSuccess { result ->
+              logger.info {
+                "$device_id deleted from $table: ${result.rowCount()} of " +
+                  "${timestamps.size} rows named"
+              }
+              connection.close()
+              removed.complete(true)
+            }
+        } else {
+          logger.error(connectionResult.cause()) { "Failed to establish connection." }
+          removed.fail(connectionResult.cause())
+        }
       }
     }
+    return removed.future()
   }
 
   /**
@@ -639,6 +701,12 @@ class MySQLVerticle : AbstractVerticle() {
     data: JsonArray,
     columns: Set<String>
   ): Future<Boolean> {
+    // The name is already one the schema answered for, and it is quoted into the
+    // statement rather than bound, so it is held to the shape of an identifier here
+    // as well: what reaches this is a request parameter either way.
+    val quoted = TableName.quoted(table)
+      ?: return Future.failedFuture(IllegalArgumentException("not a table name: $table"))
+
     // A `data` column means this table stores a row whole, which is the iOS shape
     // and the behaviour every existing deployment relies on. Anything else is
     // columnar, and each of the row's own fields goes to the column of that name.
@@ -667,7 +735,7 @@ class MySQLVerticle : AbstractVerticle() {
         }
         val columnList = written.joinToString(",") { "`$it`" }
         val insertBatch =
-          "INSERT INTO `$table` ($columnList) VALUES ${values.stream().map(Any::toString).collect(
+          "INSERT INTO $quoted ($columnList) VALUES ${values.stream().map(Any::toString).collect(
             Collectors.joining(",")
           )}"
         connection.query(insertBatch)
@@ -719,7 +787,7 @@ class MySQLVerticle : AbstractVerticle() {
   ): String {
     if (blobShaped) {
       // https://github.com/eclipse-vertx/vert.x/commit/ea0eddb129530ab3719c0ef86b471894876ec519#diff-07f061e092a63da24a06ab4507d15125e3377034f21eee18c6d4261f6714e709L241
-      return "('$device_id', '${timestampFrom(entry)}', '${escapedJson(entry)}')"
+      return "('${sqlValue(device_id)}', '${timestampFrom(entry)}', '${escapedJson(entry)}')"
     }
     val rendered = written.map { column ->
       when (column) {

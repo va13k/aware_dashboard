@@ -23,7 +23,17 @@ object TableName {
    * table on this server, so there is nothing to escape it into.
    */
   fun quoted(table: String?): String? {
-    if (table == null || !ALLOWED.matches(table)) return null
+    if (!isName(table)) return null
     return "`$table`"
+  }
+
+  /** The same name for the server that quotes an identifier the way the standard does. */
+  fun quotedAnsi(table: String?): String? {
+    if (!isName(table)) return null
+    return "\"$table\""
+  }
+
+  fun isName(table: String?): Boolean {
+    return table != null && ALLOWED.matches(table)
   }
 }

@@ -31,6 +31,14 @@ class TestTableName {
     assertNull(TableName.quoted("aware_android.accelerometer"))
   }
 
+  /** The server speaks two dialects, and each quotes an identifier its own way. */
+  @Test
+  fun quotesForTheServerThatWillReadIt() {
+    assertEquals("`accelerometer`", TableName.quoted("accelerometer"))
+    assertEquals("\"accelerometer\"", TableName.quotedAnsi("accelerometer"))
+    assertNull(TableName.quotedAnsi("accelerometer\" WHERE 1=1 -- "))
+  }
+
   @Test
   fun refusesANameNoTableCouldHave() {
     assertNull(TableName.quoted(""))

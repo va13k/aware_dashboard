@@ -17,6 +17,7 @@ import io.vertx.pgclient.PgPool
 import io.vertx.pgclient.SslMode
 import io.vertx.sqlclient.PoolOptions
 import io.vertx.sqlclient.SqlClient
+import io.vertx.sqlclient.Tuple
 import java.util.concurrent.ConcurrentHashMap
 import java.util.stream.Collectors
 import java.util.stream.StreamSupport
@@ -123,6 +124,8 @@ class PostgresVerticle : AbstractVerticle() {
             table = postData.getString("table"),
             data = JsonArray(postData.getString("data"))
           )
+            .onSuccess { applied -> receivedMessage.reply(JsonObject().put("applied", applied)) }
+            .onFailure { e -> receivedMessage.fail(500, e.message ?: "update failed") }
         }
 
         eventBus.consumer<JsonObject>("deleteData") { receivedMessage ->
@@ -132,6 +135,8 @@ class PostgresVerticle : AbstractVerticle() {
             table = postData.getString("table"),
             data = JsonArray(postData.getString("data"))
           )
+            .onSuccess { removed -> receivedMessage.reply(JsonObject().put("removed", removed)) }
+            .onFailure { e -> receivedMessage.fail(500, e.message ?: "delete failed") }
         }
 
         eventBus.consumer<JsonObject>("getData") { receivedMessage ->
@@ -180,61 +185,93 @@ class PostgresVerticle : AbstractVerticle() {
     return dataPromise.future()
   }
 
-  fun updateData(device_id: String, table: String, data: JsonArray) {
+  /** Rows a device asks to have rewritten, answered once the database has acted. */
+  fun updateData(device_id: String, table: String, data: JsonArray): Future<Boolean> {
+    val quoted = TableName.quotedAnsi(table)
+      ?: return Future.failedFuture(IllegalArgumentException("not a table name: $table"))
+    if (data.isEmpty()) {
+      logger.warn { "$device_id ignored empty update for $table" }
+      return Future.succeededFuture(true)
+    }
+
+    val rows = (0 until data.size()).map { i ->
+      val entry = data.getJsonObject(i)
+      Tuple.of(entry.encode(), device_id, entry.getDouble("timestamp"))
+    }
+
+    val applied: Promise<Boolean> = Promise.promise()
     sqlClient.getConnection { connectionResult ->
       if (connectionResult.succeeded()) {
         val connection = connectionResult.result()
-        for (i in 0 until data.size()) {
-          val entry = data.getJsonObject(i)
-          val updateItem =
-            "UPDATE \"$table\" SET \"data\" = '$entry' WHERE \"device_id\" = '$device_id' AND \"timestamp\" = ${entry.getDouble("timestamp")}"
-
-          // https://access.redhat.com/documentation/ja-jp/red_hat_build_of_eclipse_vert.x/4.0/html/eclipse_vert.x_4.0_migration_guide/changes-in-vertx-jdbc-client_changes-in-client-components#running_queries_on_managed_connections
-          connection.query(updateItem)
-            .execute()
-            .onFailure { e ->
-              logger.error(e) { "Failed to process update." }
-              connection.close()
-            }
-            .onSuccess { _ ->
-              logger.info { "$device_id updated $table: ${entry.encode()}" }
-              connection.close()
-            }
-        }
+        connection
+          .preparedQuery(
+            "UPDATE $quoted SET \"data\" = \$1 " +
+              "WHERE \"device_id\" = \$2 AND \"timestamp\" = \$3"
+          )
+          .executeBatch(rows)
+          .onFailure { e ->
+            logger.error(e) { "Failed to process update." }
+            connection.close()
+            applied.fail(e)
+          }
+          .onSuccess { _ ->
+            logger.info { "$device_id updated $table: ${rows.size} rows" }
+            connection.close()
+            applied.complete(true)
+          }
       } else {
         logger.error(connectionResult.cause()) { "Failed to establish connection." }
+        applied.fail(connectionResult.cause())
       }
     }
+    return applied.future()
   }
 
-  fun deleteData(device_id: String, table: String, data: JsonArray) {
+  /** Rows a device asks to have removed, answered once the database has acted. */
+  fun deleteData(device_id: String, table: String, data: JsonArray): Future<Boolean> {
+    val quoted = TableName.quotedAnsi(table)
+      ?: return Future.failedFuture(IllegalArgumentException("not a table name: $table"))
+
+    val timestamps = (0 until data.size()).map { data.getJsonObject(it).getDouble("timestamp") }
+    if (timestamps.isEmpty()) {
+      logger.warn { "$device_id ignored empty delete for $table" }
+      return Future.succeededFuture(true)
+    }
+
+    val parameters = Tuple.of(device_id)
+    timestamps.forEach { parameters.addDouble(it) }
+    // Numbered from two, because the device holds the first place.
+    val placeholders = timestamps.indices.joinToString(", ") { "\$${it + 2}" }
+
+    val removed: Promise<Boolean> = Promise.promise()
     sqlClient.getConnection { connectionResult ->
       if (connectionResult.succeeded()) {
         val connection = connectionResult.result()
-        val timestamps = mutableListOf<Double>()
-        for (i in 0 until data.size()) {
-          val entry = data.getJsonObject(i)
-          timestamps.add(entry.getDouble("timestamp"))
-        }
-
-        val deleteBatch =
-          "DELETE FROM \"$table\" WHERE \"device_id\" = '$device_id' AND \"timestamp\" in (${timestamps.stream().map(Any::toString).collect(
-            Collectors.joining(",")
-          )})"
-        connection.query(deleteBatch)
-          .execute()
+        connection
+          .preparedQuery(
+            "DELETE FROM $quoted WHERE \"device_id\" = \$1 " +
+              "AND \"timestamp\" IN ($placeholders)"
+          )
+          .execute(parameters)
           .onFailure { e ->
             logger.error(e) { "Failed to process delete batch." }
             connection.close()
+            removed.fail(e)
           }
-          .onSuccess { _ ->
-            logger.info { "$device_id deleted from $table: ${data.size()} records" }
+          .onSuccess { result ->
+            logger.info {
+              "$device_id deleted from $table: ${result.rowCount()} of " +
+                "${timestamps.size} rows named"
+            }
             connection.close()
+            removed.complete(true)
           }
       } else {
         logger.error(connectionResult.cause()) { "Failed to establish connection." }
+        removed.fail(connectionResult.cause())
       }
     }
+    return removed.future()
   }
 
   /**

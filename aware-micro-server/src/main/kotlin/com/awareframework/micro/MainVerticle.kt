@@ -458,27 +458,60 @@ class MainVerticle : AbstractVerticle() {
 	                    }
 	                }
 	              }
+              // Both answered once the database has said what became of the batch,
+              // for the same reason an insert is: the client reads the status as
+              // whether the server acted, and a 200 sent before anything happened
+              // is what lets a rewrite or a removal be reported as done and never
+              // occur.
               "update" -> {
-                eventBus.publish(
+                eventBus.request<JsonObject>(
                   "updateData",
                   JsonObject()
                     .put("table", route.request().getParam("table"))
                     .put("device_id", route.request().getFormAttribute("device_id"))
-                    .put("data", route.request().getFormAttribute("data"))
+                    .put("data", route.request().getFormAttribute("data")),
+                  DeliveryOptions().setSendTimeout(INSERT_REPLY_TIMEOUT_MS)
                 )
-                route.response().statusCode = 200
-                route.response().end()
+                  .onSuccess { reply ->
+                    if (reply.body().getBoolean("applied", false)) {
+                      route.response().statusCode = 200
+                      route.response().end()
+                    } else {
+                      route.response().statusCode = 403
+                      route.response().end("this table holds no row to rewrite")
+                    }
+                  }
+                  .onFailure { e ->
+                    logger.error(e) {
+                      "could not update ${route.request().getParam("table")}"
+                    }
+                    route.response().statusCode = 503
+                    route.response().end("the study database could not take this update")
+                  }
               }
               "delete" -> {
-                eventBus.publish(
+                eventBus.request<JsonObject>(
                   "deleteData",
                   JsonObject()
                     .put("table", route.request().getParam("table"))
                     .put("device_id", route.request().getFormAttribute("device_id"))
-                    .put("data", route.request().getFormAttribute("data"))
+                    .put("data", route.request().getFormAttribute("data")),
+                  DeliveryOptions().setSendTimeout(INSERT_REPLY_TIMEOUT_MS)
                 )
-                route.response().statusCode = 200
-                route.response().end()
+                  .onSuccess { _ ->
+                    route.response().statusCode = 200
+                    route.response().end()
+                  }
+                  .onFailure { e ->
+                    // A participant asking for their data to be taken out is told
+                    // it happened by the client, and the client by this. Refused
+                    // out loud, so the next attempt is made rather than assumed.
+                    logger.error(e) {
+                      "could not delete from ${route.request().getParam("table")}"
+                    }
+                    route.response().statusCode = 503
+                    route.response().end("the study database could not take this removal")
+                  }
               }
               "query" -> {
                 val requestData = JsonObject()
