@@ -408,10 +408,39 @@ export interface MessageHistory {
   }[];
 }
 
+/** One prompt the study put in front of a participant, and what came back. */
+export interface DevicePrompt {
+  shown_at: number;
+  status: number;
+  title: string | null;
+  instructions: string | null;
+  trigger_name: string | null;
+  answer: string | null;
+  answered_at: number | null;
+  answered: boolean;
+}
+
+/**
+ * What one participant was asked, from both sides.
+ *
+ * `prompts` are the ESMs their phone recorded — sent from here or raised by a
+ * schedule — and only these carry an answer. `sent` is everything the dashboard
+ * asked of the phone, including the kinds nothing comes back from: a notice is a
+ * notification the client renders and writes nothing about, and sync and update
+ * are instructions it acts on silently.
+ */
+export interface DeviceMessages {
+  prompts: DevicePrompt[];
+  sent: (SentMessage & { body: string | null })[];
+}
+
+export const fetchDeviceMessages = (deviceId: string): Promise<DeviceMessages> =>
+  get(`/messages/for-device/${encodeURIComponent(deviceId)}`);
+
 export interface SendMessageRequest {
   device_id?: string;
   device_ids?: string[];
-  kind: "sync" | "update" | "question" | "notice";
+  kind: "sync" | "update" | "question" | "esm" | "notice";
   title?: string;
   instructions?: string;
   answers?: string[];

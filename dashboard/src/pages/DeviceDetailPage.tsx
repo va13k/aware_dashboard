@@ -18,6 +18,7 @@ import {
 import SensorTile from "../components/SensorTile";
 import DeviceCoveragePanel from "../components/DeviceCoveragePanel";
 import SensorModal from "../components/SensorModal";
+import DeviceMessagesModal from "../components/DeviceMessagesModal";
 import LogsModal from "../components/LogsModal";
 import ExportDialog from "../components/ExportDialog";
 import StudyStatusPanel from "../components/StudyStatusPanel";
@@ -262,6 +263,7 @@ export default function DeviceDetailPage() {
   // The device's client-logs section is collapsed until opened, so it only
   // fetches when a researcher asks for it.
   const [showLogs, setShowLogs] = useState(false);
+  const [showPrompts, setShowPrompts] = useState(false);
   // Which phone asked to export. Its dialog needs no platform question — a
   // device belongs to one — but the count must be narrowed to it.
   const [exportingDevice, setExportingDevice] = useState<Device | null>(null);
@@ -618,6 +620,35 @@ export default function DeviceDetailPage() {
           {selected && selected.platform === "android" ? (
             <button
               type="button"
+              onClick={() => setShowPrompts(true)}
+              className="flex w-full cursor-pointer items-center justify-between gap-4 rounded-2xl border border-wire bg-card p-5 text-left shadow-card transition-colors hover:border-teal hover:bg-teal-soft/40"
+            >
+              <div>
+                <h2 className="text-[16px] font-bold text-ink">
+                  Prompts and answers
+                </h2>
+                <p className="mt-0.5 text-[12px] text-sage">
+                  Every question this participant was asked and what they
+                  answered — from the dashboard and from the study's schedules.
+                </p>
+              </div>
+              <span className="shrink-0 text-sage" aria-hidden>
+                <svg width="18" height="18" viewBox="0 0 16 16" fill="none">
+                  <path
+                    d="M6 4l4 4-4 4"
+                    stroke="currentColor"
+                    strokeWidth="1.5"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+              </span>
+            </button>
+          ) : null}
+
+          {selected && selected.platform === "android" ? (
+            <button
+              type="button"
               onClick={() => setShowLogs(true)}
               className="flex w-full cursor-pointer items-center justify-between gap-4 rounded-2xl border border-wire bg-card p-5 text-left shadow-card transition-colors hover:border-teal hover:bg-teal-soft/40"
             >
@@ -678,6 +709,14 @@ export default function DeviceDetailPage() {
             );
           })()
         : null}
+
+      {showPrompts && selected ? (
+        <DeviceMessagesModal
+          deviceId={selected.device_id}
+          title={deviceLabel(selected)}
+          onClose={() => setShowPrompts(false)}
+        />
+      ) : null}
 
       {showLogs && selected ? (
         <LogsModal

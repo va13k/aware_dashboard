@@ -11,18 +11,23 @@ import type { SendMessageRequest } from "../api/client";
  * checkbox. A checkbox is read past; this is not.
  */
 
-type Kind = "sync" | "update" | "question" | "notice";
+type Kind = "sync" | "update" | "question" | "esm" | "notice";
 
 const KINDS: { value: Kind; label: string; hint: string }[] = [
   {
     value: "question",
     label: "Ask a question",
-    hint: "Appears on the phone now. The answer lands in the study data alongside the scheduled questionnaires.",
+    hint: "Waits on the phone until it is answered. Use it for anything outside the protocol — a check on a quiet phone, a one-off ask.",
+  },
+  {
+    value: "esm",
+    label: "Ask about this moment (ESM)",
+    hint: "Expires if it is not answered in time, because an answer given hours late describes a different moment. Use it for what the study is measuring.",
   },
   {
     value: "notice",
     label: "Tell them something",
-    hint: "A message with one button to dismiss it. Nothing is being asked.",
+    hint: "A notification and nothing else — no answer is asked for and none is recorded.",
   },
   {
     value: "sync",
@@ -49,6 +54,7 @@ export default function ComposeMessageDialog({
   const [title, setTitle] = useState("");
   const [instructions, setInstructions] = useState("");
   const [answers, setAnswers] = useState("Yes, No");
+  const [expires, setExpires] = useState(1800);
   const [asking, setAsking] = useState(false);
   const [busy, setBusy] = useState(false);
   const first = useRef<HTMLSelectElement>(null);
@@ -64,7 +70,9 @@ export default function ComposeMessageDialog({
 
   // Only a composed message has words to keep. A sync or an update carries none, so
   // the question would have nothing to be about and is not asked.
-  const composed = kind === "question" || kind === "notice";
+  const composed = kind === "question" || kind === "esm" || kind === "notice";
+  // Only a question has answers to offer, and only a timed one expires.
+  const wantsAnswer = kind === "question" || kind === "esm";
   const ready = !composed || title.trim().length > 0;
 
   async function submit(retain: boolean) {
@@ -73,6 +81,7 @@ export default function ComposeMessageDialog({
       await onSend({
         kind,
         retain,
+        expires,
         ...(composed
           ? {
               title,
@@ -200,17 +209,50 @@ export default function ComposeMessageDialog({
                   placeholder="One touch answer"
                   className={`mt-1 ${field}`}
                 />
-                <label className="mt-3 block text-sm font-medium text-ink">
-                  Answers, comma separated
-                </label>
-                <input
-                  value={answers}
-                  onChange={(event) => setAnswers(event.target.value)}
-                  className={`mt-1 ${field}`}
-                />
-                <p className="mt-1 text-[12px] text-sage">
-                  Leave empty for a free-text answer.
-                </p>
+                {wantsAnswer ? (
+                  <>
+                    <label className="mt-3 block text-sm font-medium text-ink">
+                      Answers, comma separated
+                    </label>
+                    <input
+                      value={answers}
+                      onChange={(event) => setAnswers(event.target.value)}
+                      className={`mt-1 ${field}`}
+                    />
+                    <p className="mt-1 text-[12px] text-sage">
+                      Leave empty for a free-text answer.
+                    </p>
+                  </>
+                ) : (
+                  <p className="mt-3 text-[12px] leading-snug text-sage">
+                    Nothing is asked of the participant: this arrives as a
+                    notification with the words above and no way to reply, so
+                    there is no answer to record.
+                  </p>
+                )}
+
+                {kind === "esm" ? (
+                  <>
+                    <label className="mt-3 block text-sm font-medium text-ink">
+                      Expires after
+                    </label>
+                    <select
+                      value={expires}
+                      onChange={(event) => setExpires(Number(event.target.value))}
+                      className={`mt-1 ${field}`}
+                    >
+                      <option value={900}>15 minutes</option>
+                      <option value={1800}>30 minutes</option>
+                      <option value={3600}>1 hour</option>
+                      <option value={10800}>3 hours</option>
+                    </select>
+                    <p className="mt-1 text-[12px] leading-snug text-sage">
+                      Unanswered after this, it is recorded as expired rather
+                      than left waiting — a reading not taken, which is what a
+                      momentary question needs to say.
+                    </p>
+                  </>
+                ) : null}
               </>
             ) : null}
 

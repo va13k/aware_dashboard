@@ -114,6 +114,13 @@ export default function MessagesPage() {
 
   const chosen = reachable.filter((device) => picked.has(device.device_id));
 
+  // Who a row belongs to. The three columns list every device at once, so the
+  // same question answered by two participants reads as one asked twice without
+  // it. The id rather than the name the device list shows: that one falls back to
+  // the make and model, and two participants issued the same handset are then one
+  // name -- which is the case this label exists to tell apart.
+  const who = (deviceId: string): string => deviceId.slice(0, 12);
+
   return (
     <div className="p-6">
       <h1 className="text-2xl font-semibold text-ink mb-1">Messages</h1>
@@ -218,7 +225,9 @@ export default function MessagesPage() {
             rows={(history?.sent ?? []).map((m) => ({
               key: `s${m._id}`,
               head: m.kind === "sync" ? "Upload request" : m.title || "(not kept)",
-              sub: when(m.sent_at) + (m.retained ? "" : " · words not kept"),
+              sub:
+                `${who(m.device_id)} · ${when(m.sent_at)}` +
+                (m.retained ? "" : " · words not kept"),
             }))}
           />
           <Column
@@ -227,7 +236,7 @@ export default function MessagesPage() {
             rows={(history?.delivered ?? []).map((m, i) => ({
               key: `d${i}`,
               head: m.topic.split("/").pop() ?? m.topic,
-              sub: when(m.timestamp),
+              sub: `${who(m.device_id)} · ${when(m.timestamp)}`,
             }))}
           />
           <Column
@@ -236,7 +245,7 @@ export default function MessagesPage() {
             rows={(history?.answered ?? []).map((m, i) => ({
               key: `a${i}`,
               head: m.esm_user_answer || "(no answer)",
-              sub: `${m.esm_title} · ${when(m.answered_at)}`,
+              sub: `${who(m.device_id)} · ${m.esm_title} · ${when(m.answered_at)}`,
             }))}
           />
         </aside>
