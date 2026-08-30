@@ -18,6 +18,7 @@ import io.vertx.mysqlclient.MySQLPool
 import io.vertx.mysqlclient.SslMode
 import io.vertx.sqlclient.PoolOptions
 import io.vertx.sqlclient.SqlClient
+import io.vertx.sqlclient.Tuple
 import java.util.concurrent.ConcurrentHashMap
 import java.util.stream.Collectors
 import java.util.stream.StreamSupport
@@ -143,39 +144,62 @@ class MySQLVerticle : AbstractVerticle() {
             table = postData.getString("table"),
             start = postData.getDouble("start"),
             end = postData.getDouble("end")
-          // https://access.redhat.com/documentation/ja-jp/red_hat_build_of_eclipse_vert.x/4.0/html/eclipse_vert.x_4.0_migration_guide/changes-in-handlers_changes-in-common-components
-          ).onComplete { response ->
-            receivedMessage.reply(response.result())
-          }
+          )
+            .onSuccess { rows -> receivedMessage.reply(rows) }
+            // Answered as a failure, so a query this server refused reaches the
+            // caller as a refusal rather than as an empty result it would read as
+            // "this device has no rows in that period".
+            .onFailure { e -> receivedMessage.fail(500, e.message ?: "query failed") }
         }
       }
     }
   }
 
-  //Fetch data from the database and return results as JsonArray
+  /**
+   * Rows one device reported into one table over one period.
+   *
+   * The device and the period are bound rather than written into the statement:
+   * they arrive as request parameters, so a quote in one of them would otherwise
+   * end the literal it sits in and leave the rest of the segment to be read as
+   * SQL --- and this route hands the rows it selects back to the caller, which
+   * makes anything it can be made to select readable.
+   *
+   * The table is the part that cannot be bound. It is held to the shape of an
+   * identifier and then asked of the schema, so a request naming something this
+   * database does not have is refused before a statement exists.
+   */
   fun getData(device_id: String, table: String, start: Double, end: Double): Future<JsonArray> {
+    val quoted = TableName.quoted(table)
+      ?: return Future.failedFuture(IllegalArgumentException("not a table name: $table"))
 
     val dataPromise: Promise<JsonArray> = Promise.promise()
 
-    sqlClient.getConnection { connectionResult ->
-      if (connectionResult.succeeded()) {
-        val connection = connectionResult.result()
-        // https://access.redhat.com/documentation/ja-jp/red_hat_build_of_eclipse_vert.x/4.0/html/eclipse_vert.x_4.0_migration_guide/changes-in-vertx-jdbc-client_changes-in-client-components#running_queries_on_managed_connections
-        connection
-          .query("SELECT * FROM $table WHERE device_id = '$device_id' AND timestamp between $start AND $end ORDER BY timestamp ASC")
-          .execute()
-          .onFailure { e ->
-            logger.error(e) { "Failed to retrieve data." }
-            connection.close()
-            dataPromise.fail(e.message)
-          }
-          .onSuccess { rows ->
-            logger.info { "$device_id : retrieved ${rows.size()} records from $table" }
-            connection.close()
-            dataPromise.complete(JsonArray(StreamSupport.stream(rows.spliterator(), false)
-              .map { row -> row.toJson() }
-              .collect(Collectors.toList())))
-          }
+    columnsOf(table).onFailure { e -> dataPromise.fail(e) }.onSuccess {
+      sqlClient.getConnection { connectionResult ->
+        if (connectionResult.succeeded()) {
+          val connection = connectionResult.result()
+          connection
+            .preparedQuery(
+              "SELECT * FROM $quoted WHERE device_id = ? " +
+                "AND timestamp BETWEEN ? AND ? ORDER BY timestamp ASC"
+            )
+            .execute(Tuple.of(device_id, start, end))
+            .onFailure { e ->
+              logger.error(e) { "Failed to retrieve data." }
+              connection.close()
+              dataPromise.fail(e.message)
+            }
+            .onSuccess { rows ->
+              logger.info { "$device_id : retrieved ${rows.size()} records from $table" }
+              connection.close()
+              dataPromise.complete(JsonArray(StreamSupport.stream(rows.spliterator(), false)
+                .map { row -> row.toJson() }
+                .collect(Collectors.toList())))
+            }
+        } else {
+          logger.error(connectionResult.cause()) { "Failed to establish connection." }
+          dataPromise.fail(connectionResult.cause())
+        }
       }
     }
 
