@@ -372,8 +372,10 @@ def check_profiles(
     message otherwise, and only one of them is a credential to fix.
 
     An account that does not exist yet is not a failure before the first deploy,
-    which is what creates it. It is a failure on a database made by hand, where
-    nothing else will.
+    which is what creates it. Neither is one that exists holding a different
+    password: the deployment states every account's password on every run rather
+    than assuming it, so this is the same "not applied yet" as a missing schema.
+    Both are failures on a database made by hand, where nothing else will.
     """
     opened, absent, refused = [], [], []
     for profile in profiles:
@@ -398,13 +400,18 @@ def check_profiles(
         )
     if refused:
         parts.append(
-            f"{', '.join(refused)} exist and would not open it, so the password this "
-            "study holds is not the one the account has."
+            f"{', '.join(refused)} " + (
+                "hold a different password on the server; this study's is applied "
+                "when it deploys."
+                if create
+                else "exist and would not open it, so the password this study holds "
+                "is not the one the account has."
+            )
         )
 
-    if refused or (absent and not create):
+    if not create and (refused or absent):
         return check("accounts", False, " ".join(parts))
-    if absent:
+    if refused or absent:
         return check("accounts", False, " ".join(parts), warning=True)
     return check("accounts", True, " ".join(parts))
 
@@ -697,7 +704,7 @@ def main() -> int:
     # Whatever the request settled, so running this by hand after a failed deploy
     # asks as the same account the deployment did.
     admin_user = args.admin_user or str(env.get("DB_ADMIN_USER", "")).strip() or "root"
-    admin_password = args.admin_password or str(env.get("MYSQL_ROOT_PASSWORD", "")).strip()
+    admin_password = args.admin_password or database.admin_password(env)
     # A study whose database is made by hand is waiting on somebody; one setup
     # deploys is waiting on the deploy. The questions asked are the same either way.
     create = not (args.verify_only or str(env.get("DB_INIT", "")).strip().lower() == "manual")
