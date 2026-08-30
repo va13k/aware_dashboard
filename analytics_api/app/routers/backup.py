@@ -16,6 +16,7 @@ services/dump_stream.py).
 
 import asyncio
 import gzip
+import hashlib
 import io
 import os
 import re
@@ -29,7 +30,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from fastapi import APIRouter, File, Form, HTTPException, Query, UploadFile, status
-from fastapi.responses import StreamingResponse
+from fastapi.responses import FileResponse, StreamingResponse
 from sqlalchemy import text
 
 from app.database import AndroidSessionLocal, IosSessionLocal
@@ -202,13 +203,50 @@ def _watch_dump(stderr, job: jobs.Job) -> None:
             jobs.advance(job, phase=f"Exporting {match.group(1)}")
 
 
-def _dump_command(start: float | None, end: float | None) -> list[str]:
+async def _tables_without_timestamp() -> list[str]:
+    """`schema.table` for every table a period cannot be applied to.
+
+    A period export bounds the dump with one `--where` over `timestamp`, which
+    every table holding a phone's rows carries. The dashboard's own are another
+    matter: `device_contacts` records when a device was last heard from rather
+    than a moment it reported, and calls that column `last_contact`. mysqldump
+    does not skip a table the clause cannot be applied to — it stops on it, and
+    the export fails whole.
+
+    Asked of the server rather than listed here, so a table added to db/*.sql
+    without a `timestamp` is handled by the next export rather than by the next
+    person to read the failure.
+    """
+    placeholders = ", ".join(f"'{name}'" for name in DATABASES)
+    async with AndroidSessionLocal() as db:
+        try:
+            rows = (
+                await db.execute(
+                    text(
+                        "SELECT t.TABLE_SCHEMA, t.TABLE_NAME FROM information_schema.TABLES t "
+                        f"WHERE t.TABLE_SCHEMA IN ({placeholders}) AND t.TABLE_TYPE = 'BASE TABLE' "
+                        "AND NOT EXISTS (SELECT 1 FROM information_schema.COLUMNS c "
+                        "WHERE c.TABLE_SCHEMA = t.TABLE_SCHEMA AND c.TABLE_NAME = t.TABLE_NAME "
+                        "AND c.COLUMN_NAME = 'timestamp')"
+                    )
+                )
+            ).all()
+        except Exception:
+            await db.rollback()
+            return []
+    return [f"{schema}.{table}" for schema, table in rows]
+
+
+def _dump_command(
+    start: float | None, end: float | None, unfilterable: list[str] | None = None
+) -> list[str]:
     """The mysqldump invocation for a whole-database or a period export.
 
-    Every AWARE data table carries `timestamp`, so one ``--where`` bounds them
-    all. The dashboard's caches are the exception — they summarise rows rather
-    than being ones, and have no timestamp to filter on — so no export carries
-    them and the import rebuilds them from whatever arrives.
+    Every table holding a phone's rows carries `timestamp`, so one ``--where``
+    bounds them all. The dashboard's own are the exception — they summarise rows
+    rather than being ones — so the caches are left out of every export and the
+    import rebuilds them from whatever arrives, and any other table the clause
+    cannot be applied to is left out of a period export as well.
 
     Leaving them out of a whole-database export too is what keeps the two import
     modes honest. A cache describes the ``_id`` values of the deployment that
@@ -228,13 +266,18 @@ def _dump_command(start: float | None, end: float | None) -> list[str]:
         ),
     ]
     if start is not None and end is not None:
+        command += [f"--ignore-table={name}" for name in sorted(unfilterable or [])]
         command.append(f"--where=timestamp >= {start:.0f} AND timestamp <= {end:.0f}")
     return [*command, "--databases", *DATABASES]
 
 
 def _export_chunks(job: jobs.Job):
     """gzip-compressed dump bytes, produced as mysqldump writes them."""
-    command = _dump_command(job.result.get("from_ts"), job.result.get("to_ts"))
+    command = _dump_command(
+        job.result.get("from_ts"),
+        job.result.get("to_ts"),
+        job.result.get("unfilterable"),
+    )
     dump = subprocess.Popen(
         command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=_mysql_env()
     )
@@ -242,6 +285,11 @@ def _export_chunks(job: jobs.Job):
     watcher.start()
 
     compressor = zlib.compressobj(6, zlib.DEFLATED, 16 + zlib.MAX_WBITS)
+    # Taken over the bytes that leave, which is the file the researcher ends up
+    # holding rather than the SQL behind it. A dump this size arrives over a long
+    # connection through a proxy and a browser, and the only way to know it arrived
+    # whole is to compare a digest computed here with one computed there.
+    digest = hashlib.sha256()
     try:
         while True:
             chunk = dump.stdout.read(CHUNK)
@@ -250,11 +298,13 @@ def _export_chunks(job: jobs.Job):
             packed = compressor.compress(chunk)
             jobs.advance(job, add=len(chunk), out=len(packed))
             if packed:
+                digest.update(packed)
                 yield packed
 
         tail = compressor.flush()
         jobs.advance(job, out=len(tail))
         if tail:
+            digest.update(tail)
             yield tail
 
         dump.stdout.close()
@@ -265,7 +315,7 @@ def _export_chunks(job: jobs.Job):
             # The job record is what the page is watching, and it carries this.
             jobs.fail(job, message or "Database export failed")
             return
-        jobs.finish(job, {"bytes": job.bytes_out})
+        jobs.finish(job, {"bytes": job.bytes_out, "sha256": digest.hexdigest()})
     except Exception as error:  # noqa: BLE001 - surfaced through the job record
         jobs.fail(job, str(error))
         raise
@@ -326,6 +376,9 @@ async def start_export(
         filename=filename,
         from_ts=from_ts if ranged else None,
         to_ts=to_ts if ranged else None,
+        # Settled here, where the database can be asked, rather than in the thread
+        # that streams the dump.
+        unfilterable=await _tables_without_timestamp() if ranged else None,
     )
     return {"id": job.id, "filename": filename}
 
@@ -369,6 +422,23 @@ async def list_backup_files():
         )
     files.sort(key=lambda item: item["modified"], reverse=True)
     return {"directory": str(BACKUP_DIR), "files": files}
+
+
+@router.get("/files/{name}/download")
+async def download_backup_file(name: str):
+    """Hand over one of the archives the scheduled dump has already written.
+
+    They are the only copies a study has that nobody had to ask for, and until now
+    the page could restore one but not take it off the server --- which is the
+    thing a researcher wants when the server is what they are moving away from.
+    """
+    path = _resolve_backup_file(name)
+    return FileResponse(
+        path,
+        media_type="application/gzip",
+        filename=path.name,
+        headers={"Cache-Control": "no-store"},
+    )
 
 
 def _resolve_backup_file(name: str) -> Path:

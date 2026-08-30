@@ -14,6 +14,7 @@ to be opt-in: `pytest -m integration`.
 import gzip
 import os
 import subprocess
+from unittest import mock
 
 import pytest
 import pytest_asyncio
@@ -110,25 +111,53 @@ async def test_an_empty_table_yields_no_watermark_so_everything_is_admitted(
     assert ("aware_android", "accelerometer") not in marks
 
 
+def unfilterable(server):
+    """The tables a period cannot be applied to, asked of the throwaway server.
+
+    The same question the router asks before a period export, put to this server
+    rather than restated: a table that grows a `timestamp`, or one added without
+    one, changes both answers together.
+    """
+    query = (
+        "SELECT CONCAT(t.TABLE_SCHEMA, '.', t.TABLE_NAME) FROM information_schema.TABLES t "
+        "WHERE t.TABLE_SCHEMA IN ('aware_android','aware_ios') AND t.TABLE_TYPE = 'BASE TABLE' "
+        "AND NOT EXISTS (SELECT 1 FROM information_schema.COLUMNS c "
+        "WHERE c.TABLE_SCHEMA = t.TABLE_SCHEMA AND c.TABLE_NAME = t.TABLE_NAME "
+        "AND c.COLUMN_NAME = 'timestamp')"
+    )
+    listed = subprocess.run(
+        ["mysql", f"--socket={server.socket_path}", "-uroot", "-B", "-N", "-e", query],
+        capture_output=True,
+        timeout=60,
+        env={**os.environ, "MYSQL_PWD": server.password},
+    )
+    assert listed.returncode == 0, listed.stderr.decode()[-500:]
+    return [line for line in listed.stdout.decode().split() if line]
+
+
 def dump(server, tmp_path, ranged=False):
-    """A real mysqldump of the throwaway server, gzipped as the page produces it."""
-    command = [
-        "mysqldump",
-        f"--socket={server.socket_path}",
-        "-uroot",
-        "--single-transaction",
-        # The list production excludes, so a cache added there is left out here
-        # too and this dump keeps the shape the page actually produces.
-        *(
-            f"--ignore-table={db}.{table}"
-            for db in ("aware_android", "aware_ios")
-            for table in sorted(dump_stream.CACHE_TABLES)
-        ),
-    ]
+    """A real mysqldump of the throwaway server, gzipped as the page produces it.
+
+    Built by the router's own command builder rather than by a copy of it here,
+    with only the connection swapped for this server's socket. A hand-written
+    mirror is a mirror until production changes: this one still excluded the
+    caches alone after the router learned to leave out every table a period
+    cannot filter, and reported the failure the router no longer has.
+    """
+    with mock.patch.object(
+        backup_router,
+        "_mysql_base_command",
+        lambda binary: [binary, f"--socket={server.socket_path}", "-uroot"],
+    ):
+        command = backup_router._dump_command(
+            0 if ranged else None,
+            9999 if ranged else None,
+            unfilterable(server) if ranged else None,
+        )
+    # The router asks mysqldump to narrate what it is exporting so the page can
+    # name the table; here that commentary would be read as part of the dump.
+    command = [argument for argument in command if argument != "--verbose"]
     env = {**os.environ, "MYSQL_PWD": server.password}
-    if ranged:
-        command.append("--where=timestamp >= 0 AND timestamp <= 9999")
-    command += ["--databases", "aware_android", "aware_ios"]
     produced = subprocess.run(command, capture_output=True, timeout=300, env=env)
     assert produced.returncode == 0, produced.stderr.decode()[-500:]
     path = tmp_path / "backup.sql.gz"

@@ -57,6 +57,31 @@ def test_a_missing_backup_directory_lists_nothing(client, tmp_path):
     assert http.get("/backup/files").json()["files"] == []
 
 
+def test_an_archive_on_the_server_can_be_taken_off_it(client):
+    """The scheduled dump's own copies, handed over rather than only restorable.
+
+    They are the only backups a study has that nobody had to ask for, and a
+    researcher leaving this server needs them off it.
+    """
+    http, _, directory = client
+    (directory / "aware-db-20260101-000000.sql.gz").write_bytes(b"archived")
+
+    response = http.get("/backup/files/aware-db-20260101-000000.sql.gz/download")
+
+    assert response.status_code == 200
+    assert response.content == b"archived"
+    assert response.headers["content-type"] == "application/gzip"
+    assert "aware-db-20260101-000000.sql.gz" in response.headers["content-disposition"]
+
+
+def test_downloading_a_name_outside_the_backup_directory_is_refused(client):
+    """The same guard the import path has: a name picks a file in BACKUP_DIR and
+    cannot be made to leave it."""
+    http, _, _ = client
+    assert http.get("/backup/files/..%2F..%2Fetc%2Fpasswd/download").status_code == 404
+    assert http.get("/backup/files/absent.sql.gz/download").status_code == 404
+
+
 def test_an_unknown_import_mode_is_refused(client):
     http, _, _ = client
     response = http.post("/backup/import", data={"mode": "sideways"})
