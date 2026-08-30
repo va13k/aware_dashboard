@@ -119,6 +119,14 @@ def ensure_bundled_admin(
     Done as root, once, and only for the bundled database --- a server somebody else
     runs hands out its administrator ready-made, and this deployment has no account
     there to create one with. Returns whether anything was created.
+
+    Bootstrapping is all root is here for. MySQL bakes its password into the data
+    directory the first time the server starts and ignores the variable ever after,
+    so a deployment redeployed onto a volume that outlived it holds a password the
+    server has never had. Where the administrator that root would have created is
+    already on the server and already opens it, there is nothing left to bootstrap
+    and whose password `.env` holds for root decides nothing --- so that is read as
+    the account being ready rather than as a deployment to stop.
     """
     if admin_user == database.DEFAULT_ADMIN_USER:
         return False
@@ -145,11 +153,15 @@ def ensure_bundled_admin(
         ),
     )
     if result.returncode != 0:
+        if client.run(admin_user, admin_password, "SELECT 1;", batch=True).returncode == 0:
+            return False
         raise RuntimeError(
             f"The bundled database would not create {admin_user!r}: "
             + (mysql_client.error_of(result) or "the statement failed")
             + " Its own root password is what creates this account, and .env holds "
-            "one the server does not have if the volume outlived it."
+            "one the server does not have if the volume outlived it. "
+            f"Give {database.ADMIN_PASSWORD_ENV} the password {admin_user!r} already "
+            "has on that server and this deployment needs no root at all."
         )
     return True
 
