@@ -245,3 +245,79 @@ class TestTheResultShape:
         entry = verify_ingest.check("endpoint", False, "refused")
         assert set(entry) == {"name", "ok", "skipped", "detail"}
         assert entry["detail"]
+
+
+class TestWhichDatabaseTheProbeIsCheckedIn:
+    """Mysql.for_study: the database the study declares, whichever placement runs it.
+
+    The probe posts a row through the ingest path and then looks for it. Looking in
+    the wrong database is worse than not looking: a study that moved to a server it
+    names would be told the row never arrived, on a run where it arrived exactly
+    where it was sent --- and the container the check used to address is one an
+    external deployment does not have at all.
+    """
+
+    ANDROID = {"port": 3307, "name": "aware_android"}
+
+    def _issued(self, monkeypatch, source, env):
+        seen = {}
+
+        def record(command, **kwargs):
+            seen["command"] = command
+            return SimpleNamespace(returncode=0, stdout="", stderr="")
+
+        monkeypatch.setattr(verify_ingest.mysql_client.subprocess, "run", record)
+        sql = verify_ingest.Mysql.for_study(["docker"], env, source, "aware_android")
+        sql.execute("SELECT 1;")
+        return seen["command"], sql
+
+    def test_a_named_server_is_asked_and_not_the_bundled_container(self, monkeypatch):
+        command, _ = self._issued(
+            monkeypatch,
+            {"database": {"host": "db.example.edu", "android": self.ANDROID}},
+            {"MYSQL_ROOT_PASSWORD": "pw", "DB_ADMIN_USER": "dbadmin"},
+        )
+        assert "-hdb.example.edu" in command and "-P3307" in command
+        assert "aware_mysql" not in command
+
+    def test_the_bundled_database_is_still_reached_through_its_container(self, monkeypatch):
+        command, _ = self._issued(
+            monkeypatch,
+            {"database": {"host": "mysql", "android": {"port": 3306, "name": "aware_android"}}},
+            {"MYSQL_ROOT_PASSWORD": "pw"},
+        )
+        assert command[:3] == ["docker", "exec", "-i"]
+        assert "aware_mysql" in command
+
+    def test_the_administrator_is_the_one_that_server_calls_it(self, monkeypatch):
+        # root is MySQL's own name for it and nobody else's, and the probe cleans up
+        # after itself with this account.
+        _, sql = self._issued(
+            monkeypatch,
+            {"database": {"host": "mysql-1.aivencloud.com", "android": self.ANDROID}},
+            {"MYSQL_ROOT_PASSWORD": "pw"},
+        )
+        assert sql._user == "avnadmin"
+
+    def test_the_password_is_not_in_the_command(self, monkeypatch):
+        command, _ = self._issued(
+            monkeypatch,
+            {"database": {"host": "db.example.edu", "android": self.ANDROID}},
+            {"MYSQL_ROOT_PASSWORD": "a-password-nobody-should-see"},
+        )
+        assert "a-password-nobody-should-see" not in " ".join(command)
+
+    def test_the_direct_probe_opens_the_address_the_phone_was_given(self):
+        # The published config sends phones to the database the study names; the
+        # deployment's own public address is where they go only when this deployment
+        # runs the database. Probing the wrong one proves nothing about either.
+        named = {"host": "db.example.edu", "android": {"port": 3307}}
+        assert (
+            verify_ingest.resolve_database_host(named, "study.example.org", "android")
+            == "db.example.edu"
+        )
+        bundled = {"host": "mysql", "android": {"port": 3306}}
+        assert (
+            verify_ingest.resolve_database_host(bundled, "study.example.org", "android")
+            == "study.example.org"
+        )

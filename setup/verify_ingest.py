@@ -52,7 +52,7 @@ PROJECT = SCRIPT_DIR.parent
 if str(PROJECT) not in sys.path:
     sys.path.insert(0, str(PROJECT))
 
-from shared_config import database, dataflow
+from shared_config import database, dataflow, mysql_client
 from shared_config.runtime import (
     SHARED_MODE,
     atomic_write_text,
@@ -60,10 +60,10 @@ from shared_config.runtime import (
     load_env,
     strip_ipv6_brackets,
 )
+from shared_config.serializers import resolve_database_host
 from shared_config.source_store import read_source
 
 ENV_PATH = PROJECT / ".env"
-MYSQL_CONTAINER = "aware_mysql"
 
 #: Read by the setup wizard's status endpoint, so the browser shows the same result
 #: the terminal does. Written last, whole, so a reader sees a finished run or none.
@@ -121,43 +121,46 @@ def quote_sql_string(value: str) -> str:
 
 
 class Mysql:
-    """Statements run against the study database as root, through the container.
+    """Statements run against the study database as the account that administers it.
 
-    Root because the probe verifies and then removes what it wrote, and the accounts
-    on the ingest path are granted to write rather than to read back or to clean up.
-    Which account performs the *write* is the thing under test, and that is chosen by
-    the path the row travels, not here.
+    That account because the probe verifies and then removes what it wrote, and the
+    accounts on the ingest path are granted to write rather than to read back or to
+    clean up. Which account performs the *write* is the thing under test, and that is
+    chosen by the path the row travels, not here.
+
+    Addressed at the database the study declares rather than at a container this
+    deployment might not have. A study that names its own server has no `aware_mysql`
+    to ask, and asking one that is still running would read the database the study
+    moved off --- reporting a row missing that arrived exactly where it was sent.
     """
 
-    def __init__(self, docker_base: list[str], root_password: str, schema: str):
-        self._base = docker_base
-        self._root_password = root_password
+    def __init__(self, client: mysql_client.Client, admin_user: str, admin_password: str, schema: str):
+        self._client = client
+        self._user = admin_user
+        self._password = admin_password
         self._schema = schema
 
-    def _command(self, extra: list[str]) -> list[str]:
-        return self._base + [
-            "exec",
-            "-i",
-            MYSQL_CONTAINER,
-            "mysql",
-            "--protocol=TCP",
-            "-h127.0.0.1",
-            "-uroot",
-            f"-p{self._root_password}",
-            *extra,
-        ]
+    @classmethod
+    def for_study(cls, docker_base: list[str], env: dict, source: dict, schema: str):
+        databases = source.get("database") or {}
+        client = mysql_client.Client.for_study(docker_base, source)
+        if database.tls_required(databases):
+            client = client.asking_for("REQUIRED", database.tls_authority(databases))
+        return cls(
+            client,
+            database.admin_user(
+                database.declared_host(databases), str(env.get("DB_ADMIN_USER", "")).strip()
+            ),
+            database.admin_password(env),
+            schema,
+        )
 
     def execute(self, sql: str) -> subprocess.CompletedProcess:
-        return run_command(self._command([self._schema]), input_text=sql)
+        return self._client.run(self._user, self._password, sql, self._schema)
 
     def scalar(self, sql: str) -> str:
         """One value from a single-row query, or "" when the query returns nothing."""
-        result = run_command(
-            self._command(["-B", "-N", self._schema]), input_text=sql
-        )
-        if result.returncode != 0:
-            raise RuntimeError(result.stderr.strip() or "query failed")
-        return result.stdout.strip()
+        return self._client.scalar(self._user, self._password, sql, self._schema)
 
 
 def _mysql_as(
@@ -170,11 +173,14 @@ def _mysql_as(
     ssl_mode: str | None,
     sql: str,
 ) -> subprocess.CompletedProcess:
-    extra = ["--protocol=TCP", f"-h{host}", f"-P{port}", f"-u{username}", f"-p{password}"]
-    if ssl_mode:
-        extra.append(f"--ssl-mode={ssl_mode}")
-    command = docker_base + ["exec", "-i", MYSQL_CONTAINER, "mysql", *extra, schema]
-    return run_command(command, input_text=sql)
+    """The database opened at the address a phone opens, as the account a phone holds.
+
+    A separate client from the one above, and deliberately: this is the direct path's
+    question, and the answer only means anything if it is asked over the address and
+    the credential that were published rather than over the deployment's own.
+    """
+    client = mysql_client.Client(docker_base, host, port, ssl_mode=ssl_mode or "")
+    return client.run(username, password, sql, schema)
 
 
 def check(name: str, ok: bool, detail: str, skipped: bool = False) -> dict:
@@ -613,7 +619,7 @@ def main() -> int:
 
     root_password = str(env.get("MYSQL_ROOT_PASSWORD", "")).strip()
     schema = database.platform_schema(databases, "android")
-    sql = Mysql(docker_base, root_password, schema)
+    sql = Mysql.for_study(docker_base, env, source, schema)
 
     result = {
         "dataflow": android,
@@ -642,7 +648,11 @@ def main() -> int:
         result["checks"] = verify_direct(
             docker_base,
             sql,
-            host,
+            # The address the published config hands the phone, resolved by the same
+            # function that wrote it there. A study that names its own database sends
+            # phones to that server; only one running a database of its own sends them
+            # to this deployment, and asking the wrong one proves nothing about either.
+            resolve_database_host(databases, host, "android"),
             database.platform_port(databases, "android"),
             schema,
             username,
