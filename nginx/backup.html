@@ -119,6 +119,11 @@
                     <strong>Already on the server</strong>
                     <span id="serverHint">Looking for backups…</span>
                     <select id="serverFile" disabled></select>
+                    <!-- The archive the picker is on, taken off the server. The
+                         page could restore one but never hand it over, which is
+                         what a researcher wants when the server itself is what
+                         they are leaving. -->
+                    <a id="serverFileDownload" class="hidden" download>Download this backup</a>
                   </div>
                 </label>
                 <label class="choice">
@@ -154,6 +159,11 @@
         </div>
 
         <div id="status" class="status"></div>
+
+        <!-- The digest of the file that was just downloaded. Shown after an
+             export rather than always: it describes one file, and there is
+             nothing to check against until one exists. -->
+        <div id="exportDigest" class="status hidden"></div>
       </section>
     </main>
 

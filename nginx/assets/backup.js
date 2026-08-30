@@ -113,6 +113,29 @@ function renderJob(job) {
   showProgress(job.phase, job.percent, metrics);
 }
 
+/**
+ * The digest of the file that was just downloaded, and how to check it.
+ *
+ * Taken over the bytes the server sent, so comparing it with the same sum of the
+ * saved file answers the one question a long download leaves open: whether what
+ * arrived is what was produced. An export of this size travels through a proxy and
+ * a browser, and a truncated archive reads as a valid gzip until it is restored.
+ */
+function showDigest(filename, sha256) {
+  const box = document.getElementById("exportDigest");
+  if (!box) return;
+  if (!sha256) {
+    box.className = "status hidden";
+    return;
+  }
+  box.className = "status show";
+  box.innerHTML =
+    "<div>SHA-256 of the file the server sent:</div>" +
+    `<div class="digest">${escapeHtml(sha256)}</div>` +
+    "<div>Check what you saved against it:</div>" +
+    `<div class="digest">shasum -a 256 ${escapeHtml(filename)}</div>`;
+}
+
 /** Follows a job to completion, keeping the bar current. */
 async function trackJob(id) {
   for (;;) {
@@ -182,13 +205,32 @@ async function loadServerFiles() {
       )
       .join("");
     serverFile.disabled = files.length === 0;
+    const stored = files.reduce((sum, file) => sum + file.size, 0);
     serverHint.textContent = files.length
-      ? `${files.length} backup${files.length === 1 ? "" : "s"} in ${directory}`
+      ? `${files.length} backup${files.length === 1 ? "" : "s"} in ${directory}, ` +
+        `${formatBytes(stored)} on disk`
       : `No .sql.gz files in ${directory} yet.`;
+    updateServerFileDownload();
   } catch (error) {
     serverFile.disabled = true;
     serverHint.textContent = `Could not list server backups: ${error}`;
+    updateServerFileDownload();
   }
+}
+
+/** Points the download link at whichever archive the picker is on. */
+function updateServerFileDownload() {
+  const link = document.getElementById("serverFileDownload");
+  if (!link) return;
+  const name = !serverFile.disabled && serverFile.value ? serverFile.value : "";
+  if (!name) {
+    link.className = "hidden";
+    link.removeAttribute("href");
+    return;
+  }
+  link.className = "";
+  link.href = `/api/backup/files/${encodeURIComponent(name)}/download`;
+  link.setAttribute("download", name);
 }
 
 /** What the databases hold, and which periods are worth offering. */
@@ -271,8 +313,11 @@ function renderExportState() {
   renderPeriods();
 
   if (coverage?.newest) {
+    // Named rather than left as "stored": this is what the two study databases
+    // hold, and it is not the size of the archives already written beside them.
+    // Read as one figure for both, an export looks like it has already happened.
     spanHint.textContent =
-      `${formatBytes(coverage.total_bytes)} stored, ` +
+      `${formatBytes(coverage.total_bytes)} of study data in the databases, ` +
       `${formatDay(coverage.oldest)} to ${formatDay(coverage.newest)}.`;
   } else if (coverage) {
     spanHint.textContent = "The databases hold no data yet.";
@@ -390,6 +435,7 @@ exportBtn.addEventListener("click", async () => {
       )}.`,
       "ok",
     );
+    showDigest(filename, job.result && job.result.sha256);
   } catch (error) {
     setStatus(String(error), "error");
   } finally {
@@ -483,3 +529,4 @@ importBtn.addEventListener("click", async () => {
 exportBtn.disabled = true;
 loadCoverage();
 loadServerFiles();
+serverFile.addEventListener("change", updateServerFileDownload);

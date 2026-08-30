@@ -443,3 +443,15 @@ select {
     width: 100%;
   }
 }
+
+.hidden {
+  display: none;
+}
+
+/* The export's digest, meant to be selected and compared rather than read. */
+.digest {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px;
+  word-break: break-all;
+  user-select: all;
+}
