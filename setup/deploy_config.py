@@ -166,6 +166,25 @@ def ensure_analytics_password(env: dict[str, str]) -> None:
     env[database.ANALYTICS_PASSWORD_ENV] = password
 
 
+def ensure_backup_password(env: dict[str, str]) -> None:
+    """Settle on the password the dashboard dumps and restores the study with.
+
+    The deployment's own account rather than the administrator's, so nothing asks a
+    researcher for it and it is generated here like every other secret. A restore
+    feeds an archive into a database client and everything the archive contains
+    runs; as the administrator that is the whole server, and an archive that arrived
+    through an upload form is not something this deployment wrote.
+
+    Applied to the account by setup/init_study_tables.py, which reads the same value
+    on every deploy --- which is what reaches a database whose data directory already
+    exists, where db/*.sql never runs again.
+    """
+    password = str(env.get(database.BACKUP_PASSWORD_ENV, "")).strip()
+    if password in PLACEHOLDER_SECRETS:
+        password = secrets.token_urlsafe(16)
+    env[database.BACKUP_PASSWORD_ENV] = password
+
+
 def requested_dataflow() -> str:
     """The dataflow the researcher chose in this wizard run, or "" for none.
 
@@ -1052,6 +1071,7 @@ def persist_env(env: dict[str, str]) -> None:
         "PARTICIPANT_DB_PASSWORD",
         "ANDROID_SERVER_DB_PASSWORD",
         "ANALYTICS_DB_PASSWORD",
+        database.BACKUP_PASSWORD_ENV,
         "PUBLIC_HOST",
         "PUBLIC_PORT",
         "PROTOCOL",
@@ -1352,6 +1372,7 @@ def main() -> None:
     ensure_server_password(env)
     ensure_bundled_root_password(env)
     ensure_analytics_password(env)
+    ensure_backup_password(env)
     ensure_broker_passwords(env)
     env = normalize_public_env(env)
 

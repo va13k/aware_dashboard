@@ -246,6 +246,10 @@ def ensure_accounts(
     Grants here are schema-level and nothing else: the rows an account reads back are
     granted table by table in the files that create those tables, which is what keeps
     a grant from running before its table exists.
+
+    Read from the profile rather than derived from whether the account writes. The
+    dump-and-restore account writes in a way the ingest accounts do not --- it drops
+    and recreates tables --- and one flag with two answers cannot say so.
     """
     require = " REQUIRE SSL" if require_ssl else " REQUIRE NONE"
     statements = []
@@ -254,7 +258,7 @@ def ensure_accounts(
         password = mysql_client.quote_sql_string(profile["password"])
         statements.append(f"CREATE USER IF NOT EXISTS {user} IDENTIFIED BY {password};")
         statements.append(f"ALTER USER {user} IDENTIFIED BY {password}{require};")
-        privilege = "INSERT" if profile["writes"] else "SELECT"
+        privilege = profile.get("privilege") or ("INSERT" if profile["writes"] else "SELECT")
         for schema in profile["schemas"]:
             statements.append(
                 f"GRANT {privilege} ON {mysql_client.quote_identifier(schema)}.* TO {user};"
@@ -303,7 +307,12 @@ def main() -> int:
     databases = source.get("database") or {}
     admin_user, admin_password = load_admin(databases)
     schemas = study_schemas(databases)
-    profiles = database.profiles(databases, database.analytics_password(load_env(ENV_PATH)))
+    env = load_env(ENV_PATH)
+    profiles = database.profiles(
+        databases,
+        database.analytics_password(env),
+        database.backup_password(env),
+    )
     client = mysql_client.Client.for_study(docker_base, source)
     print(f"database: {placement.declared(source)} — {client.describe()}")
 

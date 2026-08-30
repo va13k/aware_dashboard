@@ -129,8 +129,8 @@ services:
       # The same declaration, resolved for a service inside the deployment.
       MYSQL_HOST: ${DB_SERVICE_HOST:-mysql}
       MYSQL_PORT: 3306
-      MYSQL_USER: root
-      MYSQL_PASSWORD: ${MYSQL_ROOT_PASSWORD:-CHANGE_ME}
+      MYSQL_USER: aware_backup
+      MYSQL_PASSWORD: ${BACKUP_DB_PASSWORD:-}
       BACKUP_DATABASES: "aware_android aware_ios"
       BACKUP_DIR: /backups
       BACKUP_INTERVAL_SECONDS: ${MYSQL_BACKUP_INTERVAL_SECONDS:-86400}
@@ -293,7 +293,10 @@ services:
       # encrypted, so the default is on: a deployment that has not run setup since
       # this became a variable is running one.
       DB_REQUIRE_TLS: ${DB_REQUIRE_TLS:-1}
-      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-CHANGE_ME}
+      # The account the backup page dumps and restores with, which holds the two
+      # study schemas and nothing else. The administrator's password is not passed
+      # to this service: a restore runs every statement in the archive it is given.
+      BACKUP_DB_PASSWORD: ${BACKUP_DB_PASSWORD:-}
       RESEARCHER_USERNAME: ${RESEARCHER_USERNAME:-}
       RESEARCHER_PASSWORD: ${RESEARCHER_PASSWORD:-}
       # Signs the researcher's session cookie. Written once at deployment, so a

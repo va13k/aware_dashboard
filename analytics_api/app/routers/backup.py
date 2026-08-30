@@ -54,13 +54,20 @@ from app.services import (
     watermarks,
 )
 
+from shared_config import database
+
 router = APIRouter(prefix="/backup", tags=["backup"])
 
 DATABASES = ("aware_android", "aware_ios")
 MYSQL_HOST = os.environ.get("MYSQL_HOST", "mysql")
 MYSQL_PORT = os.environ.get("MYSQL_PORT", "3306")
-MYSQL_USER = os.environ.get("MYSQL_BACKUP_USER", "root")
-MYSQL_PASSWORD = os.environ.get("MYSQL_ROOT_PASSWORD", "")
+#: The account both directions run as. Its own rather than the administrator's: a
+#: restore feeds an archive into a database client and every statement in it runs,
+#: so the account decides how far a bad archive reaches. This one holds the two
+#: study schemas and nothing else --- no other database on the server, no account
+#: creation, none of the server's own tables.
+MYSQL_USER = os.environ.get("MYSQL_BACKUP_USER", "") or database.BACKUP_USER
+MYSQL_PASSWORD = os.environ.get(database.BACKUP_PASSWORD_ENV, "")
 
 #: Backups written by the scheduled dump, offered as import sources so a restore
 #: does not have to travel through the browser. Anything ending in .sql.gz here
@@ -87,7 +94,10 @@ def _mysql_env() -> dict[str, str]:
     if not MYSQL_PASSWORD:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="MYSQL_ROOT_PASSWORD is not configured for backup operations",
+            detail=(
+                f"{database.BACKUP_PASSWORD_ENV} is not configured, so the "
+                "dashboard has no account to dump or restore the study with"
+            ),
         )
     env = os.environ.copy()
     env["MYSQL_PWD"] = MYSQL_PASSWORD
@@ -259,6 +269,17 @@ def _dump_command(
         "--routines",
         "--triggers",
         "--verbose",
+        # What lets an account holding only the two study schemas take the dump.
+        # Tablespaces are read from a table the server guards with PROCESS, a global
+        # privilege that says nothing about the study's rows, and the client asks for
+        # them unless told not to. It asks and carries on: the export finishes, the
+        # exit status is zero, and the refusal is a line on stderr nobody reads.
+        #
+        # No companion for the GTID statement here. This image installs Debian's
+        # default-mysql-client, which is MariaDB's, and the option that suppresses it
+        # is Oracle's --- passing it stops mysqldump before it opens a connection.
+        # MariaDB's client emits no such statement to suppress.
+        "--no-tablespaces",
         *(
             f"--ignore-table={database}.{table}"
             for database in DATABASES

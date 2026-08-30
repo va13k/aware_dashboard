@@ -709,7 +709,9 @@ def main() -> int:
     # deploys is waiting on the deploy. The questions asked are the same either way.
     create = not (args.verify_only or str(env.get("DB_INIT", "")).strip().lower() == "manual")
 
-    profiles = database.profiles(databases, database.analytics_password(env))
+    profiles = database.profiles(
+        databases, database.analytics_password(env), database.backup_password(env)
+    )
 
     # Asked for on its own, before anything is opened: the file is what somebody
     # hands to an administrator, and needing it is the usual reason the check

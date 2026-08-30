@@ -82,6 +82,21 @@ ADMIN_PASSWORD_ENV = "DB_ADMIN_PASSWORD"
 ANALYTICS_PASSWORD_ENV = "ANALYTICS_DB_PASSWORD"
 ANALYTICS_SEED_PASSWORD = "analyticspass"
 
+#: The account the dashboard dumps and restores the study with.
+#:
+#: Its own rather than the administrator's, because a restore feeds a file into a
+#: client and everything in that file runs: as the administrator that is the whole
+#: server, and an archive that arrived by upload is not something the deployment
+#: wrote. Held to the two schemas the study lives in, so the worst a bad archive
+#: can do is the thing a restore does anyway.
+BACKUP_USER = "aware_backup"
+BACKUP_PASSWORD_ENV = "BACKUP_DB_PASSWORD"
+
+#: Everything inside a schema: a restore drops and recreates the tables, and the
+#: dump carries routines and triggers. Nothing global --- no account creation, no
+#: reading the server's own tables, no reaching the schemas beside these two.
+BACKUP_PRIVILEGE = "ALL PRIVILEGES"
+
 #: Which account each Android dataflow puts on the ingest path: the study-model keys
 #: holding its name and password, and the ``.env`` variable the deployment keeps that
 #: password in.
@@ -165,7 +180,19 @@ def analytics_password(env: dict) -> str:
     return str((env or {}).get(ANALYTICS_PASSWORD_ENV) or ANALYTICS_SEED_PASSWORD).strip()
 
 
-def profiles(database: dict, analytics_secret: str = "") -> list[dict]:
+def backup_password(env: dict) -> str:
+    """The password the dump-and-restore account holds.
+
+    No seed to fall back on: the bootstrap SQL creates no such account, and a blank
+    is what the backup page reports as unconfigured rather than quietly opening the
+    database as somebody else.
+    """
+    return str((env or {}).get(BACKUP_PASSWORD_ENV) or "").strip()
+
+
+def profiles(
+    database: dict, analytics_secret: str = "", backup_secret: str = ""
+) -> list[dict]:
     """Every account this deployment opens the study's database with.
 
     One list because the deployment has one answer: the same accounts are created at
@@ -175,10 +202,11 @@ def profiles(database: dict, analytics_secret: str = "") -> list[dict]:
     collects and a dashboard that shows nothing.
 
     ``schemas`` are the schemas the account works in --- one for an account that
-    carries a platform's rows, both for the one that reads them --- and ``writes``
-    says which of those two it does. They are different failures: an ingest account
-    that cannot connect is data that never arrives, and the analytics one is a
-    dashboard with nothing to draw.
+    carries a platform's rows, both for the ones that work across them --- and
+    ``privilege`` is what it holds there. They are different failures: an ingest
+    account that cannot connect is data that never arrives, the analytics one is a
+    dashboard with nothing to draw, and the backup one is an export that cannot be
+    taken and an archive that cannot be put back.
 
     Both Android accounts are listed whichever dataflow the study runs, so a study
     switching paths finds its new account already holding the password its generated
@@ -196,6 +224,7 @@ def profiles(database: dict, analytics_secret: str = "") -> list[dict]:
                     "schemas": [platform_schema(database, "android")],
                     "dataflow": choice,
                     "writes": True,
+                    "privilege": "INSERT",
                 }
             )
     username, password = ios_credentials(database)
@@ -208,6 +237,7 @@ def profiles(database: dict, analytics_secret: str = "") -> list[dict]:
                 "schemas": [platform_schema(database, "ios")],
                 "dataflow": dataflow.WEBSERVICE,
                 "writes": True,
+                "privilege": "INSERT",
             }
         )
     entries.append(
@@ -221,6 +251,21 @@ def profiles(database: dict, analytics_secret: str = "") -> list[dict]:
             ],
             "dataflow": "",
             "writes": False,
+            "privilege": "SELECT",
+        }
+    )
+    entries.append(
+        {
+            "username": BACKUP_USER,
+            "password": str(backup_secret or ""),
+            "platform": "",
+            "schemas": [
+                platform_schema(database, "android"),
+                platform_schema(database, "ios"),
+            ],
+            "dataflow": "",
+            "writes": True,
+            "privilege": BACKUP_PRIVILEGE,
         }
     )
     return entries

@@ -254,6 +254,7 @@ class TestEveryAccountTheDeploymentOpensItWith:
             "aware_android_server",
             "aware_ios_participant",
             "aware_analytics",
+            "aware_backup",
         ]
 
     def test_each_account_carries_the_schema_it_works_in(self):
@@ -274,9 +275,44 @@ class TestEveryAccountTheDeploymentOpensItWith:
         assert writes["aware_ios_participant"] is True
         assert writes["aware_analytics"] is False
 
+    def _by_name(self, *secrets):
+        return {
+            entry["username"]: entry for entry in database.profiles(EXTERNAL, *secrets)
+        }
+
     def test_the_dashboard_password_comes_from_the_deployment(self):
-        assert database.profiles(EXTERNAL, "chosen")[-1]["password"] == "chosen"
-        assert database.profiles(EXTERNAL)[-1]["password"] == database.ANALYTICS_SEED_PASSWORD
+        assert self._by_name("chosen")["aware_analytics"]["password"] == "chosen"
+        assert (
+            self._by_name()["aware_analytics"]["password"]
+            == database.ANALYTICS_SEED_PASSWORD
+        )
+
+    def test_the_backup_account_reads_and_writes_both_schemas(self):
+        """A dump reads every table and a restore drops and recreates them, so this
+        one works across the study rather than in one platform's half of it."""
+        backup = self._by_name()["aware_backup"]
+
+        assert backup["schemas"] == ["study_android", "study_ios"]
+        assert backup["privilege"] == "ALL PRIVILEGES"
+
+    def test_the_backup_account_holds_no_seed_password(self):
+        """Nothing in db/*.sql creates it, so there is no first-boot password to
+        fall back to: a blank is a deployment that has not settled one, which the
+        backup page reports rather than working around."""
+        assert self._by_name()["aware_backup"]["password"] == ""
+        assert self._by_name("", "chosen")["aware_backup"]["password"] == "chosen"
+
+    def test_what_each_account_is_granted_is_stated_on_it(self):
+        """One flag with two answers cannot separate an account that appends rows
+        from one that drops and recreates the tables they live in."""
+        granted = {
+            entry["username"]: entry["privilege"]
+            for entry in database.profiles(EXTERNAL)
+        }
+
+        assert granted["aware_ios_participant"] == "INSERT"
+        assert granted["aware_analytics"] == "SELECT"
+        assert granted["aware_backup"] == "ALL PRIVILEGES"
 
 
 class TestWhoAdministersTheStudysDatabase:

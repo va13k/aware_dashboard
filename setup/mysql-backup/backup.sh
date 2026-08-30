@@ -18,10 +18,19 @@ BACKUP_DIR="${BACKUP_DIR:-/backups}"
 # Mirrors CACHE_TABLES in analytics_api/app/services/dump_stream.py.
 BACKUP_SKIP_TABLES="${BACKUP_SKIP_TABLES:-record_counts coverage_hourly device_enrolment}"
 BACKUP_INTERVAL_SECONDS="${BACKUP_INTERVAL_SECONDS:-86400}"
+# How long to wait after an attempt that failed, rather than the full interval.
+# What a dump needs is not all brought up by compose: the account it connects as is
+# created by the deploy, so a service started first finds no account and fails. Made
+# to wait a day for the next try, that ordering costs a study its daily archive.
+BACKUP_RETRY_SECONDS="${BACKUP_RETRY_SECONDS:-300}"
 BACKUP_RETENTION_DAYS="${BACKUP_RETENTION_DAYS:-30}"
 
 case "$BACKUP_INTERVAL_SECONDS" in
   ""|*[!0-9]*) BACKUP_INTERVAL_SECONDS=86400 ;;
+esac
+
+case "$BACKUP_RETRY_SECONDS" in
+  ""|*[!0-9]*) BACKUP_RETRY_SECONDS=300 ;;
 esac
 
 case "$BACKUP_RETENTION_DAYS" in
@@ -101,7 +110,11 @@ run_backup() {
 log "Daily MySQL backup service started"
 
 while true; do
-  run_backup || true
-  log "Next MySQL backup in $BACKUP_INTERVAL_SECONDS seconds"
-  sleep "$BACKUP_INTERVAL_SECONDS"
+  if run_backup; then
+    wait_seconds="$BACKUP_INTERVAL_SECONDS"
+  else
+    wait_seconds="$BACKUP_RETRY_SECONDS"
+  fi
+  log "Next MySQL backup in $wait_seconds seconds"
+  sleep "$wait_seconds"
 done

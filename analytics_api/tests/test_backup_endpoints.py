@@ -16,7 +16,7 @@ from app.services import backup_jobs as jobs
 
 @pytest.fixture
 def client(tmp_path, monkeypatch):
-    monkeypatch.setenv("MYSQL_ROOT_PASSWORD", "test-password")
+    monkeypatch.setenv("BACKUP_DB_PASSWORD", "test-password")
     monkeypatch.setenv("BACKUP_DIR", str(tmp_path))
 
     import importlib
@@ -160,3 +160,60 @@ def test_a_failed_job_carries_its_reason():
     snapshot = job.snapshot()
     assert snapshot["state"] == jobs.ERROR
     assert snapshot["error"] == "mysql: table is full"
+
+
+def test_the_dump_runs_as_the_studys_own_account_rather_than_the_administrator(client):
+    """A restore feeds the archive into a database client and every statement in it
+    runs, so the account is what decides how far a bad archive reaches. The
+    administrator's password is not even passed to this service."""
+    _, backup, _ = client
+
+    assert backup.MYSQL_USER == "aware_backup"
+    assert "--user=aware_backup" in backup._dump_command(None, None)
+
+
+def test_the_dump_asks_for_nothing_the_account_may_not_have(client):
+    """Tablespaces are read from a table the server guards with PROCESS, a global
+    privilege that says nothing about the study's rows. The client asks for them
+    unless told not to, and carries on when refused: the export finishes, the exit
+    status is zero, and the refusal is a line on stderr nobody reads."""
+    _, backup, _ = client
+
+    assert "--no-tablespaces" in backup._dump_command(None, None)
+
+
+def test_the_dump_passes_only_options_this_image_s_client_has(client):
+    """The image installs Debian's default-mysql-client, which is MariaDB's.
+    `--set-gtid-purged` is Oracle's, and mysqldump rejects an unknown option before
+    it opens a connection --- so an export would fail on the option rather than on
+    anything about the database."""
+    _, backup, _ = client
+
+    assert not [
+        option
+        for option in backup._dump_command(None, None)
+        if option.startswith("--set-gtid-purged")
+    ]
+
+
+def test_an_unconfigured_account_stops_the_operation(monkeypatch, tmp_path):
+    """Reported rather than worked around: without a password there is no account to
+    run as, and falling back to another one is how the administrator got here."""
+    import importlib
+
+    monkeypatch.delenv("BACKUP_DB_PASSWORD", raising=False)
+    monkeypatch.setenv("BACKUP_DIR", str(tmp_path))
+    from app.routers import backup as backup_module
+
+    backup = importlib.reload(backup_module)
+    try:
+        app = FastAPI()
+        app.include_router(backup.router)
+        http = TestClient(app)
+
+        response = http.post("/backup/import", data={"mode": "replace"})
+
+        assert response.status_code == 503
+        assert "BACKUP_DB_PASSWORD" in response.json()["detail"]
+    finally:
+        importlib.reload(backup_module)
