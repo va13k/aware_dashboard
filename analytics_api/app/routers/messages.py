@@ -30,6 +30,19 @@ from shared_config import messaging
 
 router = APIRouter(prefix="/messages", tags=["messages"])
 
+#: The question's own words live inside the ESM payload rather than in a column of
+#: their own, which is the client's shape and not ours to change. Read out here so
+#: every reader asks the same way --- one that named `esm_title` as a column was
+#: answered with an error, and the caller turned that into an empty list of answers.
+ESM_TITLE = "JSON_UNQUOTE(JSON_EXTRACT(esm_json, '$.esm_title'))"
+ESM_INSTRUCTIONS = "JSON_UNQUOTE(JSON_EXTRACT(esm_json, '$.esm_instructions'))"
+ESM_TRIGGER = "JSON_UNQUOTE(JSON_EXTRACT(esm_json, '$.esm_trigger'))"
+
+#: The status the client writes once a participant has answered. The other states a
+#: prompt passes through are its own; this is the one that carries an answer.
+ANSWERED = 2
+
+
 MAX_HISTORY = 200
 
 
@@ -61,13 +74,27 @@ class SendRequest(BaseModel):
 
 
 def _esm(payload: SendRequest) -> str:
-    """One ESM in the shape the client's own queue parses."""
+    """One ESM in the shape the client's own queue parses.
+
+    `esm_keep` is what stops this destroying whatever the participant has not
+    answered yet. The client clears its whole queue when a prompt arrives without
+    it --- every pending question is marked replaced and its notification
+    cancelled (com.aware.ESM#queueESM) --- so a question sent from here would take
+    the study's own scheduled prompts down with it.
+
+    A question waits until it is answered; a timed one carries the expiry the
+    study set. Zero is the client's own word for "no expiry", so an ad-hoc
+    question sends zero rather than an hour nobody chose.
+    """
     esm: dict = {
         "esm_type": 5 if payload.answers else 1,
         "esm_title": payload.title,
         "esm_instructions": payload.instructions,
-        "esm_expiration_threshold": payload.expires,
+        "esm_expiration_threshold": (
+            payload.expires if payload.kind == messaging.TIMED_QUESTION else 0
+        ),
         "esm_trigger": "dashboard",
+        "esm_keep": True,
     }
     if payload.answers:
         esm["esm_quick_answers"] = payload.answers
@@ -107,6 +134,7 @@ KINDS = (
     messaging.SYNC_REQUEST,
     messaging.UPDATE_REQUEST,
     messaging.QUESTION,
+    messaging.TIMED_QUESTION,
     messaging.NOTICE,
 )
 
@@ -193,6 +221,68 @@ async def _record(db: AsyncSession, device: str, channel: str, payload: SendRequ
     )
 
 
+@router.get("/for-device/{device_id}")
+async def for_device(
+    device_id: str,
+    limit: int = Query(100, le=MAX_HISTORY),
+    db: AsyncSession = Depends(get_android_db),
+):
+    """Everything one participant was asked, and what came back from each.
+
+    Two lists rather than one, because only one of the two has an answer to carry.
+    A question becomes an ESM the client queues, shows and records the answer to; a
+    notice is a notification the client renders and writes nothing about; a sync or
+    an update is an instruction it acts on silently. Pairing a notice with an empty
+    answer would read as a participant who ignored it, when nothing was ever asked
+    of them and nothing would have been recorded if they had replied.
+
+    The prompts are every one the study put in front of this participant --- the
+    ones sent from here and the ones its schedules raised --- because what a
+    researcher is looking at is a person's answering, not one channel's.
+    """
+    args = {"d": device_id, "n": limit}
+
+    async def rows(sql: str, extra: dict | None = None) -> list[dict]:
+        try:
+            result = await db.execute(text(sql), {**args, **(extra or {})})
+            return [dict(row._mapping) for row in result]
+        except SQLAlchemyError:
+            await db.rollback()
+            return []
+
+    prompts = await rows(
+        f"SELECT timestamp AS shown_at, esm_status AS status, "
+        f"{ESM_TITLE} AS title, {ESM_INSTRUCTIONS} AS instructions, "
+        f"{ESM_TRIGGER} AS trigger_name, "
+        "esm_user_answer AS answer, "
+        "double_esm_user_answer_timestamp AS answered_at "
+        "FROM esms WHERE device_id = :d ORDER BY timestamp DESC LIMIT :n"
+    )
+    sent = await rows(
+        f"SELECT sent_at, kind, title, body, retained FROM {messaging.SENT_TABLE} "
+        "WHERE device_id = :d ORDER BY sent_at DESC LIMIT :n"
+    )
+    return {"prompts": collapse_prompts(prompts), "sent": sent}
+
+
+def collapse_prompts(rows: list[dict]) -> list[dict]:
+    """One line per prompt, from the several rows a prompt leaves behind.
+
+    The client writes a row for each state a prompt passes through, so a question
+    that was answered is in the table twice --- once superseded, once answered, a
+    fraction of a second apart and under the same title. Shown as they are, a
+    researcher counts every question twice and reads half of them as ignored.
+    """
+    kept: dict[tuple, dict] = {}
+    for row in rows:
+        key = (row.get("title"), int((row.get("shown_at") or 0) / 1000))
+        seen = kept.get(key)
+        answered = bool(str(row.get("answer") or "").strip())
+        if seen is None or (answered and not seen["answered"]):
+            kept[key] = {**row, "answered": answered}
+    return sorted(kept.values(), key=lambda r: r.get("shown_at") or 0, reverse=True)
+
+
 @router.get("/history")
 async def history(
     device_id: str | None = Query(None),
@@ -205,11 +295,16 @@ async def history(
     if device_id:
         args["d"] = device_id
 
-    async def rows(sql: str) -> list[dict]:
+    async def rows(sql: str, extra: dict | None = None) -> list[dict]:
         try:
-            result = await db.execute(text(sql), args)
+            result = await db.execute(text(sql), {**args, **(extra or {})})
             return [dict(row._mapping) for row in result]
         except SQLAlchemyError:
+            # A study whose schema predates one of these tables still gets the rest,
+            # rather than a page that fails whole because one question cannot be
+            # asked. What this must not swallow is a query that is simply wrong ---
+            # `esm_title` was read as a column for exactly as long as nobody noticed
+            # the answers had stopped arriving.
             await db.rollback()
             return []
 
@@ -221,9 +316,11 @@ async def history(
         f"SELECT device_id, topic, timestamp FROM mqtt_messages {scope} "
         "ORDER BY timestamp DESC LIMIT :n"
     )
-    answered_scope = "WHERE esm_status = 2" + (" AND device_id = :d" if device_id else "")
+    answered_scope = "WHERE esm_status = :answered" + (" AND device_id = :d" if device_id else "")
     answered = await rows(
-        "SELECT device_id, esm_title, esm_user_answer, double_esm_user_answer_timestamp AS answered_at "
-        f"FROM esms {answered_scope} ORDER BY double_esm_user_answer_timestamp DESC LIMIT :n"
+        f"SELECT device_id, {ESM_TITLE} AS esm_title, esm_user_answer, "
+        "double_esm_user_answer_timestamp AS answered_at "
+        f"FROM esms {answered_scope} ORDER BY double_esm_user_answer_timestamp DESC LIMIT :n",
+        {"answered": ANSWERED},
     )
     return {"sent": sent, "delivered": delivered, "answered": answered}

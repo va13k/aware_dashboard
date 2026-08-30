@@ -94,9 +94,24 @@ QUESTION = "question"
 NOTICE = "notice"
 UPDATE_REQUEST = "update"
 
+#: A question about the moment it is asked in, which is what the client's own
+#: scheduled prompts are. It carries an expiry, and an expired one is a reading
+#: that was not taken rather than a question still waiting: an answer given three
+#: hours late describes a different moment from the one it was asked about.
+#:
+#: The same object reaches the phone either way --- both are ESMs, and the client
+#: has no separate notion of one. What differs is what the study means by it, so
+#: the two are recorded apart here rather than told apart later by whether an
+#: expiry happened to be set.
+TIMED_QUESTION = "esm"
+
 #: What a phone is asked to do rather than shown. Neither interrupts a participant,
 #: so both are held to the looser of the two limits.
 QUIET_KINDS = (SYNC_REQUEST, UPDATE_REQUEST)
+
+#: The kinds that reach a participant as a question in the client's own queue.
+#: Both are ESMs; the study's own meaning is what separates them.
+ASKING_KINDS = (QUESTION, TIMED_QUESTION)
 
 #: How many prompts one device may be sent in a window, and how long the window is.
 #: Nothing in the mechanism stops a researcher filling somebody's phone, and the
