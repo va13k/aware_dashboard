@@ -106,6 +106,24 @@ def ensure_server_password(env: dict[str, str]) -> None:
     )
 
 
+def ensure_analytics_password(env: dict[str, str]) -> None:
+    """Settle on the password the dashboard reads the study with.
+
+    The deployment's own account rather than the study's, so nothing asks a
+    researcher for it and it is generated here like every other secret. The seed the
+    bootstrap SQL creates the account with counts as no password at all: it is the
+    same word in every deployment of this software, and the account holds SELECT over
+    both schemas --- on a database the researcher named, that is every row of every
+    participant's data, readable by anyone who can reach the server.
+
+    Applied to the account by setup/init_study_tables.py, which reads the same value.
+    """
+    password = str(env.get(database.ANALYTICS_PASSWORD_ENV, "")).strip()
+    if password in PLACEHOLDER_SECRETS | {database.ANALYTICS_SEED_PASSWORD}:
+        password = secrets.token_urlsafe(16)
+    env[database.ANALYTICS_PASSWORD_ENV] = password
+
+
 def requested_dataflow() -> str:
     """The dataflow the researcher chose in this wizard run, or "" for none.
 
@@ -203,8 +221,16 @@ def require_reachable_database(source: dict) -> None:
     # assumption: a managed database calls its administrator something of its own,
     # and authenticating as a name that does not exist reads exactly like a wrong
     # password.
+    # Named by this wizard run where there is one, then by what a deployment already
+    # on record settled, then by what the host says about its provider. The request
+    # lives in /tmp and a deploy re-run after a reboot has none, which would
+    # otherwise send every managed database a login as root.
     request = load_env(REQUEST_ENV_PATH)
-    admin_user = str(request.get("DB_ADMIN_USER", "")).strip() or "root"
+    admin_user = database.admin_user(
+        str((source.get("database") or {}).get("host") or ""),
+        str(request.get("DB_ADMIN_USER", "")).strip()
+        or str(load_env(ENV_PATH).get("DB_ADMIN_USER", "")).strip(),
+    )
     # Where the study said its schema is created by hand, the deployment checks and
     # creates nothing: the account it was given may only write.
     verify_only = str(request.get("DB_INIT", "")).strip().lower() == "manual"
@@ -231,11 +257,18 @@ def require_reachable_database(source: dict) -> None:
     )
 
 
+#: The services a deployment only has because it runs the database itself. The
+#: backup job is one of them: it authenticates as root on 3306 and dumps without
+#: asking for encryption, none of which describes a database somebody else runs, so
+#: it is taken out rather than left failing against a server it cannot reach.
+#: Backing up a database the researcher named is that researcher's own arrangement
+#: --- their provider's snapshots, or an export from the dashboard's backup page.
+BUNDLED_ONLY_SERVICES = ("mysql", "mysql-backup")
+
 #: The services that wait on the bundled database's health check. A service kept out
 #: of a deployment is still depended on, and compose starts a dependency whether or
 #: not anyone asked for it, so the waits are cleared alongside the service itself.
 WAITS_ON_BUNDLED_MYSQL = (
-    "mysql-backup",
     "micro-server",
     "micro-server-android",
     "configurator",
@@ -245,7 +278,7 @@ WAITS_ON_BUNDLED_MYSQL = (
 
 
 def build_compose_override() -> str:
-    """The compose file that takes the bundled database out of the deployment.
+    """The compose file that takes the bundled database, and its backup job, out.
 
     `!reset` clears a value the base file sets rather than merging with it, which is
     what removing a service and its dependents' waits requires: an override can add
@@ -256,8 +289,9 @@ def build_compose_override() -> str:
         "# Merged over docker-compose.yml, and absent whenever the study runs the",
         "# bundled one. Edit the placement in setup rather than this file.",
         "services:",
-        "  mysql: !reset null",
     ]
+    for service in BUNDLED_ONLY_SERVICES:
+        lines.append(f"  {service}: !reset null")
     for service in WAITS_ON_BUNDLED_MYSQL:
         lines.append(f"  {service}:")
         lines.append("    depends_on: !reset null")
@@ -675,6 +709,7 @@ def persist_env(env: dict[str, str]) -> None:
         "RESEARCHER_PASSWORD",
         "PARTICIPANT_DB_PASSWORD",
         "ANDROID_SERVER_DB_PASSWORD",
+        "ANALYTICS_DB_PASSWORD",
         "PUBLIC_HOST",
         "PUBLIC_PORT",
         "PROTOCOL",
@@ -945,6 +980,7 @@ def main() -> None:
     ensure_researcher_credentials(env)
     ensure_participant_password(env)
     ensure_server_password(env)
+    ensure_analytics_password(env)
     ensure_broker_passwords(env)
     env = normalize_public_env(env)
 
