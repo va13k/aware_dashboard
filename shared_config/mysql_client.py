@@ -192,6 +192,22 @@ class Client:
         return f"{self._host}:{self._port}, from {where}"
 
 
+#: A password inside a connection string, as somebody pastes one into a field
+#: asking for a host. The client then reports the whole thing back as the name it
+#: could not resolve, and the credential lands in the deployment log.
+_CREDENTIAL_IN_URL = re.compile(r"(?P<scheme>[a-z][a-z0-9+.-]*://)(?P<user>[^:/@\s]+):[^@/\s]+@")
+
+
+def without_credentials(text: str) -> str:
+    """The same text with any `user:password@` in it reduced to the user.
+
+    Applied to everything printed about a database, because the thing being
+    reported is often the thing that was mistyped --- and a password pasted into
+    the wrong field is still a password.
+    """
+    return _CREDENTIAL_IN_URL.sub(r"\g<scheme>\g<user>:***@", str(text))
+
+
 def error_of(result: subprocess.CompletedProcess) -> str:
     """What MySQL said, with the client's own advisory left out."""
     lines = [
@@ -199,7 +215,7 @@ def error_of(result: subprocess.CompletedProcess) -> str:
         for line in (result.stderr or "").splitlines()
         if line.strip() and "Using a password on the command line" not in line
     ]
-    return lines[-1] if lines else ""
+    return without_credentials(lines[-1]) if lines else ""
 
 
 def denied(result: subprocess.CompletedProcess) -> bool:

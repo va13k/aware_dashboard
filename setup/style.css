@@ -454,3 +454,79 @@ h1 {
 .check-detail {
   color: #4a5568;
 }
+
+/* The database check reads as a list of answers, not as a paragraph: what failed
+   has to be findable at a glance, which grey running text never is. Written under
+   the box it renders into, because the ingest self-test above draws its own rows
+   with the same class names and reads as a line each. */
+#dbCheckResult .check-verdict {
+  margin: 0 0 10px;
+  padding: 10px 12px;
+  border-radius: var(--radius);
+  font-size: 14px;
+  font-weight: 600;
+}
+#dbCheckResult .check-verdict-ok {
+  background: #e8f6ec;
+  color: #1b6b33;
+}
+#dbCheckResult .check-verdict-bad {
+  background: #fdecec;
+  color: #a32d2c;
+}
+#dbCheckResult .check-row {
+  display: block;
+  border-left: 3px solid var(--border);
+  padding: 8px 0 8px 10px;
+  margin-bottom: 8px;
+}
+#dbCheckResult .check-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+}
+#dbCheckResult .check-state {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  padding: 2px 8px;
+  border-radius: 999px;
+}
+#dbCheckResult .check-detail {
+  margin-top: 4px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--text-muted);
+}
+#dbCheckResult .check-ok {
+  border-left-color: #34a853;
+}
+#dbCheckResult .check-ok .check-state {
+  background: #e8f6ec;
+  color: #1b6b33;
+}
+#dbCheckResult .check-failed {
+  border-left-color: var(--danger);
+}
+#dbCheckResult .check-failed .check-state {
+  background: #fdecec;
+  color: #a32d2c;
+}
+#dbCheckResult .check-warning {
+  border-left-color: #d98324;
+}
+#dbCheckResult .check-warning .check-state {
+  background: #fdf3e5;
+  color: #8a5311;
+}
+#dbCheckResult .check-skipped {
+  border-left-color: var(--border);
+}
+#dbCheckResult .check-skipped .check-state {
+  background: var(--bg);
+  color: var(--text-muted);
+}

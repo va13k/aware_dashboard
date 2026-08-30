@@ -5,6 +5,7 @@ import os
 import secrets
 import socket
 import subprocess
+import tempfile
 import sys
 from http.server import HTTPServer, BaseHTTPRequestHandler
 
@@ -76,6 +77,9 @@ def _service_statuses():
 
 TOKEN = secrets.token_urlsafe(32)
 WIZARD_DIR = os.path.dirname(os.path.abspath(__file__))
+#: The scripts run on the wizard's behalf live beside it in the image, and
+#: beside this file in a checkout.
+SETUP_DIR = WIZARD_DIR
 PREFIX = f"/{TOKEN}"
 URL_FILE = "/project/setup/.wizard_url"
 
@@ -131,6 +135,8 @@ class Handler(BaseHTTPRequestHandler):
             self._run_cgi("GET", b"")
         elif p == "/status":
             self._serve_status()
+        elif p == "/database.sql":
+            self._serve_setup_sql()
         else:
             self.send_response(404)
             self.end_headers()
@@ -143,9 +149,111 @@ class Handler(BaseHTTPRequestHandler):
             length = int(self.headers.get("Content-Length", 0))
             body = self.rfile.read(length)
             self._run_cgi("POST", body)
+        elif p == "/check-database":
+            length = int(self.headers.get("Content-Length", 0))
+            self._check_database(self.rfile.read(length))
         else:
             self.send_response(404)
             self.end_headers()
+
+    def _check_database(self, body):
+        """Ask the database the deploy's own questions, before deploying.
+
+        The same script the deployment runs, so what passes here passes there —
+        and a database that cannot be reached is a field to correct rather than a
+        deployment that stops half way through.
+        """
+        try:
+            asked = json.loads(body or b"{}")
+        except ValueError:
+            asked = {}
+
+        command = [sys.executable, os.path.join(SETUP_DIR, "verify_database.py"), "--quiet"]
+        for flag, key in (
+            ("--host", "host"),
+            ("--port", "port"),
+            ("--admin-user", "admin_user"),
+            ("--admin-password", "admin_password"),
+            ("--placement", "placement"),
+        ):
+            value = str(asked.get(key) or "").strip()
+            if value:
+                command += [flag, value]
+        # A study whose schema is created by hand is asked about, not acted on:
+        # the test must not leave behind what the deployment would have made.
+        if str(asked.get("init") or "").strip().lower() == "manual":
+            command.append("--verify-only")
+
+        with tempfile.NamedTemporaryFile(suffix=".json", delete=False) as out:
+            result_path = out.name
+        command += ["--json-out", result_path]
+
+        run = subprocess.run(command, capture_output=True, text=True)
+        try:
+            with open(result_path, encoding="utf-8") as handle:
+                report = json.load(handle)
+        except (OSError, ValueError):
+            report = {
+                "ok": False,
+                "checks": [
+                    {
+                        "name": "reachable",
+                        "ok": False,
+                        "skipped": False,
+                        "detail": (run.stderr or run.stdout or "").strip()
+                        or "The check did not run.",
+                    }
+                ],
+            }
+        finally:
+            try:
+                os.unlink(result_path)
+            except OSError:
+                pass
+
+        self._send_json(report)
+
+    def _serve_setup_sql(self):
+        """The statements an administrator would run, as a file to hand over."""
+        with tempfile.NamedTemporaryFile(suffix=".sql", delete=False) as out:
+            sql_path = out.name
+        subprocess.run(
+            [
+                sys.executable,
+                os.path.join(SETUP_DIR, "verify_database.py"),
+                "--sql-out",
+                sql_path,
+                "--quiet",
+            ],
+            capture_output=True,
+        )
+        try:
+            with open(sql_path, "rb") as handle:
+                data = handle.read()
+        except OSError:
+            data = b"-- The setup script could not be built.\n"
+        finally:
+            try:
+                os.unlink(sql_path)
+            except OSError:
+                pass
+
+        self.send_response(200)
+        self.send_header("Content-Type", "application/sql; charset=utf-8")
+        self.send_header("Content-Disposition", 'attachment; filename="aware-setup.sql"')
+        self.send_header("Content-Length", str(len(data)))
+        self.send_header("Cache-Control", "no-store")
+        self.end_headers()
+        self.wfile.write(data)
+
+    def _send_json(self, payload):
+        body = json.dumps(payload).encode()
+        self.send_response(200)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Length", str(len(body)))
+        self.send_header("Cache-Control", "no-store")
+        self.end_headers()
+        self.wfile.write(body)
 
     def _serve_status(self):
         statuses = _service_statuses()
