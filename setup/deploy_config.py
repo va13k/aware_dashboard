@@ -1469,7 +1469,7 @@ def main() -> None:
         join_url=android_study_url,
     )
     atomic_write_text(
-        ANDROID_CONFIG_PATH, json.dumps(android_micro, indent=2) + "\n", SECRET_MODE
+        ANDROID_CONFIG_PATH, json.dumps(android_micro, indent=2) + "\n", SHARED_MODE
     )
 
     config, study = serialize_ios_config(source, settings, EXAMPLE_PATH, CONFIG_PATH, env["STUDY_KEY"])
