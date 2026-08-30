@@ -153,6 +153,18 @@
           </p>
         </div>
         <div class="field">
+          <label>Where the study database runs</label>
+          <select id="dbPlacement" onchange="updateDbPlacement()">
+            <option value="bundled" selected>
+              On this machine, deployed alongside everything else
+            </option>
+            <option value="external">
+              On a separate server you name
+            </option>
+          </select>
+        </div>
+
+        <div class="field">
           <label for="dbAdminUser">Database administrator</label>
           <input type="text" id="dbAdminUser" placeholder="root" />
           <p class="field-error hidden" id="dbAdminUserError"></p>
@@ -175,21 +187,12 @@
           </div>
           <p class="field-error hidden" id="mysqlPassError"></p>
           <p class="hint">
-            The services inside this deployment connect to MySQL with this.
+            The account that creates the schemas, this study's accounts and its
+            tables. On the database deployed here, setup creates it with this
+            name; on a server you name, it is the one your provider gave you.
           </p>
         </div>
 
-        <div class="field">
-          <label>Where the study database runs</label>
-          <select id="dbPlacement" onchange="updateDbPlacement()">
-            <option value="bundled" selected>
-              On this machine, deployed alongside everything else
-            </option>
-            <option value="external">
-              On a separate server you name
-            </option>
-          </select>
-        </div>
         <p
           class="hint hidden"
           id="dbExposureCaution"
