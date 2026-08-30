@@ -2,6 +2,7 @@ import base64
 import json
 import pathlib
 import re
+import urllib.parse
 import sys
 
 #: Where the project root can be, in the order tried. A checkout keeps this file
@@ -29,7 +30,7 @@ def project_root(candidates=PROJECT_CANDIDATES) -> pathlib.Path:
 # being restated here, so the wizard cannot accept a choice the generation
 # refuses.
 sys.path.insert(0, str(project_root()))
-from shared_config import dataflow, placement  # noqa: E402
+from shared_config import database, dataflow, placement  # noqa: E402
 from shared_config.certificates import read_certificate  # noqa: E402
 
 # Characters that survive .env, the wizard's JSON responses and MySQL quoting
@@ -99,6 +100,68 @@ def clean_dataflow(value: object, fallback: str) -> str:
     if reason is not None:
         raise SystemExit(reason)
     return chosen
+
+
+def parse_connection_string(value: object) -> dict[str, str]:
+    """The parts of a connection string, or {} when this is not one.
+
+    Providers give a database as a single line to copy --- scheme, credentials,
+    host, port, database, options --- and that line is what a researcher has in
+    hand. Reading it here means the wizard can be pasted into rather than filled
+    in, and that pasting it in the wrong field is answered by using it rather than
+    by an error.
+    """
+    text = str(value or "").strip()
+    if "://" not in text:
+        return {}
+
+    parsed = urllib.parse.urlsplit(text)
+    if not parsed.hostname:
+        return {}
+
+    found = {"host": parsed.hostname}
+    if parsed.port:
+        found["port"] = str(parsed.port)
+    if parsed.username:
+        found["admin_user"] = urllib.parse.unquote(parsed.username)
+    if parsed.password:
+        found["admin_password"] = urllib.parse.unquote(parsed.password)
+    return found
+
+
+#: Who makes the database ready. `auto` is setup, with the account the study
+#: named; `manual` is somebody running the file it hands out, after which setup
+#: only checks what it finds. The difference is which account has to be powerful:
+#: creating a schema needs more than writing to one.
+DB_INIT_CHOICES = ("auto", "manual")
+
+
+def clean_db_init(value: object, fallback: str) -> str:
+    chosen = str(value or fallback or "auto").strip().lower()
+    if chosen not in DB_INIT_CHOICES:
+        raise SystemExit(
+            f"DB_INIT must be one of {', '.join(DB_INIT_CHOICES)}, not {chosen!r}"
+        )
+    return chosen
+
+
+def clean_admin_user(value: object, fallback: str) -> str:
+    """The account that creates the schema, as MySQL will accept it.
+
+    Defaulted to root because that is MySQL's own administrator and the bundled
+    database's. A managed service names it something else --- `avnadmin`,
+    `doadmin`, whatever was chosen when the instance was created --- and a study
+    pointed at one authenticates as nobody until it is told which.
+    """
+    name = str(value or "").strip()
+    if not name:
+        return fallback or "root"
+    if not re.fullmatch(r"[A-Za-z0-9_.@-]{1,32}", name):
+        raise SystemExit(
+            "The administrator account may hold only letters, digits and . _ @ - "
+            f"characters: {name!r}"
+        )
+    return name
 
 
 def clean_placement(value: object, dataflow_choice: str, host: object) -> tuple[str, str]:
@@ -179,6 +242,24 @@ def main() -> None:
     payload = json.load(sys.stdin)
     env_fallback = parse_env_text(str(payload.get("env", "")))
 
+    # A connection string pasted into the host field is used rather than refused:
+    # it is what the provider hands out, and it carries the port, the account and
+    # the password with it. Read first, so everything below sees the parts.
+    pasted = parse_connection_string(payload.get("db_host"))
+    if pasted:
+        payload = dict(payload)
+        payload["db_host"] = pasted["host"]
+        if pasted.get("port"):
+            payload["db_port"] = pasted["port"]
+        if pasted.get("admin_user"):
+            payload["db_admin_user"] = pasted["admin_user"]
+        # The typed password wins: somebody who filled the field meant it, and a
+        # string copied from a console may be older than the password they set.
+        if pasted.get("admin_password") and not str(
+            payload.get("mysql_root_password") or ""
+        ).strip():
+            payload["mysql_root_password"] = pasted["admin_password"]
+
     mysql_root_password = (
         str(
             payload.get(
@@ -207,6 +288,14 @@ def main() -> None:
         payload.get("db_host", env_fallback.get("DB_HOST", "")),
     )
     db_port = positive_int(payload.get("db_port"), env_fallback.get("DB_PORT", "3306"))
+    # Named by the study, then by what the host says about its provider, and only
+    # then by MySQL's own default. A managed database is not root, and a
+    # researcher deploying for the first time has no reason to know that.
+    db_admin_user = clean_admin_user(
+        payload.get("db_admin_user"),
+        database.admin_user(db_host, env_fallback.get("DB_ADMIN_USER", "")),
+    )
+    db_init = clean_db_init(payload.get("db_init"), env_fallback.get("DB_INIT", "auto"))
     db_require_tls, db_ca_certificate = clean_tls(
         db_placement,
         payload.get("db_require_tls", env_fallback.get("DB_REQUIRE_TLS", "")) or None,
@@ -273,6 +362,8 @@ def main() -> None:
         f"ANDROID_DATAFLOW={android_dataflow}",
         f"DB_PLACEMENT={db_placement}",
         f"DB_HOST={db_host}",
+        f"DB_ADMIN_USER={db_admin_user}",
+        f"DB_INIT={db_init}",
         f"DB_PORT={db_port}",
         f"DB_REQUIRE_TLS={'1' if db_require_tls else '0'}",
         f"MYSQL_BACKUP_HOST_DIR={backup_host_dir}",

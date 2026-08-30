@@ -23,6 +23,8 @@ sys.path.insert(0, str(SETUP))
 import deploy_config  # noqa: E402
 import write_request_env  # noqa: E402
 
+from shared_config import database  # noqa: E402
+
 
 class TestWhereItIsRead:
     """placement.declared: one answer, taken from the host the study names."""
@@ -192,6 +194,12 @@ class TestTakingTheBundledDatabaseOut:
     def test_the_database_service_is_removed(self):
         assert "mysql: !reset null" in deploy_config.build_compose_override()
 
+    def test_the_backup_job_goes_with_it(self):
+        """It dumps as root on 3306 without asking for encryption, which is a
+        description of the bundled database and of nothing else. Left in, it would
+        fail against a server it cannot reach for the length of the study."""
+        assert "mysql-backup: !reset null" in deploy_config.build_compose_override()
+
     def test_every_service_that_waits_on_it_stops_waiting(self):
         override = deploy_config.build_compose_override()
         for service in deploy_config.WAITS_ON_BUNDLED_MYSQL:
@@ -212,7 +220,13 @@ class TestTakingTheBundledDatabaseOut:
             if line.strip() == "depends_on:" and index + 1 < len(lines):
                 if lines[index + 1].strip() == "mysql:":
                     waiting.append(service)
-        assert sorted(waiting) == sorted(deploy_config.WAITS_ON_BUNDLED_MYSQL)
+        # A service that waits is either kept and released from the wait, or taken
+        # out of the deployment altogether. One that is neither would hold up every
+        # external deployment while compose starts a database nobody wants.
+        assert sorted(waiting) == sorted(
+            set(deploy_config.WAITS_ON_BUNDLED_MYSQL)
+            | set(deploy_config.BUNDLED_ONLY_SERVICES) - {"mysql"}
+        )
 
 
 class TestWhichPlacementRunsADatabase:
@@ -269,3 +283,130 @@ class TestReadingACertificate:
 
         # Not two implementations that happen to agree today.
         assert deploy_config.read_certificate is certificates.read_certificate
+
+class TestTheAdministratorAccount:
+    """Which account creates the schema, when the database is not ours.
+
+    A bundled database is MySQL's own, where the administrator is root. A managed
+    one names it something else, and a study told to authenticate as root there
+    fails in a way that reads like a wrong password rather than a wrong account.
+    """
+
+    def test_root_is_the_fallback(self):
+        assert write_request_env.clean_admin_user("", "root") == "root"
+        assert write_request_env.clean_admin_user(None, "") == "root"
+
+    def test_a_named_account_is_kept(self):
+        assert write_request_env.clean_admin_user("avnadmin", "root") == "avnadmin"
+        assert write_request_env.clean_admin_user("  doadmin  ", "root") == "doadmin"
+
+    def test_a_previous_answer_stands_in_for_a_blank_field(self):
+        assert write_request_env.clean_admin_user("", "avnadmin") == "avnadmin"
+
+    @pytest.mark.parametrize(
+        "name", ["ad min", "admin;DROP", "'admin'", "a" * 33, "admin`"]
+    )
+    def test_a_name_mysql_would_not_take_is_refused(self, name):
+        # Refused rather than escaped: this ends up in a command line and in
+        # GRANT statements, and neither takes a placeholder for an account.
+        with pytest.raises(SystemExit):
+            write_request_env.clean_admin_user(name, "root")
+
+    def test_the_names_managed_services_use_are_all_acceptable(self):
+        for name in ["avnadmin", "doadmin", "aware_admin", "admin@example", "a-b.c_d"]:
+            assert write_request_env.clean_admin_user(name, "root") == name
+
+class TestWhatAProviderHandsOut:
+    """A connection string is what a researcher has, so it is what setup reads.
+
+    Nobody deploying for the first time knows that Aiven calls its administrator
+    `avnadmin`, and nothing about a managed database says so on the form. The
+    string carries it, and the host says it even when the string is not used.
+    """
+
+    def test_a_connection_string_becomes_its_parts(self):
+        found = write_request_env.parse_connection_string(
+            "mysql://avnadmin:AVNS_token@mysql-1.aivencloud.com:12365/defaultdb?ssl-mode=REQUIRED"
+        )
+        assert found == {
+            "host": "mysql-1.aivencloud.com",
+            "port": "12365",
+            "admin_user": "avnadmin",
+            "admin_password": "AVNS_token",
+        }
+
+    def test_a_password_with_url_characters_survives_the_trip(self):
+        found = write_request_env.parse_connection_string(
+            "mysql://doadmin:a%40b%2Fc@db-1.ondigitalocean.com:25060/defaultdb"
+        )
+        assert found["admin_password"] == "a@b/c"
+
+    @pytest.mark.parametrize(
+        "text", ["db.example.edu", "", "not a string at all", "mysql://"]
+    )
+    def test_anything_that_is_not_one_reads_as_nothing(self, text):
+        assert write_request_env.parse_connection_string(text) == {}
+
+    @pytest.mark.parametrize(
+        "host, expected",
+        [
+            ("mysql-133d-x.a.aivencloud.com", "avnadmin"),
+            ("db-mysql-fra1-1.b.ondigitalocean.com", "doadmin"),
+            ("db.example.edu", ""),
+            ("", ""),
+        ],
+    )
+    def test_the_host_names_the_account_where_it_can(self, host, expected):
+        assert database.admin_for_host(host) == expected
+
+    def test_the_answer_is_settled_in_one_place(self):
+        # The wizard, the deploy and the checks each need it, and an account one
+        # of them uses and the others do not is a deployment that half works.
+        assert database.admin_user("mysql-1.aivencloud.com", "") == "avnadmin"
+        assert database.admin_user("db.example.edu", "") == "root"
+        assert database.admin_user("mysql-1.aivencloud.com", "chosen") == "chosen"
+
+class TestWhoMakesTheDatabaseReady:
+    """Setup, or whoever administers the database — and the study says which.
+
+    Creating a schema needs an account stronger than the one that writes to it.
+    Most managed databases hand you one; an institutional server hands you an
+    account that may insert and nothing else, and that study needs its SQL run
+    for it rather than by it.
+    """
+
+    def test_setup_does_it_unless_told_otherwise(self):
+        assert write_request_env.clean_db_init("", "") == "auto"
+        assert write_request_env.clean_db_init(None, "auto") == "auto"
+
+    def test_a_study_can_ask_to_run_the_sql_itself(self):
+        assert write_request_env.clean_db_init("manual", "auto") == "manual"
+
+    def test_a_previous_answer_stands_in_for_a_blank_one(self):
+        assert write_request_env.clean_db_init("", "manual") == "manual"
+
+    @pytest.mark.parametrize("choice", ["later", "sometimes", "1"])
+    def test_anything_else_is_refused(self, choice):
+        with pytest.raises(SystemExit):
+            write_request_env.clean_db_init(choice, "auto")
+
+class TestTheEnvironmentAlwaysCarriesTheAccount:
+    """`.env` is what every script reads before opening the database.
+
+    A deployment upgraded in place has a file written before the question was
+    asked, so the answer is settled when the file is written rather than guessed
+    again by each reader.
+    """
+
+    def test_the_example_file_shows_the_key(self):
+        example = (
+            pathlib.Path(__file__).resolve().parent.parent / "env.example"
+        ).read_text(encoding="utf-8")
+        assert "DB_ADMIN_USER=" in example
+
+    def test_the_host_settles_it_when_nothing_else_did(self):
+        assert database.admin_user("mysql-1.aivencloud.com", "") == "avnadmin"
+
+    def test_a_bundled_database_keeps_mysqls_own_administrator(self):
+        assert database.admin_user(database.COMPOSE_HOST, "") == "root"
+        assert database.admin_user("db.internal", "") == "root"
