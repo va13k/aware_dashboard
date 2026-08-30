@@ -40,6 +40,43 @@ DEPLOYED_MYSQL = "8.0"
 
 if str(API_ROOT) not in sys.path:
     sys.path.insert(0, str(API_ROOT))
+# The study's own vocabulary lives beside the API rather than inside it, and the
+# container bind-mounts it in. Outside the container the repository root is where
+# it is, so it goes on the path too.
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
+
+
+@pytest.fixture(autouse=True)
+def researcher_session(request):
+    """Every test speaks to the API as a researcher who has logged in.
+
+    One dependency on the application guards every route (app/routers/auth.py), so
+    without this each test below would be exercising the 401 rather than the route
+    it names. Lifted for a test marked `no_session`, which is how the guard itself
+    is covered.
+    """
+    if "no_session" in request.keywords:
+        yield
+        return
+
+    from app.main import app
+
+    # Taken from what the application registered rather than imported here.
+    # tests/test_auth.py reloads the auth module, which re-executes it into the
+    # same namespace but produces new function objects, and an override keyed on a
+    # freshly imported one would stop matching the guard the routes actually carry.
+    guard = next(
+        dependency.dependency
+        for dependency in app.router.dependencies
+        if dependency.dependency.__name__ == "require_session"
+    )
+
+    app.dependency_overrides[guard] = lambda: None
+    try:
+        yield
+    finally:
+        app.dependency_overrides.pop(guard, None)
 
 os.environ.setdefault(
     "ANDROID_DATABASE_URL",

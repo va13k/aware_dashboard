@@ -1,7 +1,7 @@
 import logging
 from contextlib import asynccontextmanager
 from sqlalchemy import text
-from fastapi import FastAPI
+from fastapi import Depends, FastAPI
 from app.database import android_engine, ios_engine
 from app.routers import (
     health,
@@ -52,6 +52,10 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     lifespan=lifespan,
+    # Asked of every route below, including the ones a router adds later. Nginx
+    # checks the same cookie before a request reaches this process; this is what
+    # answers when something reaches it without passing nginx.
+    dependencies=[Depends(auth.require_session)],
     docs_url=None,
     redoc_url=None,
     openapi_url=None,

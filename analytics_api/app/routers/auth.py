@@ -6,9 +6,10 @@ import secrets
 import time
 from pathlib import Path
 
-from fastapi import APIRouter, Form, Request
+from fastapi import APIRouter, Form, HTTPException, Request
 from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from fastapi.templating import Jinja2Templates
+from starlette.requests import HTTPConnection
 
 logger = logging.getLogger(__name__)
 
@@ -126,6 +127,40 @@ def session_is_valid(cookies) -> bool:
     token the same way.
     """
     return _verify_token(cookies.get(_COOKIE, ""))
+
+
+#: Answered without a session. The login pages are how one is obtained, and the
+#: health probe is the container asking whether this process is up: it runs inside
+#: the container, ahead of nginx, and reports nothing about the study.
+OPEN_PREFIXES = ("/auth/",)
+OPEN_PATHS = frozenset({"/health"})
+
+#: Checked by the route instead of here. A WebSocket handshake refused with a status
+#: is one the browser cannot read a reason from, so `live` reads the same cookie
+#: itself and closes with a code that says why.
+SOCKET_PATHS = frozenset({"/live"})
+
+
+async def require_session(connection: HTTPConnection) -> None:
+    """The session every route is held to, asked once for the whole application.
+
+    Nginx runs `auth_request` in front of this, and that was the only thing asking:
+    nothing here read the cookie, so a caller arriving by any other route --- another
+    service on the compose network, a location block written without the check ---
+    was answered in full. A boundary that holds from one direction only is one
+    editing mistake away from holding from none.
+
+    Declared on the application rather than on each router, so a router added later
+    is guarded by having been added.
+
+    `HTTPConnection` is the shape an ordinary request and a WebSocket handshake
+    share, and this runs for both.
+    """
+    path = connection.url.path
+    if path in OPEN_PATHS or path in SOCKET_PATHS or path.startswith(OPEN_PREFIXES):
+        return
+    if not session_is_valid(connection.cookies):
+        raise HTTPException(status_code=401, detail="Not authenticated")
 
 
 def _safe_next(url: str) -> str:
