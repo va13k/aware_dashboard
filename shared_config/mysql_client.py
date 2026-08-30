@@ -16,11 +16,19 @@ is up --- the client falls back to this machine's own resolution, and
 """
 
 import base64
+import contextlib
+import os
 import re
 import shlex
 import subprocess
+import tempfile
 
 from shared_config import database, placement
+from shared_config.runtime import SECRET_MODE
+
+#: What the MySQL client reads a password from when it is not given one. Every
+#: client this module runs is given it this way.
+PASSWORD_ENV = "MYSQL_PWD"
 
 #: The bundled database's container, which carries a client of its own.
 BUNDLED_CONTAINER = "aware_mysql"
@@ -113,16 +121,13 @@ class Client:
         """Whether a query is asked from the deployment's network or from this machine."""
         return self._bundled or self._network_available()
 
-    def _client_argv(
-        self, user: str, password: str, schema: str, batch: bool, keep_going: bool = False
-    ) -> list[str]:
+    def _client_argv(self, user: str, schema: str, batch: bool) -> list[str]:
         client = [
             "mysql",
             "--protocol=TCP",
             f"-h{'127.0.0.1' if self._bundled else self._host}",
             f"-P{self._port}",
             f"-u{user}",
-            f"-p{password}",
             f"--connect-timeout={CONNECT_TIMEOUT_SECONDS}",
         ]
         if self._ssl_mode:
@@ -131,11 +136,6 @@ class Client:
             client.append(f"--ssl-ca={CA_PATH}")
         if batch:
             client += ["-B", "-N"]
-        # Applying a file written for a deployment that owns its database: the
-        # grants in it name accounts a database somebody else runs has never heard
-        # of, and stopping at the first would leave the tables after it uncreated.
-        if keep_going:
-            client.append("--force")
         if schema:
             client.append(schema)
         return client
@@ -158,17 +158,42 @@ class Client:
             f"printf %s {shlex.quote(encoded)} | base64 -d > {CA_PATH} && exec {program}",
         ]
 
-    def _command(
-        self, user: str, password: str, schema: str, batch: bool, keep_going: bool = False
-    ) -> list[str]:
-        client = self._with_authority(
-            self._client_argv(user, password, schema, batch, keep_going)
+    def _command(self, user: str, schema: str, batch: bool, password_file: str) -> list[str]:
+        client = self._with_authority(self._client_argv(user, schema, batch))
+
+        # A file docker reads, rather than a variable it inherits or an argument it
+        # is given. The argument would be world-readable in `ps` for as long as the
+        # query runs, and inheriting does not survive the trip: setup reaches docker
+        # through sudo, which resets the environment, so a password handed over that
+        # way arrives empty and MySQL reports a login with no password at all.
+        carry = ["--env-file", password_file]
+        if self._bundled:
+            return self._base + ["exec", "-i"] + carry + [BUNDLED_CONTAINER] + client
+        network = ["--network", self._network] if self._network_available() else []
+        return (
+            self._base + ["run", "--rm", "-i"] + carry + network + [CLIENT_IMAGE] + client
         )
 
-        if self._bundled:
-            return self._base + ["exec", "-i", BUNDLED_CONTAINER] + client
-        network = ["--network", self._network] if self._network_available() else []
-        return self._base + ["run", "--rm", "-i"] + network + [CLIENT_IMAGE] + client
+    @staticmethod
+    @contextlib.contextmanager
+    def _password_file(password: str):
+        """The password on disk for the length of one query, readable by its owner.
+
+        Written whole rather than appended to, removed whatever happens, and holding
+        one line: docker's env-file format takes the value literally to the end of
+        the line, which every password this deployment issues survives.
+        """
+        handle, path = tempfile.mkstemp(prefix="aware-db-", suffix=".env")
+        try:
+            with os.fdopen(handle, "w", encoding="utf-8") as target:
+                os.fchmod(target.fileno(), SECRET_MODE)
+                target.write(f"{PASSWORD_ENV}={password}\n")
+            yield path
+        finally:
+            try:
+                os.unlink(path)
+            except OSError:
+                pass
 
     def run(
         self,
@@ -178,17 +203,25 @@ class Client:
         schema: str = "",
         batch: bool = False,
         stdin=None,
-        keep_going: bool = False,
     ) -> subprocess.CompletedProcess:
-        """Issue SQL, from stdin or from a file handle, and return what happened."""
-        return subprocess.run(
-            self._command(user, password, schema, batch, keep_going),
-            input=None if stdin is not None else sql,
-            stdin=stdin,
-            capture_output=True,
-            text=True,
-            check=False,
-        )
+        """Issue SQL, from stdin or from a file handle, and return what happened.
+
+        The password reaches the client through a file docker reads rather than
+        through the command. A command line is readable by every user on the machine
+        for as long as the process lives --- `ps` on the host shows what docker was
+        asked to run, and `ps` inside the container shows the client itself --- and
+        this deployment issues SQL as the account that administers the study's
+        database.
+        """
+        with self._password_file(password) as password_file:
+            return subprocess.run(
+                self._command(user, schema, batch, password_file),
+                input=None if stdin is not None else sql,
+                stdin=stdin,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
 
     def scalar(self, user: str, password: str, sql: str, schema: str = "") -> str:
         """One value from a single-row query, or "" when the query returns nothing."""

@@ -228,7 +228,7 @@ class _Server:
     def on_network(self):
         return True
 
-    def run(self, user, password, sql="", schema="", batch=False, stdin=None, keep_going=False):
+    def run(self, user, password, sql="", schema="", batch=False, stdin=None):
         self.asked.append(sql)
         if self.accounts.get(user) != password:
             return subprocess.CompletedProcess(
@@ -314,11 +314,24 @@ class TestTheAccountsAStudyOpensItWith:
         result = verify_database.check_profiles(_server(), "root", "pw", [SERVER_PROFILE])
         assert result["warning"] and not result["ok"]
 
-    def test_an_account_that_will_not_take_this_studys_password_fails(self):
-        """The account is there and the credential this study publishes is not its
-        own, which no deploy fixes by creating anything."""
+    def test_an_account_holding_another_password_is_the_deploys_to_settle(self):
+        """The deployment states every account's password on every run, so an
+        account carrying a different one is as unapplied as a missing schema. Read
+        as a failure, it stops the deploy that was about to fix it --- which is
+        what a database seeded with a first-boot password looks like on the run
+        that first generates a real one."""
         server = _server(accounts={"aware_android_server": "something else"})
         result = verify_database.check_profiles(server, "root", "pw", [SERVER_PROFILE])
+        assert result["warning"] and not result["ok"]
+        assert "applied when it deploys" in result["detail"]
+
+    def test_the_same_account_fails_where_nothing_will_settle_it(self):
+        # A database made by hand: the deployment was given an account to use, not
+        # one to alter, so a password only the study holds stays wrong.
+        server = _server(accounts={"aware_android_server": "something else"})
+        result = verify_database.check_profiles(
+            server, "root", "pw", [SERVER_PROFILE], create=False
+        )
         assert not result["ok"] and not result["warning"]
 
 
