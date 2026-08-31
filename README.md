@@ -213,7 +213,6 @@ Where people usually get one:
 | **Aiven for MySQL** | Paid after a trial; CA certificate downloadable per service. |
 | **PlanetScale** | Paid, MySQL-compatible. |
 | **A VPS you run** (Hetzner, DigitalOcean droplet, your institution's VM) | Cheapest per gigabyte, and the schema, backups and TLS are then yours to manage. |
-| **db4free.net, freemysqlhosting.net** | Free, tiny and rate-limited. Fine for trying the stack out, not for a study — no guarantee, and a database that disappears takes the collection with it. |
 
 Prices and free tiers change; check the current terms rather than trusting this
 table. What does not change is the protocol: if the service does not say **MySQL**,
