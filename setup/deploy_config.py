@@ -1,3 +1,4 @@
+import argparse
 import html
 import json
 import os
@@ -1277,6 +1278,15 @@ def chown_generated_paths(env: dict[str, str]) -> None:
         STUDY_CONFIG_PATH.parent,
         STUDIES_INDEX_PATH,
         PROJECT / "deployment-urls.json",
+        # The broker's generated configuration, and the directory itself: this one
+        # is written with mkstemp in the directory rather than over the file, so a
+        # directory left owned by root is what stops the next deploy dead rather
+        # than something a later write quietly replaces.
+        MOSQUITTO_DIR,
+        MOSQUITTO_DIR / "mosquitto.conf",
+        MOSQUITTO_DIR / "acl",
+        MOSQUITTO_DIR / "passwords",
+        NGINX_STUDY_KEY_PATH,
     ]
     for path in paths:
         try:
@@ -1405,7 +1415,20 @@ def _stored_join_url() -> str:
         return ""
 
 
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0] if __doc__ else "")
+    parser.add_argument(
+        "--docker-prefix",
+        action="append",
+        default=[],
+        help="Optional command prefix before docker, for example: --docker-prefix sudo",
+    )
+    return parser.parse_args()
+
+
 def main() -> None:
+    args = parse_args()
+    docker_prefix = list(args.docker_prefix)
     env = load_merged_env()
     rotated = apply_rotation_request(env)
     ensure_django_secret_key(env)
@@ -1464,8 +1487,8 @@ def main() -> None:
     # After the placement, because it is the placement that decides there is anywhere
     # to copy from: a study staying on the bundled database has one server, not two.
     copying = apply_data_copy(source)
-    authority = ensure_database_authority(source)
-    broker_port = apply_broker(env)
+    authority = ensure_database_authority(source, docker_prefix)
+    broker_port = apply_broker(env, docker_prefix)
     resolve_database_readers(env, source)
     print(f"dataflow: android={dataflow.declared(source, 'android')} "
           f"ios={dataflow.declared(source, 'ios')} mysql_bind={bind}")
