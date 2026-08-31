@@ -27,20 +27,6 @@ Study participants need the AWARE mobile app installed on their device:
 
 Once a participant joins a study (by scanning a QR code or entering a study URL), the app begins collecting sensor data locally and waits for the participant to manually sync it to the server.
 
-> **Important — data is not uploaded automatically.**
->
-> The AWARE app stores all collected sensor data on the phone and only sends it to the server when the participant triggers a sync manually. Data will not appear in the dashboard until they do this.
->
-> - **Android** — open the AWARE app and tap the **SYNC DATA** button.
->
-> ![Android SYNC DATA button](docs/images/android-upload-data.png)
->
-> - **iPhone** — open the AWARE app and tap the **upload button** (cloud with arrow) in the top-left corner of the screen.
->
-> ![iPhone upload button](docs/images/iphone-upload-data.png)
->
-> Remind participants to sync regularly — especially before any scheduled data collection session ends. Syncing is also how a phone picks up a changed study configuration, so a participant who syncs often stays current on both counts.
-
 ## Prerequisites
 
 ### Docker with Compose v2
