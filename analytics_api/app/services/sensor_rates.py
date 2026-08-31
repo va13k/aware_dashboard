@@ -30,6 +30,18 @@ what a researcher was reading when they chose the value.
 - *Event* — no interval at all. `calls`, `messages`, `screen`: the phone writes
   when something happens, and no configuration predicts how often that is. These
   carry no expectation, so presence is all a bucket of them can be judged on.
+- *Gated* — an interval exists, but the client drops samples before writing them.
+  A positive `threshold_<sensor>` discards a reading too close to the one before
+  it, and `status_significant_motion` stops the five motion sensors writing
+  anything while the phone is still. Either makes the configured rate a ceiling
+  the count sits somewhere under, by an amount no configuration predicts, so
+  these are judged on presence like an event sensor, with the figure kept for
+  context.
+
+The comparison is one-sided in the other direction too. `frequency_*` reaches
+Android as a sampling *hint*, so a phone may deliver faster than asked unless the
+study also sets `frequency_<sensor>_enforce`. A bucket above its expectation is
+therefore ordinary, which is why `over` is a band rather than a fault.
 
 A sensor whose governing setting is missing, unparseable or non-positive also
 ends up without an expectation. That is reported as `unconfigured` rather than
@@ -66,6 +78,9 @@ SAMPLED = "sampled"
 SCANNED = "scanned"
 #: No configured rate exists. Presence is all a bucket can be judged on.
 EVENT = "event"
+#: An interval exists, but the client filters samples before writing them, so the
+#: figure bounds the count from above. Judged on presence, like an event sensor.
+GATED = "gated"
 
 
 @dataclass(frozen=True)
@@ -78,6 +93,10 @@ class RateSpec:
     #: Further settings governing the same table, when several providers write
     #: to it. The fastest one decides the expectation.
     also: tuple[str, ...] = ()
+    #: A setting whose positive value makes the client discard a reading too
+    #: close to the one before it, so the table receives fewer rows than the
+    #: interval implies.
+    threshold: str | None = None
 
 
 # Android streams with a configured interval. Everything absent from this table
@@ -86,16 +105,36 @@ class RateSpec:
 # `significant-motion`, `esm`, `esm-scheduler` and the `applications-*` logs all
 # write when something happens rather than on a clock.
 ANDROID_RATES: dict[str, RateSpec] = {
-    "accelerometer": RateSpec("frequency_accelerometer", MICROSECONDS),
-    "barometer": RateSpec("frequency_barometer", MICROSECONDS),
-    "gravity": RateSpec("frequency_gravity", MICROSECONDS),
-    "gyroscope": RateSpec("frequency_gyroscope", MICROSECONDS),
-    "light": RateSpec("frequency_light", MICROSECONDS),
-    "linear-accelerometer": RateSpec("frequency_linear_accelerometer", MICROSECONDS),
-    "magnetometer": RateSpec("frequency_magnetometer", MICROSECONDS),
-    "proximity": RateSpec("frequency_proximity", MICROSECONDS),
-    "rotation": RateSpec("frequency_rotation", MICROSECONDS),
-    "temperature": RateSpec("frequency_temperature", MICROSECONDS),
+    "accelerometer": RateSpec(
+        "frequency_accelerometer", MICROSECONDS, threshold="threshold_accelerometer"
+    ),
+    "barometer": RateSpec(
+        "frequency_barometer", MICROSECONDS, threshold="threshold_barometer"
+    ),
+    "gravity": RateSpec(
+        "frequency_gravity", MICROSECONDS, threshold="threshold_gravity"
+    ),
+    "gyroscope": RateSpec(
+        "frequency_gyroscope", MICROSECONDS, threshold="threshold_gyroscope"
+    ),
+    "light": RateSpec("frequency_light", MICROSECONDS, threshold="threshold_light"),
+    "linear-accelerometer": RateSpec(
+        "frequency_linear_accelerometer",
+        MICROSECONDS,
+        threshold="threshold_linear_accelerometer",
+    ),
+    "magnetometer": RateSpec(
+        "frequency_magnetometer", MICROSECONDS, threshold="threshold_magnetometer"
+    ),
+    "proximity": RateSpec(
+        "frequency_proximity", MICROSECONDS, threshold="threshold_proximity"
+    ),
+    "rotation": RateSpec(
+        "frequency_rotation", MICROSECONDS, threshold="threshold_rotation"
+    ),
+    "temperature": RateSpec(
+        "frequency_temperature", MICROSECONDS, threshold="threshold_temperature"
+    ),
     # Polling loops, configured in seconds.
     "applications": RateSpec("frequency_applications", SECONDS),
     "processor": RateSpec("frequency_processor", SECONDS),
@@ -145,6 +184,16 @@ IOS_RATES: dict[str, RateSpec] = {
 
 RATES = {ANDROID: ANDROID_RATES, IOS: IOS_RATES}
 
+#: With `status_significant_motion` on, these five write only while the phone is
+#: moving (`com.aware.Accelerometer#onSensorChanged` and its four siblings return
+#: early otherwise), so an hour of stillness is an empty bucket the study asked
+#: for. Android only: iOS carries the setting as a sensor of its own, gating
+#: nothing else.
+MOTION_SETTING = "status_significant_motion"
+MOTION_GATED = frozenset(
+    {"accelerometer", "gravity", "gyroscope", "linear-accelerometer", "rotation"}
+)
+
 #: Why a stream has no expectation: no configured interval exists for it at all,
 #: or the setting that should carry one is missing or unreadable.
 NO_RATE = "event"
@@ -164,25 +213,34 @@ class ExpectedRate:
     interval_seconds: float | None = None
     #: The setting the interval was read from.
     setting: str | None = None
+    #: The settings filtering this stream on the phone, when any do. Named rather
+    #: than counted, because the setting is what a researcher changes once they
+    #: know why a row is going unjudged.
+    gated_by: tuple[str, ...] = ()
 
     @property
     def comparable(self) -> bool:
         """Whether a count can be judged against this at all."""
-        return self.per_hour is not None and self.per_hour > 0
+        return self.basis in (SAMPLED, SCANNED) and (self.per_hour or 0) > 0
 
     @property
     def is_floor(self) -> bool:
         """Whether the figure is a lower bound rather than an expectation."""
         return self.basis == SCANNED
 
+    @property
+    def is_ceiling(self) -> bool:
+        """Whether the figure is an upper bound rather than an expectation."""
+        return self.basis == GATED
 
-def _interval_seconds(value: Any, unit: str) -> float | None:
-    """A configured interval as seconds, or None when it is not a usable number.
+
+def _positive_number(value: Any) -> float | None:
+    """A config value as a positive number, or None when it is not one.
 
     Values arrive as numbers from the Android config and as strings from the
     micro-server config, so both are accepted. Zero and negatives mean "off" or
-    "as fast as possible" depending on the sensor, and neither is a rate a bucket
-    can be judged against.
+    "as fast as possible" depending on the setting, and neither is a figure an
+    interval or a threshold can be read from.
     """
     if isinstance(value, bool) or value is None:
         return None
@@ -193,11 +251,38 @@ def _interval_seconds(value: Any, unit: str) -> float | None:
             return None
     if not isinstance(value, (int, float)):
         return None
-    if value <= 0:
+    return float(value) if value > 0 else None
+
+
+def _interval_seconds(value: Any, unit: str) -> float | None:
+    """A configured interval as seconds, or None when it is not a usable number."""
+    number = _positive_number(value)
+    if number is None:
         return None
 
-    seconds = float(value) * _TO_SECONDS[unit]
+    seconds = number * _TO_SECONDS[unit]
     return seconds if seconds > 0 else None
+
+
+def _gates(
+    platform: str, sensor_key: str, spec: RateSpec, settings: dict[str, Any]
+) -> tuple[str, ...]:
+    """The settings filtering this stream on the phone, if any do.
+
+    A gate does not change how often the sensor samples; it decides which samples
+    reach the table. The interval therefore still bounds the count, and nothing
+    predicts how far under it the filter leaves things.
+    """
+    gates = []
+    if spec.threshold and _positive_number(settings.get(spec.threshold)) is not None:
+        gates.append(spec.threshold)
+    if (
+        platform == ANDROID
+        and sensor_key in MOTION_GATED
+        and study_config.is_enabled(settings.get(MOTION_SETTING))
+    ):
+        gates.append(MOTION_SETTING)
+    return tuple(gates)
 
 
 def expected_for(
@@ -209,6 +294,10 @@ def expected_for(
     A stream with an entry whose setting is absent or unreadable returns none
     either, marked `unconfigured` so the two are distinguishable — the first is
     how the sensor works, the second is something missing from the config.
+
+    A stream the config also filters on the phone keeps its figure and is marked
+    `gated`: the rate is then a ceiling rather than an expectation, so the count
+    is not comparable with it.
     """
     table = RATES.get(platform)
     if table is None:
@@ -234,13 +323,15 @@ def expected_for(
     # The fastest provider decides: a table several providers write to receives
     # at least what the quickest of them produces.
     setting, seconds = min(usable, key=lambda pair: pair[1])
+    gates = _gates(platform, sensor_key, spec, settings)
 
     return ExpectedRate(
         sensor_key=sensor_key,
-        basis=spec.kind,
+        basis=GATED if gates else spec.kind,
         per_hour=SECONDS_PER_HOUR / seconds,
         interval_seconds=seconds,
         setting=setting,
+        gated_by=gates,
     )
 
 

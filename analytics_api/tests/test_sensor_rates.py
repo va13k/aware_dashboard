@@ -8,10 +8,11 @@ looking entirely plausible.
 
 The rest is about what the model refuses to claim. A sensor the phone writes on
 an event has no rate to expect, a setting the config does not carry cannot be
-guessed at, and a scan sensor's interval bounds its scans rather than its rows.
-Each of those has to stay distinguishable from "reporting as configured", because
-a cell that asserts a comparison nobody made is worse than one that admits there
-is nothing to compare.
+guessed at, a scan sensor's interval bounds its scans rather than its rows, and a
+sensor the client filters — by a threshold, or by only writing while the phone
+moves — has an interval that bounds its rows from above. Each of those has to stay
+distinguishable from "reporting as configured", because a cell that asserts a
+comparison nobody made is worse than one that admits there is nothing to compare.
 """
 
 from app.services import sensor_rates
@@ -108,6 +109,88 @@ def test_a_scan_sensor_reports_its_figure_as_a_floor():
     assert rate.basis == sensor_rates.SCANNED
     assert rate.is_floor
     assert rate.per_hour == 60
+
+
+def test_a_threshold_makes_the_configured_rate_a_ceiling():
+    """The client discards a reading within the threshold of the one before it, so
+    the interval bounds the rows rather than predicting them — a phone left on a
+    desk writes almost none of the 180,000 an hour it is sampling at."""
+    rate = sensor_rates.expected_for(
+        "android",
+        "accelerometer",
+        {"frequency_accelerometer": 20000, "threshold_accelerometer": 0.1},
+    )
+
+    assert rate.basis == sensor_rates.GATED
+    assert rate.is_ceiling
+    assert rate.per_hour == 180_000
+    assert rate.gated_by == ("threshold_accelerometer",)
+    assert not rate.comparable
+
+
+def test_a_zero_threshold_leaves_the_rate_comparable():
+    """Every config carries the setting; only a positive one filters anything."""
+    rate = sensor_rates.expected_for(
+        "android",
+        "accelerometer",
+        {"frequency_accelerometer": 20000, "threshold_accelerometer": 0},
+    )
+
+    assert rate.basis == sensor_rates.SAMPLED
+    assert rate.comparable
+
+
+def test_significant_motion_gates_the_sensors_it_stops_and_no_others():
+    """With it on, the five motion sensors write nothing while the phone is still,
+    so an hour of stillness is an empty bucket rather than a shortfall. Light is
+    not one of them and stays judged by its rate."""
+    settings = {
+        "status_significant_motion": True,
+        "frequency_accelerometer": 20000,
+        "frequency_light": 20000,
+    }
+
+    gated = sensor_rates.expected_for("android", "accelerometer", settings)
+    ungated = sensor_rates.expected_for("android", "light", settings)
+
+    assert gated.gated_by == ("status_significant_motion",)
+    assert not gated.comparable
+    assert ungated.basis == sensor_rates.SAMPLED
+    assert ungated.comparable
+
+
+def test_significant_motion_does_not_gate_ios():
+    """iOS carries it as a sensor of its own and nothing there returns early on
+    it, so an iPhone's accelerometer stays judged against its rate."""
+    rate = sensor_rates.expected_for(
+        "ios",
+        "accelerometer",
+        {"status_significant_motion": True, "frequency_accelerometer": 20000},
+    )
+
+    assert rate.basis == sensor_rates.SAMPLED
+    assert rate.comparable
+
+
+def test_both_gates_are_named_together():
+    """The name is what a researcher changes, so a row filtered two ways has to
+    say both rather than the first one found."""
+    rate = sensor_rates.expected_for(
+        "android",
+        "gyroscope",
+        {
+            "frequency_gyroscope": 20000,
+            "threshold_gyroscope": 0.5,
+            "status_significant_motion": "true",
+        },
+    )
+
+    assert rate.gated_by == ("threshold_gyroscope", "status_significant_motion")
+
+
+def test_every_motion_gated_sensor_is_a_stream_the_rate_table_knows():
+    """A key misspelt in the set would gate nothing, silently and forever."""
+    assert sensor_rates.MOTION_GATED <= set(sensor_rates.ANDROID_RATES)
 
 
 def test_the_fastest_provider_sets_a_shared_table_rate():
