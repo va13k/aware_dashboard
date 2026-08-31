@@ -27,6 +27,11 @@ before a device joined and after it left, an empty bucket is not a gap. And how
 much was expected comes from the study config (services/sensor_rates.py). A
 bucket only partly inside an enrolment window expects only its covered part,
 which is what stops the joining hour and the leaving hour reading as failures.
+
+Not every stream has an amount to be judged on. An event sensor has no configured
+rate, and a gated one has a rate the phone then filters against — both arrive
+here carrying no comparison, and their buckets say whether data came rather than
+whether enough did.
 """
 
 import calendar
@@ -372,6 +377,10 @@ def cell(
     not say what it was judged against — and for a sensor whose configured rate
     and delivered rate differ by orders of magnitude, that is the number the
     researcher needs to see before believing the colour.
+
+    A figure the count is not comparable with is still carried, as a bound: a
+    gated sensor's rate says what the hour could have held at most, which is worth
+    reading beside what it did hold even though nothing is claimed about the gap.
     """
     if hours <= 0:
         # Nothing was asked for in this bucket, and something arrived anyway: a
@@ -393,7 +402,7 @@ def cell(
             "hours": 0,
         }
 
-    expected = rate.per_hour * hours if rate.comparable else None
+    expected = rate.per_hour * hours if rate.per_hour else None
     state = classify(records, expected, rate.comparable)
 
     return {
@@ -406,6 +415,9 @@ def cell(
         # A scan sensor's figure bounds the scans, not the rows they yield, so a
         # count above it is not evidence the scan is healthy.
         "floor": rate.is_floor,
+        # A gated sensor's figure bounds the count from above: the phone discards
+        # samples before writing them, so arriving under it is what it does.
+        "ceiling": rate.is_ceiling,
     }
 
 

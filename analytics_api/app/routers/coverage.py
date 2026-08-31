@@ -585,10 +585,13 @@ async def _device_grid_rows(
                 "required": sensor in required,
                 "cells": cells,
                 "records": sum(counts),
+                # Carried for a gated sensor too, where it is the ceiling
+                # the row sits under rather than the figure it is judged against.
                 "expected_per_hour": (
-                    round(rate.per_hour, 4) if rate.comparable else None
+                    round(rate.per_hour, 4) if rate.per_hour else None
                 ),
                 "basis": rate.basis,
+                "gated_by": list(rate.gated_by),
             }
         )
     return rows

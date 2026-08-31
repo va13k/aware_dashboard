@@ -376,6 +376,29 @@ def test_the_device_grid_carries_the_rate_each_row_is_judged_against(client, gri
     assert event["basis"] == sensor_rates.EVENT
 
 
+def test_a_gated_sensors_row_is_reported_rather_than_judged(client, grid):
+    """With significant motion on, the accelerometer writes only while the phone
+    moves, so a still hour is not a shortfall. The row keeps the configured rate
+    as the ceiling it sat under, and names the setting that put it there."""
+    grid["required"] = ["accelerometer"]
+    grid["settings"] = {
+        "frequency_accelerometer": 20000,
+        "status_significant_motion": True,
+    }
+    counts = [0] * 24
+    counts[7] = 200
+    grid["holdings"]["android"][(DEVICE, android_table("accelerometer"))] = counts
+
+    body = device_grid(client)
+    row = next(row for row in body["rows"] if row["sensor"] == "accelerometer")
+
+    assert row["basis"] == sensor_rates.GATED
+    assert row["expected_per_hour"] == 180_000
+    assert row["gated_by"] == ["status_significant_motion"]
+    assert row["cells"][7]["band"] == coverage_matrix.BAND_UNJUDGED
+    assert row["cells"][7]["ceiling"] is True
+
+
 def test_the_device_grid_reads_only_its_own_device(client, grid):
     grid["windows"][QUIET] = [{"joined_at": 0, "left_at": None}]
     grid["holdings"]["android"][(QUIET, android_table("battery"))] = [9] * 24

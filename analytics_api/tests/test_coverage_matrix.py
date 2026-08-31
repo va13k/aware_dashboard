@@ -250,6 +250,29 @@ def test_a_scan_sensors_cell_says_its_figure_is_a_floor():
     assert cell["basis"] == sensor_rates.SCANNED
 
 
+def test_a_gated_sensors_cell_carries_its_figure_as_a_ceiling():
+    """200 rows against a configured 180,000 is what a still phone produces when
+    the client filters the sensor, so the cell reports rather than judges it. The
+    figure is still carried: it says what the hour could have held at most."""
+    cell = coverage_matrix.cell(
+        200, one_hour(4), 1.0, rate(180_000, sensor_rates.GATED)
+    )
+
+    assert cell["state"] == coverage_matrix.PRESENT
+    assert cell["band"] == coverage_matrix.BAND_UNJUDGED
+    assert cell["ceiling"] is True
+    assert cell["expected"] == 180_000
+
+
+def test_a_gated_sensors_empty_hour_is_still_missing():
+    """The gate decides how much arrives, not whether anything does — so an hour
+    holding nothing at all is the one thing a gated row still asserts."""
+    cell = coverage_matrix.cell(0, one_hour(4), 1.0, rate(180_000, sensor_rates.GATED))
+
+    assert cell["state"] == coverage_matrix.MISSING
+    assert cell["band"] == coverage_matrix.BAND_NONE
+
+
 def test_the_aggregate_cell_counts_required_sensors_that_reported():
     cell = coverage_matrix.aggregate_cell(
         {"battery": 4, "screen": 0}, ["battery", "screen", "calls"], one_hour(4), 1.0
