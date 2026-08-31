@@ -96,6 +96,14 @@ const BAND_SUMMARY: Record<string, string> = {
 };
 
 /**
+ * `unjudged` where a rate does exist but the phone filters what reaches the table.
+ * The band's own wording denies a rate the researcher can see in the config, and
+ * would send them looking for the missing setting instead of at the filter.
+ */
+const GATED_SUMMARY =
+  "Arrived. The phone filters this sensor, so the amount is not judged.";
+
+/**
  * The same bands on the all-sensors grid, where they count sensors rather than rows.
  *
  * `aggregate_band` decides the colour from the share of required sensors that
@@ -131,7 +139,8 @@ function cellDetail(
     `${rowLabel} · ${bucketRange(bucket, timezone)}`,
     // The rate wording is the fallback: `aggregate_band` produces no `over`, and
     // a band this table has yet to learn still gets a sentence.
-    (aggregate ? AGGREGATE_BAND_SUMMARY[band] : null) ?? BAND_SUMMARY[band],
+    (aggregate ? AGGREGATE_BAND_SUMMARY[band] : null) ??
+      (cell.ceiling && band === "unjudged" ? GATED_SUMMARY : BAND_SUMMARY[band]),
   ];
 
   if (band === "blank") return lines;
@@ -150,7 +159,7 @@ function cellDetail(
   lines.push(recordCount(cell.records));
 
   if (cell.expected != null) {
-    const verb = cell.floor ? "at least" : "about";
+    const verb = cell.floor ? "at least" : cell.ceiling ? "at most" : "about";
     lines.push(`Config implies ${verb} ${NUMBER.format(Math.round(cell.expected))}`);
     if (cell.floor) {
       lines.push("That figure bounds the scans, not the rows each one yields.");

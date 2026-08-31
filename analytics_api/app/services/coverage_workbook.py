@@ -41,6 +41,10 @@ BAND_FILL = {
     matrix.BAND_BLANK: "F2F1EE",
 }
 
+#: `unjudged` where a rate does exist but the phone filters what reaches the
+#: table. The band's own wording denies a rate that is right there in the config.
+GATED_MEANING = "Arrived — the phone filters this sensor, so the amount is not judged"
+
 BAND_MEANING = {
     matrix.BAND_SHORT: "Well under the rate the study config asks for",
     matrix.BAND_MODERATE: "Approaching the rate the study config asks for",
@@ -73,7 +77,9 @@ def _cell_note(cell: dict) -> str | None:
     The number alone cannot say whether it is healthy, and a spreadsheet has
     nowhere else to put the expectation without adding a column per bucket.
     """
-    lines = [BAND_MEANING.get(cell.get("band"), "")]
+    band = cell.get("band")
+    gated = band == matrix.BAND_UNJUDGED and cell.get("ceiling")
+    lines = [GATED_MEANING if gated else BAND_MEANING.get(band, "")]
 
     if cell.get("required") is not None:
         lines.append(
@@ -81,7 +87,11 @@ def _cell_note(cell: dict) -> str | None:
             "required sensors reported"
         )
     elif cell.get("expected") is not None:
-        verb = "at least" if cell.get("floor") else "about"
+        verb = "about"
+        if cell.get("floor"):
+            verb = "at least"
+        elif cell.get("ceiling"):
+            verb = "at most"
         lines.append(f"Config implies {verb} {round(cell['expected']):,}")
         if cell.get("floor"):
             lines.append("That figure bounds the scans, not the rows each yields.")

@@ -141,6 +141,33 @@ def test_a_cell_carries_what_it_was_judged_against():
     assert "no configured rate" in grid.cell(row=2, column=4).comment.text
 
 
+def test_a_gated_cell_says_its_figure_is_a_ceiling():
+    """The band's own wording denies a rate the researcher can see in the config,
+    which would send them after the missing setting instead of the filter."""
+    book = sheets(
+        [
+            {
+                "label": "phone-a",
+                "cells": [
+                    cell(
+                        coverage_matrix.BAND_UNJUDGED,
+                        200,
+                        expected=180000,
+                        ceiling=True,
+                    ),
+                    cell(coverage_matrix.BAND_NONE, 0),
+                    cell(coverage_matrix.BAND_NONE, 0),
+                ],
+            }
+        ]
+    )
+    note = book["Coverage"].cell(row=2, column=2).comment.text
+
+    assert "at most 180,000" in note
+    assert "filters this sensor" in note
+    assert "no configured rate" not in note
+
+
 def test_a_partly_covered_bucket_says_how_long_it_was_enrolled():
     book = sheets(
         [

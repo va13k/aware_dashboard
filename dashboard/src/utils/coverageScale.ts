@@ -19,12 +19,15 @@ import type { CoverageCell } from "../types";
  * A seventh outcome sits outside the scale: rows that arrived with nothing to
  * measure them against. An event sensor — `calls`, `screen`, `messages` — has no
  * configured rate, so a count of its rows compares to nothing and reads as neither
- * short nor excessive. A bucket outside every enrolment window lands here too: a
- * phone still uploading after it left the study asked nothing of it, so there is
+ * short nor excessive. A sensor the phone filters before writing lands here for
+ * the same reason: a threshold, or one of the motion sensors while
+ * `status_significant_motion` is on, leaves the configured rate bounding the count
+ * rather than predicting it. A bucket outside every enrolment window is here too:
+ * a phone still uploading after it left the study asked nothing of it, so there is
  * no expectation to judge the count by — but the rows are there and the grid says
- * so, rather than showing the empty bucket its totals would then contradict.
- * Those buckets take a neutral shade in three steps of volume, which keeps them
- * readable while leaving the six judged colours to mean exactly what they say.
+ * so, rather than showing the empty bucket its totals would then contradict. Those
+ * buckets take a neutral shade in three steps of volume, which keeps them readable
+ * while leaving the six judged colours to mean exactly what they say.
  *
  * The bands themselves are decided by the API (`services/coverage_matrix.py`);
  * what lives here is which colour each one wears. Both grids and the legend read

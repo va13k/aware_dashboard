@@ -41,8 +41,25 @@ const NUMBER = new Intl.NumberFormat();
 function rateNote(perHour: number | null, basis: string | null): string {
   if (basis === "event") return "on event";
   if (perHour == null) return "";
-  if (perHour >= 1) return `≈${NUMBER.format(Math.round(perHour))}/h`;
-  return `≈${NUMBER.format(Math.round(perHour * 24))}/day`;
+  // A gated sensor's rate is the ceiling its row sits under rather than a figure
+  // the row is compared with, so the note must not read as one.
+  const sign = basis === "gated" ? "≤" : "≈";
+  if (perHour >= 1) return `${sign}${NUMBER.format(Math.round(perHour))}/h`;
+  return `${sign}${NUMBER.format(Math.round(perHour * 24))}/day`;
+}
+
+/**
+ * Why a row's amounts go unjudged, naming the setting that decides it.
+ *
+ * The colour says the count was not compared with anything; this says what to
+ * change in the study config to make it comparable again.
+ */
+function gatedNote(gatedBy: string[] | undefined): string | undefined {
+  if (!gatedBy?.length) return undefined;
+  return (
+    `Filtered on the phone by ${gatedBy.join(" and ")} — ` +
+    "the configured rate is a ceiling, not an expectation."
+  );
 }
 
 export default function DeviceCoveragePanel({
@@ -86,7 +103,7 @@ export default function DeviceCoveragePanel({
       label: SENSOR_LABEL.get(row.sensor) ?? row.sensor,
       heading: (
         <span className="flex items-center gap-1.5">
-          <span className="truncate">
+          <span className="truncate" title={gatedNote(row.gated_by)}>
             {SENSOR_LABEL.get(row.sensor) ?? row.sensor}
           </span>
           {!row.required ? (

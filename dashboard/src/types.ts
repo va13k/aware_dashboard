@@ -411,7 +411,7 @@ export type CoverageState =
   | "under"
   /** Expected and absent. */
   | "missing"
-  /** Data arrived, with no configured rate to judge the amount against. */
+  /** Data arrived, with nothing to judge the amount against. */
   | "present";
 
 /** One column of a grid. */
@@ -437,6 +437,11 @@ export interface CoverageCell {
   basis?: string | null;
   /** The expectation bounds scans rather than rows, so it is a lower bound. */
   floor?: boolean;
+  /**
+   * The phone filters this sensor before writing, so the expectation is an upper
+   * bound and the amount is not judged against it.
+   */
+  ceiling?: boolean;
   /** Aggregate cells only: required sensors reporting, out of how many. */
   reporting?: number;
   required?: number;
@@ -511,6 +516,8 @@ export interface DeviceCoverageRow {
   records: number;
   expected_per_hour: number | null;
   basis: string | null;
+  /** Settings filtering this sensor on the phone, when any do. */
+  gated_by?: string[];
 }
 
 export interface DeviceCoverage extends CoverageGridBase {
