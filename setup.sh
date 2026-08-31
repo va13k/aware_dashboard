@@ -68,11 +68,58 @@ verify_database() {
     python3 setup/verify_database.py --docker-prefix sudo || true
 }
 
+# A bundled database generates the authority it signs its own certificate with on
+# first start, which is after the deploy that writes the study has already run. So a
+# first deployment publishes a study whose database no phone can verify, and
+# verification would arrive only with whatever deploy happened to come next --- on a
+# study that enrolled in between, never. The stack is up by the time this runs, so
+# the authority is read and the study republished here instead.
+#
+# Guarded rather than run unconditionally: a deployment that has already published
+# one has nothing to gain, and a second full pass rewrites every generated file
+# underneath the services that have just read them.
+publish_database_authority() {
+    if python3 - <<'PY'
+import json
+import sys
+from pathlib import Path
+
+try:
+    from shared_config import database, placement
+    from shared_config.source_store import read_source
+
+    source = read_source()
+except Exception:
+    sys.exit(1)
+
+databases = source.get("database") or {}
+if placement.declared(source) != placement.BUNDLED or not database.tls_required(databases):
+    sys.exit(1)
+
+# Asked of the published config rather than the study model: an authority read out
+# of the container is deliberately never written back, so the model reports none on
+# every deploy and a guard reading it would republish on every deploy. What the
+# phones are served is the thing that has to carry one.
+try:
+    served = json.loads(Path("studies/studyConfig.json").read_text(encoding="utf-8"))
+except Exception:
+    sys.exit(0)
+
+published = (served.get("database") or {}).get("database_certificate_authority") or ""
+sys.exit(1 if published.strip() else 0)
+PY
+    then
+        echo "  Publishing the certificate authority the database generated..."
+        python3 setup/deploy_config.py --docker-prefix sudo
+    fi
+}
+
 deploy_stack() {
     mkdir -p studies aware-micro-server/cache aware-micro-server/esm
-    python3 setup/deploy_config.py
+    python3 setup/deploy_config.py --docker-prefix sudo
     compose up --build -d
     python3 setup/init_study_tables.py --docker-prefix sudo
+    publish_database_authority
     verify_database
 }
 
@@ -118,6 +165,9 @@ PY
 start_stack_only() {
     compose up --build -d
     python3 setup/init_study_tables.py --docker-prefix sudo
+    # The wizard wrote the study before this database existed, so this is the path a
+    # first deployment takes and the one where the authority is missing.
+    publish_database_authority
     verify_database
 }
 
