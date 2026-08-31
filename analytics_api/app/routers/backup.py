@@ -205,6 +205,23 @@ async def export_coverage(
     }
 
 
+def _drain(stderr, into: list) -> None:
+    """Keep the client's stderr moving while its stdin is being fed.
+
+    A pipe nobody reads fills at 64 KiB. A client blocked writing to a full pipe
+    has stopped reading its stdin, so the feed blocks on a write and the two wait
+    on each other for good --- neither using any CPU, and the tables the restore
+    was midway through left locked against every reader. Read on a thread of its
+    own, the client is never held up by what it has to say, and what it said is
+    still here to put in the error.
+    """
+    try:
+        for chunk in iter(lambda: stderr.read(CHUNK), b""):
+            into.append(chunk)
+    except (OSError, ValueError):
+        pass
+
+
 def _watch_dump(stderr, job: jobs.Job) -> None:
     """Follow mysqldump's running commentary so the page can name the table."""
     for raw in iter(stderr.readline, b""):
@@ -490,6 +507,9 @@ def _feed_mysql(job: jobs.Job, path: Path, mode: str, marks: dict) -> None:
         stderr=subprocess.PIPE,
         env=_mysql_env(),
     )
+    complaints: list[bytes] = []
+    watcher = threading.Thread(target=_drain, args=(mysql.stderr, complaints), daemon=True)
+    watcher.start()
     rewriter = dump_stream.DumpRewriter(
         mode,
         marks,
@@ -523,8 +543,10 @@ def _feed_mysql(job: jobs.Job, path: Path, mode: str, marks: dict) -> None:
         if mysql.stdin and not mysql.stdin.closed:
             mysql.stdin.close()
 
-    message = mysql.stderr.read().decode("utf-8", errors="replace").strip()
-    if mysql.wait() != 0:
+    status = mysql.wait()
+    watcher.join(timeout=5)
+    message = b"".join(complaints).decode("utf-8", errors="replace").strip()
+    if status != 0:
         raise RuntimeError(message or "Database import failed")
 
     jobs.advance(job, done=total)
