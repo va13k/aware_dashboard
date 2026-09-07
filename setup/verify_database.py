@@ -3,7 +3,7 @@
 
 A study can be configured against a database nobody can reach, or one that answers
 and refuses every write, and either way the deployment comes up looking healthy and
-collects nothing. The same four questions are asked whichever placement the study
+collects nothing. The same five questions are asked whichever placement the study
 runs, because the answer matters equally for both --- a bundled container that
 failed to initialise its schema is as silent as an institutional host behind a
 firewall:
