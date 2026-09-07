@@ -28,7 +28,7 @@ concurrency:
 
 jobs:
   python:
-    name: Study model, read layer, Configurator
+    name: Study model and read layer
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -39,14 +39,10 @@ jobs:
         with:
           python-version: "3.12"
           cache: pip
-          cache-dependency-path: |
-            analytics_api/requirements-dev.txt
-            AWARE-Configurator/requirements.txt
+          cache-dependency-path: analytics_api/requirements-dev.txt
 
       - name: Install
-        run: |
-          pip install -r analytics_api/requirements-dev.txt
-          pip install -r AWARE-Configurator/requirements.txt
+        run: pip install -r analytics_api/requirements-dev.txt
 
       # The study model, the setup scripts, the entrypoint parity and the generated
       # schema, which this suite asks about rather than leaving to memory.
@@ -56,6 +52,26 @@ jobs:
       - name: analytics_api
         working-directory: analytics_api
         run: python -m pytest -q
+
+  configurator-backend:
+    name: Configurator backend
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Its own image runs 3.11, and its own pins: this component and the read layer
+      # ask for different versions of cryptography and PyMySQL, which is a conflict
+      # only in an environment holding both. A deployment gives each its own.
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: AWARE-Configurator/requirements.txt
+
+      # pytest is not among the Configurator's own requirements, and is asked for
+      # here rather than pinned a second time in the repository.
+      - name: Install
+        run: pip install -r AWARE-Configurator/requirements.txt pytest
 
       - name: AWARE-Configurator
         run: python -m pytest AWARE-Configurator -q
@@ -227,4 +243,10 @@ jobs:
         if: failure()
         run: |
           docker compose ps
-          docker compose logs --tail=200
+          # Per service, because a single tail across eleven of them leaves too
+          # little of the one that failed.
+          for service in mysql micro-server micro-server-android nginx dashboard-api configurator mqtt; do
+            echo "::group::$service"
+            docker compose logs --tail=120 "$service" || true
+            echo "::endgroup::"
+          done
