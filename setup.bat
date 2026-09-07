@@ -105,7 +105,8 @@ for /f "delims=" %%i in ('!PYTHON! setup\detect_public_host.py') do set SUGGESTE
 )>.setup-defaults.env
 
 :: Build and start the wizard
-docker compose --profile setup up --build -d setup-wizard
+call :compose_files
+docker compose %COMPOSE_FILES% --profile setup up --build -d setup-wizard
 if errorlevel 1 exit /b 1
 
 echo.
@@ -140,6 +141,12 @@ echo     !WIZARD_URL!
 echo.
 echo   This token is valid for this session only.
 echo.
+echo   Keep this URL to yourself - the page behind it holds this deployment's
+echo   passwords, and it is served over plain HTTP. Port 9999 closes when setup
+echo   finishes. On an untrusted network: put SETUP_BIND=127.0.0.1 in .env, then
+echo   reach the wizard through a tunnel with
+echo       ssh -N -L 9999:localhost:9999 %USERNAME%@!SUGGESTED_PUBLIC_HOST!
+echo.
 
 start "" "!WIZARD_URL!"
 
@@ -163,18 +170,24 @@ echo.
 call :compose_files
 docker compose %COMPOSE_FILES% up --build -d
 if errorlevel 1 exit /b 1
-!PYTHON! setup\init_android_tables.py
+!PYTHON! setup\init_study_tables.py
+if errorlevel 1 exit /b 1
+call :publish_database_authority
 if errorlevel 1 exit /b 1
 call :verify_database
 if errorlevel 1 exit /b 1
 
-:: Keep the wizard alive until services are healthy (browser uses it to detect readiness)
+:: The wizard serves the browser its readiness poll and the ingest self-test, so it
+:: is taken down once the services report healthy and stays up otherwise.
 call :wait_for_service_redirect
+set SERVICES_READY=!errorlevel!
 call :verify_ingest
-if not errorlevel 1 (
+if "!SERVICES_READY!"=="0" (
     timeout /t 3 /nobreak >nul
-    docker compose --profile setup stop setup-wizard 2>nul
-    docker compose --profile setup rm -f setup-wizard 2>nul
+    docker compose %COMPOSE_FILES% --profile setup stop setup-wizard 2>nul
+    docker compose %COMPOSE_FILES% --profile setup rm -f setup-wizard 2>nul
+    rem The token goes with the server that honoured it.
+    if exist setup\.wizard_url del /f /q setup\.wizard_url
 )
 
 echo.
@@ -196,7 +209,9 @@ if errorlevel 1 exit /b 1
 call :compose_files
 docker compose %COMPOSE_FILES% up --build -d
 if errorlevel 1 exit /b 1
-%PYTHON% setup\init_android_tables.py
+%PYTHON% setup\init_study_tables.py
+if errorlevel 1 exit /b 1
+call :publish_database_authority
 if errorlevel 1 exit /b 1
 call :verify_database
 if errorlevel 1 exit /b 1
@@ -222,6 +237,16 @@ if exist docker-compose.external-db.yml (
 exit /b 0
 
 
+:: A bundled database generates the authority it signs its own certificate with on
+:: first start, and that start follows the deploy which wrote the study. The stack is
+:: up by the time this runs, so setup\publish_authority.py reads the authority out of
+:: the container and republishes the study carrying it. setup.sh calls the same
+:: script, so one deployment is asked one question on either platform.
+:publish_database_authority
+%PYTHON% setup\publish_authority.py
+exit /b !errorlevel!
+
+
 :: Does the database answer, and can this study write a row to it.
 :verify_database
 %PYTHON% setup\verify_database.py
@@ -236,9 +261,14 @@ exit /b 0
 
 :wait_for_service_redirect
 echo   Waiting for services to become ready for browser redirect...
+if exist docker-compose.external-db.yml (
+    set "HEALTH_SERVICES=aware_micro aware_configurator aware_dashboard_api aware_dashboard aware_nginx"
+) else (
+    set "HEALTH_SERVICES=aware_mysql aware_micro aware_configurator aware_dashboard_api aware_dashboard aware_nginx"
+)
 set /a _hi=0
 :_health_loop
-%PYTHON% -c "import subprocess,sys; r=subprocess.run(['docker','inspect','-f','{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}','aware_mysql','aware_micro','aware_configurator','aware_dashboard_api','aware_dashboard','aware_nginx'],capture_output=True,text=True); lines=[l.strip() for l in r.stdout.strip().splitlines()]; ok=all(l in ('healthy','running') for l in lines) and len(lines)==6; sys.exit(0 if ok else 1)" >nul 2>&1
+%PYTHON% -c "import os,subprocess,sys; names=os.environ['HEALTH_SERVICES'].split(); r=subprocess.run(['docker','inspect','-f','{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}']+names,capture_output=True,text=True); lines=[l.strip() for l in r.stdout.strip().splitlines()]; ok=all(l in ('healthy','running') for l in lines) and len(lines)==len(names); sys.exit(0 if ok else 1)" >nul 2>&1
 if not errorlevel 1 (
     echo   Services are ready. Redirecting browser shortly...
     timeout /t 5 /nobreak >nul
