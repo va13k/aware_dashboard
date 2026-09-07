@@ -10,7 +10,7 @@ empty machine to a study participants can join.
 
 | You are | Read |
 | --- | --- |
-| **A researcher deploying this for a study** | This file, in order: [Prerequisites](#prerequisites), [How to perform the deployment](#how-to-perform-the-deployment), [Configure the study in the Configurator](#5-configure-the-study-in-the-configurator), [Browse collected data](#6-browse-collected-data-in-the-analytics-dashboard) |
+| **A researcher deploying this for a study** | This file, in order: [Prerequisites](#prerequisites), [How to perform the deployment](#how-to-perform-the-deployment), [Configure the study in the Configurator](#5-configure-the-study-in-the-configurator), [Browse collected data](#6-browse-collected-data-in-the-analytics-dashboard), [Reach a participant's phone](#7-reach-a-participants-phone) |
 | **A researcher wondering which sensors are available** | [Sensor support](#sensor-support) |
 | **A researcher using a database of their own** | [Bringing your own managed database](#bringing-your-own-managed-database) |
 | **A developer reading the stack for the first time** | [docs/dev/architecture.md](docs/dev/architecture.md) — what runs, how a request is routed, where a sensor row comes from, and every generated file with its reader |
@@ -21,7 +21,8 @@ empty machine to a study participants can join.
 
 Study participants install the **AWARE client app** on their phone (Android or iOS). The app continuously collects sensor data — accelerometer, GPS, screen events, ambient noise, and [many more](#sensor-support). Due to security restrictions on both Android and iOS, participants must **manually trigger a data upload** from inside the app. Once they do, the data is sent to your server and becomes immediately available in the analytics dashboard for browsing, filtering, and export.
 
-The full stack comprises six services:
+The full stack comprises seven services, running as eleven containers —
+[docs/dev/architecture.md](docs/dev/architecture.md) lists every one of them:
 
 | Service                                                                        | Role                                                                                        |
 | ------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------- |
@@ -29,8 +30,9 @@ The full stack comprises six services:
 | **Analytics API**                                                              | FastAPI backend for the dashboard — queries the database and serves sensor data and exports |
 | **Analytics Dashboard**                                                        | React frontend — visualises collected data per device and sensor; exports CSVs and ZIPs     |
 | [**AWARE Configurator**](https://github.com/awareframework/AWARE-Configurator) | Django + React app for building and publishing study configurations for Android and iOS     |
-| [**AWARE Micro Server**](https://github.com/awareframework/aware-micro-server) | Kotlin / Vert.x server that receives data uploads from iOS clients and writes them to MySQL |
+| [**AWARE Micro Server**](https://github.com/awareframework/aware-micro-server) | Kotlin / Vert.x server that receives data uploads and writes them to MySQL. One instance serves iOS; a second serves Android whenever the study sends its data through the server rather than straight to the database |
 | **MySQL + backup**                                                             | Shared database for all collected data, with a configurable automated backup job            |
+| **Message broker** | Mosquitto — carries what you send to a participant's phone: a request to sync, a question, a notice. See [Reach a participant's phone](#7-reach-a-participants-phone) |
 
 A browser-based **setup wizard** is included for the initial deployment — it writes your configuration and launches the stack without any manual file editing.
 
@@ -947,6 +949,72 @@ A research-grade inventory of the complete dataset — useful for understanding 
   - Number of database fields, expandable to show the full field name list
 - Sensors are **sorted by record count** (most data first). Sensors with no data are listed dimmed at the bottom.
 - **Download JSON** button — exports the full manifest as a structured JSON file, useful for archiving dataset metadata alongside the raw CSVs.
+
+---
+
+**Client Logs** (`/dashboard/logs`)
+
+The lines each client writes about its own operation — what it started, what it could not do, what it retried. This is where to look when a phone is collecting less than you expected and the reason is on the phone rather than on the server.
+
+- **Android / iPhone toggle** at the top right — the two platforms record their logs differently, so they are read separately.
+- **Filter by type, by time window, or by text**, and download the filtered set.
+- **Refused writes** — when the server turned data away, a line per device says which device, why, how many attempts it made and how many rows were refused.
+
+---
+
+**Messages** (`/dashboard/messages`)
+
+Where you send something to a participant's phone and see what came of it. Described in full in [Reach a participant's phone](#7-reach-a-participants-phone) below.
+
+### 7. Reach a participant's phone
+
+Everything else in this stack observes. This is the one part that speaks: you can ask a phone to upload now, ask the participant a question, or tell them something. Sending happens on **Messages** (`/dashboard/messages`); a single device's page has a **Prompts and answers** view showing what that one participant was asked, what they answered, and how long they took.
+
+> **Android only.** These messages travel over the message broker, and it is the Android client that subscribes to it. An iPhone in the study receives nothing, so on a study running both platforms this cannot be the way you reach everyone.
+
+**What you can send**
+
+| Choose | What the participant sees | When to use it |
+| --- | --- | --- |
+| **Ask the phone to upload** | Nothing at all | A phone has gone quiet and you want to know whether it is holding data |
+| **Ask the phone for a study update** | Nothing at all | You changed questions, schedules or sensors, and want the phone to re-read the configuration now rather than on its own timer |
+| **Ask a question** | A question that waits on the phone until it is answered | Anything outside the protocol — a check on a quiet phone, a one-off ask |
+| **Ask about this moment (ESM)** | The same question, expiring if it is not answered in time | What the study is measuring: an answer given hours later describes a different moment |
+| **Tell them something** | A notification, with the sound and vibration they configured | A thank-you, a reminder, an announcement. No answer is asked for and none is recorded |
+
+A question can offer a few one-touch answers, or leave the participant a free-text box.
+
+**What became of it, in three separate columns**
+
+| Column | Means |
+| ------ | ----- |
+| **Sent** | This deployment published it. Ours to know, and known at once |
+| **Delivered** | The phone reported receiving it, in a row it uploaded along with the rest of its data |
+| **Answered** | The participant tapped an answer |
+
+**Delivered lags a sync, and that is a normal state rather than a failure.** The phone writes every message it receives into a table of its own, and that table reaches you only when the phone next uploads. So a message to a quiet phone reads as undelivered until then — which is exactly why **Ask the phone to upload** exists.
+
+**Limits, deliberately**
+
+One device may be sent **6 prompts an hour** — questions and notices — and **30 upload or update requests an hour**, which cost the participant nothing and show them nothing. Past the limit the dashboard tells you what the limit is and when it lifts, rather than refusing silently. A participant's phone is not a channel to keep pushing at.
+
+**Whether the wording is kept**
+
+Composing a message ends in two buttons: **Keep and send**, and **Send without keeping**. Either way a row is written saying that you sent something, to whom and when — a channel to participants that leaves no trace is not one a study should have. What the second button leaves out is the words themselves.
+
+**From a terminal instead**
+
+The same five things, for anyone who prefers the command line. On macOS and Linux the `--docker-prefix sudo` is what lets it reach the broker container:
+
+```bash
+python3 setup/send_message.py --docker-prefix sudo devices
+python3 setup/send_message.py --docker-prefix sudo sync --device all
+python3 setup/send_message.py --docker-prefix sudo ask --device <id> --title "How are you?" --instructions "One touch answer" --answers Good,Fine,Bad
+python3 setup/send_message.py --docker-prefix sudo notice --device <id> --title "Thank you" --instructions "The study finishes on Friday."
+python3 setup/send_message.py --docker-prefix sudo history --device <id>
+```
+
+`history` reads what the phones reported, so it shows what was delivered and what was answered — the same three states the Messages page keeps apart.
 
 ## Sensor support
 
