@@ -1,0 +1,221 @@
+# Every check this project has, run where nobody has to remember to run it.
+#
+# The suites are split by the runtime each one needs rather than by component, so a
+# red job names the language its failure is in. Versions are the ones the Dockerfiles
+# build with: a suite passing here against a different Python or Node says nothing
+# about the deployment.
+name: Check
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# A second push to the same branch replaces the run still going, rather than queueing
+# behind it.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  python:
+    name: Study model, read layer, Configurator
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # 3.12 is what analytics_api's image runs, and what its requirements were
+      # compiled against.
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: |
+            analytics_api/requirements-dev.txt
+            AWARE-Configurator/requirements.txt
+
+      - name: Install
+        run: |
+          pip install -r analytics_api/requirements-dev.txt
+          pip install -r AWARE-Configurator/requirements.txt
+
+      # The study model, the setup scripts, the entrypoint parity and the generated
+      # schema, which this suite asks about rather than leaving to memory.
+      - name: shared_config
+        run: python -m pytest shared_config -q
+
+      - name: analytics_api
+        working-directory: analytics_api
+        run: python -m pytest -q
+
+      - name: AWARE-Configurator
+        run: python -m pytest AWARE-Configurator -q
+
+  integration:
+    name: Read layer against a real MySQL
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: analytics_api/requirements-dev.txt
+
+      - name: Install
+        run: pip install -r analytics_api/requirements-dev.txt
+
+      # The suite starts a server of its own and skips when there is none, so the
+      # binary is asked for here: a missing one is a red job rather than a green one
+      # that tested nothing.
+      - name: MySQL server
+        run: |
+          mysqld --version
+          # The server is started on a data directory under the temporary folder,
+          # which Ubuntu's AppArmor profile for mysqld denies it. Unloading that
+          # profile lets it read and write the directory it was given.
+          if [ -f /etc/apparmor.d/usr.sbin.mysqld ]; then
+            sudo apparmor_parser -R /etc/apparmor.d/usr.sbin.mysqld || true
+          fi
+
+      - name: analytics_api, integration
+        working-directory: analytics_api
+        run: python -m pytest -m integration -q
+
+  dashboard:
+    name: Dashboard types and lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: dashboard/package-lock.json
+
+      - name: Install
+        working-directory: dashboard
+        run: npm ci
+
+      - name: Types
+        working-directory: dashboard
+        run: npx tsc -b
+
+      - name: Lint
+        working-directory: dashboard
+        run: npx eslint .
+
+  configurator-frontend:
+    name: Configurator frontend
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "18"
+          cache: npm
+          cache-dependency-path: AWARE-Configurator/reactapp/package-lock.json
+
+      - name: Install
+        working-directory: AWARE-Configurator/reactapp
+        run: npm ci
+
+      - name: Tests
+        working-directory: AWARE-Configurator/reactapp
+        env:
+          CI: "true"
+        run: npx react-scripts test --watchAll=false
+
+  micro-server:
+    name: Micro-server
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          java-version: "11"
+          distribution: temurin
+          cache: gradle
+
+      - name: Check
+        working-directory: aware-micro-server
+        run: ./gradlew check --no-daemon
+
+  deploy:
+    name: A fresh clone deploys and ingests (${{ matrix.dataflow }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      # The two dataflows are different deployments, and one failing should not hide
+      # what the other did.
+      fail-fast: false
+      matrix:
+        dataflow: [webservice, direct]
+    steps:
+      - uses: actions/checkout@v4
+
+      # The runner ships MySQL, stopped. On the direct dataflow this deployment
+      # publishes 3306 on every interface, so a server left running would be a port
+      # conflict rather than a fault.
+      - name: Free the ports this deployment publishes
+        run: sudo systemctl stop mysql || true
+
+      - name: Declare the study
+        env:
+          ANDROID_DATAFLOW: ${{ matrix.dataflow }}
+        run: |
+          {
+            echo "PUBLIC_HOST=localhost"
+            echo "PUBLIC_PORT=80"
+            echo "PROTOCOL=http"
+            echo "HOST_UID=$(id -u)"
+            echo "HOST_GID=$(id -g)"
+          } > .env
+          python3 - <<'PY'
+          import json
+          import os
+          import pathlib
+
+          # The dataflow is declared in the study model rather than in .env: run
+          # outside the wizard, the deploy reads the model's own answer and leaves it
+          # standing.
+          source = json.loads(pathlib.Path("source.example.json").read_text(encoding="utf-8"))
+          source["deployment"]["dataflow"]["android"] = os.environ["ANDROID_DATAFLOW"]
+          pathlib.Path("source.json").write_text(
+              json.dumps(source, indent=2) + "\n", encoding="utf-8"
+          )
+          PY
+
+      - name: Generate every configuration file
+        run: |
+          mkdir -p studies aware-micro-server/cache aware-micro-server/esm
+          python3 setup/deploy_config.py
+
+      - name: The ports it needs are free
+        run: python3 setup/check_ports.py
+
+      - name: Bring the stack up
+        run: docker compose up --build -d --wait --wait-timeout 600
+
+      - name: Create the schema and the accounts
+        run: python3 setup/init_study_tables.py
+
+      - name: Publish the authority the database generated
+        run: python3 setup/publish_authority.py
+
+      - name: The database answers what this study asks
+        run: python3 setup/verify_database.py
+
+      # The question a participant's phone asks, from outside the compose network.
+      - name: A phone's data would arrive
+        run: python3 setup/verify_ingest.py
+
+      - name: What the containers said
+        if: failure()
+        run: |
+          docker compose ps
+          docker compose logs --tail=200
