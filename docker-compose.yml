@@ -59,7 +59,17 @@ services:
         host_ip: ${MYSQL_BIND_ADDRESS:-127.0.0.1}
     volumes:
       - mysql_data:/var/lib/mysql
-      - ./db:/docker-entrypoint-initdb.d
+      # The schema arrives through --init-file above, which MySQL applies on every
+      # start. What belongs here is the one thing an init file cannot be: a shell
+      # script, run once on an empty data directory and after the accounts exist,
+      # giving each of them this deployment's own password.
+      #
+      # One named file rather than the directory holding it. MySQL runs each .sql
+      # file in this directory on its own, and android-tables.sql and ios-tables.sql
+      # are fragments that carry no USE statement: build_init_all.py supplies those
+      # where it concatenates them into init_all.sql. reclaim-sensor-label.sql is a
+      # maintenance script a deployment runs by hand.
+      - ./db/zz-account-passwords.sh:/docker-entrypoint-initdb.d/zz-account-passwords.sh:ro
       - ./db/init_all.sql:/etc/mysql/init_all.sql:ro
     networks:
       - aware_network

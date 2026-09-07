@@ -104,3 +104,77 @@ def test_deployed_study_config_carries_credentials_on_the_direct_path(
         assert "database_password" not in database
     else:
         assert "database_password" in database
+
+
+#: Where MySQL runs whatever it is given, each file on its own, when the data
+#: directory is empty.
+INITDB_DIR = "/docker-entrypoint-initdb.d"
+
+#: The schema files that carry no `USE` of their own. `build_init_all.py` supplies
+#: one where it concatenates each into `init_all.sql`, so they are readable only
+#: there and a server handed one on its own has no database selected.
+SCHEMA_FRAGMENTS = ("android-tables.sql", "ios-tables.sql")
+
+
+def test_mysql_is_only_handed_files_it_can_run_on_their_own(project_root: pathlib.Path):
+    """What reaches the initialisation directory has to stand alone.
+
+    The schema reaches the server through `--init-file`, which applies
+    `init_all.sql` whole on every start. This directory is for the one thing an init
+    file cannot be --- the shell script that gives each account this deployment's own
+    password --- and a fragment arriving here is a fresh deployment whose database
+    never finishes starting.
+    """
+    compose = yaml.safe_load(
+        (project_root / "docker-compose.yml").read_text(encoding="utf-8")
+    )
+
+    mounted = [
+        volume.split(":")[0].rsplit("/", 1)[-1]
+        for volume in compose["services"]["mysql"]["volumes"]
+        if INITDB_DIR in volume
+    ]
+
+    assert mounted, f"nothing is mounted into {INITDB_DIR}"
+    for fragment in SCHEMA_FRAGMENTS:
+        assert fragment not in mounted
+    # The directory itself carries every fragment with it.
+    assert "db" not in mounted
+
+
+def _pinned(path: pathlib.Path) -> dict[str, str]:
+    """Each distribution a compiled requirements file pins, and to what version."""
+    pins = {}
+    for line in path.read_text(encoding="utf-8").splitlines():
+        match = re.match(r"^([A-Za-z0-9._-]+)==([^\s;]+)", line.strip())
+        if match:
+            pins[match.group(1).lower().replace("_", "-")] = match.group(2)
+    return pins
+
+
+def test_the_dev_environment_can_import_everything_the_app_imports(
+    project_root: pathlib.Path,
+):
+    """`requirements-dev.in` asks for the deployed set, and this holds it to that.
+
+    A package added to `requirements.in` and never compiled into the dev file is an
+    import that works in the image and raises in the suite --- collected as an error
+    against every test module that reaches it, which reads as the suite being broken
+    rather than as one line being absent.
+    """
+    api = project_root / "analytics_api"
+    deployed = _pinned(api / "requirements.txt")
+    development = _pinned(api / "requirements-dev.txt")
+
+    missing = sorted(name for name in deployed if name not in development)
+    assert not missing, (
+        f"absent from requirements-dev.txt: {', '.join(missing)}. "
+        "Run: pip-compile --output-file=requirements-dev.txt requirements-dev.in"
+    )
+
+    differing = sorted(
+        name
+        for name, version in deployed.items()
+        if name in development and development[name] != version
+    )
+    assert not differing, f"pinned differently in the two files: {', '.join(differing)}"
