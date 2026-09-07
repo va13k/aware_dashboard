@@ -1,10 +1,11 @@
 """Devices a researcher has taken out of the analysis.
 
 Withdrawal and exclusion answer different questions, and folding them together
-would answer one of them silently. Closing an enrolment window stops new data
-arriving. What happens to the data already collected — kept, left out of the
-analysis, or removed — is a question consent forms answer differently, so it is a
-separate and deliberate action with its own confirmation.
+would answer one of them silently. Closing an enrolment window states when a
+participant was in the study, which is what the coverage grid reads against. What
+happens to the data already collected — kept, left out of the analysis, or removed
+— is a question consent forms answer differently, so it is a separate and
+deliberate action with its own confirmation.
 
 The default is the conservative one: withdrawal keeps what was collected, and a
 device is excluded only because somebody said so.

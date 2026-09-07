@@ -10,7 +10,7 @@ empty machine to a study participants can join.
 
 | You are | Read |
 | --- | --- |
-| **A researcher deploying this for a study** | This file, in order: [Prerequisites](#prerequisites), [How to perform the deployment](#how-to-perform-the-deployment), [Configure the study in the Configurator](#5-configure-the-study-in-the-configurator), [Browse collected data](#6-browse-collected-data-in-the-analytics-dashboard), [Reach a participant's phone](#7-reach-a-participants-phone) |
+| **A researcher deploying this for a study** | This file, in order: [Prerequisites](#prerequisites), [How to perform the deployment](#how-to-perform-the-deployment), [Configure the study in the Configurator](#5-configure-the-study-in-the-configurator), [Browse collected data](#6-browse-collected-data-in-the-analytics-dashboard), [Reach a participant's phone](#7-reach-a-participants-phone), [When a participant leaves](#8-when-a-participant-leaves-the-study) |
 | **A researcher wondering which sensors are available** | [Sensor support](#sensor-support) |
 | **A researcher using a database of their own** | [Bringing your own managed database](#bringing-your-own-managed-database) |
 | **A developer reading the stack for the first time** | [docs/dev/architecture.md](docs/dev/architecture.md) — what runs, how a request is routed, where a sensor row comes from, and every generated file with its reader |
@@ -19,7 +19,7 @@ empty machine to a study participants can join.
 
 ## What it is
 
-Study participants install the **AWARE client app** on their phone (Android or iOS). The app continuously collects sensor data — accelerometer, GPS, screen events, ambient noise, and [many more](#sensor-support). Due to security restrictions on both Android and iOS, participants must **manually trigger a data upload** from inside the app. Once they do, the data is sent to your server and becomes immediately available in the analytics dashboard for browsing, filtering, and export.
+Study participants install the **AWARE client app** on their phone (Android or iOS). The app continuously collects sensor data — accelerometer, GPS, screen events, ambient noise, and [many more](#sensor-support) — and uploads it on the schedule the study configuration sets, so it reaches the analytics dashboard on its own and is ready for browsing, filtering and export. How often that happens, and whether an upload waits for Wi-Fi or for a charger, are yours to set on the Configurator's [Sensors page](#5-configure-the-study-in-the-configurator).
 
 The full stack comprises seven services, running as eleven containers —
 [docs/dev/architecture.md](docs/dev/architecture.md) lists every one of them:
@@ -38,11 +38,16 @@ A browser-based **setup wizard** is included for the initial deployment — it w
 
 ### Client apps
 
-Study participants need the AWARE mobile app installed on their device:
+Study participants need the AWARE client app installed on their device. These are the two builds this deployment is written against, and the same links the study's own join page hands to participants:
 
-- **Android** and **iOS** clients are available at [awareframework.com/downloads](https://awareframework.com/downloads/)
+| Platform | What the participant installs | Source |
+| --- | --- | --- |
+| **Android** | [aware-phone-release.apk](https://github.com/va13k/aware-client/releases/download/4.8.2.beta/aware-phone-release.apk) — release 4.8.2.beta | [va13k/aware-client](https://github.com/va13k/aware-client) |
+| **iOS** | [AWARE Client v2 on the App Store](https://apps.apple.com/ch/app/aware-client-v2/id1455986181) | [tetujin/aware-client-ios-v2](https://github.com/tetujin/aware-client-ios-v2) |
 
-Once a participant joins a study (by scanning a QR code or entering a study URL), the app begins collecting sensor data locally and waits for the participant to manually sync it to the server.
+The Android client is installed from that APK rather than from Google Play, so the phone asks the participant once to allow it. The App Store link opens in whichever storefront the participant's own Apple account uses.
+
+Once a participant joins a study — by scanning the QR code or opening the study link — the app begins collecting, and uploads on the schedule the study configuration sets.
 
 ## Prerequisites
 
@@ -1015,6 +1020,51 @@ python3 setup/send_message.py --docker-prefix sudo history --device <id>
 ```
 
 `history` reads what the phones reported, so it shows what was delivered and what was answered — the same three states the Messages page keeps apart.
+
+### 8. When a participant leaves the study
+
+Two different actions, and they are kept apart deliberately: consent forms answer
+their two questions differently, so folding them into one button would answer one of
+them on your behalf.
+
+| | **Withdrawal** | **Exclusion** |
+| --- | --- | --- |
+| Answers | *When was this participant in the study?* | *Is their data part of the analysis?* |
+| Changes | What the coverage grid expects, and how the device reads | What the exports and the coverage grid contain |
+| Platforms | Android only | Android and iOS |
+| Reversible | Yes — **Rejoin** reopens the window | Yes — putting them back removes the exclusion |
+| Deletes data | No | No |
+
+**Withdrawal — recording that they left.** On the device's page. You can give the
+date they actually left rather than today's, because a researcher usually finds out
+by being told rather than by watching a phone go quiet. From that moment the
+coverage grid stops expecting data, and the device reads as *withdrawn* instead of
+merely gone silent.
+
+> **It does not stop the phone.** The phone is told nothing, keeps collecting, and
+> keeps uploading; rows that arrive after the window closes are still stored. The
+> rule at ingest admits any device that ever joined the study and does not ask
+> whether its window is open — a device that left keeps the data it had not managed
+> to upload yet, which is data the study could not collect again. Collection stops
+> when the participant leaves the study in the app or removes it from their phone.
+
+Withdrawal is Android only. An iPhone keeps its study state on the phone and never
+uploads it, so the server holds no window to close.
+
+**Exclusion — taking their data out of the analysis.** Also on the device's page,
+and on either platform. The rows stay in the database and the device stays on screen
+marked as excluded: a participant the dashboard had quietly dropped would be
+indistinguishable from one who never took part. What changes is the exports and the
+coverage grid — the exports because that is where the analysis dataset actually
+leaves.
+
+**Neither one deletes anything.** The dashboard reads study data and has no
+privilege to remove it. If consent requires the rows to be gone, that is a request
+to whoever administers the database — and it is worth agreeing on the wording of
+that request before a study starts rather than after somebody withdraws.
+
+The default is the conservative reading: withdrawal keeps what was collected, and a
+device is excluded only because somebody said so.
 
 ## Sensor support
 
