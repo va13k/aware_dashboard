@@ -140,9 +140,12 @@ MySQL ◀── dashboard-api ◀── nginx /api/ ◀── dashboard   (brows
       ◀── mysql-backup                                  (scheduled dump)
 ```
 
-Uploads are not automatic on either platform. The phone stores rows locally and
-sends them when the participant triggers a sync, which is also how it picks up a
-changed study config.
+A phone collects into its own storage and uploads on the cadence the study config
+declares: `frequency_webservice` for the data, `frequency_sync_config` for the config
+it re-reads, with `webservice_wifi_only` and `webservice_charging` deciding what an
+upload waits for. The client's own scheduler holds that cadence, so the phone arrives
+on its own and each upload resumes from the last row id it sent. A researcher can ask
+for one now, over the broker, when a phone has gone quiet.
 
 ---
 

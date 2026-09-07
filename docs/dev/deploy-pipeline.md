@@ -208,4 +208,3 @@ person, and each is prompted for rather than assumed:
 | Creating an external database, and allowing this machine to reach it | The provider's console, and an administrator account this deployment is given rather than creates |
 | Running `database.sql` by hand | For an institutional server where the account given may insert and nothing else |
 | Running `copy-study-data.sh` | It moves collected rows between two servers, so it is written out to run rather than done behind a browser |
-| A participant syncing their phone | Both platforms store rows locally and upload on the participant's action |
