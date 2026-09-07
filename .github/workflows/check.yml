@@ -31,11 +31,11 @@ jobs:
     name: Study model and read layer
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       # 3.12 is what analytics_api's image runs, and what its requirements were
       # compiled against.
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
           cache: pip
@@ -57,12 +57,12 @@ jobs:
     name: Configurator backend
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       # Its own image runs 3.11, and its own pins: this component and the read layer
       # ask for different versions of cryptography and PyMySQL, which is a conflict
       # only in an environment holding both. A deployment gives each its own.
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.11"
           cache: pip
@@ -80,9 +80,9 @@ jobs:
     name: Read layer against a real MySQL
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
           cache: pip
@@ -112,9 +112,9 @@ jobs:
     name: Dashboard types and lint
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           node-version: "20"
           cache: npm
@@ -136,9 +136,9 @@ jobs:
     name: Configurator frontend
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           node-version: "18"
           cache: npm
@@ -158,9 +158,9 @@ jobs:
     name: Micro-server
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v5
         with:
           java-version: "11"
           distribution: temurin
@@ -181,7 +181,7 @@ jobs:
       matrix:
         dataflow: [webservice, direct]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       # The runner ships MySQL, stopped. On the direct dataflow this deployment
       # publishes 3306 on every interface, so a server left running would be a port
