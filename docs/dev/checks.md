@@ -1,6 +1,6 @@
 # The checks
 
-Six jobs, run on every push to `main` and every pull request by
+Seven jobs, run on every push to `main` and every pull request by
 [`.github/workflows/check.yml`](../../.github/workflows/check.yml). Each one has a
 local equivalent, and this is the list of both.
 
@@ -14,7 +14,8 @@ rather than taking whatever the runner ships.
 
 | Job | Locally | Needs |
 | --- | --- | --- |
-| **Study model, read layer, Configurator** | `pytest shared_config -q`<br>`cd analytics_api && pytest -q`<br>`pytest AWARE-Configurator -q` | Python 3.12, `analytics_api/requirements-dev.txt` and `AWARE-Configurator/requirements.txt` |
+| **Study model and read layer** | `pytest shared_config -q`<br>`cd analytics_api && pytest -q` | Python 3.12, `analytics_api/requirements-dev.txt` |
+| **Configurator backend** | `pytest AWARE-Configurator -q` | Python 3.11, `AWARE-Configurator/requirements.txt` plus `pytest` |
 | **Read layer against a real MySQL** | `cd analytics_api && pytest -m integration -q` | A local `mysqld`, 8.0 or newer |
 | **Dashboard types and lint** | `cd dashboard && npm ci && npx tsc -b && npx eslint .` | Node 20 |
 | **Configurator frontend** | `cd AWARE-Configurator/reactapp && npm ci && CI=true npx react-scripts test --watchAll=false` | Node 18 |
@@ -32,6 +33,16 @@ Three things worth knowing about running them here rather than in CI:
 - **Your Python is probably not 3.12.** The suites pass on later versions; the pins
   in `requirements.txt` were compiled for 3.12, which is what the image runs, so CI
   is the one that answers for the deployed combination.
+- **The read layer and the Configurator get an environment each.** They ask for
+  different versions of `cryptography` and `PyMySQL`, which is no conflict in a
+  deployment — each runs in its own image, on its own Python, 3.12 and 3.11 — and is
+  one inside a single virtualenv. A local environment holding both resolves to
+  whichever was installed last.
+- **`requirements-dev.txt` is a build product.** Its input asks for the deployed set
+  with `-r requirements.txt`, so a package added to `requirements.in` reaches the
+  suite only once the dev file is compiled again:
+  `pip-compile --output-file=requirements-dev.txt requirements-dev.in`.
+  `analytics_api/tests/test_prerequisites.py` holds the two files to each other.
 
 ---
 
