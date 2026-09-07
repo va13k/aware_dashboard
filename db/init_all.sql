@@ -6,7 +6,7 @@ CREATE DATABASE IF NOT EXISTS aware_ios;
 CREATE DATABASE IF NOT EXISTS aware_android;
 
 -- The passwords below are only a first-boot seed: on a fresh data directory
--- zz-participant-password.sh replaces them with the per-deployment passwords
+-- zz-account-passwords.sh replaces them with the per-deployment passwords
 -- generated into .env. CREATE USER IF NOT EXISTS means replaying this file on later
 -- restarts never resets those passwords.
 
