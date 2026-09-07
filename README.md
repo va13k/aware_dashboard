@@ -11,6 +11,7 @@ empty machine to a study participants can join.
 | You are | Read |
 | --- | --- |
 | **A researcher deploying this for a study** | This file, in order: [Prerequisites](#prerequisites), [How to perform the deployment](#how-to-perform-the-deployment), [Configure the study in the Configurator](#5-configure-the-study-in-the-configurator), [Browse collected data](#6-browse-collected-data-in-the-analytics-dashboard), [Reach a participant's phone](#7-reach-a-participants-phone), [When a participant leaves](#8-when-a-participant-leaves-the-study) |
+| **A researcher whose deployment is misbehaving** | [When something is wrong](#9-when-something-is-wrong) — what the deployment tells you about itself, and how to read it |
 | **A researcher wondering which sensors are available** | [Sensor support](#sensor-support) |
 | **A researcher using a database of their own** | [Bringing your own managed database](#bringing-your-own-managed-database) |
 | **A developer reading the stack for the first time** | [docs/dev/architecture.md](docs/dev/architecture.md) — what runs, how a request is routed, where a sensor row comes from, and every generated file with its reader |
@@ -1065,6 +1066,167 @@ that request before a study starts rather than after somebody withdraws.
 
 The default is the conservative reading: withdrawal keeps what was collected, and a
 device is excluded only because somebody said so.
+
+### 9. When something is wrong
+
+Most problems here answer themselves if you know where to ask, and the deployment
+carries four answers of its own. Reach for these before changing anything —
+re-running setup fixes a genuinely broken configuration, and tells you nothing about
+a phone that has not uploaded yet.
+
+| What you want to know | Ask this | It tells you |
+| --- | --- | --- |
+| Is every part running? | `sudo docker compose ps` | One line per container, with `healthy`, `starting`, `unhealthy` or `exited` |
+| Why is that one not running? | `sudo docker compose logs --tail=50 <service>` | Its own last words. Service names: `nginx`, `mysql`, `micro-server`, `micro-server-android`, `dashboard-api`, `dashboard`, `configurator`, `mqtt`, `counts-refresher`, `mysql-backup` |
+| Can this study use its database? | `python3 setup/verify_database.py --docker-prefix sudo` | Five checks with a mark each, and a hint naming the likely cause |
+| Would a phone's data actually arrive? | `python3 setup/verify_ingest.py --docker-prefix sudo` | Walks the phone's own path from outside the deployment and posts a real test row |
+
+On Windows leave `--docker-prefix sudo` off. Both are safe to run on a live study.
+The database check only ever asks questions. The ingest test posts one row from a
+synthetic device named for that run, then removes it along with everything keyed to
+that name, and reports the cleanup as part of its own result — so a failed run does
+not leave a probe behind in your data.
+
+**Reading a check report.** Each line carries one of four marks, and telling them
+apart is most of the work:
+
+| Mark | Means |
+| --- | --- |
+| `ok` | Asked and answered |
+| `warn` | Not there, and setup will create it on the next deploy. Before a first deployment this is the normal reading for the schema, the accounts and the tables |
+| `FAIL` | Something you have to fix. The study cannot collect until you do |
+| `skip` | Not asked, because an earlier answer made it meaningless |
+
+---
+
+#### Setup will not finish
+
+| What you see | What it usually is | What to do |
+| --- | --- | --- |
+| `Docker is required but was not found` | Docker Desktop is installed but not started, or not installed | Start Docker Desktop and wait for the whale icon to stop animating, then run setup again |
+| The wizard URL never prints | The wizard container did not start | `sudo docker compose logs setup-wizard` |
+| The wizard URL prints but the page does not open | You are deploying a server you are not sitting at, and port `9999` is not reachable from your machine | Put `SETUP_BIND=127.0.0.1` in `.env` and reach it through an SSH tunnel — see [Remote server deployment](#remote-server-deployment) |
+| `Cannot read .env — it is owned by another user (root?)` | An earlier run was made with `sudo` and left the file owned by root | `sudo chown $USER .env`, then run setup again |
+| An error naming port `80` or `443` and an address already in use | Something else on this machine is already serving those ports — often a system Apache or Nginx, or another Docker project | Stop the other service, or free the port. Nothing in the stack can share it |
+
+#### A container will not become healthy
+
+Start with `sudo docker compose ps` to see which one, then read its logs. The
+common ones:
+
+- **`mysql` is `starting` for a few minutes on a first deploy.** It is creating the
+  schema, which is a large file. It is given up to five minutes before it counts as
+  failed; wait before concluding anything.
+- **`nginx` exits immediately.** It refuses to start rather than serve a study
+  config unguarded, so a missing generated file stops it. Re-running setup writes
+  those files again.
+- **`micro-server` or `micro-server-android` is `unhealthy`.** Its configuration is
+  the usual cause. `sudo docker compose logs micro-server` names what it could not
+  read. If a deploy printed *"Not world-readable, so the container that bind-mounts
+  it cannot open it"*, that is the same fault caught earlier.
+- **Everything is `healthy` and the site still does not answer.** Check the address
+  you are using against the one setup printed — the access links are in
+  `deployment-urls.json`.
+
+#### The database check fails
+
+The hint on the failing line is usually the whole answer. What each one means:
+
+| The detail says | What it is |
+| --- | --- |
+| The name does not resolve | A typo in the host. It wants the host on its own — no scheme, no account, no database name |
+| The name resolves and nothing answered | Either the wrong port, or the provider refusing this machine. Managed databases rarely use `3306`: Aiven and DigitalOcean give each database its own port, printed beside the host in their console. If the port is right, add this machine's address to the provider's allowed list — *Allowed IP addresses*, *Trusted sources* or *Authorized networks* depending on who you are with |
+| An account will not authenticate | The password in `.env` and the one on the server have drifted apart. Run `./setup.sh` and choose *Deploy with current config*, which re-applies them. Starting the containers with `docker compose up` on its own does not — it leaves the existing database untouched |
+| Encryption was asked for and not offered | The server cannot do TLS. Either enable it there, or say so for this study — see [Encryption to the database](#encryption-to-the-database-and-who-decides-it) |
+
+When the report ends with *"This database can take this study"*, nothing is wrong:
+what is missing is what the deploy creates.
+
+#### The ingest self-test fails
+
+This is the one worth acting on before anyone enrols, because a study that fails it
+looks deployed and collects nothing.
+
+- **Endpoint** — the address the study hands out does not answer from outside. Check
+  that ports `80` and `443` are open in the server's firewall and at the provider,
+  and that the public host setup detected is the one participants can actually reach.
+- **Certificate** — the report names who it was issued to and when it expires. A
+  name that does not match the address, or a date in the past, is a certificate to
+  renew; afterwards run setup again so the new files are picked up.
+- **Test record** — the path is reachable but the write did not land. The database
+  check above is the next thing to run.
+
+#### Nothing is arriving in the dashboard
+
+Work down this list in order; each step rules out the one before.
+
+1. **Has anyone joined?** Open **Per Device**. An empty list means no phone has ever
+   reported in — start from the join page and the QR code rather than from the server.
+2. **When did that phone last upload?** The device list carries a last-seen time.
+   Phones upload on a schedule, and two settings can hold one back for a long time:
+   **Wi-Fi only** and **Charging only**. **Offload frequency** is how often it tries.
+   To stop waiting, send **Ask the phone to upload** from
+   [Messages](#7-reach-a-participants-phone).
+3. **Is the server turning data away?** Open **Client Logs**. A banner at the top
+   counts refused writes, with a line per device saying why. *"no enrolment window
+   the study log put there"* means that phone never actually joined this study — it
+   has the app and is trying to upload, but the study log holds no join for it.
+   Usually it joined a different study URL, or the study's dataflow changed after it
+   joined, which requires every participant to join again. *"named no device at all"*
+   is a request with no device id, which no properly joined phone sends.
+4. **Does the phone read as `Unknown`?** On its page, that badge means no study event
+   says whether it is in the study — the same finding as a refusal, seen from the
+   other side.
+5. **Does the Overview say records have no device id?** That banner counts rows that
+   arrived without a device. They are counted and never exported, which is why a
+   total can exceed what a download produces. A handful is an early test; a large
+   block is worth asking about before anything is discarded.
+
+#### The numbers look wrong rather than missing
+
+- **The phone carries an old configuration.** Its page shows **Config differs** with
+  a count, and lists the fields. Send **Ask the phone for a study update** and it
+  re-reads now instead of waiting on its own timer.
+- **The coverage grid is emptier than expected.** A cell is judged against what the
+  study asked for, so a low count with a strong colour is a sensor that was expected
+  and did not arrive — check that sensor is enabled for that platform, and that the
+  participant granted the permission it needs.
+- **A withdrawn participant's data is still arriving.** That is how it works:
+  withdrawal records when they were in the study and does not stop their phone. See
+  [When a participant leaves](#8-when-a-participant-leaves-the-study).
+
+#### Messages never show as delivered
+
+Normal until that phone next uploads. **Delivered** is the phone's own report,
+carried up with its data, so it lags a sync rather than confirming one. **Sent**
+going up while **Delivered** stays put means the phone has not been heard from.
+
+#### I cannot log in
+
+The researcher username and password are in `.env`, as `RESEARCHER_USERNAME` and
+`RESEARCHER_PASSWORD`. Open that file to read them rather than deploying again. To
+change them, run setup and choose *Edit configuration first*.
+
+A session lasts 8 hours, so being asked to log in again after a working day is
+expected rather than a fault.
+
+---
+
+#### When you do ask for help
+
+Send these four things and almost any question can be answered without a call:
+
+```bash
+sudo docker compose ps
+python3 setup/verify_database.py --docker-prefix sudo
+python3 setup/verify_ingest.py --docker-prefix sudo
+sudo docker compose logs --tail=50 <the service that looks wrong>
+```
+
+**Never send `.env`, `source.json`, or the setup wizard URL.** All three carry this
+deployment's passwords. The check reports are written to be shareable — they name
+hosts, ports and accounts, never a password. If you need to quote a database host
+that arrived as a connection string, remove the account and password from it first.
 
 ## Sensor support
 
