@@ -2,6 +2,21 @@
 
 A self-hosted research platform for collecting and visualising sensor data from Android and iOS devices. The entire stack is bundled into a single Docker Compose project that you can deploy with one command.
 
+## Where to look
+
+This file is the deployment guide, written for a researcher running a study rather
+than for a programmer: it assumes no command-line experience and takes you from an
+empty machine to a study participants can join.
+
+| You are | Read |
+| --- | --- |
+| **A researcher deploying this for a study** | This file, in order: [Prerequisites](#prerequisites), [How to perform the deployment](#how-to-perform-the-deployment), [Configure the study in the Configurator](#5-configure-the-study-in-the-configurator), [Browse collected data](#6-browse-collected-data-in-the-analytics-dashboard) |
+| **A researcher wondering which sensors are available** | [Sensor support](#sensor-support) |
+| **A researcher using a database of their own** | [Bringing your own managed database](#bringing-your-own-managed-database) |
+| **A developer reading the stack for the first time** | [docs/dev/architecture.md](docs/dev/architecture.md) — what runs, how a request is routed, where a sensor row comes from, and every generated file with its reader |
+| **A developer changing how a deployment is built** | [docs/dev/deploy-pipeline.md](docs/dev/deploy-pipeline.md) — what `./setup.sh` does, step by step, and what is still done by hand |
+| **A developer working inside one component** | Its own README, beside its code: [analytics_api](analytics_api/README.md), [dashboard](dashboard/README.md) |
+
 ## What it is
 
 Study participants install the **AWARE client app** on their phone (Android or iOS). The app continuously collects sensor data — accelerometer, GPS, screen events, ambient noise, and [many more](#sensor-support). Due to security restrictions on both Android and iOS, participants must **manually trigger a data upload** from inside the app. Once they do, the data is sent to your server and becomes immediately available in the analytics dashboard for browsing, filtering, and export.
