@@ -1080,6 +1080,7 @@ a phone that has not uploaded yet.
 | Why is that one not running? | `sudo docker compose logs --tail=50 <service>` | Its own last words. Service names: `nginx`, `mysql`, `micro-server`, `micro-server-android`, `dashboard-api`, `dashboard`, `configurator`, `mqtt`, `counts-refresher`, `mysql-backup` |
 | Can this study use its database? | `python3 setup/verify_database.py --docker-prefix sudo` | Five checks with a mark each, and a hint naming the likely cause |
 | Would a phone's data actually arrive? | `python3 setup/verify_ingest.py --docker-prefix sudo` | Walks the phone's own path from outside the deployment and posts a real test row |
+| Are the ports it needs free? | `python3 setup/check_ports.py --docker-prefix sudo` | Each address a container publishes, and for a port that is taken, what holds it |
 
 On Windows leave `--docker-prefix sudo` off. Both are safe to run on a live study.
 The database check only ever asks questions. The ingest test posts one row from a
@@ -1107,7 +1108,7 @@ apart is most of the work:
 | The wizard URL never prints | The wizard container did not start | `sudo docker compose logs setup-wizard` |
 | The wizard URL prints but the page does not open | You are deploying a server you are not sitting at, and port `9999` is not reachable from your machine | Put `SETUP_BIND=127.0.0.1` in `.env` and reach it through an SSH tunnel — see [Remote server deployment](#remote-server-deployment) |
 | `Cannot read .env — it is owned by another user (root?)` | An earlier run was made with `sudo` and left the file owned by root | `sudo chown $USER .env`, then run setup again |
-| An error naming port `80` or `443` and an address already in use | Something else on this machine is already serving those ports — often a system Apache or Nginx, or another Docker project | Stop the other service, or free the port. Nothing in the stack can share it |
+| `These ports are already in use, and this deployment has to publish them:` | Another program on this machine is serving a port the stack needs — a system Apache or Nginx on 80, a local MySQL on 3306, a local Mosquitto on 1883, or another Docker project | The report names each port, what needs it, which of this machine's addresses answered, and what holds it. When a Docker container holds it, it gives you the `docker stop` command; otherwise it gives you the command to find the program. Free the port and run setup again — these addresses are fixed, so the stack has no second port to fall back on |
 
 #### A container will not become healthy
 

@@ -52,6 +52,21 @@ accounts keep their old passwords.
 **The wizard flow** asks for the configuration in a browser first, and the deploy is
 run from inside the wizard as the researcher saves.
 
+Both paths ask [`check_ports.py`](../../setup/check_ports.py) before any container
+comes up, and the wizard flow asks it once more for port 9999 before the form is
+served. A port another program holds is a container that never starts, and Docker
+reports that as an error about an address, minutes into a build — so it is answered
+first, with the port, what needs it, what holds it, and which of this machine's
+addresses answered. A port one of this deployment's own `aware_*` containers holds
+reads as available, which is what every redeploy looks like.
+
+A publish on every interface is asked about at each address this machine claims as
+its own, since anything holding that port on any one of them refuses the publish.
+Only its own addresses are asked: a name resolving elsewhere would stop a deployment
+over another server's software. What a port below 1024 cannot be asked without
+privileges is the pair of a specific address and a socket that accepts nothing —
+`answering_on` names where that answer would come from.
+
 ---
 
 ## The wizard

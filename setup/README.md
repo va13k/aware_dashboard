@@ -62,6 +62,7 @@ owner.
 [`deploy_config.py`](deploy_config.py) | The generator. Reads `.env`, the wizard's request and `source.json`; writes every generated file. The longest file here by far, and the one to read first — its `main()` is the whole pipeline in order |
 [`init_study_tables.py`](init_study_tables.py) | The only thing that creates anything: both schemas, every account with the password this study holds, and the table definitions. Runs on both placements and on every deploy, which is what keeps `.env` and the database from drifting |
 [`publish_authority.py`](publish_authority.py) | Publishes the certificate authority a bundled database generated on first start, once the stack is up. Guarded, so a deployment that has already published one does nothing |
+[`check_ports.py`](check_ports.py) | The addresses this deployment publishes, asked about before the containers that need them are built. Reads `.env` for the broker's and the database's; asks a publish on every interface at each address this machine claims as its own, so a server bound to one of them is found; and treats a port held by an `aware_*` container as available — that is a redeploy, not a conflict |
 [`studies_index_template.html`](studies_index_template.html) | The participant-facing join page, rendered into `studies/index.html` with this study's links, QR code and per-platform install instructions |
 
 ### The checks
@@ -123,6 +124,7 @@ python3 setup/verify_ingest.py --docker-prefix sudo
 python3 setup/init_study_tables.py --docker-prefix sudo
 python3 setup/deploy_config.py --docker-prefix sudo
 python3 setup/detect_public_host.py
+python3 setup/check_ports.py --docker-prefix sudo
 python3 setup/send_message.py --docker-prefix sudo devices
 ```
 
