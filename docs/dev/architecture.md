@@ -229,4 +229,5 @@ Nothing in this table is committed. Each is written by
 | The read layer, its endpoints and its tests | [analytics_api/README.md](../../analytics_api/README.md) |
 | The dashboard's pages and live channel | [dashboard/README.md](../../dashboard/README.md) |
 | The study model and the two platform configs | [`shared_config/serializers.py`](../../shared_config/serializers.py) |
+| What CI runs, and how to run it here | [checks.md](checks.md) |
 | Deploying it as a researcher | [the root README](../../README.md) |
