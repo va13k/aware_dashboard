@@ -68,6 +68,13 @@ verify_database() {
     python3 setup/verify_database.py --docker-prefix sudo || true
 }
 
+# The addresses this deployment publishes, asked about before the containers that
+# need them are built. A port another program holds is a container that never
+# starts, so the run stops here with the port and what holds it named.
+check_ports() {
+    python3 setup/check_ports.py --docker-prefix sudo "$@"
+}
+
 # A bundled database generates the authority it signs its own certificate with on
 # first start, and that start follows the deploy which wrote the study. The stack is
 # up by the time this runs, so setup/publish_authority.py reads the authority out of
@@ -80,6 +87,7 @@ publish_database_authority() {
 deploy_stack() {
     mkdir -p studies aware-micro-server/cache aware-micro-server/esm
     python3 setup/deploy_config.py --docker-prefix sudo
+    check_ports
     compose up --build -d
     python3 setup/init_study_tables.py --docker-prefix sudo
     publish_database_authority
@@ -126,6 +134,7 @@ PY
 }
 
 start_stack_only() {
+    check_ports
     compose up --build -d
     python3 setup/init_study_tables.py --docker-prefix sudo
     # The wizard wrote the study before this database existed, so this is the path a
@@ -211,6 +220,8 @@ rm -f .env.saved setup/.wizard_url setup/.ingest-check.json setup/.database-chec
 
 SUGGESTED_PUBLIC_HOST=$(python3 setup/detect_public_host.py)
 printf "PUBLIC_HOST=%s\nPUBLIC_PORT=80\nPROTOCOL=http\n" "$SUGGESTED_PUBLIC_HOST" > .setup-defaults.env
+
+check_ports --wizard
 
 # Build and start the wizard
 compose --profile setup up --build -d setup-wizard
