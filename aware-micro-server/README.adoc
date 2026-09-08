@@ -1,5 +1,15 @@
 = AWARE Micro
 
+[NOTE]
+====
+This is upstream's document, kept as it was. It describes AWARE Micro as a
+standalone server installed on a host with Java, which is not how this repository
+deploys it: here it is a container built by `docker compose`, run twice, configured
+from a file the deploy writes, and carrying rules upstream does not have.
+
+For this fork, read link:README.md[README.md] instead.
+====
+
 This is the new AWARE server for conducting studies using AWARE. It is a reactive, non-blocking server able to handle thousands of requests per second on a single machine.
 
 This can be run on any OS as it is a JVM server implementation. This server is built using image:https://img.shields.io/badge/vert.x-4.3.3-purple.svg[link="https://vertx.io"]. It is compatible with the existing AWARE clients.
