@@ -150,9 +150,9 @@ echo "ROTATE=study-key" >> .env
 Then run `./setup.sh` and choose *Deploy with current config*. `study-key` and
 `broker` are the two rotatable names, and the request is cleared once acted on, so
 a rotation happens on the deploy that asked for it. Both credentials live on phones
-in the field: a new study key changes the address a phone uploads to, so every
-participant rejoins by scanning the QR code again, and a new broker password stops
-prompts reaching a phone until it has read its configuration.
+in the field, and what each one costs a running study is stated where a researcher
+reads it, in
+[docs/guide/maintenance.md](../docs/guide/maintenance.md#rotating-a-credential).
 
 ---
 
