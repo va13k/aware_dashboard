@@ -211,51 +211,11 @@ Both options re-apply `PARTICIPANT_DB_PASSWORD` and `ANDROID_SERVER_DB_PASSWORD`
 
 ### 4. Complete the setup wizard
 
-The wizard has five steps. A progress bar at the top tracks where you are. You can go back to any previous step before deploying.
+The wizard has four steps. A progress bar at the top tracks where you are. You can go back to any previous step before deploying.
 
 ---
 
-**Step 1 — Database**
-
-Set the **database administrator** and its password. This is the account that creates the schemas, this study's own accounts and its tables.
-
-On a database you name, both are required and both come from your provider: `avnadmin` on Aiven, `doadmin` on DigitalOcean.
-
-On the database deployed here, both are an offer rather than a question. Leave them blank and the deployment administers its own server with the password it generated for it. Name an administrator instead and setup creates that account with the password beside it. The wizard refuses two answers, because neither can be carried out: `root`, which is that database's own account and already holds a password nobody typed, and half a pair, since no account can be created from a name without a password or a password without a name.
-
-Set the **participant device password** as well. This is the password of the MySQL account that participant devices use to insert their data, and it is the password participants type on their phone when the study configuration is served without an embedded password (the **Configure without password** option in the Configurator).
-
-- Use the **Generate** button to create a random one, or type your own — letters, digits and `. _ ~ @ # % ^ * + = : -` are allowed.
-- Leave it blank to keep the password the deployment already uses, or to have one generated on a fresh install.
-- On a re-run, the field is pre-filled with the current password. Changing it here applies the new password to the MySQL accounts on the next deployment, so any device still holding the old one must be given the new password.
-- The wizard shows the password again on the completion screen, and it is stored as `PARTICIPANT_DB_PASSWORD` in `.env`. You can also set it there before running `setup.sh`.
-
-This password belongs to the account a phone opens the database with, which is what the **straight to the database** dataflow asks of a phone. On the **through the server** dataflow no phone opens MySQL at all: the micro-server performs every write, with an account of its own — `aware_android_server` — and its own password, generated into `ANDROID_SERVER_DB_PASSWORD`. Nothing publishes that one, and the Configurator's Database access step edits whichever of the two the study's dataflow puts on the ingest path, naming the account it is changing.
-
-The two accounts are granted different things, because they do different work:
-
-| Account                     | Granted                                                                                                          | Used by                                                         |
-| --------------------------- | ---------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------- |
-| `aware_android_participant` | `INSERT` on the Android schema                                                                                   | A participant's phone, on the straight-to-the-database dataflow |
-| `aware_android_server`      | `INSERT` on the Android schema, plus reading `device_enrolment`, keeping `refusals`, and updating `aware_device` | The Android micro-server, on the through-the-server dataflow    |
-| `aware_analytics`           | `SELECT` on both schemas, with write on the dashboard's own cache tables                                         | The dashboard's API and its refresher                           |
-
-Separate passwords, because the participant one is embedded in the study config every phone downloads, while the server's account can read the enrolment registry a phone's account cannot.
-
-The database also applies built-in connection protection for participant devices:
-
-- repeated failed logins are progressively delayed after three attempts, up to five seconds;
-- incomplete connection handshakes time out after five seconds;
-- each MySQL account may use at most 100 simultaneous authenticated connections by default.
-
-The connection ceiling limits concurrent database work, not enrolled participants. Set
-`MYSQL_MAX_USER_CONNECTIONS_PER_ACCOUNT` in `.env` to change the persistent value on the
-next MySQL container recreation. To change the running server immediately without a
-restart, use MySQL's `SET GLOBAL max_user_connections = ...` statement as well.
-
----
-
-**Step 2 — Researcher access**
+**Step 1 — Researcher access**
 
 Set the **username and password** for the researcher login. These credentials protect the dashboard, configurator, and backup pages from being accessed by study participants.
 
@@ -267,7 +227,7 @@ Save these credentials — you will need them every time you log in to the prote
 
 ---
 
-**Step 3 — Network**
+**Step 2 — Network and database**
 
 This step decides how participant devices reach your server. Choose the option that matches where you are deploying.
 
@@ -334,6 +294,46 @@ Both paths can be relative to the project folder or absolute.
 
 HTTPS is **not required** for local network deployments (same Wi-Fi) or localhost testing.
 
+**The database, in the same step**
+
+Set the **database administrator** and its password. This is the account that creates the schemas, this study's own accounts and its tables.
+
+On a database you name, both are required and both come from your provider: `avnadmin` on Aiven, `doadmin` on DigitalOcean.
+
+On the database deployed here, both are an offer rather than a question. Leave them blank and the deployment administers its own server with the password it generated for it. Name an administrator instead and setup creates that account with the password beside it. The wizard refuses two answers, because neither can be carried out: `root`, which is that database's own account and already holds a password nobody typed, and half a pair, since no account can be created from a name without a password or a password without a name.
+
+Set the **participant device password** as well. This is the password of the MySQL account that participant devices use to insert their data, and it is the password participants type on their phone when the study configuration is served without an embedded password (the **Configure without password** option in the Configurator).
+
+- Use the **Generate** button to create a random one, or type your own — letters, digits and `. _ ~ @ # % ^ * + = : -` are allowed.
+- Leave it blank to keep the password the deployment already uses, or to have one generated on a fresh install.
+- On a re-run, the field is pre-filled with the current password. Changing it here applies the new password to the MySQL accounts on the next deployment, so any device still holding the old one must be given the new password.
+- The wizard shows the password again on the completion screen, and it is stored as `PARTICIPANT_DB_PASSWORD` in `.env`. You can also set it there before running `setup.sh`.
+
+This password belongs to the account a phone opens the database with, which is what the **straight to the database** dataflow asks of a phone. On the **through the server** dataflow no phone opens MySQL at all: the micro-server performs every write, with an account of its own — `aware_android_server` — and its own password, generated into `ANDROID_SERVER_DB_PASSWORD`. Nothing publishes that one, and the Configurator's Database access step edits whichever of the two the study's dataflow puts on the ingest path, naming the account it is changing.
+
+The two accounts are granted different things, because they do different work:
+
+| Account                     | Granted                                                                                                          | Used by                                                         |
+| --------------------------- | ---------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------- |
+| `aware_android_participant` | `INSERT` on the Android schema                                                                                   | A participant's phone, on the straight-to-the-database dataflow |
+| `aware_android_server`      | `INSERT` on the Android schema, plus reading `device_enrolment`, keeping `refusals`, and updating `aware_device` | The Android micro-server, on the through-the-server dataflow    |
+| `aware_analytics`           | `SELECT` on both schemas, with write on the dashboard's own cache tables                                         | The dashboard's API and its refresher                           |
+
+Separate passwords, because the participant one is embedded in the study config every phone downloads, while the server's account can read the enrolment registry a phone's account cannot.
+
+The database also applies built-in connection protection for participant devices:
+
+- repeated failed logins are progressively delayed after three attempts, up to five seconds;
+- incomplete connection handshakes time out after five seconds;
+- each MySQL account may use at most 100 simultaneous authenticated connections by default.
+
+The connection ceiling limits concurrent database work, not enrolled participants. Set
+`MYSQL_MAX_USER_CONNECTIONS_PER_ACCOUNT` in `.env` to change the persistent value on the
+next MySQL container recreation. To change the running server immediately without a
+restart, use MySQL's `SET GLOBAL max_user_connections = ...` statement as well.
+
+---
+
 #### How to get a free SSL certificate with Let's Encrypt
 
 [Let's Encrypt](https://letsencrypt.org/) issues free, trusted certificates automatically. The official tool for obtaining them is [Certbot](https://certbot.eff.org/). You need:
@@ -372,7 +372,7 @@ Enter these absolute paths in the wizard's **Certificate path** and **Key path**
 
 ---
 
-**Step 4 — Backups**
+**Step 3 — Backups**
 
 Configure automated MySQL backups. Backups are saved directly on the host machine (outside Docker volumes) so they survive a `docker compose down -v`.
 
@@ -382,7 +382,7 @@ Configure automated MySQL backups. Backups are saved directly on the host machin
 
 ---
 
-**Step 5 — Review**
+**Step 4 — Review**
 
 Shows a preview of the `.env` file that will be written. Review the values and click **Deploy** when ready.
 
@@ -415,7 +415,7 @@ The main page links to all four sections of the platform:
 
 **Join the study** is intentionally public so that participants can reach it without credentials. It asks which phone they have and then shows only that platform's steps: where to get the app, the join URL to copy, and the QR code to scan. The page guesses the platform from the browser and lets them switch.
 
-All other pages are protected. When you navigate to any of them without being logged in, you are redirected to the researcher login page. Enter the username and password you set in step 2 of the wizard to gain access. The session lasts 8 hours; after that you will be asked to log in again.
+All other pages are protected. When you navigate to any of them without being logged in, you are redirected to the researcher login page. Enter the username and password you set in step 1 of the wizard to gain access. The session lasts 8 hours; after that you will be asked to log in again.
 
 ### Checking the ingest path before anyone enrols
 
