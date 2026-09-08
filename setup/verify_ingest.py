@@ -146,14 +146,8 @@ class Mysql:
         client = mysql_client.Client.for_study(docker_base, source)
         if database.tls_required(databases):
             client = client.asking_for("REQUIRED", database.tls_authority(databases))
-        return cls(
-            client,
-            database.admin_user(
-                database.declared_host(databases), str(env.get("DB_ADMIN_USER", "")).strip()
-            ),
-            database.admin_password(env),
-            schema,
-        )
+        admin_user, admin_password = database.admin_credentials(databases, env)
+        return cls(client, admin_user, admin_password, schema)
 
     def execute(self, sql: str) -> subprocess.CompletedProcess:
         return self._client.run(self._user, self._password, sql, self._schema)

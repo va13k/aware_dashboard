@@ -263,8 +263,16 @@ def main() -> int:
     args = parse_args()
     env = load_env(ENV_PATH)
     source = read_source()
-    schema = database.platform_schema(source.get("database") or {}, "android")
-    root_password = database.admin_password(env)
+    databases = source.get("database") or {}
+    schema = database.platform_schema(databases, "android")
+    # Asked as root, so it asks for root's password: on the database this deployment
+    # runs that is the container's own, which is not the key an external
+    # administrator's password lives in.
+    root_password = database.admin_password(
+        env,
+        database.DEFAULT_ADMIN_USER,
+        database.is_internal(database.declared_host(databases)),
+    )
     sql = client(args.docker_prefix)
 
     if args.command == "devices":

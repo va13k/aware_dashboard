@@ -312,17 +312,25 @@ def _mysql_admin_settings(source=None):
         return os.environ.get(key) or str(env.get(key, "")).strip() or default
 
     databases = (source or {}).get("database") or {}
+    # The account that administers this study's database, whichever server that is,
+    # settled where the deploy and the checks settle it. Not root by assumption: only
+    # the bundled container has one, and a study pointed at a managed server
+    # authenticates there as an account that does not exist. Where it is root on the
+    # bundled container, the password is that container's own rather than the field
+    # the wizard offered --- root there holds no other.
+    admin_user, admin_password = database_model.admin_credentials(
+        databases,
+        {
+            "DB_ADMIN_USER": pick("DB_ADMIN_USER"),
+            database_model.ADMIN_PASSWORD_ENV: pick(database_model.ADMIN_PASSWORD_ENV),
+            "MYSQL_ROOT_PASSWORD": pick("MYSQL_ROOT_PASSWORD"),
+        },
+    )
     return {
         "host": pick("MYSQL_HOST", database_model.service_host(databases)),
         "port": int(pick("MYSQL_PORT", str(database_model.platform_port(databases, "android")))),
-        # The account that administers this study's database, whichever server that
-        # is. Not root: only the bundled container has one, and a study pointed at a
-        # managed server authenticates there as an account that does not exist.
-        "admin_user": database_model.admin_user(
-            database_model.declared_host(databases), pick("DB_ADMIN_USER")
-        ),
-        "admin_password": pick(database_model.ADMIN_PASSWORD_ENV)
-        or pick("MYSQL_ROOT_PASSWORD"),
+        "admin_user": admin_user,
+        "admin_password": admin_password,
     }
 
 

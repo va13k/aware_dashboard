@@ -702,9 +702,17 @@ def main() -> int:
         "ios": database.platform_schema(databases, "ios"),
     }
     # Whatever the request settled, so running this by hand after a failed deploy
-    # asks as the same account the deployment did.
-    admin_user = args.admin_user or str(env.get("DB_ADMIN_USER", "")).strip() or "root"
-    admin_password = args.admin_password or database.admin_password(env)
+    # asks as the same account the deployment did --- root on the database this
+    # deployment runs holding that container's own password, which is the one thing
+    # about these credentials nobody typed.
+    admin_user = (
+        args.admin_user
+        or str(env.get("DB_ADMIN_USER", "")).strip()
+        or database.DEFAULT_ADMIN_USER
+    )
+    admin_password = args.admin_password or database.admin_password(
+        env, admin_user, chosen == placement.BUNDLED
+    )
     # A study whose database is made by hand is waiting on somebody; one setup
     # deploys is waiting on the deploy. The questions asked are the same either way.
     create = not (args.verify_only or str(env.get("DB_INIT", "")).strip().lower() == "manual")

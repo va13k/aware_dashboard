@@ -92,16 +92,25 @@ def load_admin(databases: dict) -> tuple[str, str]:
     provider, and only then by MySQL's own default. A deployment upgraded in place
     has an `.env` written before the question existed, and would otherwise
     authenticate as an account its managed database has never had.
+
+    Root on the bundled database is the one account whose password is not the one
+    the administrator field carries. That server was created with a password this
+    deployment generated and MySQL wrote into its data directory, and root has held
+    no other since --- so a deploy that opened it with what was typed stopped here,
+    on `Access denied`, before a schema existed.
     """
     env = load_env(ENV_PATH)
-    password = database.admin_password(env)
+    admin_user, password = database.admin_credentials(databases, env)
     if not password:
-        raise RuntimeError(
-            f"{database.ADMIN_PASSWORD_ENV} is missing from .env"
+        # Named for the account that is short of one, since they are separate keys
+        # and only one of them can be what this deployment was going to use.
+        missing = (
+            "MYSQL_ROOT_PASSWORD"
+            if admin_user == database.DEFAULT_ADMIN_USER
+            and database.is_internal(database.declared_host(databases))
+            else database.ADMIN_PASSWORD_ENV
         )
-    admin_user = database.admin_user(
-        database.declared_host(databases), env.get("DB_ADMIN_USER", "")
-    )
+        raise RuntimeError(f"{missing} is missing from .env")
     return admin_user, password
 
 
