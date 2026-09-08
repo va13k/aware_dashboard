@@ -209,7 +209,6 @@ services:
       - ./nginx/index.html:/usr/share/nginx/html/index.html:ro
       - ./nginx/backup.html:/usr/share/nginx/html/backup.html:ro
       - ./nginx/assets:/usr/share/nginx/html/assets:ro
-      - ./nginx/configurator-loading.html:/usr/share/nginx/html/configurator-loading.html:ro
       - ./nginx/setup-loading.html:/usr/share/nginx/html/setup-loading.html:ro
       - ./nginx/${PROTOCOL:-http}.conf:/etc/nginx/conf.d/default.conf:ro
       - ./nginx/study-key.conf:/etc/nginx/conf.d/00-study-key.conf:ro
