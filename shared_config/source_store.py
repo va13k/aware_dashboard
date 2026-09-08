@@ -6,6 +6,14 @@ import os
 import pathlib
 from typing import Any, Callable
 
+try:
+    import fcntl
+except ImportError:
+    #: Windows carries no advisory-lock module and no directory a process may open.
+    #: Every import failure is taken, not the missing-module one alone, so a platform
+    #: that ships the name and refuses to load it reads the same as one without it.
+    fcntl = None
+
 from shared_config.runtime import SECRET_MODE, atomic_write_text
 
 
@@ -26,7 +34,21 @@ TEMPLATE_PATH = _project_root() / "source.example.json"
 
 @contextlib.contextmanager
 def source_lock():
-    import fcntl
+    """Hold the study model for the length of a read or a write, where the platform locks.
+
+    Taken on the directory holding the file rather than on the file, so one lock
+    covers both a read and the atomic replace a write ends with.
+
+    Where the platform offers no such lock, as on Windows, the body runs and holds to
+    what :func:`os.replace` guarantees on its own: a reader is handed the file whole,
+    either as it stood or as it became, never half of each. What a lock adds on top of
+    that is one read-modify-write at a time, and the two writers a deployment runs are
+    this deploy and the Configurator in its container --- a pair a lock taken on the
+    host reaches only one half of in any case.
+    """
+    if fcntl is None:
+        yield
+        return
 
     dir_fd = os.open(SOURCE_PATH.parent, os.O_RDONLY)
     try:
