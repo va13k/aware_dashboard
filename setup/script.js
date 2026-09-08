@@ -203,10 +203,47 @@ function go(dir) {
     // hand out one line with the scheme, the credentials and the database in
     // it, and this field wants the host alone. Left to the deployment, it comes
     // back as a DNS failure naming the whole string -- password included.
+    // The administrator is asked for where the answer is the researcher's to
+    // give. A server they name hands one out, and nothing here could guess its
+    // password. The database deployed here generates its own and keeps it in
+    // .env, so both fields are an offer rather than a question: name an
+    // administrator and setup creates it on the password beside it, or leave both
+    // and this deployment opens its own server as the root it generated. Half an
+    // answer is an account that cannot be created and `root` is the one name it
+    // cannot be created under, so both are refused here rather than at the deploy.
     if (step === 1) {
-      var mp = (document.getElementById("mysqlPass").value || "").trim();
-      if (!mp) {
+      var adminName = (document.getElementById("dbAdminUser").value || "").trim();
+      var adminPass = (document.getElementById("mysqlPass").value || "").trim();
+      var ourDatabase = dbPlacement() !== "external";
+      if (!ourDatabase && !adminPass) {
         showFieldError("mysqlPass", "Please enter the database password.");
+        return;
+      }
+      if (ourDatabase && adminName.toLowerCase() === "root") {
+        showFieldError(
+          "dbAdminUser",
+          "root is the database deployed here, and it holds the password this " +
+            "deployment generated for it. Name a different administrator, or " +
+            "leave both fields blank.",
+        );
+        return;
+      }
+      if (ourDatabase && adminName && !adminPass) {
+        showFieldError(
+          "mysqlPass",
+          "Enter the password to create " +
+            adminName +
+            " with, or clear the name and this deployment administers its own " +
+            "database.",
+        );
+        return;
+      }
+      if (ourDatabase && adminPass && !adminName) {
+        showFieldError(
+          "dbAdminUser",
+          "Name the administrator this password creates, or clear the password " +
+            "and this deployment administers its own database.",
+        );
         return;
       }
     }
@@ -714,6 +751,15 @@ function updateDbPlacement() {
   }
   updateDbMoveNotice();
 
+  // What the administrator fields mean is not the same on both placements: a
+  // server the researcher names hands one out, and the database deployed here
+  // makes one only if it is asked to. Said beside the fields on the placement it
+  // is true of, rather than as one sentence covering both.
+  var administrator = document.getElementById("dbAdminOptional");
+  if (administrator) {
+    administrator.classList.toggle("hidden", select.value === "external");
+  }
+
   // A phone opens the database itself only on the direct path. On the webservice
   // path it is given a study URL and no credential, so the field is not merely
   // hidden -- the page says why there is nothing to ask for.
@@ -1118,9 +1164,15 @@ function loadExisting() {
       // The administrator of the database this study names, whichever server that
       // is. The bundled container's own root password is never shown: it is not a
       // question anyone answers, and writing the form back would overwrite it.
-      if (d.DB_ADMIN_PASSWORD)
+      //
+      // Neither is what a deployment writes down for having been asked nothing.
+      // `root` is the account this deployment administers its own database as and
+      // CHANGE_ME is the placeholder standing where no password was typed; filled
+      // into the form they read as answers, and the next Save would try to create
+      // an administrator out of them.
+      if (d.DB_ADMIN_PASSWORD && d.DB_ADMIN_PASSWORD !== "CHANGE_ME")
         document.getElementById("mysqlPass").value = d.DB_ADMIN_PASSWORD;
-      if ((d.DB_ADMIN_USER || "").trim())
+      if ((d.DB_ADMIN_USER || "").trim() && d.DB_ADMIN_USER.trim() !== "root")
         document.getElementById("dbAdminUser").value = d.DB_ADMIN_USER;
       if (d.PARTICIPANT_DB_PASSWORD) {
         document.getElementById("participantPass").value =

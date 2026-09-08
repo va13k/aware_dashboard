@@ -166,7 +166,12 @@
 
         <div class="field">
           <label for="dbAdminUser">Database administrator</label>
-          <input type="text" id="dbAdminUser" placeholder="root" />
+          <input
+            type="text"
+            id="dbAdminUser"
+            placeholder="root"
+            oninput="clearFieldError('dbAdminUser')"
+          />
           <p class="field-error hidden" id="dbAdminUserError"></p>
           <label for="mysqlPass" style="margin-top: 10px"
             >Database administrator password</label
@@ -188,8 +193,15 @@
           <p class="field-error hidden" id="mysqlPassError"></p>
           <p class="hint">
             The account that creates the schemas, this study's accounts and its
-            tables. On the database deployed here, setup creates it with this
-            name; on a server you name, it is the one your provider gave you.
+            tables. On a server you name, it is the one your provider gave you, and
+            both fields are needed to reach it.
+          </p>
+          <p class="hint" id="dbAdminOptional">
+            On the database deployed here, both are yours to leave blank: name an
+            administrator and setup creates it with the password beside it, or
+            leave them and this deployment administers its own server with the
+            password it generated for that database. <code>root</code> is that
+            database&rsquo;s own account, so it is not a name to enter here.
           </p>
         </div>
 
