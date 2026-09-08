@@ -1110,6 +1110,41 @@ def declared_database_host() -> str:
         return ""
 
 
+def ensure_host_identity(env: dict[str, str]) -> None:
+    """Settle the user the Configurator runs as, where nothing else has.
+
+    The Configurator is the one service that writes into the bind-mounted project
+    directory while a study is being edited, and the compose file runs it as
+    HOST_UID:HOST_GID so what it writes stays owned by whoever deployed. `setup.sh`
+    writes both from the deploying user's own ids. Nothing on Windows can --- there
+    is no `id -u` to ask --- and the compose default of 1000:1000 is then a user that
+    owns nothing at all: Docker Desktop presents the whole mount as root, and the
+    directories this deploy creates inside it keep the mode they were made with,
+    0755. `studies/` is one of them, and it is where the Configurator's first Save
+    lands: a PermissionError the researcher is shown as a 500, on every Windows
+    deployment, with the study half written --- source.json updated and the
+    configuration a phone reads left as it was.
+
+    So the identity is taken from the one thing that is true wherever this runs: who
+    owns the project directory as the containers see it. On Linux that is the
+    deploying user, which is what `setup.sh` already wrote and what this leaves
+    alone. On Docker Desktop it is root, which is the only user that can write there.
+    """
+    if str(env.get("HOST_UID", "")).strip() and str(env.get("HOST_GID", "")).strip():
+        return
+
+    try:
+        anchor = PROJECT.stat()
+    except OSError as exc:
+        print(f"deploy_config: could not stat {PROJECT}: {exc}", file=sys.stderr)
+        return
+
+    if not str(env.get("HOST_UID", "")).strip():
+        env["HOST_UID"] = str(anchor.st_uid)
+    if not str(env.get("HOST_GID", "")).strip():
+        env["HOST_GID"] = str(anchor.st_gid)
+
+
 def persist_env(env: dict[str, str]) -> None:
     # Written whether or not the request carried it: a deployment upgraded in place
     # has an .env from before the question existed, and every script that opens the
@@ -1285,11 +1320,14 @@ def chown_generated_paths(env: dict[str, str]) -> None:
     path) is a harmless no-op: chowning a path to its own uid/gid always
     succeeds without extra privilege.
 
-    Windows has no Unix uid/gid concept — os.chown doesn't exist there — and
-    setup.bat never writes HOST_UID/HOST_GID to .env, since Docker Desktop's
-    bind mounts don't enforce host-side ownership the way a native Linux bind
-    mount does. Bail out before touching os.getuid/os.chown, both of which
-    would raise AttributeError on that platform.
+    Windows has no Unix uid/gid concept — os.chown doesn't exist there — so
+    this bails out before touching os.getuid/os.chown, both of which would
+    raise AttributeError when the deploy runs as native Windows Python. What
+    the Configurator runs as on that platform is settled all the same, by
+    ensure_host_identity above: Docker Desktop enforces no host-side ownership,
+    but the modes on the directories this deploy creates inside the mount are
+    the container's own, and a service running as a uid that owns none of them
+    cannot write.
 
     Every path this touches holds a secret or credentials (.env, the
     htpasswd, source.json's database passwords), so the target uid:gid is
@@ -1504,6 +1542,7 @@ def main() -> None:
     ensure_backup_password(env)
     ensure_broker_passwords(env)
     env = normalize_public_env(env)
+    ensure_host_identity(env)
 
     generate_htpasswd(
         env["RESEARCHER_USERNAME"],
