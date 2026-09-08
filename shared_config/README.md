@@ -145,3 +145,9 @@ Each module here has a test file beside it, and so do the scripts in `setup/` an
 `db/`: this is where the suite covering the deployment lives, so a test file named
 for something outside this package is testing that thing from here. `pytest
 shared_config` runs all of it, which is what the CI job does.
+
+Three of those files read the documents rather than the code, holding the counts a
+document states and two pairs of lists that have to agree, and
+[docs/dev/checks.md](../docs/dev/checks.md#what-the-suite-checks-about-the-documents)
+says what each one asserts. A change to a count in the code fails a test naming the
+sentence to follow it.

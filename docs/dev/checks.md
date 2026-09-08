@@ -23,11 +23,12 @@ rather than taking whatever the runner ships.
 | **Host scripts on Windows** | Covered here by the tests that strip the Unix-only pieces, in `pytest shared_config`; the platform itself only answers on CI | A Windows machine |
 | **A fresh clone deploys and ingests** | See below | Docker |
 
-Three things worth knowing about running them here rather than in CI:
+Some things worth knowing about running them here rather than in CI:
 
-- **`pytest shared_config` covers more than this package.** The suites for `setup/`
-  and `db/` live there too — the entrypoint parity check, the database and ingest
-  checks, and the guard that `db/init_all.sql` matches its sources.
+- **`pytest shared_config` covers more than this package.** A test file there named
+  for something outside it is testing that thing from here, which is where the suite
+  covering the deployment lives: the scripts in `setup/`, the schema in `db/`, and
+  the documents, below.
 - **The integration suite skips rather than fails when `mysqld` is absent**, so a
   checkout without MySQL still reports green. CI asks for the binary explicitly, so
   a runner without one is a red job rather than a green one that tested nothing.
@@ -46,6 +47,32 @@ Three things worth knowing about running them here rather than in CI:
   `analytics_api/tests/test_prerequisites.py` holds the two files to each other.
 
 ---
+
+## What the suite checks about the documents
+
+Three of the tests in `shared_config` read the documents rather than the code, and
+they run with everything else under `pytest shared_config -q`. Each exists because
+the drift it catches happened:
+
+| Test | Holds |
+| --- | --- |
+[`test_documented_counts.py`](../../shared_config/test_documented_counts.py) | Every count a document states against the thing that decides it: the jobs in this workflow, the services and containers in the compose file, the numbered steps in the README, the steps the setup form shows, the containers the wizard waits for |
+[`test_wizard_image.py`](../../shared_config/test_wizard_image.py) | The `COPY` lines of the wizard's image against the scripts the container actually runs, in both directions |
+[`test_backup_tables.py`](../../shared_config/test_backup_tables.py) | The tables the scheduled dump leaves out against the ones a page export leaves out, which differ on purpose |
+
+**When one fails.** The message names both halves, so the fix is to decide which is
+right rather than to hunt for the other. A count changed in code makes the document
+wrong:
+
+```
+README.md does not say 'The wizard has four steps', and 4 is what the code decides
+```
+
+**Adding a claim to the count test is deliberate.** Its list is written out rather
+than discovered, because a number found by pattern would drag in every "two answers"
+and "three ways" in the prose, none of which counts anything. A number that merely
+counts the bullets of its own list is better deleted than guarded.
+
 
 ## The deployment smoke test
 
