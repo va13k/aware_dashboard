@@ -164,15 +164,28 @@ def ios_credentials(database: dict) -> tuple[str, str]:
     )
 
 
-def admin_password(env: dict) -> str:
+def admin_password(env: dict, admin_user: str = "", bundled: bool = False) -> str:
     """The password the account that administers this study's database holds.
+
+    Root on the database this deployment runs is the one administrator that does not
+    read this key, and the reason is that nobody types its password. MySQL bakes
+    ``MYSQL_ROOT_PASSWORD`` into the data directory the first time the container
+    starts, so the value this deployment generated is the only password that account
+    has ever had. A deployment administering the bundled server as root on the typed
+    password would open it with a password the server was never told --- `Access
+    denied for user 'root'`, at the first statement of the deploy, on every study
+    that left the administrator field at the default the wizard shows.
 
     Falls back to the bundled container's root password for a deployment written
     before the two were told apart, so an upgrade in place keeps opening the database
     it already opens.
     """
-    named = str((env or {}).get(ADMIN_PASSWORD_ENV) or "").strip()
-    return named or str((env or {}).get("MYSQL_ROOT_PASSWORD") or "").strip()
+    env = env or {}
+    root_password = str(env.get("MYSQL_ROOT_PASSWORD") or "").strip()
+    if bundled and (str(admin_user or "").strip() or DEFAULT_ADMIN_USER) == DEFAULT_ADMIN_USER:
+        return root_password
+    named = str(env.get(ADMIN_PASSWORD_ENV) or "").strip()
+    return named or root_password
 
 
 def analytics_password(env: dict) -> str:
@@ -328,6 +341,20 @@ def service_host(database: dict) -> str:
     """
     host = declared_host(database)
     return COMPOSE_HOST if is_internal(host) else host
+
+
+def admin_credentials(database: dict, env: dict) -> tuple[str, str]:
+    """The account this deployment administers the study's database as, and its password.
+
+    Settled in one place because the deploy, the checks, the Configurator's account
+    changes and the message tool all have to arrive as the same account holding the
+    same password: one that opens the database for one of them and not the others is
+    a deployment that half works, and the half that fails reports a wrong password
+    rather than a disagreement.
+    """
+    host = declared_host(database)
+    user = admin_user(host, (env or {}).get("DB_ADMIN_USER", ""))
+    return user, admin_password(env, user, is_internal(host))
 
 
 def tls_declaration(database: dict) -> dict:

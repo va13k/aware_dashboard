@@ -340,3 +340,79 @@ class TestWhoAdministersTheStudysDatabase:
     def test_nothing_named_reads_as_nothing(self):
         assert database.admin_password({}) == ""
         assert database.admin_password({database.ADMIN_PASSWORD_ENV: "  "}) == ""
+
+    def test_root_on_the_bundled_database_holds_the_password_it_was_created_with(self):
+        """Nobody types this one, so the administrator field cannot reach it.
+
+        MySQL bakes MYSQL_ROOT_PASSWORD into the data directory the first time the
+        container starts. A deployment that opened the bundled server as root on the
+        typed password stopped at `Access denied for user 'root'` before a single
+        schema existed --- on every study that left the field at the wizard's own
+        default.
+        """
+        env = {
+            database.ADMIN_PASSWORD_ENV: "the one that was typed",
+            "MYSQL_ROOT_PASSWORD": "the one the container took",
+        }
+
+        assert (
+            database.admin_password(env, database.DEFAULT_ADMIN_USER, bundled=True)
+            == "the one the container took"
+        )
+
+    def test_an_account_this_deployment_creates_there_holds_the_typed_password(self):
+        """Which is the whole point of the field: on the bundled placement
+        init_study_tables.py creates the named account with what was typed."""
+        env = {
+            database.ADMIN_PASSWORD_ENV: "the one that was typed",
+            "MYSQL_ROOT_PASSWORD": "the one the container took",
+        }
+
+        assert database.admin_password(env, "aware_admin", bundled=True) == "the one that was typed"
+
+    def test_root_on_a_server_somebody_else_runs_is_not_this_container_s_root(self):
+        """A self-hosted MySQL administered as root is a password the researcher has
+        and typed, and nothing about it was generated here."""
+        env = {
+            database.ADMIN_PASSWORD_ENV: "the one that was typed",
+            "MYSQL_ROOT_PASSWORD": "the one the container took",
+        }
+
+        assert (
+            database.admin_password(env, database.DEFAULT_ADMIN_USER, bundled=False)
+            == "the one that was typed"
+        )
+
+
+class TestTheAdministratorEveryPathArrivesAs:
+    """database.admin_credentials: one account, one password, four callers.
+
+    The deploy creates the schemas and the accounts, the check reads them back, the
+    Configurator applies a changed ingest password and the message tool reads the
+    enrolment registry --- all of them as this. Resolved separately, they disagreed
+    about the bundled database's root, which is the one administrator whose password
+    was never anybody's to type.
+    """
+
+    ENV = {
+        "DB_ADMIN_USER": "",
+        database.ADMIN_PASSWORD_ENV: "the one that was typed",
+        "MYSQL_ROOT_PASSWORD": "the one the container took",
+    }
+
+    def test_the_bundled_database_is_administered_as_its_own_root(self):
+        assert database.admin_credentials({}, self.ENV) == (
+            "root",
+            "the one the container took",
+        )
+
+    def test_an_account_the_study_names_there_is_created_with_what_was_typed(self):
+        env = dict(self.ENV, DB_ADMIN_USER="aware_admin")
+
+        assert database.admin_credentials({}, env) == ("aware_admin", "the one that was typed")
+
+    def test_a_managed_server_is_opened_as_the_account_its_provider_hands_out(self):
+        assert database.admin_credentials({"host": "study.aivencloud.com"}, self.ENV) == (
+            "avnadmin",
+            "the one that was typed",
+        )
