@@ -200,15 +200,32 @@ def mysql_server(project_root: pathlib.Path):
     data, sock = root / "data", root / "mysql.sock"
     port = _free_port()
 
-    subprocess.run(
-        [binary, "--initialize-insecure", f"--datadir={data}", f"--basedir={base}"],
+    # `--no-defaults` first, and on both invocations: a host that runs MySQL of its
+    # own carries a configuration file for it, and that file names an error log, a
+    # socket and a pid file under directories only its own service account may
+    # write. Read here, they decide where this server writes instead of the
+    # directory it was handed.
+    initialise = subprocess.run(
+        [
+            binary,
+            "--no-defaults",
+            "--initialize-insecure",
+            f"--datadir={data}",
+            f"--basedir={base}",
+        ],
         capture_output=True,
+        text=True,
         timeout=300,
-        check=True,
     )
+    if initialise.returncode != 0:
+        raise RuntimeError(
+            "mysqld could not initialise a data directory for the tests:\n"
+            + (initialise.stderr or initialise.stdout or "it said nothing")
+        )
     process = subprocess.Popen(
         [
             binary,
+            "--no-defaults",
             f"--datadir={data}",
             f"--basedir={base}",
             f"--port={port}",

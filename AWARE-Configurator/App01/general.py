@@ -362,7 +362,16 @@ def write_json(path, content, mode=SHARED_MODE):
 
 
 def runtime_database_host() -> str:
-    env = normalize_public_env(load_env(ENV_PATH))
+    """The database host this deployment's own public address implies.
+
+    Empty for a deployment that has not declared that address yet, which is the
+    answer :func:`normalize_database_host_for_source` wants: it compares a host
+    against this one, and an empty answer matches none of them.
+    """
+    try:
+        env = normalize_public_env(load_env(ENV_PATH))
+    except ValueError:
+        return ""
     settings = get_runtime_settings(env)
     return str(settings["android_database_host"]).strip()
 
