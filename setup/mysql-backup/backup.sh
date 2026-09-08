@@ -12,10 +12,15 @@ MYSQL_PASSWORD="${MYSQL_PASSWORD:-}"
 MYSQL_SSL_MODE="${MYSQL_SSL_MODE:-}"
 BACKUP_DATABASES="${BACKUP_DATABASES:-aware_android aware_ios}"
 BACKUP_DIR="${BACKUP_DIR:-/backups}"
-# The dashboard's own tables, kept out of every archive. Each one summarises the
-# `_id` values of the deployment that built it, so restoring one describes rows
-# the target may not have; the API rebuilds them all from the restored data.
-# Mirrors CACHE_TABLES in analytics_api/app/services/dump_stream.py.
+# The dashboard's own summaries, kept out of every archive. Each one is built from
+# the `_id` values of the deployment that made it, so restoring one describes rows
+# the target may not have; the API rebuilds them from the restored data.
+#
+# Three of the five entries in CACHE_TABLES, in analytics_api/app/services/
+# dump_stream.py. The other two, `refusals` and `device_exclusions`, are left out of
+# a page export because they carry no `timestamp` for a ranged dump to filter on,
+# and this job dumps whole databases, so it keeps them: an exclusion is a
+# researcher's decision about a participant, and this archive is where it survives.
 BACKUP_SKIP_TABLES="${BACKUP_SKIP_TABLES:-record_counts coverage_hourly device_enrolment}"
 BACKUP_INTERVAL_SECONDS="${BACKUP_INTERVAL_SECONDS:-86400}"
 # How long to wait after an attempt that failed, rather than the full interval.

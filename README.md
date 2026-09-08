@@ -15,6 +15,7 @@ in the way of it.
 | **A researcher setting this up**                       | This file, in order: [Before you start](#before-you-start), then [Deploying it](#deploying-it) (steps 1–5), then [Running a study](#running-a-study) (steps 6–9)                |
 | **A researcher whose deployment is misbehaving**       | [When something is wrong](#when-something-is-wrong) — what the deployment tells you about itself, and how to read it                                                            |
 | **A researcher using a database of their own**         | [Using a database of your own](docs/guide/own-database.md) — what the wizard asks, what to arrange with its administrator, how to check it                                      |
+| **A researcher backing up or restoring a study** | [Backing up and restoring](#backing-up-and-restoring) — what the file carries, what it leaves out, and what the two import modes each do |
 | **A researcher keeping a deployment running**          | [Maintenance](docs/guide/maintenance.md) — the operations run by hand rather than by setup                                                                                      |
 | **A researcher wondering which sensors are available** | [Sensor support](#sensor-support)                                                                                                                                               |
 | **A developer reading the stack for the first time**   | [docs/dev/architecture.md](docs/dev/architecture.md) — what runs, how a request is routed, where a sensor row comes from, and every generated file with its reader              |
@@ -410,7 +411,7 @@ The main page links to all four sections of the platform:
 | **Join the study**      | `/studies/`      | Public — no login required |
 | **Configurator**        | `/configurator/` | Researcher login required  |
 | **Analytics Dashboard** | `/dashboard/`    | Researcher login required  |
-| **Backup & Restore**    | `/backup/`       | Researcher login required  |
+| **Backup & Restore**    | `/backup/`       | Researcher login required. See [Backing up and restoring](#backing-up-and-restoring) |
 
 **Join the study** is intentionally public so that participants can reach it without credentials. It asks which phone they have and then shows only that platform's steps: where to get the app, the join URL to copy, and the QR code to scan. The page guesses the platform from the browser and lets them switch.
 
@@ -768,6 +769,99 @@ that request before a study starts rather than after somebody withdraws.
 
 The default is the conservative reading: withdrawal keeps what was collected, and a
 device is excluded only because somebody said so.
+
+## Backing up and restoring
+
+**Backup & Restore** (`/backup/`) takes the study's two databases out as one
+compressed file, and reads one back in. Both directions run as `aware_backup`, an
+account holding everything inside those two schemas and nothing at all outside them,
+because a restore feeds a file into a database client and every statement in that
+file runs.
+
+Nothing is staged on disk in either direction. An export compresses straight into
+the download and an import decompresses as it reads, so a database of a hundred
+gigabytes goes through the page without needing room for a copy of itself. Both are
+long enough at study scale to be shown as a job with a progress bar rather than a
+page that waits.
+
+### Taking a backup
+
+Choose what to include, then **Export**:
+
+| Period | What it means |
+| --- | --- |
+| **Everything** | Every row both databases hold |
+| **Recent data** | A stretch counted back from a point you pick, either the newest data or right now. Counting back from the newest data is the one to take when collection has already stopped |
+| **Specific dates** | The first and last day to include |
+
+When the download finishes the page shows the file's **SHA-256 digest**. A streamed
+export cannot report its own size in advance, so comparing that digest against the
+file you received is how you know it arrived whole. Worth doing before you delete
+anything on the strength of having a backup.
+
+### Putting one back
+
+Point the page at a file, either one **already on the server** from the nightly
+archive or one you **upload** from your own computer, and choose what should happen
+to the rows. Uploading is practical up to a few gigabytes; past that, put the file on
+the server and pick it there.
+
+The picker also offers **Download this backup**, which takes an archive off the
+server. That is what you want when the server itself is the thing you are leaving.
+
+**Add data** folds the file into what is already stored:
+
+- Every table the file names keeps the rows the database already has.
+- A row is admitted when its timestamp is later than the newest one that phone
+  already has in that table. Anything at or before that counts as stored and is left
+  out, so this does not fill in gaps behind what a phone has already delivered. A
+  phone with nothing stored here keeps every row the file offers for it.
+- Re-reading the same backup a second time adds nothing.
+- Rows arrive with new identifiers, since the `_id` a row carried belongs to the
+  deployment that wrote it.
+
+**Replace everything** runs the file as written. Every table the file contains is
+dropped and rebuilt from it. Tables the file does not contain are left exactly as
+they are, which matters more than it sounds and is the subject of the next section.
+
+Either way, the record counts and the coverage grid are rebuilt afterwards from what
+is actually stored, so the figures on screen describe the database you now have.
+
+### What a backup does not carry
+
+The file holds the study's data. It does not hold the tables the dashboard derives
+from that data, because each of those summarises the row identifiers of the
+deployment that built it, and a summary restored from elsewhere describes rows the
+target does not have. Those are rebuilt on import instead.
+
+Two of the tables left out are not summaries. They are decisions:
+
+| Left out of the file | What it holds | What that means |
+| --- | --- | --- |
+| `device_enrolment` | When each phone was in the study, including **withdrawals and rejoins you entered by hand** | A restore rebuilds this from the phones' own study logs. A hand-entered withdrawal is not in those logs, and **Replace everything** clears the table deliberately, since windows a researcher entered describe participants the restored database may not hold |
+| `device_exclusions` | The participants you took out of the analysis | Not in a file you download from the page. It survives a restore onto the same deployment, because a table the file does not contain is not touched, and it does not travel to a different one |
+
+So the practice worth adopting is simple: **keep your own note of who was withdrawn
+and who was excluded**, outside the database. Restoring in place leaves exclusions
+alone and rebuilds enrolment from the phones. Moving a study to another deployment
+carries neither, and both are decisions about people that no amount of data can
+reconstruct.
+
+The refusal counters are left out for the same technical reason and accepted as
+lost: they describe attempts against one deployment's ingest path.
+
+### The nightly archive
+
+Separately from the page, a scheduled job dumps both databases into a folder on the
+host. How often, where, and how long the files are kept are set in the wizard's
+backup step, described under
+[Complete the setup wizard](#4-complete-the-setup-wizard).
+
+That archive is what the **already on the server** picker offers, and it carries
+slightly more than a page export does: the exclusions and the refusal counters are
+in it, because it is never a ranged dump and so never has to leave out the tables
+that carry no timestamp to range over. Restoring one with **Replace everything**
+therefore brings the exclusions back with it.
 
 ## When something is wrong
 
