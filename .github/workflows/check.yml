@@ -76,6 +76,48 @@ jobs:
       - name: AWARE-Configurator
         run: python -m pytest AWARE-Configurator -q
 
+  windows-host-scripts:
+    name: Host scripts on Windows
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      # The deploy runs Linux containers, so a deployment cannot be brought up here.
+      # What can be, and what a Windows researcher meets first, is the host half:
+      # every script after `compose up` reads the study model, and one Unix-only
+      # import in that path stops all of them before they do anything.
+      - name: Every host script imports, and the study model reads
+        run: |
+          python -c "import setup.deploy_config"
+          python -c "import setup.init_study_tables"
+          python -c "import setup.publish_authority"
+          python -c "import setup.verify_database"
+          python -c "import setup.verify_ingest"
+          python -c "import setup.check_ports"
+          python -c "import setup.send_message"
+          python -c "from shared_config.source_store import read_source; read_source()"
+
+      # The researcher's login, hashed. This used to be `openssl passwd`, a program
+      # Windows does not carry.
+      - name: The researcher's password hashes
+        run: >-
+          python -c "import sys; sys.path.insert(0, 'setup'); import deploy_config;
+          print(deploy_config.apr1_hash('probe', 'abcdefgh'))"
+
+      # Asked of the functions rather than the command, because the verdict depends
+      # on what the runner happens to hold: what is being checked here is that the
+      # socket and platform halves answer at all on Windows.
+      - name: The port check answers on this platform
+        run: >-
+          python -c "import sys; sys.path.insert(0, 'setup'); import check_ports;
+          print(check_ports.own_addresses());
+          print([a['port'] for a in check_ports.wanted(check_ports.read_env())]);
+          print(check_ports.find_command(80))"
+
   integration:
     name: Read layer against a real MySQL
     runs-on: ubuntu-latest
