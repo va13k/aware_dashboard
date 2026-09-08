@@ -24,7 +24,7 @@ import subprocess
 import tempfile
 
 from shared_config import database, placement
-from shared_config.runtime import SECRET_MODE
+from shared_config.runtime import SECRET_MODE, set_descriptor_mode
 
 #: What the MySQL client reads a password from when it is not given one. Every
 #: client this module runs is given it this way.
@@ -186,7 +186,7 @@ class Client:
         handle, path = tempfile.mkstemp(prefix="aware-db-", suffix=".env")
         try:
             with os.fdopen(handle, "w", encoding="utf-8") as target:
-                os.fchmod(target.fileno(), SECRET_MODE)
+                set_descriptor_mode(target.fileno(), SECRET_MODE)
                 target.write(f"{PASSWORD_ENV}={password}\n")
             yield path
         finally:

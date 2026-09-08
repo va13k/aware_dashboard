@@ -108,3 +108,22 @@ class TestThePasswordIsNotAnArgument:
         seen = self._issued(monkeypatch, "db.example.edu")
         assert "-e" not in seen["command"]
         assert mysql_client.PASSWORD_ENV not in " ".join(seen["command"])
+
+
+def test_the_password_file_is_written_where_descriptors_carry_no_mode(monkeypatch):
+    """The same platform question the generated files answer.
+
+    Every host script that issues SQL goes through this file, and `os.fchmod` is
+    Unix's alone, so a client asked for one on Windows stopped before the query.
+    """
+    import os
+
+    monkeypatch.delattr(os, "fchmod", raising=False)
+
+    with mysql_client.Client._password_file("s3cret-pass") as path:
+        written = pathlib.Path(path)
+        assert written.read_text(encoding="utf-8") == (
+            f"{mysql_client.PASSWORD_ENV}=s3cret-pass\n"
+        )
+
+    assert not written.exists()

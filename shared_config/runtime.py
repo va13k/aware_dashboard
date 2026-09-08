@@ -12,6 +12,21 @@ SHARED_MODE = 0o644  # nginx, the micro-server's appuser, or the host user reads
 SECRET_MODE = 0o600  # only the deploying user may read it
 
 
+def set_descriptor_mode(fileno: int, mode: int) -> None:
+    """State a mode on an open descriptor, where descriptors carry one.
+
+    Unix answers with :func:`os.fchmod`. Windows keeps its permissions in access
+    control lists rather than in a mode, and a bind mount there presents a file to a
+    container with permissions its file sharing decides, so the file is left as
+    :func:`tempfile.mkstemp` made it.
+
+    One place, because both writers that state a mode go through it: the generated
+    files, and the password a database client reads for the length of one query.
+    """
+    if hasattr(os, "fchmod"):
+        os.fchmod(fileno, mode)
+
+
 def atomic_write_text(path: pathlib.Path, text: str, mode: int = SECRET_MODE) -> None:
     """Write text to path atomically with an explicit permission mode."""
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -20,18 +35,21 @@ def atomic_write_text(path: pathlib.Path, text: str, mode: int = SECRET_MODE) ->
     )
     tmp_path = pathlib.Path(tmp_name)
     try:
-        # mkstemp always creates the file at 0600. Set the intended mode on the
-        # open descriptor before writing anything, so the file never exists with
-        # the wrong permissions and there is no path-based race.
-        os.fchmod(fd, mode)
+        # The descriptor is handed to the file object first, so it is closed however
+        # this ends. A mode stated on it before anything is written means the file
+        # never exists carrying the wrong one, and names no path for anything to be
+        # swapped at.
         with os.fdopen(fd, "w", encoding="utf-8") as tmp:
+            set_descriptor_mode(tmp.fileno(), mode)
             tmp.write(text)
             tmp.flush()
             os.fsync(tmp.fileno())
         os.replace(tmp_path, path)
     finally:
-        if tmp_path.exists():
-            tmp_path.unlink(missing_ok=True)
+        # Nothing to remove once the replace has happened, and the descriptor is
+        # closed by the time this runs either way --- which is what lets Windows
+        # remove a file at all.
+        tmp_path.unlink(missing_ok=True)
 
 
 def load_env(path: pathlib.Path) -> dict[str, str]:
