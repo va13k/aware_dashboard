@@ -139,6 +139,7 @@ and produces every file in the generated-files table in
 | `write_studies_index`, `write_deployment_urls` | The studies landing page, and the links the entry script prints |
 | `write_nginx_study_key` | `nginx/study-key.conf`. Without it nginx refuses to start rather than serving a study config unguarded |
 | `check_dataflow_applied`, `check_placement_applied` | Reads the written files back, because a check is worth only as much as the files it inspects — and those are the files a phone will be served |
+| `ensure_host_identity` | Settles the user the Configurator container runs as, where nothing else has. `setup.sh` writes it from the deploying user's own ids; a platform with no `id -u` to ask leaves it to this, which takes it from the owner of the project directory as the containers see it |
 | `chown_generated_paths`, `check_config_permissions` | Aligns ownership with the deploying user, so the Configurator can write what it is meant to |
 
 It prints a summary of what it decided: the dataflow per platform, where the

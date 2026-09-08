@@ -63,7 +63,7 @@ database passwords, so it is gitignored and materialized from the committed
 | --- | --- |
 [`dataflow.py`](dataflow.py) | Where a platform's data goes. `direct` — the phone opens MySQL itself; `webservice` — it posts to the micro-server. Declared per platform in `deployment.dataflow`; iOS is `webservice` and can be nothing else |
 [`placement.py`](placement.py) | Where the database runs. `bundled` — a container this deployment administers; `external` — a host the researcher names. Read from `database.host` rather than stored separately, so two fields cannot disagree about which database a study uses |
-[`database.py`](database.py) | One declared host resolved into the address each reader can use, and [`profiles()`](database.py) — every account this deployment opens the study's database with, in one list |
+[`database.py`](database.py) | One declared host resolved into the address each reader can use, and two answers settled in one place: [`profiles()`](database.py), every account this deployment opens the study's database with, and [`admin_credentials()`](database.py), the account it administers that database as |
 [`serializers.py`](serializers.py) | The study model turned into the Android config, the Android micro-server config, the iOS config and the iOS ESM file. The largest module, and the one where a field is silently lost |
 [`source_store.py`](source_store.py) | Reading and writing `source.json` under an advisory file lock, so the Configurator saving and a deploy reading do not interleave |
 [`runtime.py`](runtime.py) | Atomic writes with an explicit permission mode, `.env` reading and writing, and the public base URL every generated address is built from |
@@ -139,8 +139,9 @@ From the repository root:
 .venv/bin/python -m pytest shared_config -q
 ```
 
-They need nothing running: no Docker, no database, no network. Each module has a
-test file beside it, and the ones named for scripts outside this package —
-`test_verify_database.py`, `test_verify_ingest.py`, `test_bundled_admin.py`,
-`test_setup_entrypoints.py`, `test_generated_schema.py` — test `setup/` and `db/`
-from here, because this is where the suite that covers the deployment lives.
+They need nothing running: no Docker, no database, no network.
+
+Each module here has a test file beside it, and so do the scripts in `setup/` and
+`db/`: this is where the suite covering the deployment lives, so a test file named
+for something outside this package is testing that thing from here. `pytest
+shared_config` runs all of it, which is what the CI job does.

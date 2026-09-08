@@ -35,10 +35,16 @@ if not PROJECT.exists():
     PROJECT = SCRIPT_DIR.parent
 ```
 
-The wizard's process runs as root — it has to read the socket — so
+The wizard's process runs as root, since it has to read the socket, so
 `deploy_config.chown_generated_paths` hands the files it wrote back to the user who
 deployed, and refuses when the target does not match the project directory's own
 owner.
+
+Which user that is comes from `deploy_config.ensure_host_identity`. `setup.sh` writes
+`HOST_UID`/`HOST_GID` from the deploying user's own ids, and where there is no `id -u`
+to ask, the identity is taken from the owner of the project directory as the
+containers see it: the deploying user on Linux, and root on Docker Desktop, which is
+the only user that can write into the directories the deploy creates in the mount.
 
 ---
 

@@ -1,6 +1,6 @@
 # The checks
 
-Seven jobs, run on every push to `main` and every pull request by
+Eight jobs, run on every push to `main` and every pull request by
 [`.github/workflows/check.yml`](../../.github/workflows/check.yml). Each one has a
 local equivalent, and this is the list of both.
 
@@ -20,6 +20,7 @@ rather than taking whatever the runner ships.
 | **Dashboard types and lint** | `cd dashboard && npm ci && npx tsc -b && npx eslint .` | Node 20 |
 | **Configurator frontend** | `cd AWARE-Configurator/reactapp && npm ci && CI=true npx react-scripts test --watchAll=false` | Node 18 |
 | **Micro-server** | `cd aware-micro-server && ./gradlew check` | JDK 11 |
+| **Host scripts on Windows** | Covered here by the tests that strip the Unix-only pieces, in `pytest shared_config`; the platform itself only answers on CI | A Windows machine |
 | **A fresh clone deploys and ingests** | See below | Docker |
 
 Three things worth knowing about running them here rather than in CI:
@@ -82,8 +83,11 @@ copy: the sequence writes `.env`, `source.json` and every generated file.
 
 ## What is not covered
 
-- **`setup.bat` is never executed.** GitHub's Windows runners could, but the deploy
-  it drives needs Linux containers; what holds it to `setup.sh` instead is
+- **`setup.bat` is never executed as a deploy.** The Windows job runs the host half
+  it drives, which is every script that reads the study model and hashes the
+  researcher's password, and that is where each Windows failure so far has been. What
+  the job cannot reach is the deploy itself, since that needs Linux containers. What
+  holds the two entry scripts to each other instead is
   [`shared_config/test_setup_entrypoints.py`](../../shared_config/test_setup_entrypoints.py),
   which reads both as text and requires them to name the same scripts and wait on the
   same containers.
