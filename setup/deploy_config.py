@@ -1,4 +1,5 @@
 import argparse
+import hashlib
 import html
 import json
 import os
@@ -1020,15 +1021,75 @@ def report_rotation(rotated: list[str]) -> None:
               "again once it has read its configuration")
 
 
-def generate_htpasswd(username: str, password: str) -> None:
-    result = subprocess.run(
-        ["openssl", "passwd", "-apr1", password],
-        capture_output=True,
-        text=True,
-        check=True,
+#: The alphabet Apache's own encoding uses, in its own order. Neither of the two
+#: standard base64 alphabets, so it is written out rather than borrowed.
+APR1_ALPHABET = "./0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
+APR1_MAGIC = b"$apr1$"
+APR1_SALT_LENGTH = 8
+
+
+def _apr1_to64(value: int, count: int) -> str:
+    """``count`` characters of Apache's encoding, six bits at a time from the low end."""
+    return "".join(APR1_ALPHABET[(value >> (6 * i)) & 0x3F] for i in range(count))
+
+
+def apr1_hash(password: str, salt: str = "") -> str:
+    """A password in the ``$apr1$`` form nginx reads from its `auth_basic_user_file`.
+
+    Apache's MD5 form, computed here rather than by calling `openssl passwd`, so a
+    deployment needs no tool beyond Docker and Python: Windows carries no openssl,
+    and a researcher deploying there met the deploy stopping on the missing program.
+
+    The algorithm is fixed and published, and what holds this to it is
+    `shared_config/test_htpasswd.py`, which checks it against values `openssl` itself
+    produced.
+    """
+    if not salt:
+        salt = "".join(secrets.choice(APR1_ALPHABET) for _ in range(APR1_SALT_LENGTH))
+
+    secret = password.encode("utf-8")
+    seasoning = salt.encode("ascii")
+
+    start = hashlib.md5(secret + APR1_MAGIC + seasoning)
+    digest = hashlib.md5(secret + seasoning + secret).digest()
+    remaining = len(secret)
+    while remaining > 0:
+        start.update(digest[: min(remaining, 16)])
+        remaining -= 16
+    remaining = len(secret)
+    while remaining:
+        start.update(b"\0" if remaining & 1 else secret[:1])
+        remaining >>= 1
+    digest = start.digest()
+
+    # A thousand passes, each mixing the parts in an order the round number decides.
+    for round_number in range(1000):
+        context = hashlib.md5()
+        context.update(secret if round_number & 1 else digest)
+        if round_number % 3:
+            context.update(seasoning)
+        if round_number % 7:
+            context.update(secret)
+        context.update(digest if round_number & 1 else secret)
+        digest = context.digest()
+
+    encoded = "".join(
+        [
+            _apr1_to64((digest[0] << 16) | (digest[6] << 8) | digest[12], 4),
+            _apr1_to64((digest[1] << 16) | (digest[7] << 8) | digest[13], 4),
+            _apr1_to64((digest[2] << 16) | (digest[8] << 8) | digest[14], 4),
+            _apr1_to64((digest[3] << 16) | (digest[9] << 8) | digest[15], 4),
+            _apr1_to64((digest[4] << 16) | (digest[10] << 8) | digest[5], 4),
+            _apr1_to64(digest[11], 2),
+        ]
     )
-    hashed = result.stdout.strip()
-    atomic_write_text(HTPASSWD_PATH, f"{username}:{hashed}\n", SECRET_MODE)
+    return f"$apr1${salt}${encoded}"
+
+
+def generate_htpasswd(username: str, password: str) -> None:
+    atomic_write_text(
+        HTPASSWD_PATH, f"{username}:{apr1_hash(password)}\n", SECRET_MODE
+    )
 
 
 #: Answers that belong to one wizard run rather than to the deployment. The request
