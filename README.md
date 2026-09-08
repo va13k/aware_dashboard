@@ -4,36 +4,40 @@ A self-hosted research platform for collecting and visualising sensor data from 
 
 ## Where to look
 
-This file is the deployment guide, written for a researcher running a study rather
-than for a programmer: it assumes no command-line experience and takes you from an
-empty machine to a study participants can join.
+This file takes a researcher from an empty machine to a running study, in three
+parts and nine numbered steps. It assumes no command-line experience. Anything
+that only matters in one situation, such as a database of your own or a server you
+are not sitting at, is linked from the step where it comes up rather than standing
+in the way of it.
 
 | You are | Read |
 | --- | --- |
-| **A researcher deploying this for a study** | This file, in order: [Prerequisites](#prerequisites), [How to perform the deployment](#how-to-perform-the-deployment), [Configure the study in the Configurator](#5-configure-the-study-in-the-configurator), [Browse collected data](#6-browse-collected-data-in-the-analytics-dashboard), [Reach a participant's phone](#7-reach-a-participants-phone), [When a participant leaves](#8-when-a-participant-leaves-the-study) |
-| **A researcher whose deployment is misbehaving** | [When something is wrong](#9-when-something-is-wrong) — what the deployment tells you about itself, and how to read it |
+| **A researcher setting this up** | This file, in order: [Before you start](#before-you-start), then [Deploying it](#deploying-it) (steps 1–5), then [Running a study](#running-a-study) (steps 6–9) |
+| **A researcher whose deployment is misbehaving** | [When something is wrong](#when-something-is-wrong) — what the deployment tells you about itself, and how to read it |
+| **A researcher using a database of their own** | [Using a database of your own](docs/guide/own-database.md) — what the wizard asks, what to arrange with its administrator, how to check it |
+| **A researcher keeping a deployment running** | [Maintenance](docs/guide/maintenance.md) — the operations run by hand rather than by setup |
 | **A researcher wondering which sensors are available** | [Sensor support](#sensor-support) |
-| **A researcher using a database of their own** | [Bringing your own managed database](#bringing-your-own-managed-database) |
 | **A developer reading the stack for the first time** | [docs/dev/architecture.md](docs/dev/architecture.md) — what runs, how a request is routed, where a sensor row comes from, and every generated file with its reader |
 | **A developer changing how a deployment is built** | [docs/dev/deploy-pipeline.md](docs/dev/deploy-pipeline.md) — what `./setup.sh` does, step by step, and what is still done by hand |
-| **A developer working inside one component** | Its own README, beside its code: [analytics_api](analytics_api/README.md), [dashboard](dashboard/README.md) |
+| **A developer running the checks** | [docs/dev/checks.md](docs/dev/checks.md) — the seven CI jobs and their local equivalents |
+| **A developer working inside one component** | Its own README, beside its code: [analytics_api](analytics_api/README.md), [dashboard](dashboard/README.md), [setup](setup/README.md), [shared_config](shared_config/README.md) |
 
 ## What it is
 
-Study participants install the **AWARE client app** on their phone (Android or iOS). The app continuously collects sensor data — accelerometer, GPS, screen events, ambient noise, and [many more](#sensor-support) — and uploads it on the schedule the study configuration sets, so it reaches the analytics dashboard on its own and is ready for browsing, filtering and export. How often that happens, and whether an upload waits for Wi-Fi or for a charger, are yours to set on the Configurator's [Sensors page](#5-configure-the-study-in-the-configurator).
+Study participants install the **AWARE client app** on their phone (Android or iOS). The app continuously collects sensor data — accelerometer, GPS, screen events, ambient noise, and [many more](#sensor-support) — and uploads it on the schedule the study configuration sets, so it reaches the analytics dashboard on its own and is ready for browsing, filtering and export. How often that happens, and whether an upload waits for Wi-Fi or for a charger, are yours to set on the Configurator's [Sensors page](#6-configure-the-study-in-the-configurator).
 
 The full stack comprises seven services, running as eleven containers —
 [docs/dev/architecture.md](docs/dev/architecture.md) lists every one of them:
 
-| Service                                                                        | Role                                                                                        |
-| ------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------- |
-| **Nginx**                                                                      | Reverse proxy — routes all public traffic, terminates TLS, enforces authentication          |
-| **Analytics API**                                                              | FastAPI backend for the dashboard — queries the database and serves sensor data and exports |
-| **Analytics Dashboard**                                                        | React frontend — visualises collected data per device and sensor; exports CSVs and ZIPs     |
-| [**AWARE Configurator**](https://github.com/awareframework/AWARE-Configurator) | Django + React app for building and publishing study configurations for Android and iOS     |
+| Service                                                                        | Role                                                                                                                                                                                                                   |
+| ------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Nginx**                                                                      | Reverse proxy — routes all public traffic, terminates TLS, enforces authentication                                                                                                                                     |
+| **Analytics API**                                                              | FastAPI backend for the dashboard — queries the database and serves sensor data and exports                                                                                                                            |
+| **Analytics Dashboard**                                                        | React frontend — visualises collected data per device and sensor; exports CSVs and ZIPs                                                                                                                                |
+| [**AWARE Configurator**](https://github.com/awareframework/AWARE-Configurator) | Django + React app for building and publishing study configurations for Android and iOS                                                                                                                                |
 | [**AWARE Micro Server**](https://github.com/awareframework/aware-micro-server) | Kotlin / Vert.x server that receives data uploads and writes them to MySQL. One instance serves iOS; a second serves Android whenever the study sends its data through the server rather than straight to the database |
-| **MySQL + backup**                                                             | Shared database for all collected data, with a configurable automated backup job            |
-| **Message broker** | Mosquitto — carries what you send to a participant's phone: a request to sync, a question, a notice. See [Reach a participant's phone](#7-reach-a-participants-phone) |
+| **MySQL + backup**                                                             | Shared database for all collected data, with a configurable automated backup job                                                                                                                                       |
+| **Message broker**                                                             | Mosquitto — carries what you send to a participant's phone: a request to sync, a question, a notice. See [Reach a participant's phone](#8-reach-a-participants-phone)                                                  |
 
 A browser-based **setup wizard** is included for the initial deployment — it writes your configuration and launches the stack without any manual file editing.
 
@@ -41,16 +45,16 @@ A browser-based **setup wizard** is included for the initial deployment — it w
 
 Study participants need the AWARE client app installed on their device. These are the two builds this deployment is written against, and the same links the study's own join page hands to participants:
 
-| Platform | What the participant installs | Source |
-| --- | --- | --- |
-| **Android** | [aware-phone-release.apk](https://github.com/va13k/aware-client/releases/download/4.8.2.beta/aware-phone-release.apk) — release 4.8.2.beta | [va13k/aware-client](https://github.com/va13k/aware-client) |
-| **iOS** | [AWARE Client v2 on the App Store](https://apps.apple.com/ch/app/aware-client-v2/id1455986181) | [tetujin/aware-client-ios-v2](https://github.com/tetujin/aware-client-ios-v2) |
+| Platform    | What the participant installs                                                                                                              | Source                                                                        |
+| ----------- | ------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------- |
+| **Android** | [aware-phone-release.apk](https://github.com/va13k/aware-client/releases/download/4.8.2.beta/aware-phone-release.apk) — release 4.8.2.beta | [va13k/aware-client](https://github.com/va13k/aware-client)                   |
+| **iOS**     | [AWARE Client v2 on the App Store](https://apps.apple.com/ch/app/aware-client-v2/id1455986181)                                             | [tetujin/aware-client-ios-v2](https://github.com/tetujin/aware-client-ios-v2) |
 
 The Android client is installed from that APK rather than from Google Play, so the phone asks the participant once to allow it. The App Store link opens in whichever storefront the participant's own Apple account uses.
 
 Once a participant joins a study — by scanning the QR code or opening the study link — the app begins collecting, and uploads on the schedule the study configuration sets.
 
-## Prerequisites
+## Before you start
 
 ### Docker with Compose v2
 
@@ -94,13 +98,26 @@ Verify with: `git --version`.
 
 If you are deploying on a remote server, open ports `80` and `443` in your firewall before running setup. Port `9999` only needs to be reachable from your own machine during the setup step and can be closed afterwards.
 
-Treat the wizard URL as a credential while it is up. The page behind that token holds this deployment's database password and the researcher's own, and it is served over plain HTTP, so the token is what stands between them and anyone who can reach port `9999`. `setup.sh` removes the wizard container when setup finishes. On a network you do not trust, set `SETUP_BIND=127.0.0.1` in `.env` before running setup and reach the wizard through an SSH tunnel instead — see [Remote server deployment](#remote-server-deployment).
+Treat the wizard URL as a credential while it is up. The page behind that token holds this deployment's database password and the researcher's own, and it is served over plain HTTP, so the token is what stands between them and anyone who can reach port `9999`. `setup.sh` removes the wizard container when setup finishes. On a network you do not trust, set `SETUP_BIND=127.0.0.1` in `.env` before running setup and reach the wizard through an SSH tunnel instead — see [Remote server deployment](#deploying-on-a-remote-server).
 
 ### SSL certificate (optional, recommended for remote servers)
 
 If you want HTTPS, obtain a certificate for your domain before running setup — for example with [Let's Encrypt / Certbot](https://certbot.eff.org/). The setup wizard will ask for the paths to the certificate and private key files.
 
-## How to perform the deployment
+### Where the study database will run
+
+Setup asks this while you are filling in the form, and there are two answers:
+
+| Choice | What it means for you |
+| --- | --- |
+| **On this machine** | The deployment brings up its own database, creates everything inside it and manages its accounts. Nothing has to exist beforehand and nothing here needs arranging — this is the answer to take unless you have a reason to take the other one. |
+| **Somewhere I name** | A database you give it: your own server, your institution's, or one you rent from a provider. The deployment starts none of its own. |
+
+If you are taking the second, read [Using a database of your own](docs/guide/own-database.md)
+before step 3. It covers what the wizard asks you for, what to arrange with whoever
+administers the server, and how to check the connection before a study depends on it.
+
+## Deploying it
 
 ### 1. Open a terminal
 
@@ -169,11 +186,11 @@ The script checks that Docker and Python 3 are available, then does the followin
    The path contains a one-time random token that is valid for this session only, and it is the
    only thing guarding a page that holds this deployment's passwords — so do not paste it into
    a chat or an issue.
-4. **Tries to open the URL in your browser** automatically (macOS and Linux with a desktop). On a headless server, this step does nothing — see [Remote server deployment](#remote-server-deployment) below.
+4. **Tries to open the URL in your browser** automatically (macOS and Linux with a desktop). On a headless server, this step does nothing — see [Remote server deployment](#deploying-on-a-remote-server) below.
 
-Once the setup page opens in your browser — either automatically or after you copied the URL from the terminal — you are ready to continue. **Proceed to [Step 3 — Complete the setup wizard](#3-complete-the-setup-wizard).**
+Once the setup page opens in your browser — either automatically or after you copied the URL from the terminal — you are ready to continue. **Proceed to [Step 3 — Complete the setup wizard](#4-complete-the-setup-wizard).**
 
-### Re-running setup
+#### Re-running setup
 
 If `.env` already exists, the script detects them and offers a choice:
 
@@ -191,418 +208,7 @@ If `.env` already exists, the script detects them and offers a choice:
 
 Both options re-apply `PARTICIPANT_DB_PASSWORD` and `ANDROID_SERVER_DB_PASSWORD` to their MySQL accounts, so the passwords in `.env` and the ones the study needs never drift apart. If you edited a password directly in `.env`, run `setup.sh` (or `python3 setup/init_study_tables.py`) rather than `docker compose up` on its own — starting the containers by hand leaves the existing database untouched, and the accounts keep their old passwords.
 
-### Where the study database runs
-
-Setup asks this in the network step, beside the dataflow, because the two decide
-each other:
-
-| Choice | What it means |
-| --- | --- |
-| **On this machine** | The deployment brings up its own MySQL container, creates the schema and manages the accounts. Nothing has to exist beforehand. |
-| **Somewhere I name** | A host you give — your own server, your institution's, a managed instance. The deployment starts no database of its own. |
-
-**External is offered only when Android phones go through the server.** On the direct
-path every participant's phone opens the database itself, from whatever network they
-are on, so the host would have to be reachable from the internet for the length of
-the study — which is a thing you can decide about a database you administer and not
-one your institution does. The wizard disables the option rather than letting it be
-chosen and refused later.
-
-Choosing external takes the bundled database out of the deployment properly. Setup
-writes `docker-compose.external-db.yml`, which removes the `mysql` service *and* the
-`depends_on` of the six services that wait on its health check — a service kept out
-of a compose file is still depended on, and Compose starts a dependency whether or
-not anyone asked for it. The file is generated from the choice and removed again when
-you switch back, so its presence is the placement.
-
-### Bringing your own managed database
-
-**It has to be MySQL.** MySQL 8.0 or later, or a service that speaks its protocol
-— MariaDB, Aurora MySQL, Percona. The whole stack reaches the database through the
-MySQL client and `aiomysql`, and the schema is written in MySQL's dialect, so a
-PostgreSQL-compatible service **cannot be used at all**, however the connection is
-spelled. That rules out CockroachDB, Neon, Supabase, Render Postgres and anything
-else whose selling point is Postgres compatibility — there is no setting that
-bridges the two.
-
-Where people usually get one:
-
-| Service | Notes |
-| --- | --- |
-| **Google Cloud SQL for MySQL** | Paid. New accounts get trial credit; publishes its CA under *Connections → Security*. |
-| **Amazon RDS for MySQL** | Paid, with a 12-month free tier for new accounts on the smallest instance. Aurora MySQL is the same protocol at a higher price. |
-| **Azure Database for MySQL** | Paid, with a limited free tier for the first year. |
-| **DigitalOcean Managed MySQL** | Paid, flat monthly price. *Download CA certificate* button in the console. |
-| **Aiven for MySQL** | Paid after a trial; CA certificate downloadable per service. |
-| **PlanetScale** | Paid, MySQL-compatible. |
-| **A VPS you run** (Hetzner, DigitalOcean droplet, your institution's VM) | Cheapest per gigabyte, and the schema, backups and TLS are then yours to manage. |
-
-Prices and free tiers change; check the current terms rather than trusting this
-table. What does not change is the protocol: if the service does not say **MySQL**,
-it will not work here.
-
-A study collects in bursts when participants sync, not continuously, so the
-smallest tier a provider offers is usually where to start. Storage is what grows —
-high-frequency sensors like the accelerometer are the bulk of it.
-
-**1. Create the instance.** MySQL 8.0 or later. The smallest tier a provider offers
-is usually enough to start: a study writes in batches when participants sync, not
-continuously.
-
-**2. Let it be reached.** The database is opened from inside this deployment, so
-allow the address of the machine running it. Providers call this different things —
-*Authorized networks* (Cloud SQL), *Trusted sources* (DigitalOcean), *Allowed IP
-addresses* (Aiven), a security group (RDS). Nothing else has to be public: on the
-webservice dataflow, no participant's phone ever contacts the database.
-
-**3. Take an administrator account.** The one the provider created with the instance
-is what setup uses to create the schema and the study's own accounts. Setup never
-stores it; it is used for the deployment and then forgotten.
-
-**4. Find the certificate authority, if the provider verifies one.** Managed
-databases require TLS, and most publish a CA certificate to check them against:
-Cloud SQL under *Connections → Security*, DigitalOcean and Aiven behind a *Download
-CA certificate* button, RDS and Azure as downloads in their documentation. Paste the
-whole file — the `-----BEGIN CERTIFICATE-----` line included — into the wizard.
-Leaving it empty still encrypts the connection; what it leaves unchecked is whether
-the server answering is the one you meant.
-
-**5. Paste what the provider gave you.** Managed services hand out a single line
-like `mysql://user:password@db-123.example.cloud:25060/defaultdb?ssl-mode=REQUIRED`.
-Paste it into **Database host** and the wizard takes it apart — host, port,
-administrator account, and the password if you have not typed one. The parts land
-in their own fields, so you can see what was understood and correct it.
-
-Typing the host by hand works too, and the administrator account is then taken
-from it — `avnadmin` for Aiven, `doadmin` for DigitalOcean, `root` for a server
-you run. Change it if your provider named it something else. The port is yours to
-copy: 3306 is MySQL's default and managed services rarely use it.
-
-The database name is not asked for: the deployment creates its own schemas and
-names them itself.
-
-**The port is the usual trip-up.** 3306 is MySQL's default and most managed
-services do not use it — Aiven and DigitalOcean give each database a port of its
-own, often five digits. A wrong port looks exactly like a firewall: the name
-resolves, nothing answers, and the check reports `Can't connect to MySQL server`.
-If the port is right and it still times out, the provider is refusing this machine
-— add its address under *Allowed IP addresses* (Aiven), *Trusted sources*
-(DigitalOcean) or *Authorized networks* (Cloud SQL).
-
-Pasting the whole string into the host field is caught by the wizard now, but the
-reason it is worth knowing is that the string carries a password — one that ends up
-in the deployment log if it reaches the check. Treat a connection string as a
-credential, and rotate it if it has been pasted somewhere it should not have been.
-
-### Testing the database before deploying, and who creates it
-
-The database step has two controls that answer the questions people hit first.
-
-**Test this database** asks what the deployment asks — reachable, schema present,
-the study's accounts there, a row can be written — and shows each answer in the
-wizard. It runs the same script the deployment does, so an answer here is the
-answer there, and a database that cannot be reached becomes a field to correct
-rather than a deployment that stops half way.
-
-**Who creates the schema and the accounts** decides who does the work:
-
-| Choice | What happens |
-| --- | --- |
-| **Setup does it** | The deployment creates the schema and this study's accounts with the administrator account named above. Needs an account that may do that — managed databases usually give you one. |
-| **I run the SQL myself** | Setup creates nothing. **Download setup.sql** gives you the statements; run them, or hand them to whoever administers the server, then test again. The account setup uses then only has to write. |
-
-The second is the usual answer at an institution, where the account you are given
-may insert and nothing else. The file carries this study's account passwords, so
-send it the way you would send a credential.
-
-### Encryption to the database, and who decides it
-
-Without TLS, MySQL 8 still protects the password and then carries every row of every
-participant's data over the same socket in clear — the password was never the part
-most worth protecting. So the connection is encrypted, and where the database runs
-decides whether that is a question at all.
-
-**On this machine, it is settled.** The deployment administers both ends: MySQL
-generates its own certificate on first start, every account setup creates is granted
-`REQUIRE SSL`, and there is no setting to turn it off. Offering one would be a way to
-make a working study less safe in exchange for nothing.
-
-**On a database you name, you answer it.** That server is not one this deployment
-administers, and TLS there is something its owner offers or does not — an institutional
-MySQL built without it, or a MariaDB older than 11.4 that generated no certificate.
-Refusing those outright would refuse the study, so setup asks. The toggle is on by
-default: nearly every server can encrypt, and setup opens the connection and reports
-what actually happened before the study is deployed, so a server that cannot is found
-there rather than weeks later as a study that enrolled and collected nothing. Turning
-it off is recorded in the study model as `database.tls.require`, applied to every
-account as `REQUIRE NONE`, and stated wherever the connection is described — the
-wizard, the database check, and the Configurator's study page.
-
-Encryption alone does not prove *which* server answered. For a bundled database setup
-solves that for you: MySQL generates its own certificate authority on first start, and
-`deploy_config.py` reads it out of the container and publishes it in the study config,
-so a participant's phone verifies the certificate chain. Nothing to enter. It is re-read
-on every deploy, so a database that regenerates its certificate — a fresh volume, a
-restored backup — publishes the authority it is actually using.
-
-For a database you name elsewhere, only you can supply its authority. Paste it into the
-setup wizard beside the host, or into the Configurator later; it is kept in the study
-model as `database.tls.ca_certificate`. Setup verifies the server against it before the
-study deploys. Without one the connection is encrypted but unverified: the traffic
-cannot be read, and a server on the same network could impersonate the database.
-
-> **A certificate authority that cannot be read stops collection.** The Android client
-> treats an unparseable authority as a database it cannot reach — it keeps its data and
-> stops uploading rather than quietly falling back to an unverified connection. That is
-> the right behaviour, and it means a truncated or mistyped certificate halts the whole
-> study until corrected. Setup refuses to publish one it cannot read, and `deploy_config.py`
-> exits with an error rather than writing it. Leave it empty to run encrypted without
-> verification.
-
-### Getting a certificate authority for your own database
-
-You only need this if you told setup to use **a database somewhere else** — a managed
-one from a cloud provider, or a server you or your institution runs. If the deployment
-runs its own database, this is already done for you and you can skip this section.
-
-**What it is, in one paragraph.** Your database proves who it is by showing a
-certificate, the way a website does. A certificate is only worth anything if somebody
-vouched for it, and the one who vouches is called a *certificate authority*. Phones in
-your study need a copy of that authority, otherwise they can encrypt the connection but
-cannot tell your database apart from anything else answering at that address. What you
-need is one small text file, and whoever hosts the database publishes it.
-
-#### Step 1 — find the file
-
-It depends on where your database lives. In every case you are looking for the thing
-the provider calls the **server CA certificate** — not a key, not a client certificate.
-
-| Where the database runs | Where to find it |
-| --- | --- |
-| **Amazon RDS / Aurora** | Amazon publishes a certificate bundle for download; their docs call it the RDS certificate bundle. Search their documentation for *"SSL/TLS certificates for RDS"* and take the bundle for your region, or the global one. |
-| **Google Cloud SQL** | In the instance page, under **Connections → Security**, there is a server CA certificate you can download. |
-| **Azure Database for MySQL** | Microsoft publishes the root certificate their servers use, with a download link in their *"Connect with encryption"* documentation. |
-| **DigitalOcean, Aiven, Scaleway and similar** | The database's page in the control panel has a **Download CA certificate** button. |
-| **A server your institution runs** | Ask whoever administers it for the CA certificate used for TLS connections. |
-| **A server you run yourself** | If MySQL generated its own, it is `/var/lib/mysql/ca.pem` on that machine. |
-
-If none of these match, search your provider's documentation for **"CA certificate"**
-or **"SSL certificate download"**. Every provider that offers encrypted connections
-publishes one.
-
-#### Step 2 — check you got the right thing
-
-Open the file in any text editor. The right file:
-
-- begins with the line `-----BEGIN CERTIFICATE-----`
-- ends with the line `-----END CERTIFICATE-----`
-- has a block of random-looking letters and numbers in between
-- is small, a few dozen lines at most
-
-Some providers give a *bundle* holding several certificates one after another. That is
-fine — paste the whole thing.
-
-**If the file begins with `-----BEGIN PRIVATE KEY-----`, stop.** That is a secret key,
-not a certificate, and it should not be shared or pasted anywhere. Go back and look for
-the certificate instead.
-
-#### Step 3 — put it into the study
-
-In the setup wizard, paste the **whole file** into the certificate authority field
-under the database host — including the `BEGIN` and `END` lines. On a study that is
-already deployed, the same field is in the Configurator under **Study information →
-Database access**; paste it there and save.
-
-Copy all of it. A certificate that is missing its first or last line, or has lost a
-line in the middle, cannot be read — and an unreadable one stops collection (see the
-warning below).
-
-#### Step 4 — check it worked
-
-```bash
-python3 setup/verify_database.py
-```
-
-The **Encrypted** line says which of these you have:
-
-- *"Encrypted (…) and verified against the certificate authority this study supplies"* —
-  done.
-- *"Encrypted (…). The certificate is not verified"* — the connection is protected from
-  being read, but no authority is supplied. Go back to step 1.
-- *"This server's certificate does not check out against the authority this study
-  supplies"* — the file is a certificate but not the one that signed this server's.
-  This fails the check rather than warning, because the phones would refuse the
-  database too. Go back to step 1.
-
-#### If you cannot find the file
-
-Leave the field empty. The study still works and the data is still encrypted — nobody
-watching the network can read it. What you give up is the phones' ability to confirm
-they are talking to *your* database rather than to something pretending to be it. That
-is a reasonable trade on a network you trust, and worth fixing when you can.
-
-#### One thing to be careful about
-
-Devices treat a certificate authority they cannot read as a database they cannot reach:
-they hold on to their data and **stop uploading**, rather than quietly connecting
-without checking. That is deliberate — a study that thinks it is protected should not
-silently be unprotected — but it means one mistyped or half-copied certificate can halt
-the whole study until it is corrected. Setup refuses to publish a certificate it cannot
-read, so a bad paste fails at deployment rather than on the phones.
-
-### Checking the database before the study is committed to it
-
-`setup/verify_database.py` runs on both placements and asks five questions:
-
-| Check | What it answers |
-| --- | --- |
-| Reachable | The address answers on its port and the credential authenticates |
-| Encrypted | The connection is what the study asked of it, and — where an authority is supplied — the server's certificate checks out against it |
-| Schemas | Both schemas this study's data lands in are there |
-| Study accounts | Every account this deployment opens the database with — the one each Android dataflow puts on the ingest path, the iOS micro-server's, and the dashboard's own — connects with the password this study holds |
-| Tables | The tables a phone's rows land in are there |
-
-**The check creates nothing.** It opens the database as each account and reports what
-is there; `setup/init_study_tables.py` is what makes it so, and it runs as part of
-deploying. That split is what makes the answer worth having — a check that created
-what it was asked about could only ever report success, and would report it against a
-database you had not agreed to have changed yet.
-
-So what is missing before the first deploy is not a failure. It is a line saying which
-side is going to create it: setup, when it deploys, or whoever administers a database
-setup may not touch.
-
-Both schemas are asked about, and the tables as well as the accounts. An account
-holding every grant its work needs on an empty schema collects nothing, and says so
-only on the device — the client inserts into `accelerometer` and is told there is no
-such table.
-
-The client runs on the deployment's own network, so the question asked is the one the
-micro-server and the API will ask; a host that resolves on your machine and not inside
-a container is reported rather than accepted.
-
-**An external database is checked before anything is generated.** If it fails, no
-config a phone or a service reads is written and the deployment keeps running whatever
-it ran before. The bundled one is checked once it is up, since it does not exist to be
-asked before that.
-
-**Missing privileges are reported, not assumed.** If your account cannot create the
-schemas, the accounts or the tables — the usual case with an institutional database —
-setup writes the whole thing out as one file for whoever administers the server: the
-schemas, this study's accounts, and every table its data lands in. That file carries
-this study's account passwords, so send it the way you would send a credential. Once
-it has run, check again:
-
-```bash
-python3 setup/verify_database.py
-```
-
-### Switching between them
-
-Changing the placement is a redeploy, not a live change, for the same reason changing
-the dataflow is: it decides which containers exist. Re-run `setup.sh` and choose the
-other option.
-
-The change settles where the next row is written, and nothing else. Under **Keep from
-the current setup** the wizard asks about the two things that would otherwise be
-decided for you. Both are off unless switched on.
-
-**Keep the data collected so far.** On, the deploy writes `copy-study-data.sh` and the
-wizard shows the command:
-
-```bash
-sudo ./copy-study-data.sh
-```
-
-It dumps the old database from the container still holding it and loads it into the
-new one, reading both passwords where they already live rather than carrying either.
-Run it whenever suits — the study collects into the new database meanwhile — and run
-it again if it stops, since every row goes in under the id the old server gave it. A
-database that has already begun collecting is refused: inserting by id there would
-drop the new rows as duplicates, and that case is a merge-import from the dashboard's
-backup page instead. The dashboard's own counts are not copied; the first refresh on
-the new server rebuilds them.
-
-**Keep making backups.** On, the backup job stays, dumping the new database into the
-same folder as `aware_analytics`, the account that may only read. Off, it is removed
-along with the database it was written for, and copies are yours to arrange — your
-provider's snapshots, or an export from the dashboard's backup page. The answer lives
-in `.env` as `DB_KEEP_BACKUPS`, so a redeploy that skips the wizard keeps it.
-
-### Checking the ingest path before anyone enrols
-
-Setup runs `setup/verify_ingest.py` once the containers report healthy, and both the
-terminal and the wizard page show what it found. It asks the deployment the question a
-participant's phone will ask, at the study's public address rather than over the
-compose network:
-
-| Check | What it answers |
-| --- | --- |
-| Endpoint reachable | The address the study hands out answers, with the configuration a joining phone reads |
-| Certificate | On HTTPS, the certificate that address presents verifies, and when it expires |
-| Test record lands | A row posted the way the client posts one is admitted and is in the study database afterwards |
-| Probe removed | Everything the check wrote has been taken back out |
-
-Both dataflows are covered. On `webservice` the row goes over HTTPS to the Android
-micro-server; on `direct` it is written by the participant account over MySQL's
-published port, which is what a phone opens on that path.
-
-The check writes as a synthetic device named `setup-self-test-…`, and removes its row,
-its enrolment window and its entries in `record_counts`, `coverage_hourly` and
-`refusals` — all of which are keyed by device, so the study's own figures are untouched.
-If a run is interrupted, its rows are still addressable by that prefix.
-
-A failure does not stop the deployment: the stack is up either way. It means phones
-enrolled now would collect data and never deliver it, so fix what it reports and run it
-again:
-
-```bash
-python3 setup/verify_ingest.py
-```
-
-### Reclaiming sensor label space
-
-The ten physical sensor tables are created without a `label` column. The client
-fills that column from an Android broadcast a study never sends, so on a database
-created before it was dropped it holds one empty string per row across the
-highest-volume tables. `db/reclaim-sensor-label.sql` removes it there:
-
-```bash
-docker exec -i aware_mysql mysql -uroot -p<root-password> aware_android < db/reclaim-sensor-label.sql
-```
-
-The script reports each table it touches and can be re-run: a table already
-matching the schema is left alone. `bluetooth`, `locations` and `wifi` keep their
-`label`, which the client writes.
-
-### Remote server deployment
-
-On a Linux server without a graphical desktop, the browser cannot open automatically. The URL is still printed in the terminal — copy it and open it from your own computer.
-
-For the wizard to be reachable from your computer, the server's port `9999` must be
-accessible. Two ways to do this:
-
-**Option A — Temporarily open port 9999**
-
-Open port `9999` in your firewall, copy the full URL the script printed, open it in your
-browser, complete setup, then close the port again. This is the shortest path and the one the
-script assumes.
-
-**Option B — SSH tunnel (nothing is exposed at any point)**
-
-Put `SETUP_BIND=127.0.0.1` in `.env` before running setup, so the wizard listens on the server
-itself and nowhere else. Then, on your own computer:
-
-```bash
-ssh -N -L 9999:localhost:9999 your-user@your-server-ip
-```
-
-Open the URL the script printed with `localhost` in place of the server's address. Worth the
-extra step on a shared or untrusted network: the wizard serves this deployment's database
-password and the researcher's own over plain HTTP, and the token guarding them travels in the
-URL in clear text.
-
-### 3. Complete the setup wizard
+### 4. Complete the setup wizard
 
 The wizard has five steps. A progress bar at the top tracks where you are. You can go back to any previous step before deploying.
 
@@ -623,11 +229,11 @@ This password belongs to the account a phone opens the database with, which is w
 
 The two accounts are granted different things, because they do different work:
 
-| Account | Granted | Used by |
-| --- | --- | --- |
-| `aware_android_participant` | `INSERT` on the Android schema | A participant's phone, on the straight-to-the-database dataflow |
-| `aware_android_server` | `INSERT` on the Android schema, plus reading `device_enrolment`, keeping `refusals`, and updating `aware_device` | The Android micro-server, on the through-the-server dataflow |
-| `aware_analytics` | `SELECT` on both schemas, with write on the dashboard's own cache tables | The dashboard's API and its refresher |
+| Account                     | Granted                                                                                                          | Used by                                                         |
+| --------------------------- | ---------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------- |
+| `aware_android_participant` | `INSERT` on the Android schema                                                                                   | A participant's phone, on the straight-to-the-database dataflow |
+| `aware_android_server`      | `INSERT` on the Android schema, plus reading `device_enrolment`, keeping `refusals`, and updating `aware_device` | The Android micro-server, on the through-the-server dataflow    |
+| `aware_analytics`           | `SELECT` on both schemas, with write on the dashboard's own cache tables                                         | The dashboard's API and its refresher                           |
 
 Separate passwords, because the participant one is embedded in the study config every phone downloads, while the server's account can read the enrolment registry a phone's account cannot.
 
@@ -662,7 +268,7 @@ This step decides how participant devices reach your server. Choose the option t
 
 ---
 
-**Use detected local IP** *(default)*
+**Use detected local IP** _(default)_
 
 The setup script automatically detects your computer's local network IP address (e.g. `192.168.1.42`). This is the right choice when:
 
@@ -698,13 +304,13 @@ Use this when deploying on a **remote server** accessible over the internet, or 
 
 Popular cloud providers for hosting a study server:
 
-| Provider | Notes |
-| --- | --- |
-| [DigitalOcean Droplet](https://www.digitalocean.com/products/droplets) | Simple, affordable, good starting point |
-| [Hetzner Cloud](https://www.hetzner.com/cloud/) | Very affordable European option |
-| [AWS EC2](https://aws.amazon.com/ec2/) | Widely used, more configuration required |
-| [Google Cloud Compute Engine](https://cloud.google.com/compute) | Similar to AWS |
-| [Azure Virtual Machines](https://azure.microsoft.com/en-us/products/virtual-machines) | Microsoft's offering |
+| Provider                                                                              | Notes                                    |
+| ------------------------------------------------------------------------------------- | ---------------------------------------- |
+| [DigitalOcean Droplet](https://www.digitalocean.com/products/droplets)                | Simple, affordable, good starting point  |
+| [Hetzner Cloud](https://www.hetzner.com/cloud/)                                       | Very affordable European option          |
+| [AWS EC2](https://aws.amazon.com/ec2/)                                                | Widely used, more configuration required |
+| [Google Cloud Compute Engine](https://cloud.google.com/compute)                       | Similar to AWS                           |
+| [Azure Virtual Machines](https://azure.microsoft.com/en-us/products/virtual-machines) | Microsoft's offering                     |
 
 Any Linux VPS (Ubuntu 22.04 or later recommended) with Docker installed will work.
 
@@ -789,7 +395,7 @@ After you click Deploy, the wizard:
 
 If deployment fails, an error message is shown and an **Edit configuration** button lets you go back and fix the settings.
 
-### 4. What you can access
+### 5. What you can access
 
 Once deployment is complete, open the main page at `http://your-host/` (or `https://` if you enabled TLS).
 
@@ -806,7 +412,71 @@ The main page links to all four sections of the platform:
 
 All other pages are protected. When you navigate to any of them without being logged in, you are redirected to the researcher login page. Enter the username and password you set in step 2 of the wizard to gain access. The session lasts 8 hours; after that you will be asked to log in again.
 
-### 5. Configure the study in the Configurator
+### Checking the ingest path before anyone enrols
+
+Setup runs `setup/verify_ingest.py` once the containers report healthy, and both the
+terminal and the wizard page show what it found. It asks the deployment the question a
+participant's phone will ask, at the study's public address rather than over the
+compose network:
+
+| Check              | What it answers                                                                               |
+| ------------------ | --------------------------------------------------------------------------------------------- |
+| Endpoint reachable | The address the study hands out answers, with the configuration a joining phone reads         |
+| Certificate        | On HTTPS, the certificate that address presents verifies, and when it expires                 |
+| Test record lands  | A row posted the way the client posts one is admitted and is in the study database afterwards |
+| Probe removed      | Everything the check wrote has been taken back out                                            |
+
+Both dataflows are covered. On `webservice` the row goes over HTTPS to the Android
+micro-server; on `direct` it is written by the participant account over MySQL's
+published port, which is what a phone opens on that path.
+
+The check writes as a synthetic device named `setup-self-test-…`, and removes its row,
+its enrolment window and its entries in `record_counts`, `coverage_hourly` and
+`refusals` — all of which are keyed by device, so the study's own figures are untouched.
+If a run is interrupted, its rows are still addressable by that prefix.
+
+A failure does not stop the deployment: the stack is up either way. It means phones
+enrolled now would collect data and never deliver it, so fix what it reports and run it
+again:
+
+```bash
+python3 setup/verify_ingest.py
+```
+
+### Deploying on a remote server
+
+On a Linux server without a graphical desktop, the browser cannot open automatically. The URL is still printed in the terminal — copy it and open it from your own computer.
+
+For the wizard to be reachable from your computer, the server's port `9999` must be
+accessible. Two ways to do this:
+
+**Option A — Temporarily open port 9999**
+
+Open port `9999` in your firewall, copy the full URL the script printed, open it in your
+browser, complete setup, then close the port again. This is the shortest path and the one the
+script assumes.
+
+**Option B — SSH tunnel (nothing is exposed at any point)**
+
+Put `SETUP_BIND=127.0.0.1` in `.env` before running setup, so the wizard listens on the server
+itself and nowhere else. Then, on your own computer:
+
+```bash
+ssh -N -L 9999:localhost:9999 your-user@your-server-ip
+```
+
+Open the URL the script printed with `localhost` in place of the server's address. Worth the
+extra step on a shared or untrusted network: the wizard serves this deployment's database
+password and the researcher's own over plain HTTP, and the token guarding them travels in the
+URL in clear text.
+
+## Running a study
+
+The deployment is up and a participant can join it. What follows is the study
+itself: telling the app what to collect, watching what arrives, reaching a
+participant, and recording that one has left.
+
+### 6. Configure the study in the Configurator
 
 The Configurator (`/configurator/`) is the central control panel for your study. It determines what data is collected and when participants are asked questions — for both Android and iOS devices. Open it, log in with your researcher credentials, and work through its four pages.
 
@@ -903,7 +573,7 @@ Shows a summary of the complete study configuration. When everything looks corre
 >
 > Every time you change anything in the Configurator and download a new study config, participants pick the changes up the next time they sync or upload their data — the same action described under [Client apps](#client-apps). There is no separate update step for them to remember.
 
-### 6. Browse collected data in the Analytics Dashboard
+### 7. Browse collected data in the Analytics Dashboard
 
 The Analytics Dashboard (`/dashboard/`) is the researcher's main window into the collected sensor data. It has two main views — **Overview** and **Per Device** — plus a **Manifest** page.
 
@@ -970,9 +640,9 @@ The lines each client writes about its own operation — what it started, what i
 
 **Messages** (`/dashboard/messages`)
 
-Where you send something to a participant's phone and see what came of it. Described in full in [Reach a participant's phone](#7-reach-a-participants-phone) below.
+Where you send something to a participant's phone and see what came of it. Described in full in [Reach a participant's phone](#8-reach-a-participants-phone) below.
 
-### 7. Reach a participant's phone
+### 8. Reach a participant's phone
 
 Everything else in this stack observes. This is the one part that speaks: you can ask a phone to upload now, ask the participant a question, or tell them something. Sending happens on **Messages** (`/dashboard/messages`); a single device's page has a **Prompts and answers** view showing what that one participant was asked, what they answered, and how long they took.
 
@@ -980,23 +650,23 @@ Everything else in this stack observes. This is the one part that speaks: you ca
 
 **What you can send**
 
-| Choose | What the participant sees | When to use it |
-| --- | --- | --- |
-| **Ask the phone to upload** | Nothing at all | A phone has gone quiet and you want to know whether it is holding data |
-| **Ask the phone for a study update** | Nothing at all | You changed questions, schedules or sensors, and want the phone to re-read the configuration now rather than on its own timer |
-| **Ask a question** | A question that waits on the phone until it is answered | Anything outside the protocol — a check on a quiet phone, a one-off ask |
-| **Ask about this moment (ESM)** | The same question, expiring if it is not answered in time | What the study is measuring: an answer given hours later describes a different moment |
-| **Tell them something** | A notification, with the sound and vibration they configured | A thank-you, a reminder, an announcement. No answer is asked for and none is recorded |
+| Choose                               | What the participant sees                                    | When to use it                                                                                                                |
+| ------------------------------------ | ------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------- |
+| **Ask the phone to upload**          | Nothing at all                                               | A phone has gone quiet and you want to know whether it is holding data                                                        |
+| **Ask the phone for a study update** | Nothing at all                                               | You changed questions, schedules or sensors, and want the phone to re-read the configuration now rather than on its own timer |
+| **Ask a question**                   | A question that waits on the phone until it is answered      | Anything outside the protocol — a check on a quiet phone, a one-off ask                                                       |
+| **Ask about this moment (ESM)**      | The same question, expiring if it is not answered in time    | What the study is measuring: an answer given hours later describes a different moment                                         |
+| **Tell them something**              | A notification, with the sound and vibration they configured | A thank-you, a reminder, an announcement. No answer is asked for and none is recorded                                         |
 
 A question can offer a few one-touch answers, or leave the participant a free-text box.
 
 **What became of it, in three separate columns**
 
-| Column | Means |
-| ------ | ----- |
-| **Sent** | This deployment published it. Ours to know, and known at once |
+| Column        | Means                                                                                 |
+| ------------- | ------------------------------------------------------------------------------------- |
+| **Sent**      | This deployment published it. Ours to know, and known at once                         |
 | **Delivered** | The phone reported receiving it, in a row it uploaded along with the rest of its data |
-| **Answered** | The participant tapped an answer |
+| **Answered**  | The participant tapped an answer                                                      |
 
 **Delivered lags a sync, and that is a normal state rather than a failure.** The phone writes every message it receives into a table of its own, and that table reaches you only when the phone next uploads. So a message to a quiet phone reads as undelivered until then — which is exactly why **Ask the phone to upload** exists.
 
@@ -1022,24 +692,24 @@ python3 setup/send_message.py --docker-prefix sudo history --device <id>
 
 `history` reads what the phones reported, so it shows what was delivered and what was answered — the same three states the Messages page keeps apart.
 
-### 8. When a participant leaves the study
+### 9. When a participant leaves the study
 
 Two different actions, and they are kept apart deliberately: consent forms answer
 their two questions differently, so folding them into one button would answer one of
 them on your behalf.
 
-| | **Withdrawal** | **Exclusion** |
-| --- | --- | --- |
-| Answers | *When was this participant in the study?* | *Is their data part of the analysis?* |
-| Changes | What the coverage grid expects, and how the device reads | What the exports and the coverage grid contain |
-| Platforms | Android only | Android and iOS |
-| Reversible | Yes — **Rejoin** reopens the window | Yes — putting them back removes the exclusion |
-| Deletes data | No | No |
+|              | **Withdrawal**                                           | **Exclusion**                                  |
+| ------------ | -------------------------------------------------------- | ---------------------------------------------- |
+| Answers      | _When was this participant in the study?_                | _Is their data part of the analysis?_          |
+| Changes      | What the coverage grid expects, and how the device reads | What the exports and the coverage grid contain |
+| Platforms    | Android only                                             | Android and iOS                                |
+| Reversible   | Yes — **Rejoin** reopens the window                      | Yes — putting them back removes the exclusion  |
+| Deletes data | No                                                       | No                                             |
 
 **Withdrawal — recording that they left.** On the device's page. You can give the
 date they actually left rather than today's, because a researcher usually finds out
 by being told rather than by watching a phone go quiet. From that moment the
-coverage grid stops expecting data, and the device reads as *withdrawn* instead of
+coverage grid stops expecting data, and the device reads as _withdrawn_ instead of
 merely gone silent.
 
 > **It does not stop the phone.** The phone is told nothing, keeps collecting, and
@@ -1067,20 +737,20 @@ that request before a study starts rather than after somebody withdraws.
 The default is the conservative reading: withdrawal keeps what was collected, and a
 device is excluded only because somebody said so.
 
-### 9. When something is wrong
+## When something is wrong
 
 Most problems here answer themselves if you know where to ask, and the deployment
 carries four answers of its own. Reach for these before changing anything —
 re-running setup fixes a genuinely broken configuration, and tells you nothing about
 a phone that has not uploaded yet.
 
-| What you want to know | Ask this | It tells you |
-| --- | --- | --- |
-| Is every part running? | `sudo docker compose ps` | One line per container, with `healthy`, `starting`, `unhealthy` or `exited` |
-| Why is that one not running? | `sudo docker compose logs --tail=50 <service>` | Its own last words. Service names: `nginx`, `mysql`, `micro-server`, `micro-server-android`, `dashboard-api`, `dashboard`, `configurator`, `mqtt`, `counts-refresher`, `mysql-backup` |
-| Can this study use its database? | `python3 setup/verify_database.py --docker-prefix sudo` | Five checks with a mark each, and a hint naming the likely cause |
-| Would a phone's data actually arrive? | `python3 setup/verify_ingest.py --docker-prefix sudo` | Walks the phone's own path from outside the deployment and posts a real test row |
-| Are the ports it needs free? | `python3 setup/check_ports.py --docker-prefix sudo` | Each address a container publishes, and for a port that is taken, what holds it |
+| What you want to know                 | Ask this                                                | It tells you                                                                                                                                                                          |
+| ------------------------------------- | ------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Is every part running?                | `sudo docker compose ps`                                | One line per container, with `healthy`, `starting`, `unhealthy` or `exited`                                                                                                           |
+| Why is that one not running?          | `sudo docker compose logs --tail=50 <service>`          | Its own last words. Service names: `nginx`, `mysql`, `micro-server`, `micro-server-android`, `dashboard-api`, `dashboard`, `configurator`, `mqtt`, `counts-refresher`, `mysql-backup` |
+| Can this study use its database?      | `python3 setup/verify_database.py --docker-prefix sudo` | Five checks with a mark each, and a hint naming the likely cause                                                                                                                      |
+| Would a phone's data actually arrive? | `python3 setup/verify_ingest.py --docker-prefix sudo`   | Walks the phone's own path from outside the deployment and posts a real test row                                                                                                      |
+| Are the ports it needs free?          | `python3 setup/check_ports.py --docker-prefix sudo`     | Each address a container publishes, and for a port that is taken, what holds it                                                                                                       |
 
 On Windows leave `--docker-prefix sudo` off. Both are safe to run on a live study.
 The database check only ever asks questions. The ingest test posts one row from a
@@ -1091,23 +761,23 @@ not leave a probe behind in your data.
 **Reading a check report.** Each line carries one of four marks, and telling them
 apart is most of the work:
 
-| Mark | Means |
-| --- | --- |
-| `ok` | Asked and answered |
+| Mark   | Means                                                                                                                                                    |
+| ------ | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ok`   | Asked and answered                                                                                                                                       |
 | `warn` | Not there, and setup will create it on the next deploy. Before a first deployment this is the normal reading for the schema, the accounts and the tables |
-| `FAIL` | Something you have to fix. The study cannot collect until you do |
-| `skip` | Not asked, because an earlier answer made it meaningless |
+| `FAIL` | Something you have to fix. The study cannot collect until you do                                                                                         |
+| `skip` | Not asked, because an earlier answer made it meaningless                                                                                                 |
 
 ---
 
 #### Setup will not finish
 
-| What you see | What it usually is | What to do |
-| --- | --- | --- |
-| `Docker is required but was not found` | Docker Desktop is installed but not started, or not installed | Start Docker Desktop and wait for the whale icon to stop animating, then run setup again |
-| The wizard URL never prints | The wizard container did not start | `sudo docker compose logs setup-wizard` |
-| The wizard URL prints but the page does not open | You are deploying a server you are not sitting at, and port `9999` is not reachable from your machine | Put `SETUP_BIND=127.0.0.1` in `.env` and reach it through an SSH tunnel — see [Remote server deployment](#remote-server-deployment) |
-| `Cannot read .env — it is owned by another user (root?)` | An earlier run was made with `sudo` and left the file owned by root | `sudo chown $USER .env`, then run setup again |
+| What you see                                                               | What it usually is                                                                                                                                                              | What to do                                                                                                                                                                                                                                                                                                                                                 |
+| -------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `Docker is required but was not found`                                     | Docker Desktop is installed but not started, or not installed                                                                                                                   | Start Docker Desktop and wait for the whale icon to stop animating, then run setup again                                                                                                                                                                                                                                                                   |
+| The wizard URL never prints                                                | The wizard container did not start                                                                                                                                              | `sudo docker compose logs setup-wizard`                                                                                                                                                                                                                                                                                                                    |
+| The wizard URL prints but the page does not open                           | You are deploying a server you are not sitting at, and port `9999` is not reachable from your machine                                                                           | Put `SETUP_BIND=127.0.0.1` in `.env` and reach it through an SSH tunnel — see [Remote server deployment](#deploying-on-a-remote-server)                                                                                                                                                                                                                        |
+| `Cannot read .env — it is owned by another user (root?)`                   | An earlier run was made with `sudo` and left the file owned by root                                                                                                             | `sudo chown $USER .env`, then run setup again                                                                                                                                                                                                                                                                                                              |
 | `These ports are already in use, and this deployment has to publish them:` | Another program on this machine is serving a port the stack needs — a system Apache or Nginx on 80, a local MySQL on 3306, a local Mosquitto on 1883, or another Docker project | The report names each port, what needs it, which of this machine's addresses answered, and what holds it. When a Docker container holds it, it gives you the `docker stop` command; otherwise it gives you the command to find the program. Free the port and run setup again — these addresses are fixed, so the stack has no second port to fall back on |
 
 #### A container will not become healthy
@@ -1123,8 +793,8 @@ common ones:
   those files again.
 - **`micro-server` or `micro-server-android` is `unhealthy`.** Its configuration is
   the usual cause. `sudo docker compose logs micro-server` names what it could not
-  read. If a deploy printed *"Not world-readable, so the container that bind-mounts
-  it cannot open it"*, that is the same fault caught earlier.
+  read. If a deploy printed _"Not world-readable, so the container that bind-mounts
+  it cannot open it"_, that is the same fault caught earlier.
 - **Everything is `healthy` and the site still does not answer.** Check the address
   you are using against the one setup printed — the access links are in
   `deployment-urls.json`.
@@ -1133,14 +803,14 @@ common ones:
 
 The hint on the failing line is usually the whole answer. What each one means:
 
-| The detail says | What it is |
-| --- | --- |
-| The name does not resolve | A typo in the host. It wants the host on its own — no scheme, no account, no database name |
-| The name resolves and nothing answered | Either the wrong port, or the provider refusing this machine. Managed databases rarely use `3306`: Aiven and DigitalOcean give each database its own port, printed beside the host in their console. If the port is right, add this machine's address to the provider's allowed list — *Allowed IP addresses*, *Trusted sources* or *Authorized networks* depending on who you are with |
-| An account will not authenticate | The password in `.env` and the one on the server have drifted apart. Run `./setup.sh` and choose *Deploy with current config*, which re-applies them. Starting the containers with `docker compose up` on its own does not — it leaves the existing database untouched |
-| Encryption was asked for and not offered | The server cannot do TLS. Either enable it there, or say so for this study — see [Encryption to the database](#encryption-to-the-database-and-who-decides-it) |
+| The detail says                          | What it is                                                                                                                                                                                                                                                                                                                                                                              |
+| ---------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| The name does not resolve                | A typo in the host. It wants the host on its own — no scheme, no account, no database name                                                                                                                                                                                                                                                                                              |
+| The name resolves and nothing answered   | Either the wrong port, or the provider refusing this machine. Managed databases rarely use `3306`: Aiven and DigitalOcean give each database its own port, printed beside the host in their console. If the port is right, add this machine's address to the provider's allowed list — _Allowed IP addresses_, _Trusted sources_ or _Authorized networks_ depending on who you are with |
+| An account will not authenticate         | The password in `.env` and the one on the server have drifted apart. Run `./setup.sh` and choose _Deploy with current config_, which re-applies them. Starting the containers with `docker compose up` on its own does not — it leaves the existing database untouched                                                                                                                  |
+| Encryption was asked for and not offered | The server cannot do TLS. Either enable it there, or say so for this study — see [Encryption to the database](docs/guide/own-database.md#encryption-to-the-database-and-who-decides-it)                                                                                                                                                                                                                           |
 
-When the report ends with *"This database can take this study"*, nothing is wrong:
+When the report ends with _"This database can take this study"_, nothing is wrong:
 what is missing is what the deploy creates.
 
 #### The ingest self-test fails
@@ -1167,13 +837,13 @@ Work down this list in order; each step rules out the one before.
    Phones upload on a schedule, and two settings can hold one back for a long time:
    **Wi-Fi only** and **Charging only**. **Offload frequency** is how often it tries.
    To stop waiting, send **Ask the phone to upload** from
-   [Messages](#7-reach-a-participants-phone).
+   [Messages](#8-reach-a-participants-phone).
 3. **Is the server turning data away?** Open **Client Logs**. A banner at the top
-   counts refused writes, with a line per device saying why. *"no enrolment window
-   the study log put there"* means that phone never actually joined this study — it
+   counts refused writes, with a line per device saying why. _"no enrolment window
+   the study log put there"_ means that phone never actually joined this study — it
    has the app and is trying to upload, but the study log holds no join for it.
    Usually it joined a different study URL, or the study's dataflow changed after it
-   joined, which requires every participant to join again. *"named no device at all"*
+   joined, which requires every participant to join again. _"named no device at all"_
    is a request with no device id, which no properly joined phone sends.
 4. **Does the phone read as `Unknown`?** On its page, that badge means no study event
    says whether it is in the study — the same finding as a refusal, seen from the
@@ -1194,7 +864,7 @@ Work down this list in order; each step rules out the one before.
   participant granted the permission it needs.
 - **A withdrawn participant's data is still arriving.** That is how it works:
   withdrawal records when they were in the study and does not stop their phone. See
-  [When a participant leaves](#8-when-a-participant-leaves-the-study).
+  [When a participant leaves](#9-when-a-participant-leaves-the-study).
 
 #### Messages never show as delivered
 
@@ -1206,7 +876,7 @@ going up while **Delivered** stays put means the phone has not been heard from.
 
 The researcher username and password are in `.env`, as `RESEARCHER_USERNAME` and
 `RESEARCHER_PASSWORD`. Open that file to read them rather than deploying again. To
-change them, run setup and choose *Edit configuration first*.
+change them, run setup and choose _Edit configuration first_.
 
 A session lasts 8 hours, so being asked to log in again after a working day is
 expected rather than a fault.
