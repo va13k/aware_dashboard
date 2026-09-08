@@ -573,9 +573,37 @@ Shows a summary of the complete study configuration. When everything looks corre
 
 ---
 
-> **Config changes reach participants when their app next syncs.**
->
-> Every time you change anything in the Configurator and download a new study config, participants pick the changes up the next time they sync or upload their data — the same action described under [Client apps](#client-apps). There is no separate update step for them to remember.
+#### How a change reaches a participant's phone
+
+A change is not in force when you download it. It is in force once each phone has
+read it, and that happens in three ways.
+
+**On its own, on a schedule.** The app re-reads the configuration every
+**Config update frequency** minutes, which you set on the Sensors page above. This
+is its own timer, separate from **Offload frequency**, so a phone picks up a changed
+study without waiting to upload anything. Nothing is asked of anybody, and for most
+changes this is the path to rely on.
+
+**Because you asked.** Send **Ask the phone for a study update** from
+[Reach a participant's phone](#8-reach-a-participants-phone) and the phone re-reads
+now instead of waiting on that timer. Worth it for a change you need in place before
+the next session.
+
+**Because the participant asked.** A participant can force it from the app, which is
+what to tell someone you have on the phone.
+
+- **Android** — in the app, tap **CHECK FOR STUDY UPDATES**.
+
+  ![The CHECK FOR STUDY UPDATES button in the Android app](docs/images/android-check-study-updates.png)
+
+- **iPhone** — on the app's Settings screen, tap the refresh button at the top right.
+
+  ![The refresh button in the iPhone app](docs/images/ios-update-button.png)
+
+Whichever way it happened, you do not have to take it on trust: a device's page in
+the dashboard carries a badge saying whether that phone's configuration
+**matches** the deployed one, **differs** from it, with a count of the fields and
+what they are, or is **unknown** because the phone has not reported one yet.
 
 ### 7. Browse collected data in the Analytics Dashboard
 
@@ -863,7 +891,9 @@ Work down this list in order; each step rules out the one before.
 
 - **The phone carries an old configuration.** Its page shows **Config differs** with
   a count, and lists the fields. Send **Ask the phone for a study update** and it
-  re-reads now instead of waiting on its own timer.
+  re-reads now instead of waiting on its own timer, or have the participant force it
+  from the app: see
+  [How a change reaches a participant's phone](#how-a-change-reaches-a-participants-phone).
 - **The coverage grid is emptier than expected.** A cell is judged against what the
   study asked for, so a low count with a strong colour is a sensor that was expected
   and did not arrive — check that sensor is enabled for that platform, and that the
