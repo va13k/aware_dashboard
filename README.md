@@ -620,6 +620,7 @@ The default view gives a cross-device snapshot of the entire dataset.
 - **Export all** button — downloads a single ZIP file containing all sensor data as CSVs, across all devices and both platforms, for offline analysis.
 - **Manifest** button — opens the Manifest page (see below).
 - **Sensor cards grid** — one card per sensor type, organised into three sections: Shared (available on both platforms), Android only, and iPhone only. Each card shows the record count for Android and iOS and a small visual indicator of the data. Sensors with no data are shown in a muted style.
+- **Coverage grid** — one row per phone, one column per stretch of time, coloured by whether what arrived matches what the study asked for. See [Reading the coverage grid](#reading-the-coverage-grid).
 - **"Only sensors with records" toggle** — hides sensor cards that have received no data yet, letting you focus on what's actually been collected. The preference is saved in the browser and persists across sessions and page refreshes.
 - The entire page **updates itself as data arrives**, without any user action. The
   API watches the databases on one shared loop and pushes a message over a WebSocket
@@ -637,6 +638,7 @@ Drill down into an individual participant's data.
 - **Click any device** to load it. The URL updates so you can bookmark or share a direct link to a specific device (`/dashboard/devices/android/<id>` or `/dashboard/devices/ios/<id>`).
 - **Device info panel** — shows device ID, last seen time, number of active sensors, total record count, and the field values from the most recent upload payload.
 - **ZIP export** button — downloads all sensor CSVs for that device in one archive.
+- **Coverage grid** — the same grid for this one phone, a row per sensor. See [Reading the coverage grid](#reading-the-coverage-grid).
 - **Sensor cards** — the same sensor card grid as the Overview, but scoped to this device only. Cards are split into Shared and platform-specific sections. Each card has its own individual CSV export button.
 - The **"Only sensors with records" toggle** is shared with the Overview page.
 - Data **updates as that phone uploads**, over the same live channel as the
@@ -674,6 +676,57 @@ The lines each client writes about its own operation — what it started, what i
 **Messages** (`/dashboard/messages`)
 
 Where you send something to a participant's phone and see what came of it. Described in full in [Reach a participant's phone](#8-reach-a-participants-phone) below.
+
+#### Reading the coverage grid
+
+Counts say how much arrived. The coverage grid says whether it arrived **when it
+should have**, which is usually the question a study needs answered. It is on the
+Overview with one row per phone, and on each device's page with one row per sensor.
+
+**A cell is judged rather than just counted.** Its colour compares what arrived
+against what the study configuration asked for over that stretch of time, so a thin
+patch stands out without reading a single number.
+
+| Colour | On one sensor | On **All required sensors** |
+| --- | --- | --- |
+| Red | Well under expected | Under half the sensors reported |
+| Amber | Approaching expected | Most sensors reported |
+| Green | As configured | Every sensor reported |
+| Blue | Far above expected | |
+| White | Nothing arrived | No sensor reported |
+| Palest wash | Nothing expected | Nothing expected |
+| Neutral grey | Arrived, nothing to judge by | Arrived, outside the enrolment |
+
+Two things decide whether anything was expected at all, and neither of them is in the
+data. **The enrolment windows** say when a phone was in the study, so an empty bucket
+before it joined or after it left is not a gap. **The study configuration** says how
+much. A bucket only partly inside an enrolment window expects only its covered part,
+which is what stops the hour a participant joined and the hour they left from reading
+as failures.
+
+**Not every sensor has an amount to be judged on.** An event sensor such as calls or
+screen has no configured rate, so its count compares to nothing. A sensor the phone
+filters before writing is in the same position: a threshold, or the motion sensors
+while significant motion is on, leaves the configured rate bounding the count rather
+than predicting it. Those cells say whether data came, not whether enough did, and
+take the neutral shade in three steps of volume.
+
+**Opening a thin patch.** Click a column header to open it. A year drawn as months
+opens one month as days, and a day opens as hours; every level is the same question
+at a finer width. Buckets are cut in the timezone you pick, which matters for a study
+that ran across more than one.
+
+**Sending a finding to a colleague.** The whole view lives in the address bar: the
+level, the stretch you opened, the platform, the sensor, the timezone. Copy the URL
+and it reopens on what you were looking at rather than on somebody else's default
+view.
+
+**Taking it away.** The download button gives the same grid as an Excel workbook,
+with each cell's count, the colour it wore on screen, and totals down every row and
+across every column written as formulas. Every cell also carries a comment saying
+what its count was judged against, which is the part a plain table of numbers loses:
+484 means one thing against an expectation of 180,000 and another against 500.
+
 
 ### 8. Reach a participant's phone
 
@@ -990,7 +1043,8 @@ Work down this list in order; each step rules out the one before.
   [How a change reaches a participant's phone](#how-a-change-reaches-a-participants-phone).
 - **The coverage grid is emptier than expected.** A cell is judged against what the
   study asked for, so a low count with a strong colour is a sensor that was expected
-  and did not arrive — check that sensor is enabled for that platform, and that the
+  and did not arrive. [Reading the coverage grid](#reading-the-coverage-grid) says
+  what each colour claims — check that sensor is enabled for that platform, and that the
   participant granted the permission it needs.
 - **A withdrawn participant's data is still arriving.** That is how it works:
   withdrawal records when they were in the study and does not stop their phone. See
