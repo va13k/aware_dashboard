@@ -22,6 +22,11 @@ Routed under the `/dashboard` basename (`src/App.tsx`).
 | `/devices/:platform/:deviceId`     | `DeviceDetailPage`   | One participant: sensors, coverage, study events, config diff, consent |
 | `/manifest`                        | `ManifestPage`       | A per-sensor inventory of the whole dataset, for archiving or export   |
 | `/logs`                            | `LogsPage`           | What the clients reported about their own operation                    |
+| `/messages`                        | `MessagesPage`       | What was sent to a participant's phone, and what came of it            |
+
+`DeviceDetailPage` answers on `/devices/:deviceId` as well. Without a platform it
+matches the device by its id alone, so a link naming only the device reaches the
+same page.
 
 ---
 
