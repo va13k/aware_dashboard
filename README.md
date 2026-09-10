@@ -21,7 +21,7 @@ in the way of it.
 | **A developer reading the stack for the first time**   | [docs/dev/architecture.md](docs/dev/architecture.md) — what runs, how a request is routed, where a sensor row comes from, and every generated file with its reader              |
 | **A developer changing how a deployment is built**     | [docs/dev/deploy-pipeline.md](docs/dev/deploy-pipeline.md) — what `./setup.sh` does, step by step, and what is still done by hand                                               |
 | **A developer running the checks**                     | [docs/dev/checks.md](docs/dev/checks.md) — the eight CI jobs and their local equivalents                                                                                        |
-| **A developer working inside one component**           | Its own README, beside its code: [analytics_api](analytics_api/README.md), [dashboard](dashboard/README.md), [setup](setup/README.md), [shared_config](shared_config/README.md), [db](db/README.md), [nginx](nginx/README.md) |
+| **A developer working inside one component**           | Its own README, beside its code: [analytics_api](analytics_api/README.md), [dashboard](dashboard/README.md), [setup](setup/README.md), [shared_config](shared_config/README.md), [db](db/README.md), [nginx](nginx/README.md), [micro-server](aware-micro-server/README.md), [configurator](AWARE-Configurator/README.md) |
 
 ## What it is
 

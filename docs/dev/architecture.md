@@ -231,5 +231,7 @@ Nothing in this table is committed. Each is written by
 | The study model and the two platform configs | [`shared_config/serializers.py`](../../shared_config/serializers.py) |
 | The schema, how it is built, and the accounts | [db/README.md](../../db/README.md) |
 | The public surface, its two configurations and its generated files | [nginx/README.md](../../nginx/README.md) |
+| What a phone talks to, and the rules the fork added to it | [aware-micro-server/README.md](../../aware-micro-server/README.md) |
+| How a saved form becomes the generated configs | [AWARE-Configurator/README.md](../../AWARE-Configurator/README.md) |
 | What CI runs, and how to run it here | [checks.md](checks.md) |
 | Deploying it as a researcher | [the root README](../../README.md) |
