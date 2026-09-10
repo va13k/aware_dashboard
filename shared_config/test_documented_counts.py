@@ -19,10 +19,24 @@ import yaml
 
 PROJECT = pathlib.Path(__file__).resolve().parent.parent
 
-WORDS = {
-    1: "one", 2: "two", 3: "three", 4: "four", 5: "five", 6: "six",
-    7: "seven", 8: "eight", 9: "nine", 10: "ten", 11: "eleven", 12: "twelve",
-}
+UNITS = [
+    "", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine",
+    "ten", "eleven", "twelve", "thirteen", "fourteen", "fifteen", "sixteen",
+    "seventeen", "eighteen", "nineteen",
+]
+TENS = ["", "", "twenty", "thirty", "forty", "fifty", "sixty", "seventy", "eighty", "ninety"]
+
+
+def spelled(number: int) -> str:
+    """A count as a document writes it, up to ninety-nine."""
+    if number < 20:
+        return UNITS[number]
+    tens, units = divmod(number, 10)
+    return TENS[tens] + (f"-{UNITS[units]}" if units else "")
+
+
+#: Every count a claim could be stated as, so a stale one is found rather than missed.
+WORDS = {n: spelled(n) for n in range(1, 100)}
 
 
 def read(*parts: str) -> str:
@@ -76,6 +90,19 @@ def wizard_awaited_services() -> int:
     return len(names)
 
 
+def micro_server_tests() -> int:
+    """Tests the micro-server declares, one `@Test` being one of them."""
+    tests = PROJECT / "aware-micro-server" / "src" / "test" / "kotlin"
+    files = sorted(tests.rglob("*.kt"))
+    assert files, "no Kotlin test sources found"
+    # None of these parametrise, so an annotation is a case. A parametrised test
+    # added here would make this count low, and this is where that shows up.
+    for path in files:
+        source = path.read_text(encoding="utf-8")
+        assert "ParameterizedTest" not in source, f"{path.name} parametrises"
+    return sum(f.read_text(encoding="utf-8").count("@Test") for f in files)
+
+
 #: (the file, the sentence with the number left out, what decides the number)
 CLAIMS = [
     ("README.md", "{} CI jobs", workflow_jobs),
@@ -86,7 +113,21 @@ CLAIMS = [
     ("README.md", "{} numbered steps", numbered_steps),
     ("README.md", "The wizard has {} steps", wizard_steps),
     ("README.md", "Starts all {} services", wizard_awaited_services),
+    (
+        "aware-micro-server/README.md",
+        "{} tests across five classes",
+        micro_server_tests,
+    ),
 ]
+
+
+def states(text: str, claim: str) -> bool:
+    """Whether the document makes this claim, the number being a word of its own.
+
+    A plain substring finds "two tests" inside "thirty-two tests", which would
+    report every compound count as a stale one.
+    """
+    return re.search(rf"(?<![\w-]){re.escape(claim)}", text, re.IGNORECASE) is not None
 
 
 def claim_ids():
@@ -97,10 +138,10 @@ def claim_ids():
 def test_the_document_states_the_count_the_code_decides(name, template, counter):
     text = read(*name.split("/"))
     actual = counter()
-    assert actual in WORDS, f"{actual} is outside the words this checks"
+    assert actual in WORDS, f"{actual} is outside the range this spells"
 
     expected = template.format(WORDS[actual])
-    assert expected.lower() in text.lower(), (
+    assert states(text, expected), (
         f"{name} does not say {expected!r}, and {actual} is what the code decides"
     )
 
@@ -108,6 +149,4 @@ def test_the_document_states_the_count_the_code_decides(name, template, counter)
         if number == actual:
             continue
         stale = template.format(word)
-        assert stale.lower() not in text.lower(), (
-            f"{name} says {stale!r}, and it is {actual}"
-        )
+        assert not states(text, stale), f"{name} says {stale!r}, and it is {actual}"
