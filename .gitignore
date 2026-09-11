@@ -38,6 +38,11 @@ aware-micro-server/output/*.jar
 .*/
 # ...except CI config, which is source
 !.github/
+# ...and the dev-server configuration, which is the same in every checkout.
+# Everything else under .claude is one developer's own permissions and paths.
+!.claude/
+.claude/*
+!.claude/launch.json
 
 # macOS
 .DS_Store
